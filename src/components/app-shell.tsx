@@ -21,6 +21,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <Link href="/bereiche" className="hover:underline">Bereiche</Link>
             <Link href="/kategorien" className="hover:underline">Kategorien</Link>
             <Link href="/produkte" className="hover:underline">Produkte</Link>
+            <Link href="/export/katalog" className="hover:underline">Katalog-Export</Link>
             <Link href="/einstellungen" className="hover:underline">Einstellungen</Link>
           </nav>
           <div className="flex items-center gap-3 text-sm">

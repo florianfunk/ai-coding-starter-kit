@@ -1,6 +1,6 @@
 # PROJ-10: PDF-Export Gesamtkatalog
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-04-16
 **Last Updated:** 2026-04-16
 

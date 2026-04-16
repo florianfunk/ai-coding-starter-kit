@@ -14,9 +14,9 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
-| PROJ-1 | Authentifizierung & Nutzerverwaltung | Architected | [PROJ-1](PROJ-1-authentifizierung.md) | 2026-04-16 |
-| PROJ-2 | Datenmodell & FileMaker-XML-Migration | Architected | [PROJ-2](PROJ-2-datenmodell-und-migration.md) | 2026-04-16 |
-| PROJ-3 | Bereiche verwalten (CRUD) | Architected | [PROJ-3](PROJ-3-bereiche-verwalten.md) | 2026-04-16 |
+| PROJ-1 | Authentifizierung & Nutzerverwaltung | In Progress | [PROJ-1](PROJ-1-authentifizierung.md) | 2026-04-16 |
+| PROJ-2 | Datenmodell & FileMaker-XML-Migration | In Progress | [PROJ-2](PROJ-2-datenmodell-und-migration.md) | 2026-04-16 |
+| PROJ-3 | Bereiche verwalten (CRUD) | In Progress | [PROJ-3](PROJ-3-bereiche-verwalten.md) | 2026-04-16 |
 | PROJ-4 | Kategorien verwalten (CRUD) | Architected | [PROJ-4](PROJ-4-kategorien-verwalten.md) | 2026-04-16 |
 | PROJ-5 | Produkte/Artikel verwalten (CRUD) | Architected | [PROJ-5](PROJ-5-produkte-verwalten.md) | 2026-04-16 |
 | PROJ-6 | Preisverwaltung pro Produkt | Architected | [PROJ-6](PROJ-6-preisverwaltung.md) | 2026-04-16 |

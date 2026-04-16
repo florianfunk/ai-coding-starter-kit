@@ -1,6 +1,6 @@
 # PROJ-2: Datenmodell & FileMaker-XML-Migration
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-04-16
 **Last Updated:** 2026-04-16
 

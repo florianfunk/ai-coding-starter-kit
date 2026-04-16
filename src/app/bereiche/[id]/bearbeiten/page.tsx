@@ -29,6 +29,8 @@ export default async function EditBereichPage({ params }: { params: Promise<{ id
             sortierung: bereich.sortierung,
             seitenzahl: bereich.seitenzahl,
             startseite: bereich.startseite,
+            endseite: bereich.endseite,
+            farbe: bereich.farbe,
             bild_path: bereich.bild_path,
             bild_url: bildUrl,
           }}

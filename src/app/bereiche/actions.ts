@@ -11,6 +11,8 @@ const bereichSchema = z.object({
   sortierung: z.coerce.number().int().min(0).default(0),
   seitenzahl: z.coerce.number().int().min(0).optional().nullable(),
   startseite: z.coerce.number().int().min(0).optional().nullable(),
+  endseite: z.coerce.number().int().min(0).optional().nullable(),
+  farbe: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Ungültige Hex-Farbe").optional().nullable().or(z.literal("").transform(() => null)),
   bild_path: z.string().optional().nullable(),
 });
 
@@ -23,6 +25,8 @@ function parseFormData(formData: FormData) {
     sortierung: formData.get("sortierung") || 0,
     seitenzahl: formData.get("seitenzahl") || null,
     startseite: formData.get("startseite") || null,
+    endseite: formData.get("endseite") || null,
+    farbe: (formData.get("farbe") as string) || null,
     bild_path: (formData.get("bild_path") as string) || null,
   });
 }

@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
+import { getSignedUrl } from "@/lib/storage";
 import { ProduktForm } from "../produkt-form";
 import { createProdukt } from "../actions";
 
@@ -13,8 +14,14 @@ export default async function NewProduktPage({
   const [{ data: bereiche }, { data: kategorien }, { data: icons }] = await Promise.all([
     supabase.from("bereiche").select("id,name").order("sortierung"),
     supabase.from("kategorien").select("id,name,bereich_id").order("name"),
-    supabase.from("icons").select("id,label").order("label"),
+    supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
   ]);
+  const iconsFull = await Promise.all(
+    (icons ?? []).map(async (ic: any) => ({
+      id: ic.id, label: ic.label, gruppe: ic.gruppe,
+      url: await getSignedUrl("produktbilder", ic.symbol_path),
+    })),
+  );
 
   // If ?kategorie=... is passed, derive bereich_id from the kategorie
   let defaults: Record<string, any> | undefined;
@@ -32,7 +39,7 @@ export default async function NewProduktPage({
         <ProduktForm
           bereiche={bereiche ?? []}
           kategorien={kategorien ?? []}
-          icons={icons ?? []}
+          icons={iconsFull}
           defaultValues={defaults}
           action={createProdukt}
           submitLabel="Anlegen"

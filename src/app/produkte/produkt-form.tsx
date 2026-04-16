@@ -38,7 +38,7 @@ const TAB_COLORS: Record<string, string> = {
 
 type Bereich = { id: string; name: string };
 type Kategorie = { id: string; name: string; bereich_id: string };
-type Icon = { id: string; label: string };
+type Icon = { id: string; label: string; gruppe?: string | null; url?: string | null };
 
 type Props = {
   bereiche: Bereich[];
@@ -223,31 +223,79 @@ export function ProduktForm({
 
         <TabsContent value="icons">
           <SectionCard color={TAB_COLORS.icons} title="Icon-Leiste (Datenblatt)">
-            <div className="flex flex-wrap gap-2">
-              {icons.map((ic) => {
-                const on = iconSet.has(ic.id);
-                return (
-                  <button
-                    key={ic.id}
-                    type="button"
-                    onClick={() => toggleIcon(ic.id)}
-                    className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
-                      on
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-background hover:border-primary/40 hover:bg-primary/5"
-                    }`}
-                  >{ic.label}</button>
-                );
-              })}
-              {icons.length === 0 && <p className="text-muted-foreground text-sm">Keine Icons in der DB.</p>}
+            {/* Ausgewählte Icons */}
+            {iconSet.size > 0 && (
+              <div className="rounded-lg border bg-primary/5 p-3 mb-3">
+                <p className="text-xs text-muted-foreground mb-2">Ausgewählt ({iconSet.size}):</p>
+                <div className="flex flex-wrap gap-2">
+                  {[...iconSet].map((id) => {
+                    const ic = icons.find((i) => i.id === id);
+                    if (!ic) return null;
+                    return (
+                      <div key={id} className="flex flex-col items-center gap-1">
+                        <div className="h-14 w-14 rounded-lg border-2 border-primary bg-background flex items-center justify-center overflow-hidden">
+                          {ic.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={ic.url} alt={ic.label} className="max-h-full max-w-full object-contain p-1" />
+                          ) : (
+                            <span className="text-[9px] font-bold">{ic.label}</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-center w-14 truncate">{ic.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Auswahl nach Gruppe */}
+            <div className="rounded-lg border divide-y">
+              {icons.length === 0 && (
+                <p className="p-4 text-sm text-muted-foreground text-center">
+                  Keine Icons. <a href="/icons/neu" className="underline">Welche anlegen →</a>
+                </p>
+              )}
+              {(() => {
+                const groups: Record<string, typeof icons> = {};
+                for (const ic of icons) {
+                  const key = ic.gruppe ?? "Ohne Gruppe";
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(ic);
+                }
+                return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([g, items]) => (
+                  <div key={g} className="p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{g}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {items.map((ic) => {
+                        const on = iconSet.has(ic.id);
+                        return (
+                          <button
+                            key={ic.id}
+                            type="button"
+                            onClick={() => toggleIcon(ic.id)}
+                            className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all ${
+                              on ? "border-primary bg-primary/10" : "border-transparent hover:border-primary/30 hover:bg-muted"
+                            }`}
+                            title={ic.label}
+                          >
+                            <div className="h-12 w-12 rounded border bg-background flex items-center justify-center overflow-hidden">
+                              {ic.url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={ic.url} alt={ic.label} className="max-h-full max-w-full object-contain p-1" />
+                              ) : (
+                                <span className="text-[9px] font-bold px-1">{ic.label}</span>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-12 truncate text-center">{ic.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {[...iconSet].map((id) => {
-                const ic = icons.find((i) => i.id === id);
-                return ic ? <Badge key={id}>{ic.label}</Badge> : null;
-              })}
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">{iconSet.size} Icons ausgewählt</p>
           </SectionCard>
         </TabsContent>
       </Tabs>

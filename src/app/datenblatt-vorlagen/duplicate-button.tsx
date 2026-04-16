@@ -12,7 +12,7 @@ export function DuplicateButton({ id }: { id: string }) {
   const [pending, startTransition] = useTransition();
   return (
     <Button
-      variant="ghost" size="sm" className="h-8"
+      variant="ghost" size="sm" className="h-8 hover:bg-primary/10 hover:text-primary"
       disabled={pending}
       onClick={() => startTransition(async () => {
         const r = await duplicateTemplate(id);

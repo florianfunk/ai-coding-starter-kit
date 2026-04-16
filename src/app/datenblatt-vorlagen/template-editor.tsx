@@ -18,9 +18,9 @@ import {
 import { createTemplate, updateTemplate } from "./actions";
 
 const SLOT_COLORS: Record<SlotKind, { border: string; bg: string; text: string }> = {
-  image:        { border: "#3b82f6", bg: "rgba(59,130,246,0.18)", text: "#1d4ed8" },
-  energielabel: { border: "#10b981", bg: "rgba(16,185,129,0.18)", text: "#047857" },
-  cutting:      { border: "#f59e0b", bg: "rgba(245,158,11,0.22)", text: "#b45309" },
+  image:        { border: "#193073", bg: "rgba(25,48,115,0.12)",  text: "#193073" },
+  energielabel: { border: "#D90416", bg: "rgba(217,4,22,0.10)",   text: "#9c0310" },
+  cutting:      { border: "#FFC10D", bg: "rgba(255,193,13,0.22)", text: "#8a6700" },
 };
 
 const PX_PER_CM_CANVAS = 28; // base; canvas is scaled to container

@@ -1,7 +1,9 @@
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, FileText, Image as ImageIcon } from "lucide-react";
 import { FilialenTab } from "./filialen-tab";
 import { KatalogTab } from "./katalog-tab";
 import { LogosTab } from "./logos-tab";
@@ -29,19 +31,27 @@ export default async function EinstellungenPage() {
 
   return (
     <AppShell>
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Einstellungen</h1>
-        <Tabs defaultValue="filialen">
-          <TabsList>
-            <TabsTrigger value="filialen">Filialen</TabsTrigger>
-            <TabsTrigger value="katalog">Katalog</TabsTrigger>
-            <TabsTrigger value="logos">Logos</TabsTrigger>
-          </TabsList>
-          <TabsContent value="filialen"><FilialenTab filialen={filialen ?? []} /></TabsContent>
-          <TabsContent value="katalog"><KatalogTab settings={e} /></TabsContent>
-          <TabsContent value="logos"><LogosTab assetUrls={assetUrls} settings={e} /></TabsContent>
-        </Tabs>
-      </div>
+      <PageHeader
+        eyebrow="Konfiguration"
+        title="Einstellungen"
+        subtitle="Filialen, Katalog-Parameter und Marken-Assets"
+      />
+      <Tabs defaultValue="filialen">
+        <TabsList className="bg-muted/50 p-1 h-auto">
+          <TabsTrigger value="filialen" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
+            <Building2 className="h-4 w-4" /> Filialen
+          </TabsTrigger>
+          <TabsTrigger value="katalog" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
+            <FileText className="h-4 w-4" /> Katalog
+          </TabsTrigger>
+          <TabsTrigger value="logos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
+            <ImageIcon className="h-4 w-4" /> Logos
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="filialen"><FilialenTab filialen={filialen ?? []} /></TabsContent>
+        <TabsContent value="katalog"><KatalogTab settings={e} /></TabsContent>
+        <TabsContent value="logos"><LogosTab assetUrls={assetUrls} settings={e} /></TabsContent>
+      </Tabs>
     </AppShell>
   );
 }

@@ -7,6 +7,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 import { deleteKategorie } from "./actions";
 
 export function DeleteKategorieButton({ id, name }: { id: string; name: string }) {
@@ -15,7 +16,9 @@ export function DeleteKategorieButton({ id, name }: { id: string; name: string }
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm">Löschen</Button>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -26,6 +29,7 @@ export function DeleteKategorieButton({ id, name }: { id: string; name: string }
           <AlertDialogCancel disabled={pending}>Abbrechen</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={(e) => {
               e.preventDefault();
               startTransition(async () => {
@@ -35,7 +39,7 @@ export function DeleteKategorieButton({ id, name }: { id: string; name: string }
               });
             }}
           >
-            {pending ? "Lösche…" : "Löschen"}
+            {pending ? "Lösche…" : "Endgültig löschen"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

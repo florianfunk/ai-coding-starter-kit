@@ -16,7 +16,7 @@ export function DeleteTemplateButton({ id, name }: { id: string; name: string })
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive">
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
           <Trash2 className="h-4 w-4" />
         </Button>
       </AlertDialogTrigger>
@@ -29,6 +29,7 @@ export function DeleteTemplateButton({ id, name }: { id: string; name: string })
           <AlertDialogCancel disabled={pending}>Abbrechen</AlertDialogCancel>
           <AlertDialogAction
             disabled={pending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             onClick={(e) => {
               e.preventDefault();
               startTransition(async () => {
@@ -37,7 +38,7 @@ export function DeleteTemplateButton({ id, name }: { id: string; name: string })
                 else { toast.success("Gelöscht"); setOpen(false); }
               });
             }}
-          >{pending ? "Lösche…" : "Löschen"}</AlertDialogAction>
+          >{pending ? "Lösche…" : "Endgültig löschen"}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

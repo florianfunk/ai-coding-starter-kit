@@ -4,10 +4,10 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Package, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Package, Pencil, ChevronLeft, ChevronRight, ImageIcon, Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +21,16 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   const [{ data: bereich }, { data: produkte }, { data: iconLinks }] = await Promise.all([
     supabase.from("bereiche").select("id,name").eq("id", kategorie.bereich_id).single(),
     supabase.from("produkte").select("*").eq("kategorie_id", id).order("sortierung"),
-    supabase.from("kategorie_icons").select("icons(label)").eq("kategorie_id", id),
+    supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
   ]);
 
   const vorschaubildUrl = await getSignedUrl("produktbilder", kategorie.vorschaubild_path);
-  const iconLabels = ((iconLinks ?? []) as any[]).map((r) => r.icons?.label).filter(Boolean) as string[];
+  const iconData = await Promise.all(
+    ((iconLinks ?? []) as any[]).map(async (r) => ({
+      label: r.icons?.label ?? "",
+      url: r.icons?.symbol_path ? await getSignedUrl("produktbilder", r.icons.symbol_path) : null,
+    })),
+  );
 
   const produkteMitBild = await Promise.all(
     (produkte ?? []).map(async (p) => ({
@@ -34,7 +39,6 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     })),
   );
 
-  // Current prices for all products
   const prodIds = produkteMitBild.map((p) => p.id);
   const { data: preise } = prodIds.length
     ? await supabase.from("aktuelle_preise").select("produkt_id, listenpreis").in("produkt_id", prodIds)
@@ -45,117 +49,144 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2">
-            <Link href={`/bereiche/${kategorie.bereich_id}`}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> Zurück zu {bereich?.name ?? "Bereich"}
-            </Link>
-          </Button>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              {vorschaubildUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={vorschaubildUrl} alt="" className="h-16 w-24 rounded-lg object-cover border" />
-              )}
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                  {bereich?.name} &middot; Kategorie
-                </p>
-                <h1 className="text-3xl font-bold tracking-tight">{kategorie.name}</h1>
-                {kategorie.beschreibung && (
-                  <p className="text-muted-foreground mt-1 max-w-2xl">{kategorie.beschreibung}</p>
-                )}
-                {iconLabels.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {iconLabels.map((l) => (
-                      <Badge key={l} variant="secondary" className="text-xs">{l}</Badge>
-                    ))}
-                  </div>
-                )}
+        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
+          <Link href={`/bereiche/${kategorie.bereich_id}`}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> Zurück zu {bereich?.name ?? "Bereich"}
+          </Link>
+        </Button>
+
+        {/* HEADER */}
+        <Card className="border-2">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+              <div className="flex items-start gap-5 flex-1">
+                <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0">
+                  {vorschaubildUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={vorschaubildUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                      <ImageIcon className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Link href={`/bereiche/${kategorie.bereich_id}`} className="text-xs uppercase tracking-widest text-primary font-semibold hover:underline">
+                    {bereich?.name}
+                  </Link>
+                  <h1 className="text-3xl font-bold tracking-tight mt-1 accent-underline inline-block">
+                    {kategorie.name}
+                  </h1>
+                  {kategorie.beschreibung && (
+                    <p className="text-muted-foreground mt-3 max-w-2xl leading-relaxed">{kategorie.beschreibung}</p>
+                  )}
+                  {iconData.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {iconData.map((ic, i) => (
+                        <div key={i} className="inline-flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border">
+                          {ic.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={ic.url} alt={ic.label} className="h-5 w-5 object-contain" />
+                          ) : null}
+                          <span className="text-xs font-medium">{ic.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
+                  <Link href={`/kategorien/${id}/bearbeiten`}>
+                    <Pencil className="h-4 w-4 mr-2" /> Bearbeiten
+                  </Link>
+                </Button>
+                <Button asChild className="shadow-sm">
+                  <Link href={`/produkte/neu?kategorie=${id}`}>
+                    <Plus className="h-4 w-4 mr-2" /> Neues Produkt
+                  </Link>
+                </Button>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button asChild variant="outline">
-                <Link href={`/kategorien/${id}/bearbeiten`}>
-                  <Pencil className="h-4 w-4 mr-1" /> Kategorie bearbeiten
-                </Link>
-              </Button>
-              <Button asChild>
-                <Link href={`/produkte/neu?kategorie=${id}`}>
-                  <Plus className="h-4 w-4 mr-1" /> Neues Produkt
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-3">Produkte ({produkteMitBild.length})</h2>
-
-          {produkteMitBild.length === 0 ? (
-            <Card>
-              <CardContent className="py-16 text-center text-muted-foreground">
-                Noch keine Produkte in dieser Kategorie.
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-16">Bild</TableHead>
-                      <TableHead>Artikelnummer</TableHead>
-                      <TableHead>Bezeichnung</TableHead>
-                      <TableHead className="text-right">Sortierung</TableHead>
-                      <TableHead className="text-right">Listenpreis</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-24" />
+        {/* PRODUKTE-TABELLE */}
+        <Card className="border-2">
+          <CardHeader className="bg-primary text-primary-foreground py-3 rounded-t-xl flex-row items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Package className="h-4 w-4" /> Produkte ({produkteMitBild.length})
+            </CardTitle>
+            <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/80 h-7">
+              <Link href={`/produkte/neu?kategorie=${id}`}>
+                <Plus className="h-4 w-4 mr-1" /> Neu
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            {produkteMitBild.length === 0 ? (
+              <div className="py-16 text-center text-muted-foreground">
+                <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                Noch keine Produkte in dieser Kategorie
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="w-16">Bild</TableHead>
+                    <TableHead>Artikelnummer</TableHead>
+                    <TableHead>Bezeichnung</TableHead>
+                    <TableHead className="text-right w-24">Sortierung</TableHead>
+                    <TableHead className="text-right w-28">Listenpreis</TableHead>
+                    <TableHead className="w-28">Status</TableHead>
+                    <TableHead className="w-12" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {produkteMitBild.map((p) => (
+                    <TableRow key={p.id} className="group relative row-hover">
+                      <TableCell className="relative z-10 pointer-events-none">
+                        {p.hauptbild_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.hauptbild_url} alt="" className="h-10 w-10 rounded object-cover border" />
+                        ) : (
+                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center border">
+                            <Package className="h-4 w-4 text-muted-foreground/40" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/produkte/${p.id}`} className="absolute inset-0 z-0" />
+                        <span className="relative z-10 pointer-events-none font-mono text-sm group-hover:text-primary transition-colors">
+                          {p.artikelnummer}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-md relative z-10 pointer-events-none">
+                        <div className="truncate">{p.name ?? "—"}</div>
+                      </TableCell>
+                      <TableCell className="text-right text-sm relative z-10 pointer-events-none">{p.sortierung}</TableCell>
+                      <TableCell className="text-right font-semibold relative z-10 pointer-events-none">
+                        {preisMap.has(p.id) ? (
+                          <span className="text-primary">{preisMap.get(p.id)!.toFixed(2)} €</span>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="relative z-10 pointer-events-none">
+                        {p.artikel_bearbeitet
+                          ? <Badge className="bg-success/90 text-success-foreground hover:bg-success text-[10px]">bearbeitet</Badge>
+                          : <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">unbearbeitet</Badge>}
+                      </TableCell>
+                      <TableCell className="relative z-20">
+                        <Link href={`/produkte/${p.id}`} className="inline-flex items-center text-muted-foreground/50 hover:text-primary transition-colors p-1">
+                          <ChevronRight className="h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
+                        </Link>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {produkteMitBild.map((p) => (
-                      <TableRow key={p.id} className="group">
-                        <TableCell>
-                          {p.hauptbild_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.hauptbild_url} alt="" className="h-10 w-10 rounded object-cover" />
-                          ) : (
-                            <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
-                              <Package className="h-4 w-4 text-muted-foreground/40" />
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={`/produkte/${p.id}`} className="font-mono text-sm hover:text-primary hover:underline">
-                            {p.artikelnummer}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          <div className="truncate">{p.name ?? "—"}</div>
-                        </TableCell>
-                        <TableCell className="text-right text-sm">{p.sortierung}</TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {preisMap.has(p.id) ? `${preisMap.get(p.id)!.toFixed(2)} €` : "—"}
-                        </TableCell>
-                        <TableCell>
-                          {p.artikel_bearbeitet
-                            ? <Badge variant="secondary" className="text-xs">bearbeitet</Badge>
-                            : <Badge variant="outline" className="text-xs">unbearbeitet</Badge>}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={`/produkte/${p.id}`} className="inline-flex items-center text-muted-foreground group-hover:text-primary transition">
-                            <ChevronRight className="h-5 w-5" />
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppShell>
   );

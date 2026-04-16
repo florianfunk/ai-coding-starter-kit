@@ -1,47 +1,35 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settings } from "lucide-react";
-
-const NAV_ITEMS = [
-  { href: "/bereiche", label: "Bereiche", icon: LayoutGrid },
-  { href: "/kategorien", label: "Kategorien", icon: Layers },
-  { href: "/produkte", label: "Produkte", icon: Package },
-  { href: "/icons", label: "Icons", icon: Sparkles },
-  { href: "/datenblatt-vorlagen", label: "Vorlagen", icon: LayoutTemplate },
-  { href: "/export/katalog", label: "Katalog-Export", icon: FileDown },
-  { href: "/einstellungen", label: "Einstellungen", icon: Settings },
-];
+import { NavLink } from "./nav-link";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="sticky top-0 z-50 bg-primary text-primary-foreground shadow-lg">
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 px-6 py-3">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center font-bold text-lg group-hover:bg-white/25 transition">
+    <div className="min-h-screen flex flex-col bg-muted/40">
+      <header className="sticky top-0 z-50 bg-primary text-primary-foreground shadow-md">
+        <div className="max-w-screen-2xl mx-auto flex items-center gap-6 px-6 py-3">
+          <Link href="/" className="flex items-center gap-3 group shrink-0 mr-2">
+            <div className="w-10 h-10 rounded-lg bg-accent flex items-center justify-center font-bold text-primary text-xl shadow-sm group-hover:scale-105 transition-transform">
               L
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-lg tracking-wider">LICHTSTUDIO</span>
-              <span className="block text-xs text-white/60 -mt-0.5">Produktverwaltung v2.0</span>
+              <span className="font-bold text-lg tracking-wider block leading-none">LICHTSTUDIO</span>
+              <span className="block text-[10px] text-accent/90 uppercase tracking-widest mt-0.5">Produktverwaltung</span>
             </div>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white/80 hover:text-white hover:bg-white/10 transition"
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            ))}
+          <nav className="flex items-center gap-1 flex-1 overflow-x-auto">
+            <NavLink href="/bereiche" label="Bereiche"><LayoutGrid className="h-4 w-4" /></NavLink>
+            <NavLink href="/kategorien" label="Kategorien"><Layers className="h-4 w-4" /></NavLink>
+            <NavLink href="/produkte" label="Produkte"><Package className="h-4 w-4" /></NavLink>
+            <NavLink href="/icons" label="Icons"><Sparkles className="h-4 w-4" /></NavLink>
+            <NavLink href="/datenblatt-vorlagen" label="Vorlagen"><LayoutTemplate className="h-4 w-4" /></NavLink>
+            <NavLink href="/export/katalog" label="Katalog"><FileDown className="h-4 w-4" /></NavLink>
+            <NavLink href="/einstellungen" label="Einstellungen"><Settings className="h-4 w-4" /></NavLink>
           </nav>
 
-          <div className="hidden lg:block text-xs text-white/60">
-            Auth deaktiviert (dev)
+          <div className="shrink-0 text-[10px] text-white/50 uppercase tracking-widest hidden xl:block">
+            dev-modus
           </div>
         </div>
       </header>
@@ -51,7 +39,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <footer className="border-t bg-background py-3 text-center text-xs text-muted-foreground">
-        LICHT.ENGROS S.R.L. / Eisenkeil &middot; Lichtstudio Produktverwaltung
+        LICHT.ENGROS S.R.L. &middot; Eisenkeil &middot; Lichtstudio Produktverwaltung
       </footer>
     </div>
   );

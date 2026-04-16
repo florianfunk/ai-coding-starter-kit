@@ -1,5 +1,9 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { BereichForm } from "../../bereich-form";
@@ -20,24 +24,25 @@ export default async function EditBereichPage({ params }: { params: Promise<{ id
 
   return (
     <AppShell>
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Bereich bearbeiten: {bereich.name}</h1>
-        <BereichForm
-          defaultValues={{
-            name: bereich.name,
-            beschreibung: bereich.beschreibung,
-            sortierung: bereich.sortierung,
-            seitenzahl: bereich.seitenzahl,
-            startseite: bereich.startseite,
-            endseite: bereich.endseite,
-            farbe: bereich.farbe,
-            bild_path: bereich.bild_path,
-            bild_url: bildUrl,
-          }}
-          action={action}
-          submitLabel="Speichern"
-        />
-      </div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
+        <Link href={`/bereiche/${id}`}><ChevronLeft className="h-4 w-4 mr-1" /> Zurück zum Bereich</Link>
+      </Button>
+      <PageHeader eyebrow="Bearbeiten" title={`Bereich: ${bereich.name}`} />
+      <BereichForm
+        defaultValues={{
+          name: bereich.name,
+          beschreibung: bereich.beschreibung,
+          sortierung: bereich.sortierung,
+          seitenzahl: bereich.seitenzahl,
+          startseite: bereich.startseite,
+          endseite: bereich.endseite,
+          farbe: bereich.farbe,
+          bild_path: bereich.bild_path,
+          bild_url: bildUrl,
+        }}
+        action={action}
+        submitLabel="Speichern"
+      />
     </AppShell>
   );
 }

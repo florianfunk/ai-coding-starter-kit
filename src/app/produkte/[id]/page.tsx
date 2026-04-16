@@ -74,39 +74,39 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
 
   return (
     <AppShell>
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Breadcrumb */}
-        <nav className="flex items-center text-sm text-muted-foreground gap-1">
-          <Link href="/bereiche" className="hover:text-primary hover:underline">Bereiche</Link>
+        <nav className="flex items-center text-sm text-muted-foreground gap-1.5 flex-wrap">
+          <Link href="/bereiche" className="hover:text-primary hover:underline transition-colors">Bereiche</Link>
           {bereichRow && (
             <>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <Link href={`/bereiche/${bereichRow.id}`} className="hover:text-primary hover:underline">{bereichRow.name}</Link>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              <Link href={`/bereiche/${bereichRow.id}`} className="hover:text-primary hover:underline transition-colors">{bereichRow.name}</Link>
             </>
           )}
           {kategorieRow && (
             <>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <Link href={`/kategorien/${kategorieRow.id}`} className="hover:text-primary hover:underline">{kategorieRow.name}</Link>
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              <Link href={`/kategorien/${kategorieRow.id}`} className="hover:text-primary hover:underline transition-colors">{kategorieRow.name}</Link>
             </>
           )}
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="font-mono text-foreground">{produkt.artikelnummer}</span>
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          <span className="font-mono text-foreground font-semibold">{produkt.artikelnummer}</span>
         </nav>
 
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase text-muted-foreground tracking-wider">Produkt</p>
-            <h1 className="text-3xl font-bold tracking-tight font-mono">{produkt.artikelnummer}</h1>
-            <p className="text-muted-foreground">{produkt.name ?? "—"}</p>
+        <div className="flex items-start justify-between gap-4 pb-4 border-b">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">Produkt</p>
+            <h1 className="text-3xl font-bold tracking-tight font-mono break-all">{produkt.artikelnummer}</h1>
+            <p className="text-muted-foreground mt-1">{produkt.name ?? "—"}</p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
+          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+            <Button asChild variant="outline" className="hover:bg-muted/50">
               <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
                 <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
               </Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
               <Link href={`/produkte/${id}/datenblatt`}>Datenblatt PDF</Link>
             </Button>
             <ProduktTopActions id={id} />

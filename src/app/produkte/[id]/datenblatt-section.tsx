@@ -10,9 +10,9 @@ import type { DatenblattTemplate, Slot, SlotKind } from "@/lib/datenblatt";
 import { setDatenblattTemplate, setSlotBild, uploadSlotBild } from "../datenblatt-actions";
 
 const SLOT_COLORS: Record<SlotKind, { border: string; bg: string }> = {
-  image:        { border: "#3b82f6", bg: "rgba(59,130,246,0.10)" },
-  energielabel: { border: "#10b981", bg: "rgba(16,185,129,0.10)" },
-  cutting:      { border: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
+  image:        { border: "#193073", bg: "rgba(25,48,115,0.08)" },
+  energielabel: { border: "#D90416", bg: "rgba(217,4,22,0.08)" },
+  cutting:      { border: "#FFC10D", bg: "rgba(255,193,13,0.14)" },
 };
 
 type Props = {

@@ -6,7 +6,7 @@ import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Layers, Pencil, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
+import { Plus, Layers, Pencil, ChevronRight, ChevronLeft, ImageIcon } from "lucide-react";
 import { DeleteKategorieButton } from "@/app/kategorien/delete-button";
 
 export const dynamic = "force-dynamic";
@@ -32,55 +32,54 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="space-y-6">
-        <div>
-          <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2">
-            <Link href="/bereiche"><ChevronLeft className="h-4 w-4 mr-1" /> Alle Bereiche</Link>
-          </Button>
-        </div>
+        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
+          <Link href="/bereiche"><ChevronLeft className="h-4 w-4 mr-1" /> Alle Bereiche</Link>
+        </Button>
 
-        {/* BEREICH HEADER — wie FileMaker */}
-        <Card>
+        {/* BEREICH HEADER — FileMaker-style */}
+        <Card className="border-2">
           <CardContent className="pt-6 space-y-6">
-            {/* Name + Sortierung */}
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_auto] gap-6 items-end">
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Name</p>
-                <h1 className="text-3xl font-bold tracking-tight border-b-2 border-b-accent pb-2">
+                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Name</p>
+                <h1 className="text-3xl font-bold tracking-tight accent-underline inline-block">
                   {bereich.name}
                 </h1>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Sortierung</p>
-                <div className="text-3xl font-bold tracking-tight border-b-2 border-b-accent pb-2">
+                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Sortierung</p>
+                <div className="text-3xl font-bold tracking-tight inline-block accent-underline min-w-16 text-center px-2">
                   {bereich.sortierung}
                 </div>
               </div>
             </div>
 
-            {/* Farbfeld */}
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 items-center">
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Farbfeld</p>
-                <div className="font-mono border-b-2 border-b-accent pb-2">
+                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Farbfeld</p>
+                <div className="font-mono border-b-4 border-accent pb-1 text-lg inline-block min-w-32">
                   {bereich.farbe ?? <span className="text-muted-foreground">—</span>}
                 </div>
               </div>
-              <div className="h-12 rounded-lg border" style={{ backgroundColor: bereich.farbe || undefined }} />
+              <div
+                className="h-14 rounded-lg border-2 flex items-center justify-center shadow-inner"
+                style={{ backgroundColor: bereich.farbe || "transparent" }}
+              >
+                {!bereich.farbe && <span className="text-xs text-muted-foreground">keine Farbe</span>}
+              </div>
             </div>
 
-            {/* Beschreibung */}
             {bereich.beschreibung && (
               <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Beschreibung</p>
-                <p className="text-sm">{bereich.beschreibung}</p>
+                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Beschreibung</p>
+                <p className="text-sm leading-relaxed">{bereich.beschreibung}</p>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex gap-2 pt-2 border-t">
-              <Button asChild variant="outline">
+            <div className="flex gap-2 pt-4 border-t">
+              <Button asChild className="shadow-sm">
                 <Link href={`/bereiche/${id}/bearbeiten`}>
-                  <Pencil className="h-4 w-4 mr-1" /> Bereich bearbeiten
+                  <Pencil className="h-4 w-4 mr-2" /> Bereich bearbeiten
                 </Link>
               </Button>
             </div>
@@ -89,76 +88,96 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
 
         {/* BILD + KATEGORIEN-TABELLE */}
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Bild</CardTitle></CardHeader>
+          <Card className="border-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm uppercase tracking-widest text-primary">Bild</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="aspect-[4/3] rounded-lg border bg-muted overflow-hidden">
+              <div className="aspect-[4/3] rounded-lg border-2 bg-muted overflow-hidden">
                 {bereichBildUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={bereichBildUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                    <Layers className="h-10 w-10" />
+                  <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                    <ImageIcon className="h-10 w-10" />
                   </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-2">
-                {bereich.seitenzahl ? `Seitenzahl: ${bereich.seitenzahl}` : "—"}
-              </p>
+              <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Seitenzahl</p>
+                  <p className="font-semibold">{bereich.seitenzahl ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Start</p>
+                  <p className="font-semibold">{bereich.startseite ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Ende</p>
+                  <p className="font-semibold">{bereich.endseite ?? "—"}</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-2">
             <CardHeader className="bg-primary text-primary-foreground flex flex-row items-center justify-between py-3 rounded-t-xl">
-              <CardTitle className="text-base">Kategorien</CardTitle>
-              <Button asChild size="sm" variant="secondary" className="h-7">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4" /> Kategorien ({(kategorien ?? []).length})
+              </CardTitle>
+              <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/80 h-7">
                 <Link href={`/kategorien/neu?bereich=${id}`}>
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 mr-1" /> Neu
                 </Link>
               </Button>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="w-12">#</TableHead>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="w-12 text-muted-foreground">#</TableHead>
                     <TableHead>Name</TableHead>
-                    <TableHead className="text-right w-24">Anzahl<br/>Artikel</TableHead>
+                    <TableHead className="text-right w-24">Anzahl Artikel</TableHead>
                     <TableHead className="text-right w-24">Sortierung</TableHead>
                     <TableHead className="text-right w-24">Startseite</TableHead>
                     <TableHead className="text-right w-24">Endseite</TableHead>
-                    <TableHead className="w-28" />
+                    <TableHead className="w-32" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {(kategorien ?? []).length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                        Noch keine Kategorien in diesem Bereich.
+                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                        <Layers className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                        Noch keine Kategorien in diesem Bereich
                       </TableCell>
                     </TableRow>
                   )}
                   {(kategorien ?? []).map((k, i) => (
-                    <TableRow key={k.id} className="group relative">
-                      <TableCell className="relative z-10 pointer-events-none text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-medium relative z-10 pointer-events-none">
-                        <Link href={`/kategorien/${k.id}`} className="absolute inset-0 z-0 pointer-events-auto" aria-label={`${k.name} öffnen`} />
-                        <span className="relative z-10">{k.name}</span>
+                    <TableRow key={k.id} className="group relative row-hover">
+                      <TableCell className="text-muted-foreground relative z-10 pointer-events-none">{i + 1}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/kategorien/${k.id}`} className="absolute inset-0 z-0" aria-label={`${k.name} öffnen`} />
+                        <span className="relative z-10 pointer-events-none group-hover:text-primary transition-colors">
+                          {k.name}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right relative z-10 pointer-events-none">{prodCount.get(k.id) ?? 0}</TableCell>
+                      <TableCell className="text-right font-semibold text-primary relative z-10 pointer-events-none">
+                        {prodCount.get(k.id) ?? 0}
+                      </TableCell>
                       <TableCell className="text-right relative z-10 pointer-events-none">{k.sortierung}</TableCell>
                       <TableCell className="text-right relative z-10 pointer-events-none">{k.startseite ?? "—"}</TableCell>
                       <TableCell className="text-right relative z-10 pointer-events-none">{k.endseite ?? "—"}</TableCell>
                       <TableCell className="relative z-20">
                         <div className="flex items-center justify-end gap-0.5">
-                          <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary">
                             <Link href={`/kategorien/${k.id}/bearbeiten`} title="Bearbeiten">
                               <Pencil className="h-3.5 w-3.5" />
                             </Link>
                           </Button>
                           <DeleteKategorieButton id={k.id} name={k.name} />
-                          <Link href={`/kategorien/${k.id}`} className="text-accent-foreground/70 hover:text-accent-foreground">
-                            <ChevronRight className="h-5 w-5" />
+                          <Link href={`/kategorien/${k.id}`} className="text-muted-foreground/50 hover:text-primary p-1 transition-colors">
+                            <ChevronRight className="h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
                           </Link>
                         </div>
                       </TableCell>

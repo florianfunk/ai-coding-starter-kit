@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { KatalogForm } from "./katalog-form";
 import { JobStatusList } from "./job-status";
@@ -16,13 +17,12 @@ export default async function KatalogExportPage() {
 
   return (
     <AppShell>
+      <PageHeader
+        eyebrow="PDF-Export"
+        title="Gesamtkatalog exportieren"
+        subtitle="Generiert das komplette Katalog-PDF mit allen Bereichen, Kategorien und Produkten"
+      />
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Gesamtkatalog exportieren</h1>
-          <p className="text-muted-foreground">
-            Generiert das komplette Katalog-PDF mit allen Bereichen, Kategorien und Produkten.
-          </p>
-        </div>
         <KatalogForm wechselkurs={Number(einstellungen?.wechselkurs_eur_chf ?? 1)} />
         <JobStatusList jobs={jobs ?? []} />
       </div>

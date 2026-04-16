@@ -1,9 +1,9 @@
 import type { Slot } from "@/lib/datenblatt";
 
 const SLOT_COLORS: Record<string, string> = {
-  image: "#3b82f6",
-  energielabel: "#10b981",
-  cutting: "#f59e0b",
+  image: "#193073",
+  energielabel: "#D90416",
+  cutting: "#FFC10D",
 };
 
 export function TemplatePreview({

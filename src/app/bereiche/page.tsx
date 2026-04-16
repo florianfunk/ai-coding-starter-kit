@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Layers, Pencil, ChevronRight } from "lucide-react";
+import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
 import { DeleteBereichButton } from "./delete-button";
 
 export const dynamic = "force-dynamic";
@@ -36,75 +36,88 @@ export default async function BereichePage() {
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Bereiche</h1>
-            <p className="text-muted-foreground mt-1">{withUrls.length} Hauptkategorien im Katalog</p>
-          </div>
-          <Button asChild size="lg">
-            <Link href="/bereiche/neu"><Plus className="mr-2 h-4 w-4" /> Neuer Bereich</Link>
-          </Button>
-        </div>
+      <PageHeader
+        eyebrow="Katalogstruktur"
+        title="Bereiche"
+        subtitle={`${withUrls.length} Hauptkategorien`}
+      >
+        <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
+          <Link href="/bereiche/neu">
+            <Plus className="mr-2 h-4 w-4" /> Neuer Bereich
+          </Link>
+        </Button>
+      </PageHeader>
 
-        {withUrls.length === 0 && (
-          <Card><CardContent className="py-16 text-center text-muted-foreground">Noch keine Bereiche angelegt.</CardContent></Card>
-        )}
-
+      {withUrls.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-20 text-center text-muted-foreground">
+            <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p className="text-lg mb-1">Noch keine Bereiche angelegt</p>
+            <p className="text-sm">Lege deinen ersten Bereich an, um loszulegen.</p>
+          </CardContent>
+        </Card>
+      ) : (
         <div className="grid gap-3">
           {withUrls.map((b, i) => (
-            <Card key={b.id} className="group hover:shadow-md hover:border-primary/30 transition-all relative">
-              <CardContent className="flex items-center gap-5 py-4">
+            <Card key={b.id} className="group card-hover border-2 overflow-hidden">
+              <CardContent className="flex items-center gap-5 py-4 relative">
                 <Link href={`/bereiche/${b.id}`} className="absolute inset-0 z-0" aria-label={`${b.name} öffnen`} />
 
-                <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0 relative z-10">
-                  {i + 1}
+                <div
+                  className="h-11 w-11 rounded-xl flex items-center justify-center font-bold text-base shrink-0 relative z-10 border-2"
+                  style={b.farbe ? { backgroundColor: b.farbe, borderColor: b.farbe } : undefined}
+                >
+                  <span className={b.farbe ? "text-foreground/80" : "text-primary"}>{i + 1}</span>
                 </div>
 
-                <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10">
+                <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10 border">
                   {b.bild_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={b.bild_url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/40">
-                      <Layers className="h-6 w-6" />
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                      <ImageIcon className="h-5 w-5" />
                     </div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0 relative z-10 pointer-events-none">
-                  <div className="font-semibold text-lg group-hover:text-primary transition">{b.name}</div>
+                  <div className="font-semibold text-lg group-hover:text-primary transition-colors">{b.name}</div>
                   {b.beschreibung && (
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{b.beschreibung}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">{b.beschreibung}</p>
                   )}
                 </div>
 
-                <div className="hidden md:flex items-center gap-6 shrink-0 relative z-10 pointer-events-none">
-                  <div className="text-center">
-                    <p className="text-lg font-semibold">{katCount.get(b.id) ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Kategorien</p>
+                <div className="hidden md:flex items-center gap-4 shrink-0 relative z-10 pointer-events-none">
+                  <div className="text-center min-w-14">
+                    <p className="text-2xl font-bold leading-none text-primary">{katCount.get(b.id) ?? 0}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Kategorien</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-semibold">{prodCount.get(b.id) ?? 0}</p>
-                    <p className="text-xs text-muted-foreground">Produkte</p>
+                  <div className="text-center min-w-14">
+                    <p className="text-2xl font-bold leading-none">{prodCount.get(b.id) ?? 0}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Produkte</p>
                   </div>
-                  <Badge variant="secondary" className="text-xs">S. {b.startseite ?? "—"}</Badge>
+                  <div className="text-center min-w-14">
+                    <p className="text-sm font-semibold leading-none">S. {b.startseite ?? "—"}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Start</p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 relative z-20">
-                  <Button asChild variant="ghost" size="sm">
+                  <Button asChild variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary">
                     <Link href={`/bereiche/${b.id}/bearbeiten`}>
-                      <Pencil className="h-4 w-4 mr-1" /> Bearbeiten
+                      <Pencil className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Bearbeiten</span>
                     </Link>
                   </Button>
                   <DeleteBereichButton id={b.id} name={b.name} />
-                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition ml-1 pointer-events-none" />
+                  <ChevronRight className="h-5 w-5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all ml-1" />
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
-      </div>
+      )}
     </AppShell>
   );
 }

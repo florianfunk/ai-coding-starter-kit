@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
-import { KategorieForm } from "../../kategorie-form";
+import { KategorieForm, type IconOption } from "../../kategorie-form";
 import { updateKategorie, type KategorieFormState } from "../../actions";
 
 export default async function EditKategoriePage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,9 +13,16 @@ export default async function EditKategoriePage({ params }: { params: Promise<{ 
 
   const [{ data: bereiche }, { data: icons }, { data: katIcons }] = await Promise.all([
     supabase.from("bereiche").select("id,name").order("sortierung"),
-    supabase.from("icons").select("id,label").order("label"),
+    supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
     supabase.from("kategorie_icons").select("icon_id").eq("kategorie_id", id),
   ]);
+
+  const iconOptions: IconOption[] = await Promise.all(
+    (icons ?? []).map(async (ic: any) => ({
+      id: ic.id, label: ic.label, gruppe: ic.gruppe,
+      url: await getSignedUrl("produktbilder", ic.symbol_path),
+    })),
+  );
 
   const bildUrl = await getSignedUrl("produktbilder", kat.vorschaubild_path);
   const iconIds = (katIcons ?? []).map((r) => r.icon_id);
@@ -28,10 +35,10 @@ export default async function EditKategoriePage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">Kategorie bearbeiten: {kat.name}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Kategorie bearbeiten: {kat.name}</h1>
         <KategorieForm
           bereiche={bereiche ?? []}
-          icons={icons ?? []}
+          icons={iconOptions}
           defaultValues={{
             bereich_id: kat.bereich_id,
             name: kat.name,

@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { LayoutGrid, Layers, Package, FileDown, Settings } from "lucide-react";
+import { LayoutGrid, Layers, Package, Sparkles, FileDown, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/bereiche", label: "Bereiche", icon: LayoutGrid },
   { href: "/kategorien", label: "Kategorien", icon: Layers },
   { href: "/produkte", label: "Produkte", icon: Package },
+  { href: "/icons", label: "Icons", icon: Sparkles },
   { href: "/export/katalog", label: "Katalog-Export", icon: FileDown },
   { href: "/einstellungen", label: "Einstellungen", icon: Settings },
 ];

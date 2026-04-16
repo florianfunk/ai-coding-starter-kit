@@ -1,0 +1,50 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e26]:
+    - banner [ref=e27]:
+      - generic [ref=e28]:
+        - link "LICHTSTUDIO" [ref=e29] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e30]:
+          - link "Bereiche" [ref=e31] [cursor=pointer]:
+            - /url: /bereiche
+          - link "Kategorien" [ref=e32] [cursor=pointer]:
+            - /url: /kategorien
+          - link "Produkte" [ref=e33] [cursor=pointer]:
+            - /url: /produkte
+          - link "Katalog-Export" [ref=e34] [cursor=pointer]:
+            - /url: /export/katalog
+          - link "Einstellungen" [ref=e35] [cursor=pointer]:
+            - /url: /einstellungen
+        - generic [ref=e36]:
+          - generic [ref=e37]: demo@lichtengros.test
+          - button "Abmelden" [ref=e39] [cursor=pointer]
+    - main [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - heading "Lichtstudio" [level=1] [ref=e43]
+          - paragraph [ref=e44]: Interne Produktverwaltung für LICHT.ENGROS / Eisenkeil.
+        - generic [ref=e45]:
+          - link "Bereiche 20 Hauptkategorien des Katalogs verwalten." [ref=e46] [cursor=pointer]:
+            - /url: /bereiche
+            - generic [ref=e48]:
+              - generic [ref=e49]: Bereiche
+              - generic [ref=e50]: 20 Hauptkategorien des Katalogs verwalten.
+          - link "Kategorien Untergliederung mit Icons und Vorschaubildern." [ref=e52] [cursor=pointer]:
+            - /url: /kategorien
+            - generic [ref=e54]:
+              - generic [ref=e55]: Kategorien
+              - generic [ref=e56]: Untergliederung mit Icons und Vorschaubildern.
+          - link "Produkte Artikel mit allen technischen Daten pflegen." [ref=e58] [cursor=pointer]:
+            - /url: /produkte
+            - generic [ref=e60]:
+              - generic [ref=e61]: Produkte
+              - generic [ref=e62]: Artikel mit allen technischen Daten pflegen.
+          - link "Einstellungen Filialen, Logos und Katalog-Parameter." [ref=e64] [cursor=pointer]:
+            - /url: /einstellungen
+            - generic [ref=e66]:
+              - generic [ref=e67]: Einstellungen
+              - generic [ref=e68]: Filialen, Logos und Katalog-Parameter.
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e22] [cursor=pointer]:
+    - img [ref=e23]
+  - alert [ref=e16]: Lichtstudio

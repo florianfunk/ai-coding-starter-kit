@@ -1,0 +1,73 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "LICHTSTUDIO" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e6]:
+          - link "Bereiche" [ref=e7] [cursor=pointer]:
+            - /url: /bereiche
+          - link "Kategorien" [ref=e8] [cursor=pointer]:
+            - /url: /kategorien
+          - link "Produkte" [ref=e9] [cursor=pointer]:
+            - /url: /produkte
+          - link "Katalog-Export" [ref=e10] [cursor=pointer]:
+            - /url: /export/katalog
+          - link "Einstellungen" [ref=e11] [cursor=pointer]:
+            - /url: /einstellungen
+        - generic [ref=e12]:
+          - generic [ref=e13]: demo@lichtengros.test
+          - button "Abmelden" [ref=e15] [cursor=pointer]
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - heading "Einstellungen" [level=1] [ref=e18]
+        - generic [ref=e19]:
+          - tablist [ref=e20]:
+            - tab "Filialen" [selected] [ref=e21] [cursor=pointer]
+            - tab "Katalog" [ref=e22] [cursor=pointer]
+            - tab "Logos" [ref=e23] [cursor=pointer]
+          - tabpanel "Filialen" [ref=e24]:
+            - generic [ref=e25]:
+              - generic [ref=e26]:
+                - generic [ref=e27]: Filialen (3)
+                - button "+ neu" [ref=e28] [cursor=pointer]
+              - table [ref=e31]:
+                - rowgroup [ref=e32]:
+                  - row "Marke Name Land Adresse" [ref=e33]:
+                    - columnheader "Marke" [ref=e34]
+                    - columnheader "Name" [ref=e35]
+                    - columnheader "Land" [ref=e36]
+                    - columnheader "Adresse" [ref=e37]
+                    - columnheader [ref=e38]
+                - rowgroup [ref=e39]:
+                  - 'row "lichtengros MARLING IT Gampenstraße 60 39020 Marling Tel: +39 0473 016100 Bearbeiten Löschen" [ref=e40]':
+                    - cell "lichtengros" [ref=e41]:
+                      - generic [ref=e42]: lichtengros
+                    - cell "MARLING" [ref=e43]
+                    - cell "IT" [ref=e44]
+                    - 'cell "Gampenstraße 60 39020 Marling Tel: +39 0473 016100" [ref=e45]'
+                    - cell "Bearbeiten Löschen" [ref=e46]:
+                      - button "Bearbeiten" [ref=e47] [cursor=pointer]
+                      - button "Löschen" [ref=e48] [cursor=pointer]
+                  - 'row "lichtengros KLAUSEN IT Brennerstraße 2 39043 Klausen Tel: +39 0472 849300 Bearbeiten Löschen" [ref=e49]':
+                    - cell "lichtengros" [ref=e50]:
+                      - generic [ref=e51]: lichtengros
+                    - cell "KLAUSEN" [ref=e52]
+                    - cell "IT" [ref=e53]
+                    - 'cell "Brennerstraße 2 39043 Klausen Tel: +39 0472 849300" [ref=e54]'
+                    - cell "Bearbeiten Löschen" [ref=e55]:
+                      - button "Bearbeiten" [ref=e56] [cursor=pointer]
+                      - button "Löschen" [ref=e57] [cursor=pointer]
+                  - 'row "eisenkeil VOMP AT Industriestraße 5 6134 Vomp Tel: +43 44 568 72 65 Bearbeiten Löschen" [ref=e58]':
+                    - cell "eisenkeil" [ref=e59]:
+                      - generic [ref=e60]: eisenkeil
+                    - cell "VOMP" [ref=e61]
+                    - cell "AT" [ref=e62]
+                    - 'cell "Industriestraße 5 6134 Vomp Tel: +43 44 568 72 65" [ref=e63]'
+                    - cell "Bearbeiten Löschen" [ref=e64]:
+                      - button "Bearbeiten" [ref=e65] [cursor=pointer]
+                      - button "Löschen" [ref=e66] [cursor=pointer]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e72] [cursor=pointer]:
+    - img [ref=e73]
+  - alert [ref=e76]

@@ -1,0 +1,133 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "L LICHTSTUDIO Produktverwaltung v2.0" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: L
+          - generic [ref=e7]:
+            - text: LICHTSTUDIO
+            - generic [ref=e8]: Produktverwaltung v2.0
+        - navigation [ref=e9]:
+          - link "Bereiche" [ref=e10] [cursor=pointer]:
+            - /url: /bereiche
+            - img [ref=e11]
+            - text: Bereiche
+          - link "Kategorien" [ref=e16] [cursor=pointer]:
+            - /url: /kategorien
+            - img [ref=e17]
+            - text: Kategorien
+          - link "Produkte" [ref=e21] [cursor=pointer]:
+            - /url: /produkte
+            - img [ref=e22]
+            - text: Produkte
+          - link "Katalog-Export" [ref=e26] [cursor=pointer]:
+            - /url: /export/katalog
+            - img [ref=e27]
+            - text: Katalog-Export
+          - link "Einstellungen" [ref=e31] [cursor=pointer]:
+            - /url: /einstellungen
+            - img [ref=e32]
+            - text: Einstellungen
+        - generic [ref=e35]:
+          - generic [ref=e36]: demo@lichtengros.test
+          - button "Abmelden" [ref=e38] [cursor=pointer]:
+            - img
+            - generic [ref=e39]: Abmelden
+    - main [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - paragraph [ref=e44]: Produkt
+            - heading "BL13528-60-4.8-2700-90-20" [level=1] [ref=e45]
+            - paragraph [ref=e46]: LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP20 60LED/m (5m-Rolle)
+          - generic [ref=e47]:
+            - link "Datenblatt PDF" [ref=e48] [cursor=pointer]:
+              - /url: /produkte/183633e8-11b3-45b5-8d23-928d03399f9e/datenblatt
+            - generic [ref=e49]:
+              - button "Duplizieren" [ref=e50] [cursor=pointer]
+              - button "Löschen" [ref=e51] [cursor=pointer]
+        - generic [ref=e52]:
+          - generic [ref=e53]:
+            - tablist [ref=e54]:
+              - tab "Basis" [ref=e55] [cursor=pointer]:
+                - img [ref=e56]
+                - text: Basis
+              - tab "Datenblatt" [active] [selected] [ref=e59] [cursor=pointer]:
+                - img [ref=e60]
+                - text: Datenblatt
+              - tab "Elektrotechnische" [ref=e63] [cursor=pointer]:
+                - img [ref=e64]
+                - text: Elektrotechnische
+              - tab "Lichttechnische" [ref=e66] [cursor=pointer]:
+                - img [ref=e67]
+                - text: Lichttechnische
+              - tab "Mechanische" [ref=e73] [cursor=pointer]:
+                - img [ref=e74]
+                - text: Mechanische
+              - tab "Thermische" [ref=e76] [cursor=pointer]:
+                - img [ref=e77]
+                - text: Thermische
+              - tab "Sonstiges" [ref=e79] [cursor=pointer]:
+                - img [ref=e80]
+                - text: Sonstiges
+              - tab "Icons (4)" [ref=e84] [cursor=pointer]:
+                - img [ref=e85]
+                - text: Icons (4)
+            - tabpanel "Datenblatt" [ref=e163]:
+              - generic [ref=e165]:
+                - heading "Datenblatt-Inhalt" [level=3] [ref=e166]
+                - generic [ref=e167]:
+                  - generic [ref=e168]:
+                    - text: Titel
+                    - textbox "Titel" [ref=e169]: LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP20 60LED/m (5m-Rolle)
+                  - generic [ref=e170]:
+                    - generic [ref=e171]:
+                      - text: Text Block 1
+                      - textbox "Text Block 1" [ref=e172]: "Der LED-Strip darf nur mit einem Kühlprofil verwendet werden und muss Abstand zu leicht entflammbaren Materialien haben. Die Rollenlänge beträgt 5 Meter, Anschluss max Länge 5 Tnt. Zollnummer: 94054090."
+                    - generic [ref=e173]:
+                      - text: Text Block 2
+                      - textbox "Text Block 2" [ref=e174]
+                    - generic [ref=e175]:
+                      - text: Text Block 3
+                      - textbox "Text Block 3" [ref=e176]
+          - generic [ref=e117]:
+            - link "Abbrechen" [ref=e118] [cursor=pointer]:
+              - /url: /produkte
+            - button "Speichern" [ref=e119] [cursor=pointer]
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - text: Preise
+              - generic [ref=e123]: "1"
+            - button "Neuer Preis" [ref=e124] [cursor=pointer]:
+              - img
+              - text: Neuer Preis
+          - table [ref=e128]:
+            - rowgroup [ref=e129]:
+              - row "Gültig ab EK Lichtengros EK Eisenkeil Listenpreis Status" [ref=e130]:
+                - columnheader "Gültig ab" [ref=e131]
+                - columnheader "EK Lichtengros" [ref=e132]
+                - columnheader "EK Eisenkeil" [ref=e133]
+                - columnheader "Listenpreis" [ref=e134]
+                - columnheader "Status" [ref=e135]
+                - columnheader [ref=e136]
+            - rowgroup [ref=e137]:
+              - row "2026-01-01 7.13 € — 40.22 € aktuell" [ref=e138]:
+                - cell "2026-01-01" [ref=e139]
+                - cell "7.13 €" [ref=e140]
+                - cell "—" [ref=e141]
+                - cell "40.22 €" [ref=e142]
+                - cell "aktuell" [ref=e143]:
+                  - generic [ref=e144]: aktuell
+                - cell [ref=e145]:
+                  - button [ref=e146] [cursor=pointer]:
+                    - img
+        - generic [ref=e147]:
+          - generic [ref=e149]: Galerie (0/12)
+          - button "Choose File" [ref=e151]
+    - contentinfo [ref=e152]: LICHT.ENGROS S.R.L. / Eisenkeil · Lichtstudio Produktverwaltung
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e158] [cursor=pointer]:
+    - img [ref=e159]
+  - alert [ref=e162]

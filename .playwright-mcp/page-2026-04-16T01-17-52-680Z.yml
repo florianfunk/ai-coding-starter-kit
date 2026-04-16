@@ -1,0 +1,86 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "LICHTSTUDIO" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e6]:
+          - link "Bereiche" [ref=e7] [cursor=pointer]:
+            - /url: /bereiche
+          - link "Kategorien" [ref=e8] [cursor=pointer]:
+            - /url: /kategorien
+          - link "Produkte" [ref=e9] [cursor=pointer]:
+            - /url: /produkte
+          - link "Katalog-Export" [ref=e10] [cursor=pointer]:
+            - /url: /export/katalog
+          - link "Einstellungen" [ref=e11] [cursor=pointer]:
+            - /url: /einstellungen
+        - generic [ref=e12]:
+          - generic [ref=e13]: demo@lichtengros.test
+          - button "Abmelden" [ref=e15] [cursor=pointer]
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - heading "Bereiche" [level=1] [ref=e20]
+            - paragraph [ref=e21]: 3 Bereiche im Katalog.
+          - link "neuer Bereich" [ref=e22] [cursor=pointer]:
+            - /url: /bereiche/neu
+            - img
+            - text: neuer Bereich
+        - table [ref=e25]:
+          - rowgroup [ref=e26]:
+            - row "# Name Kategorien Produkte Sortierung Seitenzahl Startseite Bild" [ref=e27]:
+              - columnheader "#" [ref=e28]
+              - columnheader "Name" [ref=e29]
+              - columnheader "Kategorien" [ref=e30]
+              - columnheader "Produkte" [ref=e31]
+              - columnheader "Sortierung" [ref=e32]
+              - columnheader "Seitenzahl" [ref=e33]
+              - columnheader "Startseite" [ref=e34]
+              - columnheader "Bild" [ref=e35]
+              - columnheader [ref=e36]
+          - rowgroup [ref=e37]:
+            - row "1 LED STRIP 3 5 1 10 4 — Löschen" [ref=e38]:
+              - cell "1" [ref=e39]
+              - cell "LED STRIP" [ref=e40]:
+                - link "LED STRIP" [ref=e41] [cursor=pointer]:
+                  - /url: /bereiche/74d4425d-458c-441c-9deb-d56f3e2df93f/bearbeiten
+              - cell "3" [ref=e42]
+              - cell "5" [ref=e43]
+              - cell "1" [ref=e44]
+              - cell "10" [ref=e45]
+              - cell "4" [ref=e46]
+              - cell "—" [ref=e47]
+              - cell "Löschen" [ref=e48]:
+                - button "Löschen" [ref=e49] [cursor=pointer]
+            - row "2 LED EINBAUSTRAHLER 1 2 2 10 30 — Löschen" [ref=e50]:
+              - cell "2" [ref=e51]
+              - cell "LED EINBAUSTRAHLER" [ref=e52]:
+                - link "LED EINBAUSTRAHLER" [ref=e53] [cursor=pointer]:
+                  - /url: /bereiche/6b6989a6-91f7-4fa0-8f84-6535cfb85937/bearbeiten
+              - cell "1" [ref=e54]
+              - cell "2" [ref=e55]
+              - cell "2" [ref=e56]
+              - cell "10" [ref=e57]
+              - cell "30" [ref=e58]
+              - cell "—" [ref=e59]
+              - cell "Löschen" [ref=e60]:
+                - button "Löschen" [ref=e61] [cursor=pointer]
+            - row "3 PENDELLEUCHTEN 1 3 3 10 50 — Löschen" [ref=e62]:
+              - cell "3" [ref=e63]
+              - cell "PENDELLEUCHTEN" [ref=e64]:
+                - link "PENDELLEUCHTEN" [ref=e65] [cursor=pointer]:
+                  - /url: /bereiche/f3e5db78-e785-4cea-9756-86a11ffdf265/bearbeiten
+              - cell "1" [ref=e66]
+              - cell "3" [ref=e67]
+              - cell "3" [ref=e68]
+              - cell "10" [ref=e69]
+              - cell "50" [ref=e70]
+              - cell "—" [ref=e71]
+              - cell "Löschen" [ref=e72]:
+                - button "Löschen" [ref=e73] [cursor=pointer]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e79] [cursor=pointer]:
+    - img [ref=e80]
+  - alert [ref=e83]

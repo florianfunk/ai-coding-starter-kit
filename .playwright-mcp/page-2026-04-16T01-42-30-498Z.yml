@@ -1,0 +1,112 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "L LICHTSTUDIO Produktverwaltung v2.0" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: L
+          - generic [ref=e7]:
+            - text: LICHTSTUDIO
+            - generic [ref=e8]: Produktverwaltung v2.0
+        - navigation [ref=e9]:
+          - link "Bereiche" [ref=e10] [cursor=pointer]:
+            - /url: /bereiche
+            - img [ref=e11]
+            - text: Bereiche
+          - link "Kategorien" [ref=e16] [cursor=pointer]:
+            - /url: /kategorien
+            - img [ref=e17]
+            - text: Kategorien
+          - link "Produkte" [ref=e21] [cursor=pointer]:
+            - /url: /produkte
+            - img [ref=e22]
+            - text: Produkte
+          - link "Katalog-Export" [ref=e26] [cursor=pointer]:
+            - /url: /export/katalog
+            - img [ref=e27]
+            - text: Katalog-Export
+          - link "Einstellungen" [ref=e31] [cursor=pointer]:
+            - /url: /einstellungen
+            - img [ref=e32]
+            - text: Einstellungen
+        - generic [ref=e35]:
+          - generic [ref=e36]: demo@lichtengros.test
+          - button "Abmelden" [ref=e38] [cursor=pointer]:
+            - img
+            - generic [ref=e39]: Abmelden
+    - main [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - heading "Bereiche" [level=1] [ref=e44]
+            - paragraph [ref=e45]: 3 Hauptkategorien im Katalog
+          - link "Neuer Bereich" [ref=e46] [cursor=pointer]:
+            - /url: /bereiche/neu
+            - img
+            - text: Neuer Bereich
+        - generic [ref=e47]:
+          - generic [ref=e49]:
+            - generic [ref=e50]: "1"
+            - img [ref=e53]
+            - generic [ref=e57]:
+              - link "LED STRIP" [ref=e58] [cursor=pointer]:
+                - /url: /bereiche/74d4425d-458c-441c-9deb-d56f3e2df93f/bearbeiten
+              - paragraph [ref=e59]: Hochflexible LED-Streifen für Grund- und Akzentbeleuchtung
+            - generic [ref=e60]:
+              - generic [ref=e61]:
+                - paragraph [ref=e62]: "3"
+                - paragraph [ref=e63]: Kategorien
+              - generic [ref=e64]:
+                - paragraph [ref=e65]: "5"
+                - paragraph [ref=e66]: Produkte
+              - generic [ref=e68]: S. 4
+            - generic [ref=e69]:
+              - button "Löschen" [ref=e70] [cursor=pointer]
+              - link [ref=e71] [cursor=pointer]:
+                - /url: /bereiche/74d4425d-458c-441c-9deb-d56f3e2df93f/bearbeiten
+                - img [ref=e72]
+          - generic [ref=e75]:
+            - generic [ref=e76]: "2"
+            - img [ref=e79]
+            - generic [ref=e83]:
+              - link "LED EINBAUSTRAHLER" [ref=e84] [cursor=pointer]:
+                - /url: /bereiche/6b6989a6-91f7-4fa0-8f84-6535cfb85937/bearbeiten
+              - paragraph [ref=e85]: Einbauleuchten für Deckeninstallation
+            - generic [ref=e86]:
+              - generic [ref=e87]:
+                - paragraph [ref=e88]: "1"
+                - paragraph [ref=e89]: Kategorien
+              - generic [ref=e90]:
+                - paragraph [ref=e91]: "2"
+                - paragraph [ref=e92]: Produkte
+              - generic [ref=e94]: S. 30
+            - generic [ref=e95]:
+              - button "Löschen" [ref=e96] [cursor=pointer]
+              - link [ref=e97] [cursor=pointer]:
+                - /url: /bereiche/6b6989a6-91f7-4fa0-8f84-6535cfb85937/bearbeiten
+                - img [ref=e98]
+          - generic [ref=e101]:
+            - generic [ref=e102]: "3"
+            - img [ref=e105]
+            - generic [ref=e109]:
+              - link "PENDELLEUCHTEN" [ref=e110] [cursor=pointer]:
+                - /url: /bereiche/f3e5db78-e785-4cea-9756-86a11ffdf265/bearbeiten
+              - paragraph [ref=e111]: Hängende Designleuchten für Büro und Wohnraum
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - paragraph [ref=e114]: "1"
+                - paragraph [ref=e115]: Kategorien
+              - generic [ref=e116]:
+                - paragraph [ref=e117]: "3"
+                - paragraph [ref=e118]: Produkte
+              - generic [ref=e120]: S. 50
+            - generic [ref=e121]:
+              - button "Löschen" [ref=e122] [cursor=pointer]
+              - link [ref=e123] [cursor=pointer]:
+                - /url: /bereiche/f3e5db78-e785-4cea-9756-86a11ffdf265/bearbeiten
+                - img [ref=e124]
+    - contentinfo [ref=e126]: LICHT.ENGROS S.R.L. / Eisenkeil · Lichtstudio Produktverwaltung
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e132] [cursor=pointer]:
+    - img [ref=e133]
+  - alert [ref=e136]

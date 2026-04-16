@@ -1,0 +1,94 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "L LICHTSTUDIO Produktverwaltung v2.0" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e6]: L
+          - generic [ref=e7]:
+            - text: LICHTSTUDIO
+            - generic [ref=e8]: Produktverwaltung v2.0
+        - navigation [ref=e9]:
+          - link "Bereiche" [ref=e10] [cursor=pointer]:
+            - /url: /bereiche
+            - img [ref=e11]
+            - text: Bereiche
+          - link "Kategorien" [ref=e16] [cursor=pointer]:
+            - /url: /kategorien
+            - img [ref=e17]
+            - text: Kategorien
+          - link "Produkte" [ref=e21] [cursor=pointer]:
+            - /url: /produkte
+            - img [ref=e22]
+            - text: Produkte
+          - link "Katalog-Export" [ref=e26] [cursor=pointer]:
+            - /url: /export/katalog
+            - img [ref=e27]
+            - text: Katalog-Export
+          - link "Einstellungen" [ref=e31] [cursor=pointer]:
+            - /url: /einstellungen
+            - img [ref=e32]
+            - text: Einstellungen
+        - generic [ref=e35]:
+          - generic [ref=e36]: demo@lichtengros.test
+          - button "Abmelden" [ref=e38] [cursor=pointer]:
+            - img
+            - generic [ref=e39]: Abmelden
+    - main [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - heading "Willkommen im Lichtstudio" [level=1] [ref=e43]
+          - paragraph [ref=e44]: Interne Produktverwaltung von LICHT.ENGROS / Eisenkeil.
+        - generic [ref=e45]:
+          - link "3 Bereiche" [ref=e46] [cursor=pointer]:
+            - /url: /bereiche
+            - generic [ref=e48]:
+              - img [ref=e50]
+              - generic [ref=e55]:
+                - paragraph [ref=e56]: "3"
+                - paragraph [ref=e57]: Bereiche
+          - link "5 Kategorien" [ref=e58] [cursor=pointer]:
+            - /url: /kategorien
+            - generic [ref=e60]:
+              - img [ref=e62]
+              - generic [ref=e66]:
+                - paragraph [ref=e67]: "5"
+                - paragraph [ref=e68]: Kategorien
+          - link "10 Produkte" [ref=e69] [cursor=pointer]:
+            - /url: /produkte
+            - generic [ref=e71]:
+              - img [ref=e73]
+              - generic [ref=e77]:
+                - paragraph [ref=e78]: "10"
+                - paragraph [ref=e79]: Produkte
+          - link "10 Preise" [ref=e80] [cursor=pointer]:
+            - /url: /produkte
+            - generic [ref=e82]:
+              - img [ref=e84]
+              - generic [ref=e87]:
+                - paragraph [ref=e88]: "10"
+                - paragraph [ref=e89]: Preise
+        - generic [ref=e90]:
+          - link "Neues Produkt Artikel mit technischen Daten anlegen." [ref=e91] [cursor=pointer]:
+            - /url: /produkte/neu
+            - generic [ref=e92]:
+              - generic [ref=e93]:
+                - img [ref=e95]
+                - generic [ref=e99]: Neues Produkt
+              - paragraph [ref=e101]: Artikel mit technischen Daten anlegen.
+          - link "Katalog exportieren Gesamtkatalog als PDF generieren." [ref=e102] [cursor=pointer]:
+            - /url: /export/katalog
+            - generic [ref=e103]:
+              - generic [ref=e104]:
+                - img [ref=e106]
+                - generic [ref=e110]: Katalog exportieren
+              - paragraph [ref=e112]: Gesamtkatalog als PDF generieren.
+          - link "Einstellungen Filialen, Logos und Katalog-Parameter." [ref=e113] [cursor=pointer]:
+            - /url: /einstellungen
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - img [ref=e117]
+                - generic [ref=e120]: Einstellungen
+              - paragraph [ref=e122]: Filialen, Logos und Katalog-Parameter.
+    - contentinfo [ref=e123]: LICHT.ENGROS S.R.L. / Eisenkeil · Lichtstudio Produktverwaltung
+  - region "Notifications alt+T"

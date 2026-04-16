@@ -1,0 +1,17 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: Lichtstudio
+      - generic [ref=e6]: Interner Login zur Produktverwaltung
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - text: E-Mail
+        - textbox "E-Mail" [ref=e10]
+      - generic [ref=e11]:
+        - text: Passwort
+        - textbox "Passwort" [ref=e12]
+      - button "Anmelden" [ref=e13] [cursor=pointer]
+      - link "Passwort vergessen?" [ref=e15] [cursor=pointer]:
+        - /url: /reset-password/request
+  - region "Notifications alt+T"
+  - alert [ref=e16]

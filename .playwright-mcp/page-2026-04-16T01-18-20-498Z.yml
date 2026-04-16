@@ -1,0 +1,174 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "LICHTSTUDIO" [ref=e5] [cursor=pointer]:
+          - /url: /
+        - navigation [ref=e6]:
+          - link "Bereiche" [ref=e7] [cursor=pointer]:
+            - /url: /bereiche
+          - link "Kategorien" [ref=e8] [cursor=pointer]:
+            - /url: /kategorien
+          - link "Produkte" [ref=e9] [cursor=pointer]:
+            - /url: /produkte
+          - link "Katalog-Export" [ref=e10] [cursor=pointer]:
+            - /url: /export/katalog
+          - link "Einstellungen" [ref=e11] [cursor=pointer]:
+            - /url: /einstellungen
+        - generic [ref=e12]:
+          - generic [ref=e13]: demo@lichtengros.test
+          - button "Abmelden" [ref=e15] [cursor=pointer]
+    - main [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e18]:
+          - generic [ref=e19]:
+            - heading "Produkte" [level=1] [ref=e20]
+            - paragraph [ref=e21]: 10 Produkte gefunden.
+          - link "neues Produkt" [ref=e22] [cursor=pointer]:
+            - /url: /produkte/neu
+            - img
+            - text: neues Produkt
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - text: Suche (Artikelnr, Name, Titel)
+            - textbox "z.B. BL13528" [ref=e25]
+          - generic [ref=e26]:
+            - text: Bereich
+            - combobox [ref=e27]:
+              - option "Alle" [selected]
+              - option "LED STRIP"
+              - option "LED EINBAUSTRAHLER"
+              - option "PENDELLEUCHTEN"
+          - generic [ref=e28]:
+            - text: Kategorie
+            - combobox [ref=e29]:
+              - option "Alle" [selected]
+              - option "120 SMD/MT"
+              - option "60 SMD/MT"
+              - option "LINEARE PENDELLEUCHTEN"
+              - option "NEON FLEX"
+              - option "RUNDE EINBAUSTRAHLER"
+          - generic [ref=e30]:
+            - text: Status
+            - combobox [ref=e31]:
+              - option "Alle" [selected]
+              - option "nur unbearbeitet"
+              - option "nur bearbeitet"
+          - generic [ref=e32]:
+            - link "Zurücksetzen" [ref=e33] [cursor=pointer]:
+              - /url: /produkte
+            - button "Anwenden" [ref=e34] [cursor=pointer]
+        - table [ref=e37]:
+          - rowgroup [ref=e38]:
+            - row "Artikelnummer Name Bereich Kategorie Sortierung Status" [ref=e39]:
+              - columnheader "Artikelnummer" [ref=e40]
+              - columnheader "Name" [ref=e41]
+              - columnheader "Bereich" [ref=e42]
+              - columnheader "Kategorie" [ref=e43]
+              - columnheader "Sortierung" [ref=e44]
+              - columnheader "Status" [ref=e45]
+          - rowgroup [ref=e46]:
+            - row "BL13528-60-4.8-2700-90-20 LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP20 60LED/m (5m-Rolle) LED STRIP 60 SMD/MT 1 bearbeitet" [ref=e47]:
+              - cell "BL13528-60-4.8-2700-90-20" [ref=e48]:
+                - link "BL13528-60-4.8-2700-90-20" [ref=e49] [cursor=pointer]:
+                  - /url: /produkte/183633e8-11b3-45b5-8d23-928d03399f9e
+              - cell "LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP20 60LED/m (5m-Rolle)" [ref=e50]
+              - cell "LED STRIP" [ref=e51]
+              - cell "60 SMD/MT" [ref=e52]
+              - cell "1" [ref=e53]
+              - cell "bearbeitet" [ref=e54]:
+                - generic [ref=e55]: bearbeitet
+            - row "BL13528-60-4.8-2700-90-65 LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP65 60LED/m (5m-Rolle) LED STRIP 60 SMD/MT 2 bearbeitet" [ref=e56]:
+              - cell "BL13528-60-4.8-2700-90-65" [ref=e57]:
+                - link "BL13528-60-4.8-2700-90-65" [ref=e58] [cursor=pointer]:
+                  - /url: /produkte/e427e681-979d-45ac-b975-e54f04280250
+              - cell "LED-FLEXBAND 4,8W/m 24V 2700°K 430lm Ra90 IP65 60LED/m (5m-Rolle)" [ref=e59]
+              - cell "LED STRIP" [ref=e60]
+              - cell "60 SMD/MT" [ref=e61]
+              - cell "2" [ref=e62]
+              - cell "bearbeitet" [ref=e63]:
+                - generic [ref=e64]: bearbeitet
+            - row "BL13528-60-4.8-3000-90-20 LED-FLEXBAND 4,8W/m 24V 3000°K 430lm Ra90 IP20 60LED/m LED STRIP 60 SMD/MT 3 bearbeitet" [ref=e65]:
+              - cell "BL13528-60-4.8-3000-90-20" [ref=e66]:
+                - link "BL13528-60-4.8-3000-90-20" [ref=e67] [cursor=pointer]:
+                  - /url: /produkte/af902492-8cf8-4660-80c9-cd6e9c8e2cf1
+              - cell "LED-FLEXBAND 4,8W/m 24V 3000°K 430lm Ra90 IP20 60LED/m" [ref=e68]
+              - cell "LED STRIP" [ref=e69]
+              - cell "60 SMD/MT" [ref=e70]
+              - cell "3" [ref=e71]
+              - cell "bearbeitet" [ref=e72]:
+                - generic [ref=e73]: bearbeitet
+            - row "BL2835-120-9.6-3000-90-20 LED-FLEXBAND 9,6W/m 24V 3000°K 1100lm Ra90 IP20 120LED/m LED STRIP 120 SMD/MT 4 bearbeitet" [ref=e74]:
+              - cell "BL2835-120-9.6-3000-90-20" [ref=e75]:
+                - link "BL2835-120-9.6-3000-90-20" [ref=e76] [cursor=pointer]:
+                  - /url: /produkte/d5b43fc8-8152-4d1f-a2d6-bf5f07dd506b
+              - cell "LED-FLEXBAND 9,6W/m 24V 3000°K 1100lm Ra90 IP20 120LED/m" [ref=e77]
+              - cell "LED STRIP" [ref=e78]
+              - cell "120 SMD/MT" [ref=e79]
+              - cell "4" [ref=e80]
+              - cell "bearbeitet" [ref=e81]:
+                - generic [ref=e82]: bearbeitet
+            - row "EBR-12W-4000-BK LED-Einbaustrahler rund 12W 4000K schwarz LED EINBAUSTRAHLER RUNDE EINBAUSTRAHLER 7 bearbeitet" [ref=e83]:
+              - cell "EBR-12W-4000-BK" [ref=e84]:
+                - link "EBR-12W-4000-BK" [ref=e85] [cursor=pointer]:
+                  - /url: /produkte/e35a457a-e977-4f50-8ca0-32b2318285b1
+              - cell "LED-Einbaustrahler rund 12W 4000K schwarz" [ref=e86]
+              - cell "LED EINBAUSTRAHLER" [ref=e87]
+              - cell "RUNDE EINBAUSTRAHLER" [ref=e88]
+              - cell "7" [ref=e89]
+              - cell "bearbeitet" [ref=e90]:
+                - generic [ref=e91]: bearbeitet
+            - row "EBR-8W-3000-WH LED-Einbaustrahler rund 8W 3000K weiß LED EINBAUSTRAHLER RUNDE EINBAUSTRAHLER 6 bearbeitet" [ref=e92]:
+              - cell "EBR-8W-3000-WH" [ref=e93]:
+                - link "EBR-8W-3000-WH" [ref=e94] [cursor=pointer]:
+                  - /url: /produkte/55270acf-e187-4b64-a6d7-ad6f5464c0bc
+              - cell "LED-Einbaustrahler rund 8W 3000K weiß" [ref=e95]
+              - cell "LED EINBAUSTRAHLER" [ref=e96]
+              - cell "RUNDE EINBAUSTRAHLER" [ref=e97]
+              - cell "6" [ref=e98]
+              - cell "bearbeitet" [ref=e99]:
+                - generic [ref=e100]: bearbeitet
+            - row "NF-1220-3000-IP67 NEON FLEX 12W/m 24V 3000K IP67 LED STRIP NEON FLEX 5 bearbeitet" [ref=e101]:
+              - cell "NF-1220-3000-IP67" [ref=e102]:
+                - link "NF-1220-3000-IP67" [ref=e103] [cursor=pointer]:
+                  - /url: /produkte/47e302f4-afd6-4939-9fc6-a3c67f9e6acb
+              - cell "NEON FLEX 12W/m 24V 3000K IP67" [ref=e104]
+              - cell "LED STRIP" [ref=e105]
+              - cell "NEON FLEX" [ref=e106]
+              - cell "5" [ref=e107]
+              - cell "bearbeitet" [ref=e108]:
+                - generic [ref=e109]: bearbeitet
+            - row "PL-LINEAR-36W-4000 Pendelleuchte Linear 36W 4000K 1200mm PENDELLEUCHTEN LINEARE PENDELLEUCHTEN 8 bearbeitet" [ref=e110]:
+              - cell "PL-LINEAR-36W-4000" [ref=e111]:
+                - link "PL-LINEAR-36W-4000" [ref=e112] [cursor=pointer]:
+                  - /url: /produkte/7263e87a-8ba5-4826-ad28-dc07200a3c09
+              - cell "Pendelleuchte Linear 36W 4000K 1200mm" [ref=e113]
+              - cell "PENDELLEUCHTEN" [ref=e114]
+              - cell "LINEARE PENDELLEUCHTEN" [ref=e115]
+              - cell "8" [ref=e116]
+              - cell "bearbeitet" [ref=e117]:
+                - generic [ref=e118]: bearbeitet
+            - row "PL-LINEAR-54W-3000 Pendelleuchte Linear 54W 3000K 1800mm PENDELLEUCHTEN LINEARE PENDELLEUCHTEN 9 bearbeitet" [ref=e119]:
+              - cell "PL-LINEAR-54W-3000" [ref=e120]:
+                - link "PL-LINEAR-54W-3000" [ref=e121] [cursor=pointer]:
+                  - /url: /produkte/b554c779-93c0-45c3-91ad-3faaea8021e0
+              - cell "Pendelleuchte Linear 54W 3000K 1800mm" [ref=e122]
+              - cell "PENDELLEUCHTEN" [ref=e123]
+              - cell "LINEARE PENDELLEUCHTEN" [ref=e124]
+              - cell "9" [ref=e125]
+              - cell "bearbeitet" [ref=e126]:
+                - generic [ref=e127]: bearbeitet
+            - row "PL-RING-48W-3000 Pendelleuchte Ring 48W 3000K Ø600mm PENDELLEUCHTEN LINEARE PENDELLEUCHTEN 10 bearbeitet" [ref=e128]:
+              - cell "PL-RING-48W-3000" [ref=e129]:
+                - link "PL-RING-48W-3000" [ref=e130] [cursor=pointer]:
+                  - /url: /produkte/6ad741d4-1c23-444a-b521-38f7791393a5
+              - cell "Pendelleuchte Ring 48W 3000K Ø600mm" [ref=e131]
+              - cell "PENDELLEUCHTEN" [ref=e132]
+              - cell "LINEARE PENDELLEUCHTEN" [ref=e133]
+              - cell "10" [ref=e134]
+              - cell "bearbeitet" [ref=e135]:
+                - generic [ref=e136]: bearbeitet
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e142] [cursor=pointer]:
+    - img [ref=e143]
+  - alert [ref=e146]

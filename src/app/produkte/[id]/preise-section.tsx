@@ -8,11 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { addPreis, deletePreis, type PreisInput } from "../preise-actions";
 
 type Preis = {
-  id: string; gueltig_ab: string; ek: number | null; listenpreis: number; status: "aktiv" | "inaktiv";
+  id: string; gueltig_ab: string; ek: number | null; ek_eisenkeil: number | null; listenpreis: number; status: "aktiv" | "inaktiv";
 };
 
 export function PreiseSection({ produktId, preise }: { produktId: string; preise: Preis[] }) {
@@ -21,12 +21,10 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
   const [pending, startTransition] = useTransition();
   const today = new Date().toISOString().slice(0, 10);
 
-  // determine current price (latest active with gueltig_ab <= today)
   const currentId = (() => {
-    const candidates = list
-      .filter((p) => p.status === "aktiv" && p.gueltig_ab <= today)
+    const c = list.filter((p) => p.status === "aktiv" && p.gueltig_ab <= today)
       .sort((a, b) => b.gueltig_ab.localeCompare(a.gueltig_ab));
-    return candidates[0]?.id;
+    return c[0]?.id;
   })();
 
   function add(p: PreisInput) {
@@ -47,48 +45,59 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
     });
   }
 
+  const fmt = (v: number | null) => v != null ? `${v.toFixed(2)} €` : "—";
+
   return (
-    <Card>
+    <Card className="border-l-4 border-l-amber-500">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Preise</CardTitle>
-        <Button size="sm" onClick={() => setShowForm((v) => !v)}>
-          <Plus className="mr-1 h-4 w-4" /> {showForm ? "Abbrechen" : "neuer Preis"}
+        <CardTitle className="flex items-center gap-2">
+          Preise
+          <Badge variant="secondary">{list.length}</Badge>
+        </CardTitle>
+        <Button size="sm" variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)}>
+          <Plus className="mr-1 h-4 w-4" /> {showForm ? "Abbrechen" : "Neuer Preis"}
         </Button>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-4">
         {showForm && <PreisForm onSubmit={add} pending={pending} />}
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Gültig ab</TableHead>
-              <TableHead className="text-right">EK</TableHead>
-              <TableHead className="text-right">Listenpreis</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-24 text-right" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Noch keine Preise.</TableCell></TableRow>
-            )}
-            {list.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>{p.gueltig_ab}</TableCell>
-                <TableCell className="text-right">{p.ek != null ? `${p.ek.toFixed(2)} €` : "—"}</TableCell>
-                <TableCell className="text-right font-medium">{p.listenpreis.toFixed(2)} €</TableCell>
-                <TableCell>
-                  {p.id === currentId
-                    ? <Badge>aktuell</Badge>
-                    : p.status === "aktiv" ? <Badge variant="secondary">aktiv</Badge> : <Badge variant="outline">inaktiv</Badge>}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button size="sm" variant="ghost" onClick={() => remove(p.id)} disabled={pending}>Löschen</Button>
-                </TableCell>
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead>Gültig ab</TableHead>
+                <TableHead className="text-right">EK Lichtengros</TableHead>
+                <TableHead className="text-right">EK Eisenkeil</TableHead>
+                <TableHead className="text-right font-semibold">Listenpreis</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-16" />
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {list.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Noch keine Preise.</TableCell></TableRow>
+              )}
+              {list.map((p) => (
+                <TableRow key={p.id} className={p.id === currentId ? "bg-emerald-50" : ""}>
+                  <TableCell className="font-mono text-sm">{p.gueltig_ab}</TableCell>
+                  <TableCell className="text-right">{fmt(p.ek)}</TableCell>
+                  <TableCell className="text-right">{fmt(p.ek_eisenkeil)}</TableCell>
+                  <TableCell className="text-right font-semibold">{fmt(p.listenpreis)}</TableCell>
+                  <TableCell>
+                    {p.id === currentId
+                      ? <Badge className="bg-emerald-600">aktuell</Badge>
+                      : p.status === "aktiv" ? <Badge variant="secondary">aktiv</Badge> : <Badge variant="outline">inaktiv</Badge>}
+                  </TableCell>
+                  <TableCell>
+                    <Button size="icon" variant="ghost" onClick={() => remove(p.id)} disabled={pending}>
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -98,36 +107,47 @@ function PreisForm({ onSubmit, pending }: { onSubmit: (p: PreisInput) => void; p
   const today = new Date().toISOString().slice(0, 10);
   const [gueltigAb, setGueltigAb] = useState(today);
   const [ek, setEk] = useState("");
+  const [ekEis, setEkEis] = useState("");
   const [lp, setLp] = useState("");
   const [deact, setDeact] = useState(true);
 
   return (
-    <div className="rounded border p-3 grid grid-cols-5 gap-3 items-end bg-muted/30">
-      <div>
-        <Label htmlFor="gueltig_ab">Gültig ab</Label>
-        <Input id="gueltig_ab" type="date" value={gueltigAb} onChange={(e) => setGueltigAb(e.target.value)} />
+    <div className="rounded-lg border-2 border-dashed border-primary/30 p-4 bg-primary/5 space-y-4">
+      <h4 className="font-semibold text-sm">Neuen Preis hinzufügen</h4>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+        <div>
+          <Label className="text-xs">Gültig ab</Label>
+          <Input type="date" value={gueltigAb} onChange={(e) => setGueltigAb(e.target.value)} />
+        </div>
+        <div>
+          <Label className="text-xs">EK Lichtengros (€)</Label>
+          <Input type="number" step="0.01" value={ek} onChange={(e) => setEk(e.target.value)} placeholder="0.00" />
+        </div>
+        <div>
+          <Label className="text-xs">EK Eisenkeil (€)</Label>
+          <Input type="number" step="0.01" value={ekEis} onChange={(e) => setEkEis(e.target.value)} placeholder="0.00" />
+        </div>
+        <div>
+          <Label className="text-xs">Listenpreis (€) *</Label>
+          <Input type="number" step="0.01" required value={lp} onChange={(e) => setLp(e.target.value)} placeholder="0.00" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={deact} onChange={(e) => setDeact(e.target.checked)} />
+            alte deaktivieren
+          </label>
+          <Button
+            disabled={pending || !lp}
+            onClick={() => onSubmit({
+              gueltig_ab: gueltigAb,
+              ek: ek ? Number(ek) : null,
+              ek_eisenkeil: ekEis ? Number(ekEis) : null,
+              listenpreis: Number(lp),
+              deactivateOthers: deact,
+            })}
+          >Speichern</Button>
+        </div>
       </div>
-      <div>
-        <Label htmlFor="ek">EK (€)</Label>
-        <Input id="ek" type="number" step="0.01" value={ek} onChange={(e) => setEk(e.target.value)} />
-      </div>
-      <div>
-        <Label htmlFor="lp">Listenpreis (€) *</Label>
-        <Input id="lp" type="number" step="0.01" required value={lp} onChange={(e) => setLp(e.target.value)} />
-      </div>
-      <label className="flex items-center gap-2 text-sm pt-6">
-        <input type="checkbox" checked={deact} onChange={(e) => setDeact(e.target.checked)} />
-        alte deaktivieren
-      </label>
-      <Button
-        disabled={pending || !lp}
-        onClick={() => onSubmit({
-          gueltig_ab: gueltigAb,
-          ek: ek ? Number(ek) : null,
-          listenpreis: Number(lp),
-          deactivateOthers: deact,
-        })}
-      >Speichern</Button>
     </div>
   );
 }

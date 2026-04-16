@@ -16,6 +16,8 @@ const baseSchema = z.object({
   hauptbild_path: z.string().optional().nullable(),
   datenblatt_titel: z.string().max(300).optional().nullable(),
   datenblatt_text: z.string().max(20000).optional().nullable(),
+  datenblatt_text_2: z.string().max(20000).optional().nullable(),
+  datenblatt_text_3: z.string().max(20000).optional().nullable(),
 });
 
 export type ProduktFormState = { error: string | null; fieldErrors?: Record<string, string> };
@@ -55,6 +57,8 @@ function parseBase(formData: FormData) {
     hauptbild_path: (formData.get("hauptbild_path") as string) || null,
     datenblatt_titel: formData.get("datenblatt_titel") || null,
     datenblatt_text: formData.get("datenblatt_text") || null,
+    datenblatt_text_2: formData.get("datenblatt_text_2") || null,
+    datenblatt_text_3: formData.get("datenblatt_text_3") || null,
   });
 }
 

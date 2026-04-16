@@ -1,9 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { createClient } from "@/lib/supabase/server";
-import { logoutAction } from "@/app/login/actions";
-import { Button } from "@/components/ui/button";
-import { LayoutGrid, Layers, Package, FileDown, Settings, LogOut, Menu } from "lucide-react";
+import { LayoutGrid, Layers, Package, FileDown, Settings } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/bereiche", label: "Bereiche", icon: LayoutGrid },
@@ -14,14 +11,8 @@ const NAV_ITEMS = [
 ];
 
 export async function AppShell({ children }: { children: ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      {/* Top bar */}
       <header className="sticky top-0 z-50 bg-primary text-primary-foreground shadow-lg">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 px-6 py-3">
           <Link href="/" className="flex items-center gap-3 group">
@@ -47,33 +38,16 @@ export async function AppShell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
-            {user && (
-              <span className="hidden lg:block text-xs text-white/60 max-w-[180px] truncate">
-                {user.email}
-              </span>
-            )}
-            <form action={logoutAction}>
-              <Button
-                variant="ghost"
-                size="sm"
-                type="submit"
-                className="text-white/70 hover:text-white hover:bg-white/10"
-              >
-                <LogOut className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">Abmelden</span>
-              </Button>
-            </form>
+          <div className="hidden lg:block text-xs text-white/60">
+            Auth deaktiviert (dev)
           </div>
         </div>
       </header>
 
-      {/* Main content */}
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-6 py-8">
         {children}
       </main>
 
-      {/* Footer */}
       <footer className="border-t bg-background py-3 text-center text-xs text-muted-foreground">
         LICHT.ENGROS S.R.L. / Eisenkeil &middot; Lichtstudio Produktverwaltung
       </footer>

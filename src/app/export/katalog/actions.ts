@@ -10,10 +10,9 @@ export type StartKatalogResult = { jobId?: string; error: string | null };
 
 export async function startKatalogJob(params: KatalogParams): Promise<StartKatalogResult> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
   const { data: job, error } = await supabase
     .from("katalog_jobs")
-    .insert({ status: "queued", parameter: params as any, started_by: user?.id })
+    .insert({ status: "queued", parameter: params as any })
     .select("id")
     .single();
   if (error || !job) return { error: error?.message ?? "Job-Anlage fehlgeschlagen" };

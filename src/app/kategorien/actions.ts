@@ -12,17 +12,39 @@ const schema = z.object({
   beschreibung: z.string().max(4000).optional().nullable(),
   sortierung: z.coerce.number().int().min(0).default(0),
   vorschaubild_path: z.string().optional().nullable(),
+  spalte_1: z.string().optional().nullable(),
+  spalte_2: z.string().optional().nullable(),
+  spalte_3: z.string().optional().nullable(),
+  spalte_4: z.string().optional().nullable(),
+  spalte_5: z.string().optional().nullable(),
+  spalte_6: z.string().optional().nullable(),
+  spalte_7: z.string().optional().nullable(),
+  spalte_8: z.string().optional().nullable(),
+  spalte_9: z.string().optional().nullable(),
 });
 
 export type KategorieFormState = { error: string | null; fieldErrors?: Record<string, string> };
 
 function parse(formData: FormData) {
+  const spaltenVal = (k: string) => {
+    const v = (formData.get(k) as string) || null;
+    return v && v !== "__leer__" ? v : null;
+  };
   return schema.safeParse({
     bereich_id: formData.get("bereich_id"),
     name: formData.get("name"),
     beschreibung: formData.get("beschreibung") || null,
     sortierung: formData.get("sortierung") || 0,
     vorschaubild_path: (formData.get("vorschaubild_path") as string) || null,
+    spalte_1: spaltenVal("spalte_1"),
+    spalte_2: spaltenVal("spalte_2"),
+    spalte_3: spaltenVal("spalte_3"),
+    spalte_4: spaltenVal("spalte_4"),
+    spalte_5: spaltenVal("spalte_5"),
+    spalte_6: spaltenVal("spalte_6"),
+    spalte_7: spaltenVal("spalte_7"),
+    spalte_8: spaltenVal("spalte_8"),
+    spalte_9: spaltenVal("spalte_9"),
   });
 }
 

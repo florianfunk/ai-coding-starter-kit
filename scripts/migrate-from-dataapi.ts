@@ -523,12 +523,19 @@ async function main() {
         const vorschauPath = bildUrl ? await uploadContainer("produktbilder", `kategorien/${fmId}`, bildUrl) : null;
         let katId: string;
         if (!DRY_RUN) {
+          // Normalize T1-T9: "leer" → null
+          const tNorm = (v: any) => {
+            const s = (v ?? "").toString().trim();
+            if (!s || s.toLowerCase() === "leer") return null;
+            return s;
+          };
           const res = await pg.query(
             `insert into public.kategorien
                (external_id, bereich_id, name, beschreibung, sortierung, vorschaubild_path,
                 seitenangabe, seitenzahl, startseite, endseite, sortierung_alt, sortierung_ber,
-                fm_erstellt_von, fm_geaendert_von)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+                fm_erstellt_von, fm_geaendert_von,
+                spalte_1, spalte_2, spalte_3, spalte_4, spalte_5, spalte_6, spalte_7, spalte_8, spalte_9)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
              on conflict (external_id) do update set
                bereich_id = excluded.bereich_id,
                name = excluded.name,
@@ -542,7 +549,16 @@ async function main() {
                sortierung_alt = excluded.sortierung_alt,
                sortierung_ber = excluded.sortierung_ber,
                fm_erstellt_von = excluded.fm_erstellt_von,
-               fm_geaendert_von = excluded.fm_geaendert_von
+               fm_geaendert_von = excluded.fm_geaendert_von,
+               spalte_1 = excluded.spalte_1,
+               spalte_2 = excluded.spalte_2,
+               spalte_3 = excluded.spalte_3,
+               spalte_4 = excluded.spalte_4,
+               spalte_5 = excluded.spalte_5,
+               spalte_6 = excluded.spalte_6,
+               spalte_7 = excluded.spalte_7,
+               spalte_8 = excluded.spalte_8,
+               spalte_9 = excluded.spalte_9
              returning id, (xmax = 0) as inserted`,
             [
               fmId, bereichUuid,
@@ -554,6 +570,8 @@ async function main() {
               toNum(r.Seitenzahl), toNum(r.Startseite), toNum(r.Endseite),
               toNum(r.Sortierung_alt), toNum(r.Sortierung_ber),
               r.ErstelltVon || null, r.GeändertVon || null,
+              tNorm(r.T1), tNorm(r.T2), tNorm(r.T3), tNorm(r.T4), tNorm(r.T5),
+              tNorm(r.T6), tNorm(r.T7), tNorm(r.T8), tNorm(r.T9),
             ],
           );
           katId = res.rows[0].id;

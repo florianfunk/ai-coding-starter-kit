@@ -1,5 +1,9 @@
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
-import { ALL_PRODUKT_FIELDS } from "@/app/produkte/fields";
+import { getSpaltenDefinition, formatSpaltenWert } from "@/lib/katalog-column-map";
+
+// ===========================================================================
+// Types
+// ===========================================================================
 
 export type KatalogParams = {
   layout: "lichtengros" | "eisenkeil";
@@ -7,18 +11,20 @@ export type KatalogParams = {
   preisAenderung: "plus" | "minus";
   preisProzent: number;
   waehrung: "EUR" | "CHF";
-  wechselkurs: number; // EUR -> CHF
+  wechselkurs: number;
 };
 
 export type KatalogData = {
   params: KatalogParams;
-  bereiche: any[];           // ordered
+  bereiche: any[];
   kategorienByBereich: Map<string, any[]>;
   produkteByKategorie: Map<string, any[]>;
   preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
   hauptbildByProdukt: Map<string, string | null>;
   iconLabelsByProdukt: Map<string, string[]>;
+  kategorieIconsByKategorie: Map<string, { label: string; url: string | null }[]>;
   bereichBildUrl: Map<string, string | null>;
+  kategorieBildUrl: Map<string, string | null>;
   logoUrl: string | null;
   coverVorneUrl: string | null;
   coverHintenUrl: string | null;
@@ -27,36 +33,276 @@ export type KatalogData = {
   generatedAt: Date;
 };
 
+// ===========================================================================
+// Styling — am Original-Katalog orientiert
+// ===========================================================================
+
+const DARK = "#3a3a3a";       // Cover- und Back-Cover-Hintergrund
+const TEXT_DARK = "#1a1a1a";
+const TEXT_MUTED = "#666";
+const TEXT_LIGHT = "#ffffff";
+const LINE = "#d4d4d4";
+const LINE_DARK = "#1a1a1a";
+
 const styles = StyleSheet.create({
-  page: { padding: 28, fontSize: 9, fontFamily: "Helvetica" },
-  cover: { padding: 0, justifyContent: "center", alignItems: "center", flex: 1 },
-  coverImg: { width: "100%", height: "100%", objectFit: "cover" },
-  coverFallback: { fontSize: 38, fontWeight: 700, letterSpacing: 4 },
-  bereichPage: { padding: 28, justifyContent: "center", alignItems: "center" },
-  bereichBild: { width: "80%", height: 320, objectFit: "contain", marginBottom: 18 },
-  bereichTitel: { fontSize: 30, fontWeight: 700, letterSpacing: 2 },
-  kategorieHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, paddingBottom: 4, marginBottom: 8 },
-  kategorieTitle: { fontSize: 14, fontWeight: 700, letterSpacing: 1 },
-  artikelRow: { flexDirection: "row", borderBottomWidth: 0.3, borderColor: "#ddd", paddingVertical: 3, fontSize: 8 },
-  artNo: { width: "30%", fontFamily: "Courier" },
-  artName: { width: "55%" },
-  artPreis: { width: "15%", textAlign: "right" },
-  toc: { padding: 28 },
-  tocLine: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 1.5, fontSize: 9 },
-  footer: { position: "absolute", bottom: 14, left: 28, right: 28, fontSize: 7, color: "#888", flexDirection: "row", justifyContent: "space-between" },
-  pageNumber: { position: "absolute", bottom: 14, right: 28, fontSize: 7, color: "#888" },
-  produktPage: { padding: 28 },
-  prodHeader: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 0.5, paddingBottom: 4, marginBottom: 8 },
-  topRow: { flexDirection: "row", gap: 12 },
-  hauptbild: { width: "55%", height: 160, objectFit: "contain", backgroundColor: "#f5f5f5" },
-  techCol: { width: "45%" },
-  techRow: { fontSize: 8, marginBottom: 1 },
-  iconBar: { flexDirection: "row", flexWrap: "wrap", marginTop: 6, gap: 3 },
-  iconBadge: { borderWidth: 0.5, paddingHorizontal: 4, paddingVertical: 2, fontSize: 7 },
-  preisLine: { fontSize: 11, fontWeight: 700, marginTop: 8 },
+  // ─── Cover (S.1) ─────────────────────────────────────────
+  cover: {
+    backgroundColor: DARK,
+    padding: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    flex: 1,
+  },
+  coverImage: { width: "100%", height: "100%", objectFit: "cover" },
+  coverTitle: {
+    fontSize: 24,
+    fontFamily: "Helvetica",
+    color: TEXT_LIGHT,
+    letterSpacing: 2,
+    textAlign: "center",
+    marginBottom: 6,
+  },
+  coverSubtitle: {
+    fontSize: 14,
+    fontFamily: "Helvetica",
+    color: TEXT_LIGHT,
+    letterSpacing: 3,
+    textAlign: "center",
+    opacity: 0.85,
+    marginBottom: 40,
+  },
+  coverSmall: {
+    fontSize: 8,
+    color: TEXT_LIGHT,
+    letterSpacing: 1.5,
+    opacity: 0.7,
+    marginTop: 180,
+    textAlign: "center",
+  },
+  coverSmallText: {
+    fontSize: 7,
+    color: TEXT_LIGHT,
+    opacity: 0.6,
+    marginTop: 4,
+    textAlign: "center",
+  },
+
+  // ─── Dunkle leere Rückseite (S.2) ────────────────────────
+  emptyDark: { backgroundColor: DARK, flex: 1 },
+
+  // ─── Index (S.3) ─────────────────────────────────────────
+  indexPage: { padding: "50 50 50 50", fontFamily: "Helvetica" },
+  indexTitle: {
+    fontSize: 28,
+    fontWeight: 400,
+    color: TEXT_DARK,
+    letterSpacing: 2,
+    marginBottom: 22,
+  },
+  indexSeparator: { borderTopWidth: 0.75, borderColor: LINE_DARK, marginBottom: 2 },
+  indexRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderColor: LINE,
+  },
+  indexName: {
+    flex: 1,
+    fontSize: 10,
+    color: TEXT_DARK,
+    letterSpacing: 0.8,
+  },
+  indexPages: {
+    fontSize: 10,
+    color: TEXT_DARK,
+    width: 90,
+    textAlign: "right",
+    paddingRight: 18,
+  },
+  indexDot: { width: 12, height: 12, borderRadius: 6 },
+
+  // ─── Bereich-Intro (Vollbild + Label-Band) ───────────────
+  bereichIntro: { padding: 0, position: "relative", flex: 1 },
+  bereichBild: { width: "100%", height: "100%", objectFit: "cover" },
+  bereichLabelBand: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 120,
+    height: 60,
+    backgroundColor: "rgba(20,20,20,0.55)",
+    justifyContent: "center",
+    paddingRight: 50,
+  },
+  bereichLabelText: {
+    color: TEXT_LIGHT,
+    fontSize: 22,
+    letterSpacing: 2,
+    fontWeight: 700,
+    textAlign: "right",
+  },
+  bereichFallback: {
+    flex: 1,
+    backgroundColor: DARK,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  bereichFallbackText: {
+    color: TEXT_LIGHT,
+    fontSize: 36,
+    fontWeight: 700,
+    letterSpacing: 4,
+  },
+
+  // ─── Kategorie-Seite ─────────────────────────────────────
+  kategoriePage: {
+    padding: "34 34 40 34",
+    fontFamily: "Helvetica",
+    fontSize: 8.5,
+  },
+  kategorieHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  kategorieHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 6 },
+  pageNumBox: { fontSize: 9, color: TEXT_DARK },
+  bereichMarkerBox: { width: 10, height: 10, marginRight: 4 },
+  bereichLabelTop: {
+    fontSize: 9,
+    color: TEXT_DARK,
+    letterSpacing: 1,
+  },
+
+  kategorieTitleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10,
+  },
+  kategorieTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: TEXT_DARK,
+    letterSpacing: 0.5,
+  },
+  iconBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    maxWidth: "60%",
+    justifyContent: "flex-end",
+  },
+  iconBox: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconImg: { width: 32, height: 32, objectFit: "contain" },
+  iconLabel: {
+    fontSize: 6,
+    color: TEXT_DARK,
+    textAlign: "center",
+    marginTop: 2,
+  },
+
+  descriptionBlock: { marginBottom: 10 },
+  descriptionText: { fontSize: 9, lineHeight: 1.4, color: TEXT_DARK },
+  techDatenTitle: {
+    fontSize: 9,
+    fontWeight: 700,
+    color: TEXT_DARK,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  bulletLine: { fontSize: 9, color: TEXT_DARK, lineHeight: 1.4 },
+
+  topSplit: { flexDirection: "row", gap: 14, marginBottom: 14 },
+  leftColumn: { flex: 1 },
+  rightColumn: { width: 200, gap: 8 },
+  mainImage: { width: "100%", height: 130, objectFit: "cover" },
+  secondaryImage: { width: "100%", height: 110, objectFit: "cover" },
+
+  technicalDrawing: {
+    width: "100%",
+    height: 100,
+    marginBottom: 14,
+    objectFit: "contain",
+  },
+
+  // Varianten-Tabelle
+  table: { marginTop: 6 },
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#1a1a1a",
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+  },
+  tableHeaderCell: {
+    fontSize: 7,
+    color: TEXT_LIGHT,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 5,
+    paddingHorizontal: 4,
+    borderBottomWidth: 0.3,
+    borderColor: LINE,
+    minHeight: 24,
+  },
+  tableCell: { fontSize: 7.5, color: TEXT_DARK },
+  thumbCell: { width: 32, paddingRight: 4 },
+  thumbImg: { width: 28, height: 20, objectFit: "contain" },
+
+  // Seitenfuß
+  footer: {
+    position: "absolute",
+    bottom: 14,
+    left: 34,
+    right: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  footerText: { fontSize: 7, color: TEXT_MUTED },
+
+  // ─── Copyright + Back-Cover ──────────────────────────────
+  copyrightPage: {
+    backgroundColor: DARK,
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    padding: 50,
+  },
+  copyrightText: {
+    fontSize: 8,
+    color: TEXT_LIGHT,
+    opacity: 0.7,
+    textAlign: "center",
+    lineHeight: 1.6,
+    marginBottom: 40,
+  },
+  backCoverText: {
+    fontSize: 9,
+    color: TEXT_LIGHT,
+    opacity: 0.6,
+    textAlign: "center",
+  },
 });
 
-function calcPrice(p: { listenpreis: number; ek: number | null } | null | undefined, params: KatalogParams) {
+// ===========================================================================
+// Helpers
+// ===========================================================================
+
+function calcPrice(
+  p: { listenpreis: number; ek: number | null } | null | undefined,
+  params: KatalogParams,
+): number | null {
   if (!p) return null;
   const base = params.preisauswahl === "ek" ? (p.ek ?? p.listenpreis) : p.listenpreis;
   const factor = 1 + (params.preisAenderung === "plus" ? 1 : -1) * (params.preisProzent / 100);
@@ -65,139 +311,368 @@ function calcPrice(p: { listenpreis: number; ek: number | null } | null | undefi
   return final;
 }
 
-function formatPrice(value: number | null, currency: "EUR" | "CHF") {
-  if (value == null) return "—";
-  return new Intl.NumberFormat("de-DE", { style: "currency", currency }).format(value);
+function spaltenOf(kategorie: any): (string | null)[] {
+  return [
+    kategorie.spalte_1, kategorie.spalte_2, kategorie.spalte_3,
+    kategorie.spalte_4, kategorie.spalte_5, kategorie.spalte_6,
+    kategorie.spalte_7, kategorie.spalte_8, kategorie.spalte_9,
+  ];
 }
 
+function activeSpalten(kategorie: any): { index: number; label: string; def: ReturnType<typeof getSpaltenDefinition> }[] {
+  const result: { index: number; label: string; def: ReturnType<typeof getSpaltenDefinition> }[] = [];
+  spaltenOf(kategorie).forEach((label, i) => {
+    if (!label) return;
+    const def = getSpaltenDefinition(label);
+    if (!def) return;
+    result.push({ index: i, label, def });
+  });
+  return result;
+}
+
+// Bullet-Liste aus Beschreibung bauen (Zeilen mit "•" werden als Bullets dargestellt)
+function parseBeschreibung(text: string | null | undefined): { intro: string | null; bullets: string[] } {
+  if (!text) return { intro: null, bullets: [] };
+  const lines = text.split(/\r?\n/);
+  const bullets: string[] = [];
+  const introLines: string[] = [];
+  let hitBullet = false;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("•") || trimmed.startsWith("-") || trimmed.startsWith("*")) {
+      hitBullet = true;
+      bullets.push(trimmed.replace(/^[•\-*]\s*/, ""));
+    } else if (!hitBullet) {
+      introLines.push(trimmed);
+    } else {
+      bullets.push(trimmed);
+    }
+  }
+  return { intro: introLines.join(" ") || null, bullets };
+}
+
+// ===========================================================================
+// Document
+// ===========================================================================
+
 export function KatalogDocument(d: KatalogData) {
-  const themeColor = d.params.layout === "lichtengros" ? "#2b6c8c" : "#7a3e3e";
+  const isLichtengros = d.params.layout === "lichtengros";
+  const brandName = isLichtengros ? "LICHT.ENGROS" : "EISENKEIL";
+  const subtitle = "ARCHITECTURAL";
 
   return (
-    <Document title={`Lichtstudio Katalog ${d.params.layout}`}>
-      {/* COVER vorne */}
+    <Document title={`${brandName} Katalog`}>
+      {/* ═════════ COVER S.1 ═════════ */}
       <Page size="A4" style={styles.cover}>
-        {d.coverVorneUrl
-          ? <Image src={d.coverVorneUrl} style={styles.coverImg} />
-          : <Text style={styles.coverFallback}>{d.params.layout === "lichtengros" ? "LICHT.ENGROS" : "EISENKEIL"}</Text>}
-      </Page>
-
-      {/* INHALTSVERZEICHNIS */}
-      <Page size="A4" style={styles.toc}>
-        <Text style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: themeColor }}>INHALT</Text>
-        {d.bereiche.map((b, i) => (
-          <View style={styles.tocLine} key={b.id}>
-            <Text>{i + 1}. {b.name}</Text>
-            <Text>{b.startseite ?? "—"}</Text>
+        {d.coverVorneUrl ? (
+          <Image src={d.coverVorneUrl} style={styles.coverImage} />
+        ) : (
+          <View style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}>
+            <Text style={styles.coverTitle}>{brandName}</Text>
+            <Text style={styles.coverSubtitle}>{subtitle}</Text>
+            <Text style={styles.coverSmall}>PRICELIST</Text>
+            <Text style={styles.coverSmallText}>
+              {d.params.waehrung === "EUR" ? "Preisangaben in Euro" : "Preisangaben in Schweizer Franken"}
+            </Text>
           </View>
-        ))}
-        <Text style={styles.pageNumber} render={({ pageNumber }) => `${pageNumber}`} fixed />
+        )}
       </Page>
 
-      {/* Pro Bereich */}
+      {/* ═════════ S.2: Leere dunkle Seite ═════════ */}
+      <Page size="A4" style={styles.emptyDark} />
+
+      {/* ═════════ S.3: INDEX ═════════ */}
+      <Page size="A4" style={styles.indexPage}>
+        <Text style={styles.indexTitle}>INDEX</Text>
+        <View style={styles.indexSeparator} />
+        {d.bereiche.map((b) => {
+          const kategorien = d.kategorienByBereich.get(b.id) ?? [];
+          const first = b.startseite ?? kategorien[0]?.startseite ?? null;
+          const last = b.endseite ?? kategorien[kategorien.length - 1]?.endseite ?? null;
+          const pageRange = first && last ? `${first} - ${last}` : first ? `${first}` : "—";
+          return (
+            <View key={b.id} style={styles.indexRow}>
+              <Text style={styles.indexName}>{(b.name ?? "").toUpperCase()}</Text>
+              <Text style={styles.indexPages}>{pageRange}</Text>
+              <View style={[styles.indexDot, { backgroundColor: b.farbe || "#ddd" }]} />
+            </View>
+          );
+        })}
+        <Text
+          style={[styles.footerText, { position: "absolute", bottom: 18, right: 34 }]}
+          render={({ pageNumber }) => `${pageNumber}`}
+          fixed
+        />
+      </Page>
+
+      {/* ═════════ Pro Bereich ═════════ */}
       {d.bereiche.map((b) => {
         const kategorien = d.kategorienByBereich.get(b.id) ?? [];
+        const bereichBild = d.bereichBildUrl.get(b.id);
         return (
-          <View key={b.id} wrap={false}>
-            {/* Bereich-Startseite */}
-            <Page size="A4" style={styles.bereichPage}>
-              {d.bereichBildUrl.get(b.id) && (
-                <Image src={d.bereichBildUrl.get(b.id)!} style={styles.bereichBild} />
+          <React.Fragment key={b.id}>
+            {/* Bereich-Intro-Seite (Vollbild) */}
+            <Page size="A4" style={styles.bereichIntro}>
+              {bereichBild ? (
+                <>
+                  <Image src={bereichBild} style={styles.bereichBild} />
+                  <View style={styles.bereichLabelBand}>
+                    <Text style={styles.bereichLabelText}>{(b.name ?? "").toUpperCase()}</Text>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.bereichFallback}>
+                  <Text style={styles.bereichFallbackText}>{(b.name ?? "").toUpperCase()}</Text>
+                </View>
               )}
-              <Text style={[styles.bereichTitel, { color: themeColor }]}>{b.name?.toUpperCase()}</Text>
-              <Text style={styles.pageNumber} render={({ pageNumber }) => `${pageNumber}`} fixed />
             </Page>
 
-            {/* Pro Kategorie: Liste der Artikel + danach Datenblätter */}
-            {kategorien.map((k) => {
-              const produkte = d.produkteByKategorie.get(k.id) ?? [];
-              return (
-                <View key={k.id}>
-                  <Page size="A4" style={styles.produktPage}>
-                    <View style={[styles.kategorieHeader, { borderColor: themeColor }]}>
-                      <Text style={[styles.kategorieTitle, { color: themeColor }]}>{k.name}</Text>
-                      <Text>{b.name}</Text>
-                    </View>
-                    {k.beschreibung && <Text style={{ fontSize: 9, marginBottom: 6 }}>{k.beschreibung}</Text>}
-                    {produkte.map((p) => {
-                      const price = calcPrice(d.preisByProdukt.get(p.id), d.params);
-                      return (
-                        <View style={styles.artikelRow} key={p.id}>
-                          <Text style={styles.artNo}>{p.artikelnummer}</Text>
-                          <Text style={styles.artName}>{p.name ?? p.datenblatt_titel ?? ""}</Text>
-                          <Text style={styles.artPreis}>{formatPrice(price, d.params.waehrung)}</Text>
-                        </View>
-                      );
-                    })}
-                    <Text style={styles.pageNumber} render={({ pageNumber }) => `${pageNumber}`} fixed />
-                  </Page>
-
-                  {/* Datenblätter */}
-                  {produkte.map((p) => {
-                    const techRows = ALL_PRODUKT_FIELDS
-                      .map((f) => {
-                        const v = (p as any)[f.col];
-                        if (v == null || v === "") return null;
-                        const valStr = f.type === "bool" ? (v ? "Ja" : "Nein") : String(v);
-                        return { label: f.label, value: `${valStr}${f.unit ? ` ${f.unit}` : ""}` };
-                      })
-                      .filter(Boolean) as { label: string; value: string }[];
-                    const price = calcPrice(d.preisByProdukt.get(p.id), d.params);
-                    const hb = d.hauptbildByProdukt.get(p.id);
-                    const icons = d.iconLabelsByProdukt.get(p.id) ?? [];
-                    return (
-                      <Page key={p.id} size="A4" style={styles.produktPage}>
-                        <View style={[styles.prodHeader, { borderColor: themeColor }]}>
-                          <Text style={{ fontFamily: "Courier", fontWeight: 700 }}>{p.artikelnummer}</Text>
-                          <Text>{k.name}</Text>
-                        </View>
-                        {p.datenblatt_titel && <Text style={{ marginBottom: 6 }}>{p.datenblatt_titel}</Text>}
-                        <View style={styles.topRow}>
-                          {hb
-                            ? <Image src={hb} style={styles.hauptbild} />
-                            : <View style={styles.hauptbild} />}
-                          <View style={styles.techCol}>
-                            {techRows.slice(0, 22).map((r) => (
-                              <Text style={styles.techRow} key={r.label}>• {r.label}: {r.value}</Text>
-                            ))}
-                          </View>
-                        </View>
-                        {icons.length > 0 && (
-                          <View style={styles.iconBar}>
-                            {icons.map((l) => <Text key={l} style={[styles.iconBadge, { borderColor: themeColor }]}>{l}</Text>)}
-                          </View>
-                        )}
-                        <Text style={styles.preisLine}>Preis: {formatPrice(price, d.params.waehrung)}</Text>
-                        {p.datenblatt_text && (
-                          <Text style={{ fontSize: 8, marginTop: 8, lineHeight: 1.4 }}>{p.datenblatt_text}</Text>
-                        )}
-                        <Text style={styles.pageNumber} render={({ pageNumber }) => `${pageNumber}`} fixed />
-                      </Page>
-                    );
-                  })}
-                </View>
-              );
-            })}
-          </View>
+            {/* Für jede Kategorie: Hauptseite + ggf. Fortsetzungsseiten */}
+            {kategorien.map((k) => (
+              <KategorieSeiten
+                key={k.id}
+                bereich={b}
+                kategorie={k}
+                produkte={d.produkteByKategorie.get(k.id) ?? []}
+                preisByProdukt={d.preisByProdukt}
+                hauptbildByProdukt={d.hauptbildByProdukt}
+                kategorieIcons={d.kategorieIconsByKategorie.get(k.id) ?? []}
+                kategorieBild={d.kategorieBildUrl.get(k.id) ?? null}
+                params={d.params}
+              />
+            ))}
+          </React.Fragment>
         );
       })}
 
-      {/* Copyright + Filialen */}
-      <Page size="A4" style={styles.toc}>
-        <Text style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: themeColor }}>FILIALEN</Text>
-        <Text style={{ fontSize: 9, whiteSpace: "pre-wrap" } as any}>{d.filialenText}</Text>
-        <Text style={{ fontSize: 8, marginTop: 24, color: "#666" }}>{d.copyrightText}</Text>
-        <Text style={{ fontSize: 7, marginTop: 12, color: "#aaa" }}>
-          Stand: {d.generatedAt.toLocaleDateString("de-DE")}
+      {/* ═════════ Copyright-Seite (dunkel) ═════════ */}
+      <Page size="A4" style={styles.copyrightPage}>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.copyrightText}>
+          {d.copyrightText || "Copyright © von LICHT.ENGROS S.R.L."}
+          {"\n"}LICHT.ENGROS S.R.L übernimmt keine Verantwortung für Druckfehler, Abmessungen, Beschreibungen oder falsche technische Daten.
+          {"\n"}Das Unternehmen behält sich das Recht vor, die im vorliegenden Katalog enthaltenen Produkte und Preise jederzeit und ohne
+          {"\n"}vorherige Ankündigung zu ändern. Jede unbefugte Vervielfältigung oder Kopie ist untersagt.
+          {"\n"}Die angegebenen Preise sind exklusive Mehrwertsteuer.
         </Text>
       </Page>
 
-      {/* COVER hinten */}
-      {d.coverHintenUrl && (
-        <Page size="A4" style={styles.cover}>
-          <Image src={d.coverHintenUrl} style={styles.coverImg} />
-        </Page>
-      )}
+      {/* ═════════ Back-Cover ═════════ */}
+      <Page size="A4" style={styles.copyrightPage}>
+        <View style={{ flex: 1 }} />
+        <Text style={styles.backCoverText}>{isLichtengros ? "Lichtengros S.R.L." : "Eisenkeil GmbH"}</Text>
+        <View style={{ flex: 1 }} />
+      </Page>
     </Document>
   );
 }
+
+// ===========================================================================
+// Kategorie-Seiten (Hauptseite + Fortsetzungen)
+// ===========================================================================
+
+function KategorieSeiten({
+  bereich,
+  kategorie,
+  produkte,
+  preisByProdukt,
+  hauptbildByProdukt,
+  kategorieIcons,
+  kategorieBild,
+  params,
+}: {
+  bereich: any;
+  kategorie: any;
+  produkte: any[];
+  preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
+  hauptbildByProdukt: Map<string, string | null>;
+  kategorieIcons: { label: string; url: string | null }[];
+  kategorieBild: string | null;
+  params: KatalogParams;
+}) {
+  const spalten = activeSpalten(kategorie);
+  const { intro, bullets } = parseBeschreibung(kategorie.beschreibung);
+
+  // Auf erste Seite passen ~8 Zeilen (weil Hauptseite Beschreibung + Bilder + 8 Zeilen Platz),
+  // Fortsetzungsseiten haben ~30 Zeilen
+  const FIRST_PAGE_ROWS = 8;
+  const CONTINUATION_ROWS = 30;
+
+  const firstPageProdukte = produkte.slice(0, FIRST_PAGE_ROWS);
+  const remaining = produkte.slice(FIRST_PAGE_ROWS);
+  const continuationPages: any[][] = [];
+  for (let i = 0; i < remaining.length; i += CONTINUATION_ROWS) {
+    continuationPages.push(remaining.slice(i, i + CONTINUATION_ROWS));
+  }
+
+  return (
+    <>
+      {/* ─── Hauptseite ─── */}
+      <Page size="A4" style={styles.kategoriePage}>
+        {/* Top bar: Seitenzahl + Bereich-Marker + Bereich-Name */}
+        <View style={styles.kategorieHeaderRow}>
+          <View style={styles.kategorieHeaderLeft}>
+            <Text style={styles.pageNumBox} render={({ pageNumber }) => `${pageNumber}`} fixed />
+            <View style={[styles.bereichMarkerBox, { backgroundColor: bereich.farbe || "#ddd", marginLeft: 6 }]} />
+          </View>
+          <Text style={styles.bereichLabelTop}>{(bereich.name ?? "").toUpperCase()}</Text>
+        </View>
+
+        {/* Titel + Icons */}
+        <View style={styles.kategorieTitleRow}>
+          <Text style={styles.kategorieTitle}>{kategorie.name}</Text>
+          {kategorieIcons.length > 0 && (
+            <View style={styles.iconBar}>
+              {kategorieIcons.slice(0, 10).map((ic, idx) => (
+                <View key={idx} style={styles.iconBox}>
+                  {ic.url ? <Image src={ic.url} style={styles.iconImg} /> : <Text style={styles.iconLabel}>{ic.label}</Text>}
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Beschreibung links + Bilder rechts */}
+        <View style={styles.topSplit}>
+          <View style={styles.leftColumn}>
+            {intro && (
+              <View style={styles.descriptionBlock}>
+                <Text style={styles.descriptionText}>{intro}</Text>
+              </View>
+            )}
+            {bullets.length > 0 && (
+              <>
+                <Text style={styles.techDatenTitle}>Technische Daten:</Text>
+                {bullets.map((b, i) => (
+                  <Text key={i} style={styles.bulletLine}>• {b}</Text>
+                ))}
+              </>
+            )}
+          </View>
+          <View style={styles.rightColumn}>
+            {kategorieBild ? <Image src={kategorieBild} style={styles.mainImage} /> : <View style={styles.mainImage} />}
+          </View>
+        </View>
+
+        {/* Tabelle der Varianten (erste N Zeilen) */}
+        <VariantenTabelle
+          spalten={spalten}
+          produkte={firstPageProdukte}
+          preisByProdukt={preisByProdukt}
+          hauptbildByProdukt={hauptbildByProdukt}
+          params={params}
+          showHeader
+        />
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText} />
+          <Text style={styles.footerText}>{(bereich.name ?? "").toUpperCase()}</Text>
+        </View>
+      </Page>
+
+      {/* ─── Fortsetzungsseiten ─── */}
+      {continuationPages.map((pageProdukte, pageIdx) => (
+        <Page key={pageIdx} size="A4" style={styles.kategoriePage}>
+          <View style={styles.kategorieHeaderRow}>
+            <View style={styles.kategorieHeaderLeft}>
+              <Text style={styles.pageNumBox} render={({ pageNumber }) => `${pageNumber}`} fixed />
+              <View style={[styles.bereichMarkerBox, { backgroundColor: bereich.farbe || "#ddd", marginLeft: 6 }]} />
+            </View>
+            <Text style={styles.bereichLabelTop}>{(bereich.name ?? "").toUpperCase()}</Text>
+          </View>
+
+          <VariantenTabelle
+            spalten={spalten}
+            produkte={pageProdukte}
+            preisByProdukt={preisByProdukt}
+            hauptbildByProdukt={hauptbildByProdukt}
+            params={params}
+            showHeader
+          />
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText} />
+            <Text style={styles.footerText}>{(bereich.name ?? "").toUpperCase()}</Text>
+          </View>
+        </Page>
+      ))}
+    </>
+  );
+}
+
+// ===========================================================================
+// Varianten-Tabelle
+// ===========================================================================
+
+function VariantenTabelle({
+  spalten,
+  produkte,
+  preisByProdukt,
+  hauptbildByProdukt,
+  params,
+  showHeader,
+}: {
+  spalten: { index: number; label: string; def: ReturnType<typeof getSpaltenDefinition> }[];
+  produkte: any[];
+  preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
+  hauptbildByProdukt: Map<string, string | null>;
+  params: KatalogParams;
+  showHeader: boolean;
+}) {
+  if (produkte.length === 0) return null;
+
+  // Breiten berechnen: Thumb 32 + Artikel 130 + Spalten gleich verteilt auf Rest
+  const reservedWidth = 32 + 130;
+  const remainingSpalten = spalten.length || 1;
+  const colWidth = `${Math.max(8, 80 / remainingSpalten)}%`;
+
+  return (
+    <View style={styles.table}>
+      {showHeader && (
+        <View style={styles.tableHeader}>
+          <View style={styles.thumbCell} />
+          <Text style={[styles.tableHeaderCell, { width: 130 }]}>Artikel</Text>
+          {spalten.map((s) => (
+            <Text
+              key={s.index}
+              style={[
+                styles.tableHeaderCell,
+                { flex: 1, textAlign: s.def?.align ?? "left", paddingHorizontal: 2 },
+              ]}
+            >
+              {s.label}
+            </Text>
+          ))}
+        </View>
+      )}
+      {produkte.map((p) => {
+        const price = calcPrice(preisByProdukt.get(p.id), params);
+        const thumb = hauptbildByProdukt.get(p.id);
+        return (
+          <View key={p.id} style={styles.tableRow} wrap={false}>
+            <View style={styles.thumbCell}>
+              {thumb ? <Image src={thumb} style={styles.thumbImg} /> : <View style={styles.thumbImg} />}
+            </View>
+            <Text style={[styles.tableCell, { width: 130 }]}>{p.artikelnummer}</Text>
+            {spalten.map((s) => (
+              <Text
+                key={s.index}
+                style={[
+                  styles.tableCell,
+                  { flex: 1, textAlign: s.def?.align ?? "left", paddingHorizontal: 2 },
+                ]}
+              >
+                {s.def ? formatSpaltenWert(p, s.def, price, params.waehrung) : ""}
+              </Text>
+            ))}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Needed for React.Fragment usage above
+import React from "react";

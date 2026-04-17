@@ -56,6 +56,10 @@ export default async function EditKategoriePage({ params }: { params: Promise<{ 
           vorschaubild_path: kat.vorschaubild_path,
           vorschaubild_url: bildUrl,
           iconIds,
+          spalten: [
+            kat.spalte_1, kat.spalte_2, kat.spalte_3, kat.spalte_4, kat.spalte_5,
+            kat.spalte_6, kat.spalte_7, kat.spalte_8, kat.spalte_9,
+          ],
         }}
         action={action}
         submitLabel="Speichern"

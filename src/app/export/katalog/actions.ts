@@ -34,6 +34,7 @@ async function runKatalogJob(jobId: string, params: KatalogParams) {
     const { data: produkte } = await admin.from("produkte").select("*").order("sortierung");
     const { data: preise } = await admin.from("aktuelle_preise").select("*");
     const { data: produktIcons } = await admin.from("produkt_icons").select("produkt_id, icons(label)").order("sortierung");
+    const { data: kategorieIcons } = await admin.from("kategorie_icons").select("kategorie_id, icon_id, icons(label, symbol_path)");
     const { data: einstellungen } = await admin.from("katalog_einstellungen").select("*").eq("id", 1).single();
     const { data: filialen } = await admin.from("filialen").select("*").eq("marke", params.layout).order("sortierung");
 
@@ -62,6 +63,14 @@ async function runKatalogJob(jobId: string, params: KatalogParams) {
       if (r.icons?.label) arr.push(r.icons.label);
       iconLabelsByProdukt.set(r.produkt_id, arr);
     }
+    const kategorieIconsByKategorie = new Map<string, { label: string; url: string | null }[]>();
+    for (const r of (kategorieIcons ?? []) as any[]) {
+      if (!r.icons) continue;
+      const url = await signServiceUrl(admin, "assets", r.icons.symbol_path);
+      const arr = kategorieIconsByKategorie.get(r.kategorie_id) ?? [];
+      arr.push({ label: r.icons.label, url });
+      kategorieIconsByKategorie.set(r.kategorie_id, arr);
+    }
 
     // Bilder URLs (signed)
     const hauptbildByProdukt = new Map<string, string | null>();
@@ -71,6 +80,10 @@ async function runKatalogJob(jobId: string, params: KatalogParams) {
     const bereichBildUrl = new Map<string, string | null>();
     for (const b of bereiche ?? []) {
       bereichBildUrl.set(b.id, await signServiceUrl(admin, "produktbilder", b.bild_path));
+    }
+    const kategorieBildUrl = new Map<string, string | null>();
+    for (const k of kategorien ?? []) {
+      kategorieBildUrl.set(k.id, await signServiceUrl(admin, "produktbilder", k.vorschaubild_path));
     }
     const logoField = params.layout === "lichtengros" ? "logo_lichtengros_dunkel" : "logo_eisenkeil_dunkel";
     const logoUrl = await signServiceUrl(admin, "assets", einstellungen?.[logoField] ?? null);
@@ -91,7 +104,9 @@ async function runKatalogJob(jobId: string, params: KatalogParams) {
         preisByProdukt,
         hauptbildByProdukt,
         iconLabelsByProdukt,
+        kategorieIconsByKategorie,
         bereichBildUrl,
+        kategorieBildUrl,
         logoUrl,
         coverVorneUrl,
         coverHintenUrl,

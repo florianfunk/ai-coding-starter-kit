@@ -8,8 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image as ImageIcon } from "lucide-react";
+import { Image as ImageIcon, Table as TableIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
 import { uploadKategorieBild, type KategorieFormState } from "./actions";
 
 const initial: KategorieFormState = { error: null };
@@ -27,6 +29,7 @@ type Props = {
     vorschaubild_path?: string | null;
     vorschaubild_url?: string | null;
     iconIds?: string[];
+    spalten?: (string | null)[];
   };
   action: (prev: KategorieFormState, formData: FormData) => Promise<KategorieFormState>;
   submitLabel: string;
@@ -38,6 +41,14 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
   const [bildPreview, setBildPreview] = useState(defaultValues?.vorschaubild_url ?? null);
   const [selected, setSelected] = useState<Set<string>>(new Set(defaultValues?.iconIds ?? []));
   const [uploading, startUpload] = useTransition();
+  const [spalten, setSpalten] = useState<(string | null)[]>(() => {
+    const init = defaultValues?.spalten ?? [];
+    return Array.from({ length: 9 }, (_, i) => init[i] ?? null);
+  });
+
+  function setSpalte(i: number, value: string | null) {
+    setSpalten((prev) => prev.map((v, idx) => (idx === i ? value : v)));
+  }
 
   function handleFile(file: File | null) {
     if (!file) return;
@@ -102,6 +113,42 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
           <div className="space-y-2">
             <Label htmlFor="beschreibung">Beschreibung</Label>
             <Textarea id="beschreibung" name="beschreibung" rows={6} defaultValue={defaultValues?.beschreibung ?? ""} />
+          </div>
+
+          {/* Katalog-Spalten */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <TableIcon className="h-4 w-4 text-muted-foreground" />
+              <Label>Katalog-Spalten</Label>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Wählen Sie, welche Produktdaten in den Tabellenspalten des Katalogs angezeigt werden.
+              Bis zu 9 Spalten möglich — leere Spalten werden übersprungen.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {spalten.map((value, i) => (
+                <div key={i} className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Spalte {i + 1}</Label>
+                  <input type="hidden" name={`spalte_${i + 1}`} value={value ?? "__leer__"} />
+                  <Select
+                    value={value ?? "__leer__"}
+                    onValueChange={(v) => setSpalte(i, v === "__leer__" ? null : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Leer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__leer__">— Leer —</SelectItem>
+                      {SPALTEN_OPTIONEN.map((opt) => (
+                        <SelectItem key={opt.label} value={opt.label}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Icon-Auswahl */}

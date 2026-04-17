@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Image as ImageIcon } from "lucide-react";
+import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { uploadBereichBild, type BereichFormState } from "./actions";
 
 const initial: BereichFormState = { error: null };
@@ -87,33 +88,11 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
           </div>
 
           {/* Row: Farbe picker */}
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="farbe">Farbfeld (Hex)</Label>
-              <div className="flex gap-2 items-center">
-                <Input
-                  id="farbe"
-                  name="farbe"
-                  placeholder="#FFE4E1"
-                  value={farbe}
-                  onChange={(e) => setFarbe(e.target.value)}
-                  className="font-mono border-0 border-b-2 border-b-accent rounded-none px-0 focus-visible:ring-0 focus-visible:border-b-primary"
-                />
-                <input
-                  type="color"
-                  value={/^#[0-9A-Fa-f]{6}$/.test(farbe) ? farbe : "#ffe4e1"}
-                  onChange={(e) => setFarbe(e.target.value.toUpperCase())}
-                  className="h-9 w-12 rounded cursor-pointer border"
-                />
-              </div>
-              {state.fieldErrors?.farbe && <p className="text-sm text-destructive">{state.fieldErrors.farbe}</p>}
-            </div>
-            <div
-              className="rounded-lg border h-16 w-full flex items-center justify-center text-xs text-muted-foreground"
-              style={{ backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(farbe) ? farbe : undefined }}
-            >
-              {farbe || "keine Farbe"}
-            </div>
+          <div className="space-y-2">
+            <Label>Farbe (für Katalog-Index)</Label>
+            <input type="hidden" name="farbe" value={farbe} />
+            <ColorPalettePicker value={farbe || null} onChange={(v) => setFarbe(v ?? "")} />
+            {state.fieldErrors?.farbe && <p className="text-sm text-destructive">{state.fieldErrors.farbe}</p>}
           </div>
 
           {/* Row: Bild + Beschreibung + Seitenangaben */}

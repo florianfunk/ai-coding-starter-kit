@@ -74,6 +74,7 @@ export function CompletenessDetail({ result, className }: Props) {
             className,
           )}
         >
+          <span className="text-xs text-muted-foreground hidden sm:inline">Vollständigkeit</span>
           <Progress
             value={result.percent}
             className="h-2 w-16 bg-muted"

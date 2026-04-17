@@ -24,7 +24,29 @@
 | PROJ-8 | Filialen- & Katalog-Einstellungen | In Progress | [PROJ-8](PROJ-8-filialen-und-katalog-einstellungen.md) | 2026-04-16 |
 | PROJ-9 | PDF-Export Einzel-Datenblatt | In Progress | [PROJ-9](PROJ-9-pdf-datenblatt.md) | 2026-04-16 |
 | PROJ-10 | PDF-Export Gesamtkatalog | In Progress | [PROJ-10](PROJ-10-pdf-gesamtkatalog.md) | 2026-04-16 |
+| PROJ-11 | Bulk-Bearbeitung | Planned | [PROJ-11](PROJ-11-bulk-bearbeitung.md) | 2026-04-17 |
+| PROJ-12 | Produkt duplizieren | Planned | [PROJ-12](PROJ-12-produkt-duplizieren.md) | 2026-04-17 |
+| PROJ-13 | Icon-Suche im Picker | Planned | [PROJ-13](PROJ-13-icon-suche.md) | 2026-04-17 |
+| PROJ-14 | Quick-Edit & Inline-Bearbeitung | Planned | [PROJ-14](PROJ-14-quick-edit.md) | 2026-04-17 |
+| PROJ-15 | Drag-and-Drop-Sortierung | Planned | [PROJ-15](PROJ-15-drag-drop-sortierung.md) | 2026-04-17 |
+| PROJ-16 | Katalog-Export Live-Progress | Planned | [PROJ-16](PROJ-16-katalog-live-progress.md) | 2026-04-17 |
+| PROJ-17 | Excel/CSV-Import für Preise | Planned | [PROJ-17](PROJ-17-preis-import.md) | 2026-04-17 |
+| PROJ-18 | Galerie-Bilder sortierbar | Planned | [PROJ-18](PROJ-18-galerie-sortierung.md) | 2026-04-17 |
+| PROJ-19 | Änderungsprotokoll | Planned | [PROJ-19](PROJ-19-aenderungsprotokoll.md) | 2026-04-17 |
+| PROJ-20 | Datenblatt-Vorschau Split-View | Planned | [PROJ-20](PROJ-20-datenblatt-split-view.md) | 2026-04-17 |
+| PROJ-21 | Vollständigkeits-Indikator | Planned | [PROJ-21](PROJ-21-vollstaendigkeits-indikator.md) | 2026-04-17 |
+| PROJ-22 | Globale Suche (Cmd+K) | Planned | [PROJ-22](PROJ-22-globale-suche.md) | 2026-04-17 |
+| PROJ-23 | Breadcrumb-Navigation | Planned | [PROJ-23](PROJ-23-breadcrumb-navigation.md) | 2026-04-17 |
+| PROJ-24 | Keyboard-Shortcuts | Planned | [PROJ-24](PROJ-24-keyboard-shortcuts.md) | 2026-04-17 |
+| PROJ-25 | Toast-Benachrichtigungen | Planned | [PROJ-25](PROJ-25-toast-benachrichtigungen.md) | 2026-04-17 |
+| PROJ-26 | Dark Mode | Planned | [PROJ-26](PROJ-26-dark-mode.md) | 2026-04-17 |
+| PROJ-27 | Onboarding & Leere Zustände | Planned | [PROJ-27](PROJ-27-onboarding-leere-zustaende.md) | 2026-04-17 |
+| PROJ-28 | Produkt-Vergleich | Planned | [PROJ-28](PROJ-28-produkt-vergleich.md) | 2026-04-17 |
+| PROJ-29 | Smart-Form (Produkt-Formular-Optimierung) | Planned | [PROJ-29](PROJ-29-smart-form.md) | 2026-04-17 |
+| PROJ-30 | Excel/CSV-Export | Planned | [PROJ-30](PROJ-30-csv-export.md) | 2026-04-17 |
+| PROJ-31 | Benutzerverwaltung | Planned | [PROJ-31](PROJ-31-benutzerverwaltung.md) | 2026-04-17 |
+| PROJ-32 | Inline-Hilfe / FAQ | Planned | [PROJ-32](PROJ-32-inline-hilfe.md) | 2026-04-17 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-11
+## Next Available ID: PROJ-33

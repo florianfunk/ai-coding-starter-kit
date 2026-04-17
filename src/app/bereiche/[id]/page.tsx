@@ -6,7 +6,10 @@ import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Layers, Pencil, ChevronRight, ChevronLeft, ImageIcon } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
 import { DeleteKategorieButton } from "@/app/kategorien/delete-button";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +35,21 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="space-y-6">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
-          <Link href="/bereiche"><ChevronLeft className="h-4 w-4 mr-1" /> Alle Bereiche</Link>
-        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/bereiche">Bereiche</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{bereich.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {/* BEREICH HEADER — FileMaker-style */}
         <Card className="border-2">

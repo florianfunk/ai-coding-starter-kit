@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Package, Pencil, ChevronLeft, ChevronRight, ImageIcon, Layers } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { Plus, Package, Pencil, ChevronRight, ImageIcon, Layers } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +52,21 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   return (
     <AppShell>
       <div className="space-y-6">
-        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
-          <Link href={`/bereiche/${kategorie.bereich_id}`}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Zurück zu {bereich?.name ?? "Bereich"}
-          </Link>
-        </Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/kategorien">Kategorien</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{kategorie.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {/* HEADER */}
         <Card className="border-2">

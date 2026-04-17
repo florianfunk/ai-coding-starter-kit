@@ -10,7 +10,10 @@ import { ProduktTopActions } from "./top-actions";
 import { PreiseSection } from "./preise-section";
 import { GalerieSection } from "./galerie-section";
 import { DatenblattSection } from "./datenblatt-section";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import type { DatenblattTemplate } from "@/lib/datenblatt";
 
 export default async function ProduktDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -75,24 +78,37 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="space-y-5">
-        {/* Breadcrumb */}
-        <nav className="flex items-center text-sm text-muted-foreground gap-1.5 flex-wrap">
-          <Link href="/bereiche" className="hover:text-primary hover:underline transition-colors">Bereiche</Link>
-          {bereichRow && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-              <Link href={`/bereiche/${bereichRow.id}`} className="hover:text-primary hover:underline transition-colors">{bereichRow.name}</Link>
-            </>
-          )}
-          {kategorieRow && (
-            <>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-              <Link href={`/kategorien/${kategorieRow.id}`} className="hover:text-primary hover:underline transition-colors">{kategorieRow.name}</Link>
-            </>
-          )}
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          <span className="font-mono text-foreground font-semibold">{produkt.artikelnummer}</span>
-        </nav>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild><Link href="/produkte">Produkte</Link></BreadcrumbLink>
+            </BreadcrumbItem>
+            {bereichRow && (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild><Link href={`/bereiche/${bereichRow.id}`}>{bereichRow.name}</Link></BreadcrumbLink>
+                </BreadcrumbItem>
+              </>
+            )}
+            {kategorieRow && (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild><Link href={`/kategorien/${kategorieRow.id}`}>{kategorieRow.name}</Link></BreadcrumbLink>
+                </BreadcrumbItem>
+              </>
+            )}
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-mono">{produkt.artikelnummer}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         <div className="flex items-start justify-between gap-4 pb-4 border-b">
           <div className="min-w-0">
@@ -109,7 +125,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
               <Link href={`/produkte/${id}/datenblatt`}>Datenblatt PDF</Link>
             </Button>
-            <ProduktTopActions id={id} />
+            <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
           </div>
         </div>
 

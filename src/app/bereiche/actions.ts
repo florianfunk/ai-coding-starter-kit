@@ -40,7 +40,7 @@ export async function createBereich(_prev: BereichFormState, formData: FormData)
   const { error } = await supabase.from("bereiche").insert(parsed.data);
   if (error) return { error: error.message };
   revalidatePath("/bereiche");
-  redirect("/bereiche");
+  redirect("/bereiche?toast=success&message=Bereich+angelegt");
 }
 
 export async function updateBereich(id: string, _prev: BereichFormState, formData: FormData): Promise<BereichFormState> {
@@ -53,7 +53,7 @@ export async function updateBereich(id: string, _prev: BereichFormState, formDat
   if (error) return { error: error.message };
   revalidatePath("/bereiche");
   revalidatePath(`/bereiche/${id}`);
-  redirect("/bereiche");
+  redirect("/bereiche?toast=success&message=Bereich+gespeichert");
 }
 
 export async function deleteBereich(id: string): Promise<{ error: string | null }> {

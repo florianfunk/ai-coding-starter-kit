@@ -1,9 +1,6 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { KategorieForm, type IconOption } from "../../kategorie-form";
@@ -38,10 +35,16 @@ export default async function EditKategoriePage({ params }: { params: Promise<{ 
 
   return (
     <AppShell>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
-        <Link href={`/kategorien/${id}`}><ChevronLeft className="h-4 w-4 mr-1" /> Zurück zur Kategorie</Link>
-      </Button>
-      <PageHeader eyebrow="Bearbeiten" title={`Kategorie: ${kat.name}`} />
+      <PageHeader
+        eyebrow="Bearbeiten"
+        title={`Kategorie: ${kat.name}`}
+        breadcrumbs={[
+          { label: "Dashboard", href: "/" },
+          { label: "Kategorien", href: "/kategorien" },
+          { label: kat.name, href: `/kategorien/${id}` },
+          { label: "Bearbeiten" },
+        ]}
+      />
       <KategorieForm
         bereiche={bereiche ?? []}
         icons={iconOptions}

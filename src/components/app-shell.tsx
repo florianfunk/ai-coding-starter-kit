@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settings } from "lucide-react";
 import { NavLink } from "./nav-link";
+import { ThemeToggle } from "./theme-toggle";
+import { ToastListener } from "./toast-listener";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -28,11 +30,13 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <NavLink href="/einstellungen" label="Einstellungen"><Settings className="h-4 w-4" /></NavLink>
           </nav>
 
-          <div className="shrink-0 text-[10px] text-white/50 uppercase tracking-widest hidden xl:block">
-            dev-modus
+          <div className="shrink-0">
+            <ThemeToggle />
           </div>
         </div>
       </header>
+
+      <ToastListener />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-6 py-8">
         {children}

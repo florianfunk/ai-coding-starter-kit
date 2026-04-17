@@ -35,6 +35,10 @@ export default async function EinstellungenPage() {
         eyebrow="Konfiguration"
         title="Einstellungen"
         subtitle="Filialen, Katalog-Parameter und Marken-Assets"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/" },
+          { label: "Einstellungen" },
+        ]}
       />
       <Tabs defaultValue="filialen">
         <TabsList className="bg-muted/50 p-1 h-auto">

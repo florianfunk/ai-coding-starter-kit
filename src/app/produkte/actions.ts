@@ -93,7 +93,7 @@ export async function createProdukt(_p: ProduktFormState, formData: FormData): P
   await setProduktIcons(supabase, data.id, iconIds);
 
   revalidatePath("/produkte");
-  redirect(`/produkte/${data.id}`);
+  redirect(`/produkte/${data.id}?toast=success&message=Produkt+angelegt`);
 }
 
 export async function updateProdukt(id: string, _p: ProduktFormState, formData: FormData): Promise<ProduktFormState> {
@@ -121,20 +121,44 @@ export async function deleteProdukt(id: string): Promise<{ error: string | null 
   const { error } = await supabase.from("produkte").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/produkte");
-  redirect("/produkte");
+  redirect("/produkte?toast=success&message=Produkt+gel%C3%B6scht");
 }
 
 export async function duplicateProdukt(id: string): Promise<{ id?: string; error: string | null }> {
   const supabase = await createClient();
   const { data: src } = await supabase.from("produkte").select("*").eq("id", id).single();
   if (!src) return { error: "Produkt nicht gefunden." };
+
+  // Build copy — strip auto-generated / system fields
   const copy = { ...src } as any;
-  delete copy.id; delete copy.external_id; delete copy.created_at; delete copy.updated_at;
-  delete copy.created_by; delete copy.updated_by; delete copy.search_vector;
-  copy.artikelnummer = `${src.artikelnummer}-copy`;
+  delete copy.id;
+  delete copy.external_id;
+  delete copy.created_at;
+  delete copy.updated_at;
+  delete copy.created_by;
+  delete copy.updated_by;
+  delete copy.search_vector;
+  copy.artikelnummer = `${src.artikelnummer}-KOPIE`;
   copy.artikel_bearbeitet = false;
+
   const { data, error } = await supabase.from("produkte").insert(copy).select("id").single();
-  if (error || !data) return { error: error?.message ?? "Duplikat fehlgeschlagen" };
+  if (error || !data) {
+    if (error?.code === "23505") return { error: "Artikelnummer existiert bereits (evtl. bereits dupliziert)." };
+    return { error: error?.message ?? "Fehler beim Duplizieren" };
+  }
+
+  // Copy produkt_icons (n:m) for the new product
+  const { data: srcIcons } = await supabase
+    .from("produkt_icons")
+    .select("icon_id, sortierung")
+    .eq("produkt_id", id);
+
+  if (srcIcons && srcIcons.length > 0) {
+    await supabase.from("produkt_icons").insert(
+      srcIcons.map((row) => ({ produkt_id: data.id, icon_id: row.icon_id, sortierung: row.sortierung })),
+    );
+  }
+
   revalidatePath("/produkte");
   return { id: data.id, error: null };
 }

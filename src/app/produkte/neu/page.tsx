@@ -1,8 +1,5 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { ProduktForm } from "../produkt-form";
@@ -35,17 +32,17 @@ export default async function NewProduktPage({
     defaults = { bereich_id: sp.bereich };
   }
 
-  const backHref = sp.kategorie
-    ? `/kategorien/${sp.kategorie}`
-    : sp.bereich ? `/bereiche/${sp.bereich}` : "/produkte";
-  const backLabel = sp.kategorie ? "Zurück zur Kategorie" : sp.bereich ? "Zurück zum Bereich" : "Alle Produkte";
-
   return (
     <AppShell>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
-        <Link href={backHref}><ChevronLeft className="h-4 w-4 mr-1" /> {backLabel}</Link>
-      </Button>
-      <PageHeader eyebrow="Neu anlegen" title="Neues Produkt" />
+      <PageHeader
+        eyebrow="Neu anlegen"
+        title="Neues Produkt"
+        breadcrumbs={[
+          { label: "Dashboard", href: "/" },
+          { label: "Produkte", href: "/produkte" },
+          { label: "Neu" },
+        ]}
+      />
       <ProduktForm
         bereiche={bereiche ?? []}
         kategorien={kategorien ?? []}

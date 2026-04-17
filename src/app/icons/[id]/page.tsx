@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { IconForm } from "../icon-form";
@@ -27,7 +28,15 @@ export default async function EditIconPage({ params }: { params: Promise<{ id: s
   return (
     <AppShell>
       <div className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight">Icon bearbeiten: {icon.label}</h1>
+        <PageHeader
+          eyebrow="Bearbeiten"
+          title={`Icon: ${icon.label}`}
+          breadcrumbs={[
+            { label: "Dashboard", href: "/" },
+            { label: "Icons", href: "/icons" },
+            { label: icon.label },
+          ]}
+        />
         <IconForm
           gruppen={gruppen.sort()}
           defaultValues={{

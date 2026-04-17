@@ -8,56 +8,109 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Loader2, Trash2 } from "lucide-react";
 import { deleteProdukt, duplicateProdukt } from "../actions";
 
-export function ProduktTopActions({ id }: { id: string }) {
+interface ProduktTopActionsProps {
+  id: string;
+  artikelnummer?: string;
+}
+
+export function ProduktTopActions({ id, artikelnummer }: ProduktTopActionsProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [dupOpen, setDupOpen] = useState(false);
+  const [delPending, startDelTransition] = useTransition();
+  const [dupPending, startDupTransition] = useTransition();
+
+  const pending = delPending || dupPending;
+  const displayName = artikelnummer ?? id;
 
   return (
     <div className="flex gap-2">
-      <Button
-        variant="outline"
-        className="hover:bg-primary hover:text-primary-foreground transition-colors"
-        disabled={pending}
-        onClick={() => startTransition(async () => {
-          const r = await duplicateProdukt(id);
-          if (r.error) toast.error(r.error);
-          else { toast.success("Dupliziert"); if (r.id) router.push(`/produkte/${r.id}`); }
-        })}
-      >
-        <Copy className="h-4 w-4 mr-1" /> Duplizieren
-      </Button>
-
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      {/* Duplizieren */}
+      <AlertDialog open={dupOpen} onOpenChange={setDupOpen}>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground transition-colors">
-            <Trash2 className="h-4 w-4 mr-1" /> Löschen
+          <Button
+            variant="outline"
+            className="hover:bg-primary hover:text-primary-foreground transition-colors"
+            disabled={pending}
+          >
+            <Copy className="h-4 w-4 mr-1" /> Duplizieren
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Produkt löschen?</AlertDialogTitle>
+            <AlertDialogTitle>Produkt duplizieren?</AlertDialogTitle>
             <AlertDialogDescription>
-              Alle Preise und Galeriebilder werden mit gelöscht.
+              &laquo;{displayName}&raquo; wird dupliziert. Preise werden nicht &uuml;bernommen.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={dupPending}>Abbrechen</AlertDialogCancel>
             <AlertDialogAction
-              disabled={pending}
+              disabled={dupPending}
+              onClick={(e) => {
+                e.preventDefault();
+                startDupTransition(async () => {
+                  const r = await duplicateProdukt(id);
+                  if (r.error) {
+                    toast.error(r.error);
+                    setDupOpen(false);
+                  } else {
+                    toast.success("Produkt dupliziert");
+                    setDupOpen(false);
+                    if (r.id) router.push(`/produkte/${r.id}`);
+                  }
+                });
+              }}
+            >
+              {dupPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Dupliziere&hellip;
+                </>
+              ) : (
+                "Duplizieren"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* L&ouml;schen */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogTrigger asChild>
+          <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground transition-colors" disabled={pending}>
+            <Trash2 className="h-4 w-4 mr-1" /> L&ouml;schen
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Produkt l&ouml;schen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Alle Preise und Galeriebilder werden mit gel&ouml;scht.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={delPending}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={delPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={(e) => {
                 e.preventDefault();
-                startTransition(async () => {
+                startDelTransition(async () => {
                   const r = await deleteProdukt(id);
                   if (r.error) toast.error(r.error);
                 });
               }}
             >
-              {pending ? "Lösche…" : "Endgültig löschen"}
+              {delPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" /> L&ouml;sche&hellip;
+                </>
+              ) : (
+                <>Endg&uuml;ltig l&ouml;schen</>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Zap, Sun, Wrench, Thermometer, MoreHorizontal, Image as ImageIcon, FileText, Hash } from "lucide-react";
+import { IconPicker } from "@/components/icon-picker";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
 
@@ -98,7 +99,6 @@ export function ProduktForm({
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="hauptbild_path" value={hauptbildPath ?? ""} />
-      {[...iconSet].map((id) => <input key={id} type="hidden" name="icon_ids" value={id} />)}
 
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
@@ -223,79 +223,7 @@ export function ProduktForm({
 
         <TabsContent value="icons">
           <SectionCard color={TAB_COLORS.icons} title="Icon-Leiste (Datenblatt)">
-            {/* Ausgewählte Icons */}
-            {iconSet.size > 0 && (
-              <div className="rounded-lg border bg-primary/5 p-3 mb-3">
-                <p className="text-xs text-muted-foreground mb-2">Ausgewählt ({iconSet.size}):</p>
-                <div className="flex flex-wrap gap-2">
-                  {[...iconSet].map((id) => {
-                    const ic = icons.find((i) => i.id === id);
-                    if (!ic) return null;
-                    return (
-                      <div key={id} className="flex flex-col items-center gap-1">
-                        <div className="h-14 w-14 rounded-lg border-2 border-primary bg-background flex items-center justify-center overflow-hidden">
-                          {ic.url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={ic.url} alt={ic.label} className="max-h-full max-w-full object-contain p-1" />
-                          ) : (
-                            <span className="text-[9px] font-bold">{ic.label}</span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-center w-14 truncate">{ic.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Auswahl nach Gruppe */}
-            <div className="rounded-lg border divide-y">
-              {icons.length === 0 && (
-                <p className="p-4 text-sm text-muted-foreground text-center">
-                  Keine Icons. <a href="/icons/neu" className="underline">Welche anlegen →</a>
-                </p>
-              )}
-              {(() => {
-                const groups: Record<string, typeof icons> = {};
-                for (const ic of icons) {
-                  const key = ic.gruppe ?? "Ohne Gruppe";
-                  if (!groups[key]) groups[key] = [];
-                  groups[key].push(ic);
-                }
-                return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([g, items]) => (
-                  <div key={g} className="p-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{g}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {items.map((ic) => {
-                        const on = iconSet.has(ic.id);
-                        return (
-                          <button
-                            key={ic.id}
-                            type="button"
-                            onClick={() => toggleIcon(ic.id)}
-                            className={`flex flex-col items-center gap-1 p-1.5 rounded-lg border-2 transition-all ${
-                              on ? "border-primary bg-primary/10" : "border-transparent hover:border-primary/30 hover:bg-muted"
-                            }`}
-                            title={ic.label}
-                          >
-                            <div className="h-12 w-12 rounded border bg-background flex items-center justify-center overflow-hidden">
-                              {ic.url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={ic.url} alt={ic.label} className="max-h-full max-w-full object-contain p-1" />
-                              ) : (
-                                <span className="text-[9px] font-bold px-1">{ic.label}</span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-muted-foreground w-12 truncate text-center">{ic.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
+            <IconPicker icons={icons} selectedIds={iconSet} onToggle={toggleIcon} />
           </SectionCard>
         </TabsContent>
       </Tabs>

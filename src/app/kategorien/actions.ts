@@ -51,7 +51,7 @@ export async function createKategorie(_p: KategorieFormState, formData: FormData
   await setIcons(supabase, data.id, iconIds);
 
   revalidatePath("/kategorien");
-  redirect("/kategorien");
+  redirect("/kategorien?toast=success&message=Kategorie+angelegt");
 }
 
 export async function updateKategorie(id: string, _p: KategorieFormState, formData: FormData): Promise<KategorieFormState> {
@@ -67,7 +67,7 @@ export async function updateKategorie(id: string, _p: KategorieFormState, formDa
 
   revalidatePath("/kategorien");
   revalidatePath(`/kategorien/${id}/bearbeiten`);
-  redirect("/kategorien");
+  redirect("/kategorien?toast=success&message=Kategorie+gespeichert");
 }
 
 export async function deleteKategorie(id: string): Promise<{ error: string | null }> {

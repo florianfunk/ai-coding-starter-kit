@@ -10,7 +10,7 @@ import { ProduktTopActions } from "./top-actions";
 import { PreiseSection } from "./preise-section";
 import { GalerieSection } from "./galerie-section";
 import { DatenblattSection } from "./datenblatt-section";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileText } from "lucide-react";
 import { SplitViewLayout } from "./split-view-layout";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
@@ -128,22 +128,20 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             <h1 className="text-3xl font-bold tracking-tight font-mono break-all">{produkt.artikelnummer}</h1>
             <p className="text-muted-foreground mt-1">{produkt.name ?? "—"}</p>
           </div>
-          <div className="flex gap-4 shrink-0 items-start">
-            <CompletenessDetail result={completeness} className="w-56 hidden lg:block" />
-            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-              <Button asChild variant="outline" className="hover:bg-muted/50">
-                <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
-                  <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
-                </Link>
-              </Button>
-              <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
-            </div>
+          <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
+            <CompletenessDetail result={completeness} />
+            <Button asChild variant="outline" className="hover:bg-muted/50">
+              <Link href={`/produkte/${id}/datenblatt`}>
+                <FileText className="h-4 w-4 mr-1" /> Datenblatt
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="hover:bg-muted/50">
+              <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
+              </Link>
+            </Button>
+            <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
           </div>
-        </div>
-
-        {/* Completeness on mobile (below header) */}
-        <div className="lg:hidden">
-          <CompletenessDetail result={completeness} />
         </div>
 
         <SplitViewLayout produktId={id}>

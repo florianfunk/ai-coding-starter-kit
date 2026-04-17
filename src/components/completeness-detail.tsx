@@ -1,7 +1,11 @@
 "use client";
 
 import { Progress } from "@/components/ui/progress";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   completenessBarClass,
   completenessTextClass,
@@ -31,7 +35,6 @@ const FIELD_ANCHORS: Record<string, string> = {
   "Icon zugeordnet": "field-icons",
 };
 
-/** All completeness fields in order, marking which ones are filled */
 const ALL_FIELDS = [
   "Artikelnummer",
   "Name",
@@ -62,11 +65,29 @@ export function CompletenessDetail({ result, className }: Props) {
   }
 
   return (
-    <Card className={cn("border-2", className)}>
-      <CardContent className="p-4 space-y-3">
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg border px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer",
+            className,
+          )}
+        >
+          <Progress
+            value={result.percent}
+            className="h-2 w-16 bg-muted"
+            indicatorClassName={barColor}
+          />
+          <span className={cn("text-sm font-bold tabular-nums", textColor)}>
+            {result.percent}%
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-4 space-y-3" align="end">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Vollstaendigkeit
+            Vollständigkeit
           </p>
           <span className={cn("text-lg font-bold tabular-nums", textColor)}>
             {result.percent}%
@@ -103,7 +124,7 @@ export function CompletenessDetail({ result, className }: Props) {
             );
           })}
         </ul>
-      </CardContent>
-    </Card>
+      </PopoverContent>
+    </Popover>
   );
 }

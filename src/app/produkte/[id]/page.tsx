@@ -157,16 +157,18 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             submitLabel="Speichern"
           />
 
-          <DatenblattSection
-            produktId={id}
-            templates={templatesTyped}
-            activeTemplateId={produkt.datenblatt_template_id}
-            slotImages={slotImages}
-          />
+          <div className="mt-8 pt-8 border-t-2 border-dashed border-muted-foreground/20 space-y-8">
+            <DatenblattSection
+              produktId={id}
+              templates={templatesTyped}
+              activeTemplateId={produkt.datenblatt_template_id}
+              slotImages={slotImages}
+            />
 
-          <PreiseSection produktId={id} preise={preise ?? []} />
-          <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
-          <AuditSection produktId={id} />
+            <PreiseSection produktId={id} preise={preise ?? []} />
+            <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
+            <AuditSection produktId={id} />
+          </div>
         </SplitViewLayout>
       </div>
     </AppShell>

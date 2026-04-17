@@ -70,7 +70,7 @@ export function CompletenessDetail({ result, className }: Props) {
         <button
           type="button"
           className={cn(
-            "flex items-center gap-2.5 rounded-lg border px-3 py-1.5 hover:bg-muted/50 transition-colors cursor-pointer",
+            "flex items-center gap-2.5 rounded-lg border px-3 py-1.5 hover:bg-muted hover:border-primary/30 hover:shadow-sm transition-all duration-150 cursor-pointer active:scale-[0.97]",
             className,
           )}
         >

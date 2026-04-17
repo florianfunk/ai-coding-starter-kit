@@ -111,7 +111,7 @@ export function InlineEdit({
       }}
       tabIndex={0}
       role="button"
-      className={`cursor-default rounded px-1 -mx-1 hover:bg-muted/60 transition-colors select-none ${className}`}
+      className={`cursor-pointer rounded px-1 -mx-1 hover:bg-muted hover:shadow-sm border border-transparent hover:border-primary/20 transition-all duration-150 select-none ${className}`}
       title="Doppelklick zum Bearbeiten"
     >
       {String(value) || "\u2014"}

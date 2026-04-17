@@ -334,11 +334,14 @@ export function ProduktForm({
         </AccordionItem>
       </Accordion>
 
-      <div className="sticky bottom-0 z-40 -mx-6 px-6 py-4 border-t bg-background/95 backdrop-blur flex gap-3 justify-end shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        <Button asChild variant="outline" type="button"><a href="/produkte">Abbrechen</a></Button>
-        <Button type="submit" size="lg" disabled={pending || uploading}>
-          {pending ? "Speichere..." : submitLabel}
-        </Button>
+      <div className="sticky bottom-0 z-40 -mx-6 px-6 py-3 border-t-2 border-primary/20 bg-background/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.08)] flex items-center justify-between">
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">Produktdaten</p>
+        <div className="flex gap-3 ml-auto">
+          <Button asChild variant="outline" type="button"><a href="/produkte">Abbrechen</a></Button>
+          <Button type="submit" size="lg" disabled={pending || uploading}>
+            {pending ? "Speichere..." : submitLabel}
+          </Button>
+        </div>
       </div>
     </form>
   );

@@ -13,6 +13,11 @@ import { config } from "dotenv";
 
 config({ path: ".env.local" });
 
+if (process.env.NODE_ENV === "production") {
+  console.error("ABORTED: reset-for-migration darf nicht in production laufen.");
+  process.exit(1);
+}
+
 const CONFIRMED = process.argv.includes("--yes");
 
 const TABLES_IN_ORDER = [

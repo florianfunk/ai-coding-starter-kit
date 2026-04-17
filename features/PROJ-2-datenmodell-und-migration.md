@@ -155,8 +155,26 @@ Idempotenz: Alle Inserts nutzen `ON CONFLICT (external_id) DO UPDATE`, wobei `ex
 - `0008_farbfelder_drop_unique.sql` — Farbfeld-Code darf Duplikate haben
 - `0009_artikelnummer_not_unique.sql` — Artikelnummern in FileMaker nicht eindeutig
 
-## QA Test Results
-_To be added by /qa_
+## QA Test Results (2026-04-17)
+**Verdict: PRODUCTION-READY** ✅
+
+### Datenintegrität
+- Record Counts: alle korrekt (20/80/419/1449/33/71/4)
+- Referenzielle Integrität: 0 verwaiste FK
+- NULL-Pflichtfelder: keine NULLs
+- Duplikate external_id: keine
+- RLS: alle Tabellen aktiv
+- Bilder: 418/419 Produkte mit Hauptbild, 33/33 Icons
+
+### Security Audit
+- Keine Critical/High Findings
+- Medium: `rejectUnauthorized: false` (lokal-only), Report aus Git entfernt
+- Low: `.env.local.example` aktualisiert, Production-Guard in Reset-Skript
+
+### Offene Info-Punkte (nicht blockierend)
+- 1 Duplikat-Artikelnummer `DM1FLS-42-1050-DALI2-LD1P` (erwartet)
+- 12 Produkte ohne aktiven Preis — im FM-Original prüfen
+- 4 Bereiche + 1 Produkt ohne Bild — fehlendes Quellmaterial
 
 ## Deployment
 _To be added by /deploy_

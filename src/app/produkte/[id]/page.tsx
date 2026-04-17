@@ -10,11 +10,14 @@ import { ProduktTopActions } from "./top-actions";
 import { PreiseSection } from "./preise-section";
 import { GalerieSection } from "./galerie-section";
 import { DatenblattSection } from "./datenblatt-section";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Info } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import type { DatenblattTemplate } from "@/lib/datenblatt";
+import { calculateCompleteness } from "@/lib/completeness";
+import { CompletenessDetail } from "@/components/completeness-detail";
 
 export default async function ProduktDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -70,6 +73,14 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     if (url) slotImages[row.slot_id] = { path: row.storage_path, url };
   }
 
+  // Compute completeness
+  const hasActivePrice = (preise ?? []).some((p) => p.status === "aktiv");
+  const completeness = calculateCompleteness(produkt, {
+    hasActivePrice,
+    iconCount: (produktIcons ?? []).length,
+    galerieCount: (galerie ?? []).length,
+  });
+
   async function action(prev: ProduktFormState, formData: FormData) {
     "use server";
     return updateProdukt(id, prev, formData);
@@ -111,22 +122,30 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
         </Breadcrumb>
 
         <div className="flex items-start justify-between gap-4 pb-4 border-b">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">Produkt</p>
             <h1 className="text-3xl font-bold tracking-tight font-mono break-all">{produkt.artikelnummer}</h1>
             <p className="text-muted-foreground mt-1">{produkt.name ?? "—"}</p>
           </div>
-          <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-            <Button asChild variant="outline" className="hover:bg-muted/50">
-              <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
-              <Link href={`/produkte/${id}/datenblatt`}>Datenblatt PDF</Link>
-            </Button>
-            <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
+          <div className="flex gap-4 shrink-0 items-start">
+            <CompletenessDetail result={completeness} className="w-56 hidden lg:block" />
+            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+              <Button asChild variant="outline" className="hover:bg-muted/50">
+                <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
+                <Link href={`/produkte/${id}/datenblatt`}>Datenblatt PDF</Link>
+              </Button>
+              <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
+            </div>
           </div>
+        </div>
+
+        {/* Completeness on mobile (below header) */}
+        <div className="lg:hidden">
+          <CompletenessDetail result={completeness} />
         </div>
 
         <ProduktForm

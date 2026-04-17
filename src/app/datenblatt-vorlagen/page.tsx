@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, FileText, Pencil, ChevronRight, Lock, LayoutTemplate } from "lucide-react";
 import { DeleteTemplateButton } from "./delete-button";
+import { EmptyState } from "@/components/empty-state";
 import { DuplicateButton } from "./duplicate-button";
 import { TemplatePreview } from "./template-preview";
 import type { Slot } from "@/lib/datenblatt";
@@ -36,12 +37,13 @@ export default async function TemplatesPage() {
       </PageHeader>
 
       {(templates ?? []).length === 0 && (
-        <Card className="border-dashed">
-          <CardContent className="py-20 text-center text-muted-foreground">
-            <LayoutTemplate className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg">Noch keine Vorlagen</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={FileText}
+          title="Keine Vorlagen"
+          description="Erstellen Sie eine Datenblatt-Vorlage mit Slots fuer Bilder, Diagramme und Energielabel."
+          actionLabel="Vorlage anlegen"
+          actionHref="/datenblatt-vorlagen/neu"
+        />
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

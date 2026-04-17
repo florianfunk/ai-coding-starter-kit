@@ -4,6 +4,8 @@ import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settin
 import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme-toggle";
 import { ToastListener } from "./toast-listener";
+import { GlobalShortcuts } from "./global-shortcuts";
+import { CommandPalette, CommandPaletteTrigger } from "./command-palette";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -30,13 +32,16 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <NavLink href="/einstellungen" label="Einstellungen"><Settings className="h-4 w-4" /></NavLink>
           </nav>
 
-          <div className="shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            <CommandPaletteTrigger />
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       <ToastListener />
+      <GlobalShortcuts />
+      <CommandPalette />
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-6 py-8">
         {children}

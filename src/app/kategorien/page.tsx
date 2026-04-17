@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Layers, Pencil, ChevronRight, ImageIcon, Filter } from "lucide-react";
 import { DeleteKategorieButton } from "./delete-button";
+import { EmptyState } from "@/components/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -82,12 +83,13 @@ export default async function KategorienPage({
       </form>
 
       {withUrls.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-20 text-center text-muted-foreground">
-            <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg">Keine Kategorien</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Layers}
+          title="Keine Kategorien"
+          description="Erstellen Sie eine Kategorie, um Produkte thematisch zu gruppieren."
+          actionLabel="Kategorie anlegen"
+          actionHref={`/kategorien/neu${bereich ? `?bereich=${bereich}` : ""}`}
+        />
       ) : (
         <div className="grid gap-3">
           {withUrls.map((k, i) => (

@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
+import { Plus, Layers, Pencil, ChevronRight, ImageIcon, Package } from "lucide-react";
 import { DeleteBereichButton } from "./delete-button";
+import { EmptyState } from "@/components/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -49,13 +50,13 @@ export default async function BereichePage() {
       </PageHeader>
 
       {withUrls.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="py-20 text-center text-muted-foreground">
-            <Layers className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-lg mb-1">Noch keine Bereiche angelegt</p>
-            <p className="text-sm">Lege deinen ersten Bereich an, um loszulegen.</p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={Package}
+          title="Keine Bereiche vorhanden"
+          description="Legen Sie Ihren ersten Bereich an, um die Katalogstruktur aufzubauen."
+          actionLabel="Bereich anlegen"
+          actionHref="/bereiche/neu"
+        />
       ) : (
         <div className="grid gap-3">
           {withUrls.map((b, i) => (

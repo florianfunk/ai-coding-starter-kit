@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Info, Sparkles } from "lucide-react";
+import { Plus, Pencil, Info, Sparkles, Palette } from "lucide-react";
 import { DeleteIconButton } from "./delete-button";
+import { EmptyState } from "@/components/empty-state";
 
 export const dynamic = "force-dynamic";
 
@@ -65,9 +66,14 @@ export default async function IconsPage() {
             <TableBody>
               {withUrls.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
-                    <Sparkles className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    Noch keine Icons. Lege welche an, um sie in Kategorien/Produkten zu verwenden.
+                  <TableCell colSpan={6} className="py-8">
+                    <EmptyState
+                      icon={Palette}
+                      title="Keine Icons"
+                      description="Laden Sie Icons hoch, um sie in Kategorien und Produkten zu verwenden."
+                      actionLabel="Icon anlegen"
+                      actionHref="/icons/neu"
+                    />
                   </TableCell>
                 </TableRow>
               )}

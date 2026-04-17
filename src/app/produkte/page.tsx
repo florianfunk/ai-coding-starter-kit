@@ -4,10 +4,11 @@ import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Package, ChevronRight, Search, Filter, X } from "lucide-react";
+import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Search, Filter, X } from "lucide-react";
+import { ProdukteTableBody } from "./produkte-table-body";
+import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ const PAGE_SIZE = 50;
 export default async function ProdukteListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; bereich?: string; kategorie?: string; status?: string; sort?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; bereich?: string; kategorie?: string; status?: string; sort?: string; page?: string; vollstaendigkeit?: string }>;
 }) {
   const sp = await searchParams;
   const supabase = await createClient();
@@ -47,21 +48,60 @@ export default async function ProdukteListPage({
 
   const { data: produkte, count } = await query;
 
+  // Fetch completeness context for visible products
+  const produktIds = (produkte ?? []).map((p) => p.id);
+  let completenessMap: Record<string, CompletenessResult> = {};
+
+  if (produktIds.length > 0) {
+    const [{ data: activePreise }, { data: iconCounts }, { data: galerieCounts }] = await Promise.all([
+      supabase.from("aktuelle_preise").select("produkt_id").in("produkt_id", produktIds),
+      supabase.from("produkt_icons").select("produkt_id").in("produkt_id", produktIds),
+      supabase.from("produkt_bilder").select("produkt_id").in("produkt_id", produktIds),
+    ]);
+
+    const priceSet = new Set((activePreise ?? []).map((r) => r.produkt_id));
+    const iconCountMap: Record<string, number> = {};
+    for (const r of iconCounts ?? []) {
+      iconCountMap[r.produkt_id] = (iconCountMap[r.produkt_id] ?? 0) + 1;
+    }
+    const galerieCountMap: Record<string, number> = {};
+    for (const r of galerieCounts ?? []) {
+      galerieCountMap[r.produkt_id] = (galerieCountMap[r.produkt_id] ?? 0) + 1;
+    }
+
+    for (const p of produkte ?? []) {
+      completenessMap[p.id] = calculateCompleteness(p, {
+        hasActivePrice: priceSet.has(p.id),
+        iconCount: iconCountMap[p.id] ?? 0,
+        galerieCount: galerieCountMap[p.id] ?? 0,
+      });
+    }
+  }
+
+  // Filter by completeness (client-side since it's computed)
+  let filteredProdukte = produkte ?? [];
+  if (sp.vollstaendigkeit === "unvollstaendig") {
+    filteredProdukte = filteredProdukte.filter((p) => (completenessMap[p.id]?.percent ?? 0) <= 80);
+  } else if (sp.vollstaendigkeit === "vollstaendig") {
+    filteredProdukte = filteredProdukte.filter((p) => (completenessMap[p.id]?.percent ?? 0) > 80);
+  }
+
   const filteredKategorien = sp.bereich
     ? (kategorien ?? []).filter((k) => k.bereich_id === sp.bereich)
     : (kategorien ?? []);
-  const bereichName = new Map((bereiche ?? []).map((b) => [b.id, b.name]));
-  const kategorieName = new Map((kategorien ?? []).map((k) => [k.id, k.name]));
+  const bereichNameMap = Object.fromEntries((bereiche ?? []).map((b) => [b.id, b.name]));
+  const kategorieNameMap = Object.fromEntries((kategorien ?? []).map((k) => [k.id, k.name]));
 
+  const displayCount = sp.vollstaendigkeit ? filteredProdukte.length : (count ?? 0);
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
-  const hasFilter = Boolean(sp.q || sp.bereich || sp.kategorie || sp.status);
+  const hasFilter = Boolean(sp.q || sp.bereich || sp.kategorie || sp.status || sp.vollstaendigkeit);
 
   return (
     <AppShell>
       <PageHeader
         eyebrow="Artikel"
         title="Produkte"
-        subtitle={`${count ?? 0} Produkte${hasFilter ? " gefunden (Filter aktiv)" : ""}`}
+        subtitle={`${displayCount} Produkte${hasFilter ? " gefunden (Filter aktiv)" : ""}`}
       >
         <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
           <Link href="/produkte/neu">
@@ -73,7 +113,7 @@ export default async function ProdukteListPage({
       {/* Filter */}
       <Card className="mb-4 border-2">
         <CardContent className="p-4">
-          <form className="grid gap-3 md:grid-cols-5 items-end">
+          <form className="grid gap-3 md:grid-cols-6 items-end">
             <div className="md:col-span-2">
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 flex items-center gap-1">
                 <Search className="h-3 w-3" /> Suche
@@ -102,7 +142,15 @@ export default async function ProdukteListPage({
                 <option value="bearbeitet">Bearbeitet</option>
               </select>
             </div>
-            <div className="md:col-span-5 flex gap-2 justify-end border-t pt-3 mt-1">
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Vollstaendigkeit</label>
+              <select name="vollstaendigkeit" defaultValue={sp.vollstaendigkeit ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
+                <option value="">Alle</option>
+                <option value="unvollstaendig">Unvollstaendig (&lt;80%)</option>
+                <option value="vollstaendig">Vollstaendig (&gt;80%)</option>
+              </select>
+            </div>
+            <div className="md:col-span-6 flex gap-2 justify-end border-t pt-3 mt-1">
               {hasFilter && (
                 <Button asChild type="button" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
                   <Link href="/produkte"><X className="h-4 w-4 mr-1" /> Filter zurücksetzen</Link>
@@ -128,41 +176,25 @@ export default async function ProdukteListPage({
                 <TableHead className="text-primary-foreground font-semibold">Kategorie</TableHead>
                 <TableHead className="text-right text-primary-foreground font-semibold">Sort</TableHead>
                 <TableHead className="text-primary-foreground font-semibold">Status</TableHead>
+                <TableHead className="text-primary-foreground font-semibold min-w-[140px]">Vollstaendigkeit</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {(produkte ?? []).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-16 text-center text-muted-foreground">
-                    <Package className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                    {hasFilter ? "Keine Produkte entsprechen deinem Filter" : "Noch keine Produkte angelegt"}
-                  </TableCell>
-                </TableRow>
-              )}
-              {(produkte ?? []).map((p) => (
-                <TableRow key={p.id} className="group relative row-hover">
-                  <TableCell>
-                    <Link href={`/produkte/${p.id}`} className="absolute inset-0 z-0" />
-                    <span className="relative z-10 pointer-events-none font-mono text-sm group-hover:text-primary transition-colors">
-                      {p.artikelnummer}
-                    </span>
-                  </TableCell>
-                  <TableCell className="max-w-md truncate relative z-10 pointer-events-none">{p.name ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm relative z-10 pointer-events-none">{bereichName.get(p.bereich_id) ?? "—"}</TableCell>
-                  <TableCell className="text-muted-foreground text-sm relative z-10 pointer-events-none">{kategorieName.get(p.kategorie_id) ?? "—"}</TableCell>
-                  <TableCell className="text-right relative z-10 pointer-events-none">{p.sortierung}</TableCell>
-                  <TableCell className="relative z-10 pointer-events-none">
-                    {p.artikel_bearbeitet
-                      ? <Badge className="bg-success text-success-foreground hover:bg-success text-[10px]">bearbeitet</Badge>
-                      : <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">unbearbeitet</Badge>}
-                  </TableCell>
-                  <TableCell className="relative z-20">
-                    <ChevronRight className="h-5 w-5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+            <ProdukteTableBody
+              produkte={filteredProdukte.map((p) => ({
+                id: p.id,
+                artikelnummer: p.artikelnummer,
+                name: p.name,
+                bereich_id: p.bereich_id,
+                kategorie_id: p.kategorie_id,
+                sortierung: p.sortierung,
+                artikel_bearbeitet: p.artikel_bearbeitet,
+              }))}
+              bereichName={bereichNameMap}
+              kategorieName={kategorieNameMap}
+              hasFilter={hasFilter}
+              completenessMap={completenessMap}
+            />
           </Table>
         </CardContent>
       </Card>

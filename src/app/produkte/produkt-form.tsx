@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,34 +8,65 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Zap, Sun, Wrench, Thermometer, MoreHorizontal, Image as ImageIcon, FileText, Hash } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
 
 const initial: ProduktFormState = { error: null };
 
-const TAB_ICONS: Record<string, any> = {
-  elektrisch: Zap,
-  lichttechnisch: Sun,
-  mechanisch: Wrench,
-  thermisch: Thermometer,
-  sonstiges: MoreHorizontal,
+const STORAGE_KEY = "produkt-form-sections";
+
+const SECTION_IDS = ["datenblatt", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
+type SectionId = (typeof SECTION_IDS)[number];
+
+const DEFAULT_OPEN: SectionId[] = ["datenblatt"];
+
+const SECTION_META: Record<SectionId, { label: string; icon: React.ElementType; color: string }> = {
+  datenblatt: { label: "Datenblatt", icon: FileText, color: "border-l-violet-500" },
+  elektrisch: { label: "Elektrotechnisch", icon: Zap, color: "border-l-amber-500" },
+  lichttechnisch: { label: "Lichttechnisch", icon: Sun, color: "border-l-yellow-400" },
+  mechanisch: { label: "Mechanisch", icon: Wrench, color: "border-l-emerald-500" },
+  thermisch: { label: "Thermisch & Sonstiges", icon: Thermometer, color: "border-l-red-400" },
+  icons: { label: "Icons", icon: Palette, color: "border-l-primary" },
 };
 
-const TAB_COLORS: Record<string, string> = {
-  basis: "border-l-blue-500",
-  datenblatt: "border-l-violet-500",
-  elektrisch: "border-l-amber-500",
-  lichttechnisch: "border-l-yellow-400",
-  mechanisch: "border-l-emerald-500",
-  thermisch: "border-l-red-400",
-  sonstiges: "border-l-gray-400",
-  icons: "border-l-primary",
-};
+function loadOpenSections(): string[] {
+  if (typeof window === "undefined") return DEFAULT_OPEN;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_OPEN;
+}
+
+function saveOpenSections(sections: string[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sections));
+  } catch { /* ignore */ }
+}
+
+/** Check if a section has any filled fields in defaultValues */
+function isSectionFilled(sectionId: SectionId, defaultValues: Record<string, any>, iconCount: number): boolean {
+  if (sectionId === "icons") return iconCount > 0;
+  if (sectionId === "datenblatt") {
+    return !!(defaultValues.datenblatt_titel || defaultValues.datenblatt_text || defaultValues.datenblatt_text_2 || defaultValues.datenblatt_text_3);
+  }
+  // For field-group sections, check if any field has a value
+  const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
+  for (const tab of groupTabs) {
+    const group = PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab);
+    if (group) {
+      for (const f of group.fields) {
+        const val = defaultValues[f.col];
+        if (val != null && val !== "" && val !== false) return true;
+      }
+    }
+  }
+  return false;
+}
 
 type Bereich = { id: string; name: string };
 type Kategorie = { id: string; name: string; bereich_id: string };
@@ -65,11 +96,25 @@ export function ProduktForm({
   const [hauptbildPreview, setHauptbildPreview] = useState<string | null>(defaultHauptbildUrl);
   const [iconSet, setIconSet] = useState<Set<string>>(new Set(defaultIconIds));
   const [uploading, startUpload] = useTransition();
+  const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
     [kategorien, bereichId],
   );
+
+  const allOpen = openSections.length === SECTION_IDS.length;
+
+  const handleSectionsChange = useCallback((value: string[]) => {
+    setOpenSections(value);
+    saveOpenSections(value);
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    const next = allOpen ? [] : [...SECTION_IDS];
+    setOpenSections(next);
+    saveOpenSections(next);
+  }, [allOpen]);
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -96,96 +141,98 @@ export function ProduktForm({
     });
   }
 
+  const thermischGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "thermisch");
+  const sonstigesGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "sonstiges");
+
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-6">
       <input type="hidden" name="hauptbild_path" value={hauptbildPath ?? ""} />
 
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
-      <Tabs defaultValue="basis">
-        <TabsList className="flex-wrap h-auto gap-1 bg-transparent p-0 border-b rounded-none w-full justify-start">
-          <TabsTrigger value="basis" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-b-none">
-            <Hash className="h-3.5 w-3.5 mr-1" /> Basis
-          </TabsTrigger>
-          <TabsTrigger value="datenblatt" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-b-none">
-            <FileText className="h-3.5 w-3.5 mr-1" /> Datenblatt
-          </TabsTrigger>
-          {PRODUKT_FIELD_GROUPS.map((g) => {
-            const Icon = TAB_ICONS[g.tab] ?? MoreHorizontal;
-            return (
-              <TabsTrigger key={g.tab} value={g.tab} className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-b-none">
-                <Icon className="h-3.5 w-3.5 mr-1" /> {g.title.replace(" Daten", "")}
-              </TabsTrigger>
-            );
-          })}
-          <TabsTrigger value="icons" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-b-none">
-            <ImageIcon className="h-3.5 w-3.5 mr-1" /> Icons ({iconSet.size})
-          </TabsTrigger>
-        </TabsList>
+      {/* Grunddaten -- always visible, not collapsible */}
+      <Card className="border-l-4 border-l-blue-500">
+        <CardContent className="pt-6">
+          <h3 className="text-lg font-semibold mb-4 tracking-tight">Grunddaten</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="artikelnummer">Artikelnummer *</Label>
+              <Input id="artikelnummer" name="artikelnummer" required defaultValue={defaultValues.artikelnummer ?? ""} className="font-mono text-base" />
+              {state.fieldErrors?.artikelnummer && <p className="text-sm text-destructive">{state.fieldErrors.artikelnummer}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Bezeichnung</Label>
+              <Input id="name" name="name" defaultValue={defaultValues.name ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sortierung">Sortierung</Label>
+              <Input id="sortierung" name="sortierung" type="number" defaultValue={String(defaultValues.sortierung ?? 0)} />
+            </div>
+          </div>
 
-        <TabsContent value="basis">
-          <SectionCard color={TAB_COLORS.basis} title="Basisdaten">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="artikelnummer">Artikelnummer *</Label>
-                <Input id="artikelnummer" name="artikelnummer" required defaultValue={defaultValues.artikelnummer ?? ""} className="font-mono text-base" />
-                {state.fieldErrors?.artikelnummer && <p className="text-sm text-destructive">{state.fieldErrors.artikelnummer}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="bereich_id">Bereich *</Label>
+              <select id="bereich_id" name="bereich_id" required value={bereichId} onChange={(e) => setBereichId(e.target.value)} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
+                <option value="" disabled>-- wahlen --</option>
+                {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="kategorie_id">Kategorie *</Label>
+              <select id="kategorie_id" name="kategorie_id" required defaultValue={defaultValues.kategorie_id ?? ""} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
+                <option value="" disabled>-- wahlen --</option>
+                {filteredKategorien.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mt-4">
+            <Switch id="artikel_bearbeitet" name="artikel_bearbeitet" defaultChecked={defaultValues.artikel_bearbeitet ?? false} />
+            <Label htmlFor="artikel_bearbeitet">Artikel bearbeitet</Label>
+          </div>
+
+          <div className="mt-4 space-y-2">
+            <Label>Hauptbild</Label>
+            <div className="flex items-start gap-4">
+              <div className="h-32 w-40 rounded-lg border-2 border-dashed bg-muted/50 overflow-hidden flex items-center justify-center shrink-0">
+                {hauptbildPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={hauptbildPreview} alt="" className="h-full w-full object-contain" />
+                ) : (
+                  <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="name">Bezeichnung</Label>
-                <Input id="name" name="name" defaultValue={defaultValues.name ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="sortierung">Sortierung</Label>
-                <Input id="sortierung" name="sortierung" type="number" defaultValue={String(defaultValues.sortierung ?? 0)} />
+                <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
+                  onChange={(e) => handleHauptbild(e.target.files?.[0] ?? null)} />
+                {uploading && <p className="text-sm text-muted-foreground">Lade hoch...</p>}
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="bereich_id">Bereich *</Label>
-                <select id="bereich_id" name="bereich_id" required value={bereichId} onChange={(e) => setBereichId(e.target.value)} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
-                  <option value="" disabled>– wählen –</option>
-                  {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kategorie_id">Kategorie *</Label>
-                <select id="kategorie_id" name="kategorie_id" required defaultValue={defaultValues.kategorie_id ?? ""} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
-                  <option value="" disabled>– wählen –</option>
-                  {filteredKategorien.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-                </select>
-              </div>
-            </div>
+      {/* Toggle all button */}
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={toggleAll} className="text-muted-foreground text-xs gap-1.5">
+          <ChevronsUpDown className="h-3.5 w-3.5" />
+          {allOpen ? "Alle schliessen" : "Alle offnen"}
+        </Button>
+      </div>
 
-            <div className="flex items-center gap-3 mt-4">
-              <Switch id="artikel_bearbeitet" name="artikel_bearbeitet" defaultChecked={defaultValues.artikel_bearbeitet ?? false} />
-              <Label htmlFor="artikel_bearbeitet">Artikel bearbeitet</Label>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <Label>Hauptbild</Label>
-              <div className="flex items-start gap-4">
-                <div className="h-32 w-40 rounded-lg border-2 border-dashed bg-muted/50 overflow-hidden flex items-center justify-center shrink-0">
-                  {hauptbildPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={hauptbildPreview} alt="" className="h-full w-full object-contain" />
-                  ) : (
-                    <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
-                    onChange={(e) => handleHauptbild(e.target.files?.[0] ?? null)} />
-                  {uploading && <p className="text-sm text-muted-foreground">Lade hoch…</p>}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        </TabsContent>
-
-        <TabsContent value="datenblatt">
-          <SectionCard color={TAB_COLORS.datenblatt} title="Datenblatt-Inhalt">
+      {/* Accordion sections */}
+      <Accordion type="multiple" value={openSections} onValueChange={handleSectionsChange} className="space-y-3">
+        {/* Datenblatt */}
+        <AccordionItem value="datenblatt" className="border rounded-lg overflow-hidden">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+            <span className="flex items-center gap-2">
+              <SectionIndicator filled={isSectionFilled("datenblatt", defaultValues, iconSet.size)} />
+              <FileText className="h-4 w-4 text-violet-500" />
+              <span className="font-semibold">Datenblatt</span>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="datenblatt_titel">Titel</Label>
@@ -206,46 +253,91 @@ export function ProduktForm({
                 </div>
               </div>
             </div>
-          </SectionCard>
-        </TabsContent>
+          </AccordionContent>
+        </AccordionItem>
 
-        {PRODUKT_FIELD_GROUPS.map((group) => (
-          <TabsContent key={group.tab} value={group.tab}>
-            <SectionCard color={TAB_COLORS[group.tab] ?? "border-l-gray-300"} title={group.title}>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {group.fields.map((f) => (
-                  <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
-                ))}
-              </div>
-            </SectionCard>
-          </TabsContent>
-        ))}
+        {/* Elektrotechnisch */}
+        {PRODUKT_FIELD_GROUPS.filter((g) => g.tab !== "thermisch" && g.tab !== "sonstiges").map((group) => {
+          const meta = SECTION_META[group.tab as SectionId];
+          if (!meta) return null;
+          const SIcon = meta.icon;
+          return (
+            <AccordionItem key={group.tab} value={group.tab} className="border rounded-lg overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <SectionIndicator filled={isSectionFilled(group.tab as SectionId, defaultValues, iconSet.size)} />
+                  <SIcon className={`h-4 w-4 ${meta.color.replace("border-l-", "text-")}`} />
+                  <span className="font-semibold">{meta.label}</span>
+                  <span className="text-xs text-muted-foreground ml-1">({group.fields.length} Felder)</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {group.fields.map((f) => (
+                    <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
 
-        <TabsContent value="icons">
-          <SectionCard color={TAB_COLORS.icons} title="Icon-Leiste (Datenblatt)">
+        {/* Thermisch & Sonstiges (merged) */}
+        <AccordionItem value="thermisch" className="border rounded-lg overflow-hidden">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+            <span className="flex items-center gap-2">
+              <SectionIndicator filled={isSectionFilled("thermisch", defaultValues, iconSet.size)} />
+              <Thermometer className="h-4 w-4 text-red-400" />
+              <span className="font-semibold">Thermisch & Sonstiges</span>
+              <span className="text-xs text-muted-foreground ml-1">({(thermischGroup?.fields.length ?? 0) + (sonstigesGroup?.fields.length ?? 0)} Felder)</span>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {thermischGroup?.fields.map((f) => (
+                <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
+              ))}
+              {sonstigesGroup?.fields.map((f) => (
+                <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
+              ))}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Icons */}
+        <AccordionItem value="icons" className="border rounded-lg overflow-hidden">
+          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+            <span className="flex items-center gap-2">
+              <SectionIndicator filled={iconSet.size > 0} />
+              <Palette className="h-4 w-4 text-primary" />
+              <span className="font-semibold">Icons</span>
+              {iconSet.size > 0 && (
+                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">{iconSet.size}</span>
+              )}
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-4 pb-4">
             <IconPicker icons={icons} selectedIds={iconSet} onToggle={toggleIcon} />
-          </SectionCard>
-        </TabsContent>
-      </Tabs>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       <div className="sticky bottom-0 z-40 -mx-6 px-6 py-4 border-t bg-background/95 backdrop-blur flex gap-3 justify-end shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <Button asChild variant="outline" type="button"><a href="/produkte">Abbrechen</a></Button>
         <Button type="submit" size="lg" disabled={pending || uploading}>
-          {pending ? "Speichere…" : submitLabel}
+          {pending ? "Speichere..." : submitLabel}
         </Button>
       </div>
     </form>
   );
 }
 
-function SectionCard({ color, title, children }: { color: string; title: string; children: React.ReactNode }) {
+function SectionIndicator({ filled }: { filled: boolean }) {
   return (
-    <Card className={`border-l-4 ${color}`}>
-      <CardContent className="pt-6">
-        <h3 className="text-lg font-semibold mb-4 tracking-tight">{title}</h3>
-        {children}
-      </CardContent>
-    </Card>
+    <span
+      className={`inline-block h-2 w-2 rounded-full shrink-0 ${filled ? "bg-emerald-500" : "bg-gray-300"}`}
+      aria-label={filled ? "Ausgefullt" : "Leer"}
+    />
   );
 }
 
@@ -255,7 +347,7 @@ function FieldInput({ field, defaultValue }: { field: { col: string; label: stri
       <div className="space-y-2">
         <Label htmlFor={field.col}>{field.label}</Label>
         <select id={field.col} name={field.col} defaultValue={defaultValue == null ? "" : String(defaultValue)} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
-          <option value="">—</option>
+          <option value="">--</option>
           <option value="true">Ja</option>
           <option value="false">Nein</option>
         </select>

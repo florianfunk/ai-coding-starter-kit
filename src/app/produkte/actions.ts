@@ -116,6 +116,33 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
   return { error: null };
 }
 
+const QUICK_EDIT_FIELDS = ["sortierung", "name", "artikel_bearbeitet"] as const;
+type QuickEditField = (typeof QUICK_EDIT_FIELDS)[number];
+
+export async function quickUpdateProdukt(
+  id: string,
+  field: string,
+  value: string | number | boolean,
+): Promise<{ error: string | null }> {
+  if (!QUICK_EDIT_FIELDS.includes(field as QuickEditField)) {
+    return { error: `Feld '${field}' ist nicht für Quick-Edit freigegeben.` };
+  }
+
+  // Treat empty string as null for nullable text fields
+  const dbValue = field === "name" && value === "" ? null : value;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("produkte")
+    .update({ [field]: dbValue })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/produkte");
+  return { error: null };
+}
+
 export async function deleteProdukt(id: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase.from("produkte").delete().eq("id", id);

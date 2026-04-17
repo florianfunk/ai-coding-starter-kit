@@ -1,8 +1,8 @@
-# PROJ-2: Datenmodell & FileMaker-XML-Migration
+# PROJ-2: Datenmodell & FileMaker-Data-API-Migration
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-04-16
-**Last Updated:** 2026-04-16
+**Last Updated:** 2026-04-17
 
 ## Dependencies
 - Requires: PROJ-1 (Authentifizierung) — für RLS-Policies auf allen Tabellen
@@ -14,17 +14,17 @@
 - Als Nutzer möchte ich nach der Migration sofort erkennen, welche Produkte „unvollständig" migriert sind (z.B. fehlende Felder), damit ich sie nachpflegen kann.
 
 ## Acceptance Criteria
-- [ ] Supabase-Schema angelegt mit Tabellen: `bereiche`, `kategorien`, `produkte`, `preise`, `filialen`, `katalog_einstellungen`, `produkt_bilder`, `icons` (Werte-/Lookup-Tabellen wo sinnvoll)
-- [ ] Alle Tabellen haben `id` (UUID), `created_at`, `updated_at`, `created_by`, `updated_by`
-- [ ] Row Level Security (RLS) aktiv auf allen Tabellen, Zugriff nur für authentifizierte Nutzer
-- [ ] Fremdschlüsselbeziehungen: Kategorien → Bereiche, Produkte → Kategorien, Preise → Produkte
-- [ ] Import-Skript liest `daten/Lichtengross Produktkatalog_fmp12.xml` und schreibt in Supabase
-- [ ] Binärbilder aus dem XML werden in Supabase Storage abgelegt, URLs in den Produkt-/Bereich-/Kategorie-Records gespeichert
-- [ ] Import ist idempotent: zweimaliges Ausführen führt nicht zu Duplikaten
-- [ ] Nach Migration steht ein Abgleichbericht zur Verfügung (Anzahl importiert pro Tabelle, Fehler/Warnungen)
-- [ ] Alle 20 Bereiche, alle Kategorien und alle Produkte aus der XML sind in Supabase sichtbar
-- [ ] Preisdaten mit Gültigkeitsdatum und Status (aktiv/inaktiv) übernommen
-- [ ] Filialdaten (Marling, Klausen, Bruneck, Vomp, CH) übernommen
+- [x] Supabase-Schema angelegt mit Tabellen: `bereiche`, `kategorien`, `produkte`, `preise`, `filialen`, `katalog_einstellungen`, `produkt_bilder`, `icons`, `farbfelder`, `katalog_seiten` (Werte-/Lookup-Tabellen wo sinnvoll)
+- [x] Alle Tabellen haben `id` (UUID), `created_at`, `updated_at`, `created_by`, `updated_by`
+- [x] Row Level Security (RLS) aktiv auf allen Tabellen, Zugriff nur für authentifizierte Nutzer
+- [x] Fremdschlüsselbeziehungen: Kategorien → Bereiche, Produkte → Kategorien, Preise → Produkte
+- [x] Import-Skript liest über **FileMaker Data API** (statt XML) und schreibt in Supabase (`scripts/migrate-from-dataapi.ts`)
+- [x] Container-Bilder werden via Data API heruntergeladen und in Supabase Storage hochgeladen, Pfade in den Records gespeichert
+- [x] Import ist idempotent: zweimaliges Ausführen aktualisiert via `ON CONFLICT (external_id) DO UPDATE`
+- [x] Nach Migration steht ein Abgleichbericht zur Verfügung (`scripts/migrate-dataapi-report.json`)
+- [x] Alle 20 Bereiche, 80 Kategorien, 419 Produkte aus FileMaker sind in Supabase
+- [x] 1.449 Preisdatensätze mit Gültigkeitsdatum und Status (aktiv/inaktiv) übernommen
+- [ ] Filialdaten (Marling, Klausen, Bruneck, Vomp, CH) — noch nicht in FM-Tabellen vorhanden, manuell nachpflegen
 
 ## Edge Cases
 - Was passiert, wenn ein Produkt auf eine nicht existierende Kategorie verweist? → In Import-Log als Warnung, Produkt bleibt mit NULL-Kategorie erhalten
@@ -122,6 +122,38 @@ Idempotenz: Alle Inserts nutzen `ON CONFLICT (external_id) DO UPDATE`, wobei `ex
 ### Risiken & Mitigation
 - **Risiko:** Binärbilder im XML sind Base64-kodiert und groß → Skript könnte in RAM laufen. **Mitigation:** Streaming-Parser oder Chunked-Processing.
 - **Risiko:** FileMaker-UUIDs sind Text, Supabase-UUIDs strikt. **Mitigation:** FileMaker-ID in separater Spalte `external_id` speichern, neue UUIDs generieren.
+
+## Implementation Notes (2026-04-17)
+
+### Änderung gegenüber Architektur-Design
+- **Data API statt XML-Import**: Die DDR-XML enthielt nur Schema-Metadaten, keine Datensätze.
+  Stattdessen wurde die **FileMaker Data API** (`https://claris.sustainable.de`) angebunden.
+  Container-Bilder werden per HTTP-Redirect-Flow mit Session-Token heruntergeladen.
+- **Neues Skript**: `scripts/migrate-from-dataapi.ts` ersetzt das XML-basierte `scripts/migrate-filemaker.ts`.
+- **Reset-Skript**: `scripts/reset-for-migration.ts` löscht alle Daten + Storage für einen sauberen Re-Import.
+
+### Migrationsstatistik (Vollimport 2026-04-17)
+| Tabelle | Records | Bilder |
+|---------|---------|--------|
+| Bereiche | 20 | 20 |
+| Kategorien | 80 | ~80 |
+| Artikel/Produkte | 419 | 1.264 (Haupt-, Detail-, Zeichnungsbilder) |
+| Preise | 1.449 | — |
+| Icons | 33 | 33 |
+| Farbfelder | 71 | — |
+| Katalogseiten | 4 | — |
+| Kategorie↔Icon | 138 | — |
+| Produkt↔Icon | 1.212 | — |
+| System-Einstellungen | 1 (Singleton) | 6 Logos/Cover |
+
+### Warnungen (nicht kritisch)
+- 5 Produkt-Icons verweisen auf gelöschte Icons in FileMaker
+- 30 Preise verweisen auf gelöschte Artikel in FileMaker — übersprungen
+
+### Schema-Migrationen
+- `0007_filemaker_import_fields.sql` — Marker, Sortierfelder, Bildpfade, Farbfelder, Katalogseiten
+- `0008_farbfelder_drop_unique.sql` — Farbfeld-Code darf Duplikate haben
+- `0009_artikelnummer_not_unique.sql` — Artikelnummern in FileMaker nicht eindeutig
 
 ## QA Test Results
 _To be added by /qa_

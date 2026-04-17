@@ -1,0 +1,114 @@
+{
+  "run_at": "2026-04-17T05:06:37.460Z",
+  "dry_run": false,
+  "skip_images": false,
+  "limit": null,
+  "icons": {
+    "inserted": 33,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "farbfelder": {
+    "inserted": 71,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "bereiche": {
+    "inserted": 20,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "kategorien": {
+    "inserted": 80,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "kategorie_icons": {
+    "inserted": 138,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "produkte": {
+    "inserted": 419,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "produkt_icons": {
+    "inserted": 1212,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": [
+      "Artikel 0B9D7819-2C9D-41FC-8648-2515FF3B15EC: Icon 3805B79B-5B78-9E4A-9D91-1550C790FA0F nicht gefunden",
+      "Artikel BF723F62-7FA8-40F6-B824-5293F71C6563: Icon 3805B79B-5B78-9E4A-9D91-1550C790FA0F nicht gefunden",
+      "Artikel FBF4C7ED-EFAF-4B96-B512-67FB610CEB0B: Icon 2A94911E-8835-9D4B-BDC2-B1C3A5964CD0 nicht gefunden",
+      "Artikel FBF4C7ED-EFAF-4B96-B512-67FB610CEB0B: Icon 3166CD97-C04F-824F-88E3-D73C2A3379CC nicht gefunden",
+      "Artikel FBF4C7ED-EFAF-4B96-B512-67FB610CEB0B: Icon 3166CD97-C04F-824F-88E3-D73C2A3379CC nicht gefunden"
+    ]
+  },
+  "produkt_bilder": {
+    "inserted": 0,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "preise": {
+    "inserted": 1449,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": [
+      "Preis 96A3C7B9-5151-458B-BB13-1064A613BEDA: Artikel 292CFF22-CE5C-49F9-9E3C-2865756AA31A nicht gefunden",
+      "Preis 04382A82-8322-4108-B9D2-D1F110EB9935: Artikel 643A395F-9ACF-4A6F-AAC6-D4F925302A93 nicht gefunden",
+      "Preis 15BDEF5D-DA87-4037-9DAB-C8532332279B: Artikel 8A4B9708-68EA-4524-838C-433FD4468D11 nicht gefunden",
+      "Preis 6DAEAAC4-0B6B-435C-A520-BA21985DD21C: Artikel A95BE1DF-761E-4486-8DE7-CF6759F5A79D nicht gefunden",
+      "Preis 69A6AA4E-7CDA-43C6-B1BC-91CD1A4403A5: Artikel 59F21740-01C3-4F5F-9B2E-D0D12A39DA09 nicht gefunden",
+      "Preis 9A28A7E9-3680-44AF-9690-458FD0AF8286: Artikel 2A22B89D-967E-4200-9109-040E20B2CFBB nicht gefunden",
+      "Preis 5DE2ADBC-E75F-41A0-A2F5-5943FF38678E: Artikel 7891B853-FF1A-41CF-BD41-E0F2FEFB649D nicht gefunden",
+      "Preis 38537493-CC2F-4EE2-8DAE-0598187CB2D7: Artikel 75224C3F-8548-45CF-9195-0AF66D8BD521 nicht gefunden",
+      "Preis B1CB1CAB-2964-44D9-8B81-05E948D13FE7: Artikel 07A05EB6-B963-4384-BD7D-254CDFD541F5 nicht gefunden",
+      "Preis 9815C14A-F267-4444-8143-90E7CFE99C9D: Artikel 75224C3F-8548-45CF-9195-0AF66D8BD521 nicht gefunden",
+      "Preis D0C78835-17D3-40F9-8B6D-0E5CE41D9D4F: Artikel 292CFF22-CE5C-49F9-9E3C-2865756AA31A nicht gefunden",
+      "Preis 06E26D64-1AA3-4FA0-B6B5-5C060726C17E: Artikel 07A05EB6-B963-4384-BD7D-254CDFD541F5 nicht gefunden",
+      "Preis 9B6504E8-FBB2-4D69-AC98-195BC3F2A9DE: Artikel 7891B853-FF1A-41CF-BD41-E0F2FEFB649D nicht gefunden",
+      "Preis DDEF165C-B07B-42F6-9AF0-411B0F675B16: Artikel 8A4B9708-68EA-4524-838C-433FD4468D11 nicht gefunden",
+      "Preis CB87F4E5-A03A-4E22-8A6F-792168BFEE9C: Artikel 643A395F-9ACF-4A6F-AAC6-D4F925302A93 nicht gefunden",
+      "Preis 75070A92-2B2F-4FE2-B705-0BB770CE7405: Artikel  nicht gefunden",
+      "Preis CB188263-520B-42DB-ACA9-4938573E7703: Artikel 292CFF22-CE5C-49F9-9E3C-2865756AA31A nicht gefunden",
+      "Preis 8742700C-3EDC-4A0F-8154-C43ED3577F07: Artikel 643A395F-9ACF-4A6F-AAC6-D4F925302A93 nicht gefunden",
+      "Preis 6A9D1479-8D66-4AAF-8A97-6EA5BD1E2500: Artikel 8A4B9708-68EA-4524-838C-433FD4468D11 nicht gefunden",
+      "Preis 6FB66EBB-F5DB-40F6-88A7-878298EEA531: Artikel 7891B853-FF1A-41CF-BD41-E0F2FEFB649D nicht gefunden",
+      "Preis 195E1762-E551-445F-BD6F-994E04753A2A: Artikel 75224C3F-8548-45CF-9195-0AF66D8BD521 nicht gefunden",
+      "Preis 2325A900-C635-4BCE-AE90-9A6356C1BF60: Artikel 07A05EB6-B963-4384-BD7D-254CDFD541F5 nicht gefunden",
+      "Preis 8F15F461-F3EA-413B-A649-E5F0F09B56CB: Artikel  nicht gefunden",
+      "Preis 422AA348-2D90-411C-9B7B-2CED4CD38184: Artikel  nicht gefunden",
+      "Preis 44F661D8-DEEF-400D-B84C-FB72C17CD913: Artikel 643A395F-9ACF-4A6F-AAC6-D4F925302A93 nicht gefunden",
+      "Preis 26B592A4-AEDF-4AED-B24E-532855C06FFE: Artikel 75224C3F-8548-45CF-9195-0AF66D8BD521 nicht gefunden",
+      "Preis DCD9A9C9-9EE4-4FD1-8F98-E62D1287F5D4: Artikel 07A05EB6-B963-4384-BD7D-254CDFD541F5 nicht gefunden",
+      "Preis A4656054-713B-4BE9-A58B-C6F15FB7C62F: Artikel 8A4B9708-68EA-4524-838C-433FD4468D11 nicht gefunden",
+      "Preis 7C542C54-9A9A-494D-B66E-B617B3A3A4A4: Artikel 292CFF22-CE5C-49F9-9E3C-2865756AA31A nicht gefunden",
+      "Preis 0F4A0743-962B-4EB0-91E6-4D1ADFE0B0AB: Artikel 7891B853-FF1A-41CF-BD41-E0F2FEFB649D nicht gefunden"
+    ]
+  },
+  "katalog_seiten": {
+    "inserted": 4,
+    "updated": 0,
+    "skipped": 0,
+    "warnings": []
+  },
+  "einstellungen": {
+    "inserted": 0,
+    "updated": 1,
+    "skipped": 0,
+    "warnings": []
+  },
+  "bilder": {
+    "uploaded": 1264,
+    "failed": 0,
+    "skipped": 0
+  }
+}

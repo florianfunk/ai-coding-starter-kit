@@ -15,7 +15,7 @@
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
 | PROJ-1 | Authentifizierung & Nutzerverwaltung | In Progress | [PROJ-1](PROJ-1-authentifizierung.md) | 2026-04-16 |
-| PROJ-2 | Datenmodell & FileMaker-XML-Migration | In Progress | [PROJ-2](PROJ-2-datenmodell-und-migration.md) | 2026-04-16 |
+| PROJ-2 | Datenmodell & FileMaker-Data-API-Migration | Approved | [PROJ-2](PROJ-2-datenmodell-und-migration.md) | 2026-04-16 |
 | PROJ-3 | Bereiche verwalten (CRUD) | In Progress | [PROJ-3](PROJ-3-bereiche-verwalten.md) | 2026-04-16 |
 | PROJ-4 | Kategorien verwalten (CRUD) | In Progress | [PROJ-4](PROJ-4-kategorien-verwalten.md) | 2026-04-16 |
 | PROJ-5 | Produkte/Artikel verwalten (CRUD) | In Progress | [PROJ-5](PROJ-5-produkte-verwalten.md) | 2026-04-16 |

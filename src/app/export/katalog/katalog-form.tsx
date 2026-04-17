@@ -28,8 +28,16 @@ export function KatalogForm({ wechselkurs }: { wechselkurs: number }) {
         waehrung,
         wechselkurs,
       });
-      if (r.error || !r.jobId) toast.error(r.error ?? "Job konnte nicht gestartet werden");
-      else { toast.success("Katalog wird generiert…"); router.refresh(); }
+      if (r.error || !r.jobId) {
+        toast.error(r.error ?? "Job konnte nicht gestartet werden");
+        return;
+      }
+      toast.success("Katalog wird generiert…");
+      router.refresh();
+      // Render-Task in API-Route starten (läuft im Hintergrund, ohne auf Response zu warten)
+      fetch(`/api/katalog-jobs/${r.jobId}/run`, { method: "POST" }).catch(() => {
+        toast.error("Render-Task konnte nicht gestartet werden");
+      });
     });
   }
 

@@ -143,6 +143,54 @@ export async function quickUpdateProdukt(
   return { error: null };
 }
 
+export async function bulkUpdateProdukte(
+  ids: string[],
+  action: string,
+  value?: string,
+): Promise<{ error: string | null; count: number }> {
+  if (!ids.length) return { error: "Keine Produkte ausgewählt.", count: 0 };
+
+  const supabase = await createClient();
+  let error: string | null = null;
+  let count = 0;
+
+  if (action === "mark_done") {
+    const { error: e, count: c } = await supabase
+      .from("produkte")
+      .update({ artikel_bearbeitet: true })
+      .in("id", ids);
+    error = e?.message ?? null;
+    count = c ?? ids.length;
+  } else if (action === "mark_undone") {
+    const { error: e, count: c } = await supabase
+      .from("produkte")
+      .update({ artikel_bearbeitet: false })
+      .in("id", ids);
+    error = e?.message ?? null;
+    count = c ?? ids.length;
+  } else if (action === "change_kategorie") {
+    if (!value) return { error: "Keine Kategorie angegeben.", count: 0 };
+    const { error: e, count: c } = await supabase
+      .from("produkte")
+      .update({ kategorie_id: value })
+      .in("id", ids);
+    error = e?.message ?? null;
+    count = c ?? ids.length;
+  } else if (action === "delete") {
+    const { error: e, count: c } = await supabase
+      .from("produkte")
+      .delete()
+      .in("id", ids);
+    error = e?.message ?? null;
+    count = c ?? ids.length;
+  } else {
+    return { error: `Unbekannte Aktion: ${action}`, count: 0 };
+  }
+
+  revalidatePath("/produkte");
+  return { error, count };
+}
+
 export async function deleteProdukt(id: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const { error } = await supabase.from("produkte").delete().eq("id", id);
@@ -221,4 +269,210 @@ export async function deleteGalerieBild(bildId: string, produktId: string) {
   if (error) return { error: error.message };
   revalidatePath(`/produkte/${produktId}`);
   return { error: null };
+}
+
+export async function reorderGalerieBilder(
+  produktId: string,
+  orderedImageIds: string[],
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  // Update sortierung for each image in the new order
+  const updates = orderedImageIds.map((id, index) =>
+    supabase
+      .from("produkt_bilder")
+      .update({ sortierung: index })
+      .eq("id", id)
+      .eq("produkt_id", produktId),
+  );
+
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
+
+  revalidatePath(`/produkte/${produktId}`);
+  return { error: null };
+}
+
+export async function setHauptbild(
+  produktId: string,
+  storagePath: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("produkte")
+    .update({ hauptbild_path: storagePath })
+    .eq("id", produktId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/produkte/${produktId}`);
+  return { error: null };
+}
+
+// ---------------------------------------------------------------------------
+// Preis-Import
+// ---------------------------------------------------------------------------
+
+export type ImportPreiseRow = {
+  artikelnummer: string;
+  listenpreis?: number | null;
+  ek_lichtengros?: number | null;
+  ek_eisenkeil?: number | null;
+  gueltig_ab?: string | null;
+};
+
+export type ImportPreiseResult = {
+  imported: number;
+  notFound: string[];
+  error: string | null;
+};
+
+export async function importPreise(data: {
+  rows: ImportPreiseRow[];
+  deactivateOld: boolean;
+}): Promise<ImportPreiseResult> {
+  const supabase = await createClient();
+
+  // Fetch all products to build artikelnummer -> id map
+  const { data: produkte, error: fetchErr } = await supabase
+    .from("produkte")
+    .select("id, artikelnummer");
+
+  if (fetchErr || !produkte) {
+    return { imported: 0, notFound: [], error: fetchErr?.message ?? "Produkte konnten nicht geladen werden." };
+  }
+
+  const artNrToId: Record<string, string> = {};
+  for (const p of produkte) {
+    artNrToId[p.artikelnummer.trim().toLowerCase()] = p.id;
+  }
+
+  let imported = 0;
+  const notFound: string[] = [];
+
+  for (const row of data.rows) {
+    const key = row.artikelnummer.trim().toLowerCase();
+    const produktId = artNrToId[key];
+
+    if (!produktId) {
+      notFound.push(row.artikelnummer);
+      continue;
+    }
+
+    // If deactivateOld: set existing active prices to inactive
+    if (data.deactivateOld) {
+      await supabase
+        .from("preise")
+        .update({ status: "inaktiv" })
+        .eq("produkt_id", produktId)
+        .eq("status", "aktiv");
+    }
+
+    // Insert new price record
+    const insertData: Record<string, unknown> = {
+      produkt_id: produktId,
+      status: "aktiv",
+    };
+
+    if (row.listenpreis != null) insertData.listenpreis = row.listenpreis;
+    if (row.ek_lichtengros != null) insertData.ek_lichtengros = row.ek_lichtengros;
+    if (row.ek_eisenkeil != null) insertData.ek_eisenkeil = row.ek_eisenkeil;
+    if (row.gueltig_ab) insertData.gueltig_ab = row.gueltig_ab;
+
+    const { error: insertErr } = await supabase.from("preise").insert(insertData);
+
+    if (!insertErr) {
+      imported++;
+    }
+  }
+
+  revalidatePath("/produkte");
+  return { imported, notFound, error: null };
+}
+
+export type PreisMatchResult = {
+  artikelnummer: string;
+  produktId: string | null;
+  produktName: string | null;
+  alterListenpreis: number | null;
+  alterEkLg: number | null;
+  alterEkEk: number | null;
+};
+
+export async function matchArtikelnummern(
+  artikelnummern: string[],
+): Promise<{ matches: Record<string, PreisMatchResult>; error: string | null }> {
+  const supabase = await createClient();
+
+  // Fetch products matching the given artikelnummern
+  const { data: produkte, error: fetchErr } = await supabase
+    .from("produkte")
+    .select("id, artikelnummer, name");
+
+  if (fetchErr || !produkte) {
+    return { matches: {}, error: fetchErr?.message ?? "Fehler beim Laden der Produkte." };
+  }
+
+  const artNrToProduct: Record<string, { id: string; name: string | null }> = {};
+  for (const p of produkte) {
+    artNrToProduct[p.artikelnummer.trim().toLowerCase()] = { id: p.id, name: p.name };
+  }
+
+  // Get current prices for matched products
+  const matchedIds = artikelnummern
+    .map((a) => artNrToProduct[a.trim().toLowerCase()]?.id)
+    .filter(Boolean) as string[];
+
+  const priceMap: Record<string, { listenpreis: number | null; ek_lichtengros: number | null; ek_eisenkeil: number | null }> = {};
+
+  if (matchedIds.length > 0) {
+    const { data: preise } = await supabase
+      .from("preise")
+      .select("produkt_id, listenpreis, ek_lichtengros, ek_eisenkeil")
+      .in("produkt_id", matchedIds)
+      .eq("status", "aktiv")
+      .order("gueltig_ab", { ascending: false });
+
+    if (preise) {
+      for (const p of preise) {
+        // Only keep the first (most recent) price per product
+        if (!priceMap[p.produkt_id]) {
+          priceMap[p.produkt_id] = {
+            listenpreis: p.listenpreis,
+            ek_lichtengros: p.ek_lichtengros,
+            ek_eisenkeil: p.ek_eisenkeil,
+          };
+        }
+      }
+    }
+  }
+
+  const matches: Record<string, PreisMatchResult> = {};
+  for (const artNr of artikelnummern) {
+    const key = artNr.trim().toLowerCase();
+    const product = artNrToProduct[key];
+    if (product) {
+      const prices = priceMap[product.id];
+      matches[artNr] = {
+        artikelnummer: artNr,
+        produktId: product.id,
+        produktName: product.name,
+        alterListenpreis: prices?.listenpreis ?? null,
+        alterEkLg: prices?.ek_lichtengros ?? null,
+        alterEkEk: prices?.ek_eisenkeil ?? null,
+      };
+    } else {
+      matches[artNr] = {
+        artikelnummer: artNr,
+        produktId: null,
+        produktName: null,
+        alterListenpreis: null,
+        alterEkLg: null,
+        alterEkEk: null,
+      };
+    }
+  }
+
+  return { matches, error: null };
 }

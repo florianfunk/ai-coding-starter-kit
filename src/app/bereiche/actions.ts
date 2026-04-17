@@ -100,6 +100,18 @@ export async function uploadBereichBild(
   return { path, error: null };
 }
 
+export async function reorderBereiche(orderedIds: string[]): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const updates = orderedIds.map((id, i) =>
+    supabase.from("bereiche").update({ sortierung: (i + 1) * 10 }).eq("id", id),
+  );
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
+  revalidatePath("/bereiche");
+  return { error: null };
+}
+
 function flattenErrors(err: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};
   for (const i of err.issues) out[i.path.join(".")] = i.message;

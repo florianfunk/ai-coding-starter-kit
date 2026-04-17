@@ -5,9 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Filter, X } from "lucide-react";
-import { ProdukteTableBody } from "./produkte-table-body";
+import { Plus, Search, Filter, X, Upload } from "lucide-react";
+import { ProdukteTable } from "./produkte-table-body";
+import { ExportDialog } from "./export-dialog";
 import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
 
 export const dynamic = "force-dynamic";
@@ -103,11 +103,28 @@ export default async function ProdukteListPage({
         title="Produkte"
         subtitle={`${displayCount} Produkte${hasFilter ? " gefunden (Filter aktiv)" : ""}`}
       >
-        <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
-          <Link href="/produkte/neu">
-            <Plus className="mr-2 h-4 w-4" /> Neues Produkt
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ExportDialog
+            produktCount={displayCount}
+            filters={{
+              search: sp.q,
+              bereichId: sp.bereich,
+              kategorieId: sp.kategorie,
+              status: sp.status,
+              vollstaendigkeit: sp.vollstaendigkeit,
+            }}
+          />
+          <Button asChild variant="outline" size="lg" className="shadow-sm hover:shadow-md transition-shadow">
+            <Link href="/produkte/import">
+              <Upload className="mr-2 h-4 w-4" /> Preise importieren
+            </Link>
+          </Button>
+          <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
+            <Link href="/produkte/neu">
+              <Plus className="mr-2 h-4 w-4" /> Neues Produkt
+            </Link>
+          </Button>
+        </div>
       </PageHeader>
 
       {/* Filter */}
@@ -167,35 +184,22 @@ export default async function ProdukteListPage({
       {/* Tabelle */}
       <Card className="border-2">
         <CardContent className="p-0 overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-primary text-primary-foreground hover:bg-primary">
-                <TableHead className="text-primary-foreground font-semibold">Artikelnummer</TableHead>
-                <TableHead className="text-primary-foreground font-semibold">Name</TableHead>
-                <TableHead className="text-primary-foreground font-semibold">Bereich</TableHead>
-                <TableHead className="text-primary-foreground font-semibold">Kategorie</TableHead>
-                <TableHead className="text-right text-primary-foreground font-semibold">Sort</TableHead>
-                <TableHead className="text-primary-foreground font-semibold">Status</TableHead>
-                <TableHead className="text-primary-foreground font-semibold min-w-[140px]">Vollstaendigkeit</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <ProdukteTableBody
-              produkte={filteredProdukte.map((p) => ({
-                id: p.id,
-                artikelnummer: p.artikelnummer,
-                name: p.name,
-                bereich_id: p.bereich_id,
-                kategorie_id: p.kategorie_id,
-                sortierung: p.sortierung,
-                artikel_bearbeitet: p.artikel_bearbeitet,
-              }))}
-              bereichName={bereichNameMap}
-              kategorieName={kategorieNameMap}
-              hasFilter={hasFilter}
-              completenessMap={completenessMap}
-            />
-          </Table>
+          <ProdukteTable
+            produkte={filteredProdukte.map((p) => ({
+              id: p.id,
+              artikelnummer: p.artikelnummer,
+              name: p.name,
+              bereich_id: p.bereich_id,
+              kategorie_id: p.kategorie_id,
+              sortierung: p.sortierung,
+              artikel_bearbeitet: p.artikel_bearbeitet,
+            }))}
+            bereichName={bereichNameMap}
+            kategorieName={kategorieNameMap}
+            kategorien={(kategorien ?? []).map((k) => ({ id: k.id, name: k.name }))}
+            hasFilter={hasFilter}
+            completenessMap={completenessMap}
+          />
         </CardContent>
       </Card>
 

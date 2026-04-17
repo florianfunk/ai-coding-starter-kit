@@ -80,6 +80,18 @@ export async function deleteKategorie(id: string): Promise<{ error: string | nul
   return { error: null };
 }
 
+export async function reorderKategorien(orderedIds: string[]): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const updates = orderedIds.map((id, i) =>
+    supabase.from("kategorien").update({ sortierung: (i + 1) * 10 }).eq("id", id),
+  );
+  const results = await Promise.all(updates);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) return { error: failed.error.message };
+  revalidatePath("/kategorien");
+  return { error: null };
+}
+
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 export async function uploadKategorieBild(formData: FormData) {
   const file = formData.get("file") as File | null;

@@ -4,11 +4,9 @@ import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Layers, Pencil, ChevronRight, ImageIcon, Filter } from "lucide-react";
-import { DeleteKategorieButton } from "./delete-button";
+import { Plus, Layers, Filter } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { SortableKategorienList } from "./sortable-list";
 
 export const dynamic = "force-dynamic";
 
@@ -51,12 +49,22 @@ export default async function KategorienPage({
     })),
   );
 
+  const items = withUrls.map((k) => ({
+    id: k.id,
+    name: k.name,
+    bereich_id: k.bereich_id,
+    bereichName: bereichName.get(k.bereich_id) ?? "\u2014",
+    vorschaubild_url: k.vorschaubild_url,
+    prodCount: prodCount.get(k.id) ?? 0,
+    icons: iconsByKat.get(k.id) ?? [],
+  }));
+
   return (
     <AppShell>
       <PageHeader
         eyebrow="Katalogstruktur"
         title="Kategorien"
-        subtitle={`${withUrls.length} ${bereich ? "Kategorien in diesem Bereich" : "Kategorien insgesamt"}`}
+        subtitle={`${items.length} ${bereich ? "Kategorien in diesem Bereich" : "Kategorien insgesamt"}`}
       >
         <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
           <Link href={`/kategorien/neu${bereich ? `?bereich=${bereich}` : ""}`}>
@@ -82,7 +90,7 @@ export default async function KategorienPage({
         )}
       </form>
 
-      {withUrls.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyState
           icon={Layers}
           title="Keine Kategorien"
@@ -91,58 +99,7 @@ export default async function KategorienPage({
           actionHref={`/kategorien/neu${bereich ? `?bereich=${bereich}` : ""}`}
         />
       ) : (
-        <div className="grid gap-3">
-          {withUrls.map((k, i) => (
-            <Card key={k.id} className="group card-hover border-2 overflow-hidden">
-              <CardContent className="flex items-center gap-5 py-4 relative">
-                <Link href={`/kategorien/${k.id}`} className="absolute inset-0 z-0" aria-label={`${k.name} öffnen`} />
-
-                <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shrink-0 relative z-10">
-                  {i + 1}
-                </div>
-
-                <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10 border">
-                  {k.vorschaubild_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={k.vorschaubild_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
-                      <ImageIcon className="h-5 w-5" />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 relative z-10 pointer-events-none">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <div className="font-semibold text-lg group-hover:text-primary transition-colors">{k.name}</div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{bereichName.get(k.bereich_id) ?? "—"}</p>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    {(iconsByKat.get(k.id) ?? []).slice(0, 6).map((label) => (
-                      <Badge key={label} variant="secondary" className="text-[10px]">{label}</Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="hidden md:block text-center shrink-0 relative z-10 pointer-events-none min-w-14">
-                  <p className="text-2xl font-bold leading-none text-primary">{prodCount.get(k.id) ?? 0}</p>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Produkte</p>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0 relative z-20">
-                  <Button asChild variant="ghost" size="sm" className="hover:bg-primary/10 hover:text-primary">
-                    <Link href={`/kategorien/${k.id}/bearbeiten`}>
-                      <Pencil className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">Bearbeiten</span>
-                    </Link>
-                  </Button>
-                  <DeleteKategorieButton id={k.id} name={k.name} />
-                  <ChevronRight className="h-5 w-5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all ml-1" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <SortableKategorienList initialItems={items} />
       )}
     </AppShell>
   );

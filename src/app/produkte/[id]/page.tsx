@@ -10,8 +10,8 @@ import { ProduktTopActions } from "./top-actions";
 import { PreiseSection } from "./preise-section";
 import { GalerieSection } from "./galerie-section";
 import { DatenblattSection } from "./datenblatt-section";
-import { ChevronLeft, Info } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ChevronLeft } from "lucide-react";
+import { SplitViewLayout } from "./split-view-layout";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -135,9 +135,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
                   <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
                 </Link>
               </Button>
-              <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
-                <Link href={`/produkte/${id}/datenblatt`}>Datenblatt PDF</Link>
-              </Button>
               <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
             </div>
           </div>
@@ -148,27 +145,29 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
           <CompletenessDetail result={completeness} />
         </div>
 
-        <ProduktForm
-          bereiche={bereiche ?? []}
-          kategorien={kategorien ?? []}
-          icons={iconsFull}
-          defaultValues={produkt}
-          defaultIconIds={(produktIcons ?? []).map((r) => r.icon_id)}
-          defaultHauptbildUrl={hauptbildUrl}
-          produktId={id}
-          action={action}
-          submitLabel="Speichern"
-        />
+        <SplitViewLayout produktId={id}>
+          <ProduktForm
+            bereiche={bereiche ?? []}
+            kategorien={kategorien ?? []}
+            icons={iconsFull}
+            defaultValues={produkt}
+            defaultIconIds={(produktIcons ?? []).map((r) => r.icon_id)}
+            defaultHauptbildUrl={hauptbildUrl}
+            produktId={id}
+            action={action}
+            submitLabel="Speichern"
+          />
 
-        <DatenblattSection
-          produktId={id}
-          templates={templatesTyped}
-          activeTemplateId={produkt.datenblatt_template_id}
-          slotImages={slotImages}
-        />
+          <DatenblattSection
+            produktId={id}
+            templates={templatesTyped}
+            activeTemplateId={produkt.datenblatt_template_id}
+            slotImages={slotImages}
+          />
 
-        <PreiseSection produktId={id} preise={preise ?? []} />
-        <GalerieSection produktId={id} bilder={galerieMit} />
+          <PreiseSection produktId={id} preise={preise ?? []} />
+          <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
+        </SplitViewLayout>
       </div>
     </AppShell>
   );

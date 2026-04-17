@@ -1,11 +1,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settings } from "lucide-react";
+import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settings, History, HelpCircle, Users } from "lucide-react";
 import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme-toggle";
 import { ToastListener } from "./toast-listener";
 import { GlobalShortcuts } from "./global-shortcuts";
 import { CommandPalette, CommandPaletteTrigger } from "./command-palette";
+import { UserMenu } from "./user-menu";
 
 export async function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -30,11 +31,15 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <NavLink href="/datenblatt-vorlagen" label="Vorlagen"><LayoutTemplate className="h-4 w-4" /></NavLink>
             <NavLink href="/export/katalog" label="Katalog"><FileDown className="h-4 w-4" /></NavLink>
             <NavLink href="/einstellungen" label="Einstellungen"><Settings className="h-4 w-4" /></NavLink>
+            <NavLink href="/aktivitaet" label="Aktivitaet"><History className="h-4 w-4" /></NavLink>
+            <NavLink href="/hilfe" label="Hilfe"><HelpCircle className="h-4 w-4" /></NavLink>
+            <NavLink href="/benutzer" label="Benutzer"><Users className="h-4 w-4" /></NavLink>
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
             <CommandPaletteTrigger />
             <ThemeToggle />
+            <UserMenu />
           </div>
         </div>
       </header>

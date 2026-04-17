@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 import { ALL_PRODUKT_FIELDS } from "./fields";
 
 const baseSchema = z.object({
@@ -111,6 +112,8 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
   const iconIds = formData.getAll("icon_ids").map(String).filter(Boolean);
   await setProduktIcons(supabase, id, iconIds);
 
+  await logAudit(supabase, { tableName: "produkte", recordId: id, action: "update", recordLabel: parsed.data.artikelnummer });
+
   revalidatePath("/produkte");
   revalidatePath(`/produkte/${id}`);
   return { error: null };
@@ -138,6 +141,8 @@ export async function quickUpdateProdukt(
     .eq("id", id);
 
   if (error) return { error: error.message };
+
+  await logAudit(supabase, { tableName: "produkte", recordId: id, action: "update", changes: { [field]: { old: null, new: dbValue } } });
 
   revalidatePath("/produkte");
   return { error: null };
@@ -187,14 +192,21 @@ export async function bulkUpdateProdukte(
     return { error: `Unbekannte Aktion: ${action}`, count: 0 };
   }
 
+  for (const pid of ids) {
+    await logAudit(supabase, { tableName: "produkte", recordId: pid, action: action === "delete" ? "delete" : "update", changes: action !== "delete" ? { bulk_action: { old: null, new: action } } : undefined });
+  }
+
   revalidatePath("/produkte");
   return { error, count };
 }
 
 export async function deleteProdukt(id: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
+  // Fetch label before deleting
+  const { data: row } = await supabase.from("produkte").select("artikelnummer").eq("id", id).single();
   const { error } = await supabase.from("produkte").delete().eq("id", id);
   if (error) return { error: error.message };
+  await logAudit(supabase, { tableName: "produkte", recordId: id, action: "delete", recordLabel: row?.artikelnummer ?? id });
   revalidatePath("/produkte");
   redirect("/produkte?toast=success&message=Produkt+gel%C3%B6scht");
 }
@@ -233,6 +245,8 @@ export async function duplicateProdukt(id: string): Promise<{ id?: string; error
       srcIcons.map((row) => ({ produkt_id: data.id, icon_id: row.icon_id, sortierung: row.sortierung })),
     );
   }
+
+  await logAudit(supabase, { tableName: "produkte", recordId: data.id, action: "create", recordLabel: copy.artikelnummer });
 
   revalidatePath("/produkte");
   return { id: data.id, error: null };

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 const schema = z.object({
   bereich_id: z.string().uuid("Bereich ist Pflicht"),
@@ -50,6 +51,8 @@ export async function createKategorie(_p: KategorieFormState, formData: FormData
   const iconIds = formData.getAll("icon_ids").map(String).filter(Boolean);
   await setIcons(supabase, data.id, iconIds);
 
+  await logAudit(supabase, { tableName: "kategorien", recordId: data.id, action: "create", recordLabel: parsed.data.name });
+
   revalidatePath("/kategorien");
   redirect("/kategorien?toast=success&message=Kategorie+angelegt");
 }
@@ -65,6 +68,8 @@ export async function updateKategorie(id: string, _p: KategorieFormState, formDa
   const iconIds = formData.getAll("icon_ids").map(String).filter(Boolean);
   await setIcons(supabase, id, iconIds);
 
+  await logAudit(supabase, { tableName: "kategorien", recordId: id, action: "update", recordLabel: parsed.data.name });
+
   revalidatePath("/kategorien");
   revalidatePath(`/kategorien/${id}/bearbeiten`);
   redirect("/kategorien?toast=success&message=Kategorie+gespeichert");
@@ -74,8 +79,10 @@ export async function deleteKategorie(id: string): Promise<{ error: string | nul
   const supabase = await createClient();
   const { count } = await supabase.from("produkte").select("*", { count: "exact", head: true }).eq("kategorie_id", id);
   if ((count ?? 0) > 0) return { error: `${count} Produkte verweisen auf diese Kategorie.` };
+  const { data: row } = await supabase.from("kategorien").select("name").eq("id", id).single();
   const { error } = await supabase.from("kategorien").delete().eq("id", id);
   if (error) return { error: error.message };
+  await logAudit(supabase, { tableName: "kategorien", recordId: id, action: "delete", recordLabel: row?.name ?? id });
   revalidatePath("/kategorien");
   return { error: null };
 }

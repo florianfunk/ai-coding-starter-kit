@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -30,6 +31,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { InlineEdit } from "@/components/inline-edit";
 import {
   ChevronRight,
@@ -40,6 +47,7 @@ import {
   Trash2,
   X,
   FolderOpen,
+  Scale,
 } from "lucide-react";
 import { quickUpdateProdukt, bulkUpdateProdukte } from "./actions";
 import { toast } from "sonner";
@@ -70,6 +78,8 @@ interface ProdukteTableProps {
   completenessMap: Record<string, CompletenessResult>;
 }
 
+const MAX_COMPARE = 3;
+
 export function ProdukteTable({
   produkte,
   bereichName,
@@ -78,9 +88,34 @@ export function ProdukteTable({
   hasFilter,
   completenessMap,
 }: ProdukteTableProps) {
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [compareIds, setCompareIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isBulkPending, startBulkTransition] = useTransition();
+
+  function toggleCompare(id: string) {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      }
+      if (prev.length >= MAX_COMPARE) {
+        toast.error(`Maximal ${MAX_COMPARE} Produkte zum Vergleich`);
+        return prev;
+      }
+      return [...prev, id];
+    });
+  }
+
+  function removeFromCompare(id: string) {
+    setCompareIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function navigateToCompare() {
+    if (compareIds.length >= 2) {
+      router.push(`/produkte/vergleich?ids=${compareIds.join(",")}`);
+    }
+  }
 
   const allIds = produkte.map((p) => p.id);
   const allSelected = produkte.length > 0 && allIds.every((id) => selected.has(id));
@@ -160,13 +195,14 @@ export function ProdukteTable({
             <TableHead className="text-right text-primary-foreground font-semibold">Sort</TableHead>
             <TableHead className="text-primary-foreground font-semibold">Status</TableHead>
             <TableHead className="text-primary-foreground font-semibold min-w-[140px]">Vollstaendigkeit</TableHead>
+            <TableHead className="w-10" />
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         {produkte.length === 0 ? (
           <TableBody>
             <TableRow>
-              <TableCell colSpan={9} className="py-16 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="py-16 text-center text-muted-foreground">
                 <Box className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
                 <p className="text-lg font-semibold text-foreground mb-1">
                   {hasFilter ? "Keine Treffer" : "Keine Produkte"}
@@ -190,6 +226,8 @@ export function ProdukteTable({
                 completeness={completenessMap[p.id]}
                 isSelected={selected.has(p.id)}
                 onToggle={() => toggleOne(p.id)}
+                isComparing={compareIds.includes(p.id)}
+                onToggleCompare={() => toggleCompare(p.id)}
               />
             ))}
           </TableBody>
@@ -269,6 +307,60 @@ export function ProdukteTable({
         </div>
       )}
 
+      {/* Compare Bar — only when no bulk selection is active */}
+      {selectedCount === 0 && compareIds.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t-2 border-accent bg-accent/10 backdrop-blur supports-[backdrop-filter]:bg-accent/5 shadow-lg">
+          <div className="mx-auto flex items-center justify-between gap-3 px-4 py-3 max-w-screen-2xl">
+            <div className="flex items-center gap-3">
+              <Scale className="h-5 w-5 text-accent-foreground shrink-0" />
+              <span className="text-sm font-semibold whitespace-nowrap">
+                {compareIds.length} von {MAX_COMPARE} zum Vergleich
+              </span>
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {compareIds.map((cid) => {
+                  const prod = produkte.find((p) => p.id === cid);
+                  return (
+                    <Badge key={cid} variant="secondary" className="flex items-center gap-1 shrink-0 py-1 px-2">
+                      <span className="text-xs font-mono">{prod?.artikelnummer ?? "..."}</span>
+                      <span className="text-xs text-muted-foreground max-w-[120px] truncate">
+                        {prod?.name ?? ""}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFromCompare(cid)}
+                        className="ml-1 hover:text-destructive transition-colors"
+                        aria-label="Aus Vergleich entfernen"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCompareIds([])}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Auswahl leeren
+              </Button>
+              <Button
+                size="sm"
+                onClick={navigateToCompare}
+                disabled={compareIds.length < 2}
+                className="shadow-sm"
+              >
+                <Scale className="h-4 w-4 mr-1" />
+                Vergleichen
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
@@ -291,8 +383,8 @@ export function ProdukteTable({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Spacer so table content is not hidden by bulk bar */}
-      {selectedCount > 0 && <div className="h-20" />}
+      {/* Spacer so table content is not hidden by bottom bars */}
+      {(selectedCount > 0 || compareIds.length > 0) && <div className="h-20" />}
     </>
   );
 }
@@ -333,6 +425,8 @@ function ProduktRow({
   completeness,
   isSelected,
   onToggle,
+  isComparing,
+  onToggleCompare,
 }: {
   produkt: Produkt;
   bereich: string;
@@ -340,6 +434,8 @@ function ProduktRow({
   completeness?: CompletenessResult;
   isSelected: boolean;
   onToggle: () => void;
+  isComparing: boolean;
+  onToggleCompare: () => void;
 }) {
   const [p, setP] = useState(produkt);
   const [isPending, startTransition] = useTransition();
@@ -469,6 +565,31 @@ function ProduktRow({
             <CompletenessBar result={completeness} />
           </span>
         )}
+      </TableCell>
+
+      {/* Compare */}
+      <TableCell className="relative z-10">
+        <TooltipProvider delayDuration={300}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggleCompare}
+                className={`pointer-events-auto p-1 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  isComparing
+                    ? "text-accent-foreground bg-accent"
+                    : "text-muted-foreground/40 hover:text-accent-foreground hover:bg-accent/50"
+                }`}
+                aria-label={isComparing ? "Aus Vergleich entfernen" : "Zum Vergleich hinzufuegen"}
+              >
+                <Scale className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>{isComparing ? "Aus Vergleich entfernen" : "Zum Vergleich hinzufuegen"}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </TableCell>
 
       {/* Arrow */}

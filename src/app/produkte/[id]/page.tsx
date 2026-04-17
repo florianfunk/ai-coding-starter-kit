@@ -18,6 +18,7 @@ import {
 import type { DatenblattTemplate } from "@/lib/datenblatt";
 import { calculateCompleteness } from "@/lib/completeness";
 import { CompletenessDetail } from "@/components/completeness-detail";
+import { AuditSection } from "./audit-section";
 
 export default async function ProduktDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -167,6 +168,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
 
           <PreiseSection produktId={id} preise={preise ?? []} />
           <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
+          <AuditSection produktId={id} />
         </SplitViewLayout>
       </div>
     </AppShell>

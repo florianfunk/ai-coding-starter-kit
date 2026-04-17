@@ -12,8 +12,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
+import { FieldInfo } from "@/components/field-info";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
+
+const FIELD_TOOLTIPS: Record<string, string> = {
+  schutzart_ip: "Die IP-Schutzart gibt den Schutzgrad gegen Beruhrung, Fremdkorper und Wasser an (z.B. IP20 = kein Wasserschutz, IP67 = wasserdicht).",
+  ugr: "Unified Glare Rating — Mass fur die psychologische Blendung. Werte unter 19 gelten als blendfrei.",
+  farbkonsistenz_sdcm: "Standard Deviation of Color Matching — misst die Farbkonsistenz. SDCM 3 = kaum sichtbare Farbunterschiede.",
+  farbwiedergabeindex_cri: "Color Rendering Index — wie naturlich Farben unter dieser Lichtquelle erscheinen. CRI 90+ ist sehr gut.",
+  lebensdauer_h: "Angabe in Stunden (h). Typisch: 50.000h = ca. 17 Jahre bei 8h/Tag.",
+  energieeffizienzklasse: "EU-Energielabel von A (beste) bis G.",
+  schutzklasse: "Elektrische Schutzklasse (I, II oder III). Bestimmt die Erdungsanforderung.",
+  nennspannung_v: "Betriebsspannung in Volt (z.B. 24V DC fur LED-Strips, 230V AC fur Deckenleuchten).",
+};
 
 const initial: ProduktFormState = { error: null };
 
@@ -342,10 +354,14 @@ function SectionIndicator({ filled }: { filled: boolean }) {
 }
 
 function FieldInput({ field, defaultValue }: { field: { col: string; label: string; type: string; unit?: string }; defaultValue: any }) {
+  const tooltip = FIELD_TOOLTIPS[field.col];
   if (field.type === "bool") {
     return (
       <div className="space-y-2">
-        <Label htmlFor={field.col}>{field.label}</Label>
+        <Label htmlFor={field.col} className="inline-flex items-center gap-1.5">
+          {field.label}
+          {tooltip && <FieldInfo text={tooltip} />}
+        </Label>
         <select id={field.col} name={field.col} defaultValue={defaultValue == null ? "" : String(defaultValue)} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
           <option value="">--</option>
           <option value="true">Ja</option>
@@ -356,9 +372,10 @@ function FieldInput({ field, defaultValue }: { field: { col: string; label: stri
   }
   return (
     <div className="space-y-2">
-      <Label htmlFor={field.col} className="text-xs">
+      <Label htmlFor={field.col} className="text-xs inline-flex items-center gap-1.5">
         {field.label}
-        {field.unit && <span className="text-muted-foreground ml-1">({field.unit})</span>}
+        {field.unit && <span className="text-muted-foreground">({field.unit})</span>}
+        {tooltip && <FieldInfo text={tooltip} />}
       </Label>
       <Input
         id={field.col}

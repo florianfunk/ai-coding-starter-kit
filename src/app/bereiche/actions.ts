@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { logAudit } from "@/lib/audit";
 
 const bereichSchema = z.object({
   name: z.string().min(1, "Name ist Pflicht").max(200),
@@ -37,8 +38,9 @@ export async function createBereich(_prev: BereichFormState, formData: FormData)
     return { error: "Bitte Eingaben prüfen.", fieldErrors: flattenErrors(parsed.error) };
   }
   const supabase = await createClient();
-  const { error } = await supabase.from("bereiche").insert(parsed.data);
-  if (error) return { error: error.message };
+  const { data, error } = await supabase.from("bereiche").insert(parsed.data).select("id").single();
+  if (error || !data) return { error: error?.message ?? "Fehler beim Anlegen" };
+  await logAudit(supabase, { tableName: "bereiche", recordId: data.id, action: "create", recordLabel: parsed.data.name });
   revalidatePath("/bereiche");
   redirect("/bereiche?toast=success&message=Bereich+angelegt");
 }
@@ -51,6 +53,7 @@ export async function updateBereich(id: string, _prev: BereichFormState, formDat
   const supabase = await createClient();
   const { error } = await supabase.from("bereiche").update(parsed.data).eq("id", id);
   if (error) return { error: error.message };
+  await logAudit(supabase, { tableName: "bereiche", recordId: id, action: "update", recordLabel: parsed.data.name });
   revalidatePath("/bereiche");
   revalidatePath(`/bereiche/${id}`);
   redirect("/bereiche?toast=success&message=Bereich+gespeichert");
@@ -69,8 +72,11 @@ export async function deleteBereich(id: string): Promise<{ error: string | null 
     return { error: `${count} Kategorien verweisen auf diesen Bereich. Bitte erst verschieben oder löschen.` };
   }
 
+  // Fetch name before deleting
+  const { data: row } = await supabase.from("bereiche").select("name").eq("id", id).single();
   const { error } = await supabase.from("bereiche").delete().eq("id", id);
   if (error) return { error: error.message };
+  await logAudit(supabase, { tableName: "bereiche", recordId: id, action: "delete", recordLabel: row?.name ?? id });
   revalidatePath("/bereiche");
   return { error: null };
 }

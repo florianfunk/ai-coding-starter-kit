@@ -33,9 +33,17 @@ const EMPTY_RESULTS: SearchResults = {
   produkte: [],
 };
 
-export function CommandPalette() {
+export function CommandPalette({ onOpenRef }: { onOpenRef?: React.MutableRefObject<(() => void) | null> } = {}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+
+  // Expose setOpen to external callers via ref
+  useEffect(() => {
+    if (onOpenRef) {
+      onOpenRef.current = () => setOpen(true);
+      return () => { onOpenRef.current = null; };
+    }
+  }, [onOpenRef]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>(EMPTY_RESULTS);
   const [loading, setLoading] = useState(false);
@@ -230,15 +238,11 @@ export function CommandPalette() {
 }
 
 /** Small trigger button for the header navigation */
-export function CommandPaletteTrigger() {
+function CommandPaletteTrigger({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       type="button"
-      onClick={() =>
-        document.dispatchEvent(
-          new KeyboardEvent("keydown", { key: "k", metaKey: true })
-        )
-      }
+      onClick={onOpen}
       className="flex items-center gap-2 rounded-md bg-primary-foreground/10 px-3 py-1.5 text-sm text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground transition-colors"
       aria-label="Suche öffnen"
     >
@@ -248,5 +252,16 @@ export function CommandPaletteTrigger() {
         <span className="text-xs">&#8984;</span>K
       </kbd>
     </button>
+  );
+}
+
+/** Combined trigger + palette — shares state directly without synthetic events */
+export function CommandPaletteWithTrigger() {
+  const openRef = useRef<(() => void) | null>(null);
+  return (
+    <>
+      <CommandPaletteTrigger onOpen={() => openRef.current?.()} />
+      <CommandPalette onOpenRef={openRef} />
+    </>
   );
 }

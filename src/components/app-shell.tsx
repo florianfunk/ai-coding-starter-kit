@@ -5,7 +5,7 @@ import { NavLink } from "./nav-link";
 import { ThemeToggle } from "./theme-toggle";
 import { ToastListener } from "./toast-listener";
 import { GlobalShortcuts } from "./global-shortcuts";
-import { CommandPalette, CommandPaletteTrigger } from "./command-palette";
+import { CommandPaletteWithTrigger } from "./command-palette";
 import { UserMenu } from "./user-menu";
 
 export async function AppShell({ children }: { children: ReactNode }) {
@@ -37,7 +37,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
-            <CommandPaletteTrigger />
+            <CommandPaletteWithTrigger />
             <ThemeToggle />
             <UserMenu />
           </div>
@@ -46,8 +46,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
 
       <ToastListener />
       <GlobalShortcuts />
-      <CommandPalette />
-
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-6 py-8">
         {children}
       </main>

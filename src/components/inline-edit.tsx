@@ -103,6 +103,14 @@ export function InlineEdit({
   return (
     <span
       onDoubleClick={startEditing}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          startEditing();
+        }
+      }}
+      tabIndex={0}
+      role="button"
       className={`cursor-default rounded px-1 -mx-1 hover:bg-muted/60 transition-colors select-none ${className}`}
       title="Doppelklick zum Bearbeiten"
     >

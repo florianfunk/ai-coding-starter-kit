@@ -344,6 +344,14 @@ export function PreisImportWizard() {
                   : "border-muted-foreground/25 hover:border-primary/50"
               }`}
               onClick={() => document.getElementById("csv-file-input")?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  document.getElementById("csv-file-input")?.click();
+                }
+              }}
+              tabIndex={0}
+              role="button"
             >
               <Upload className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
               <p className="text-lg font-medium">

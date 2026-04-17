@@ -154,6 +154,16 @@ export async function bulkUpdateProdukte(
   value?: string,
 ): Promise<{ error: string | null; count: number }> {
   if (!ids.length) return { error: "Keine Produkte ausgewählt.", count: 0 };
+  if (ids.length > 500) return { error: "Maximal 500 Produkte gleichzeitig.", count: 0 };
+
+  // Validate all IDs are UUIDs
+  const validIds = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (validIds.length !== ids.length) return { error: "Ungueltige Produkt-IDs.", count: 0 };
+
+  // Validate value as UUID for kategorie change
+  if (action === "change_kategorie" && value && !/^[0-9a-f-]{36}$/i.test(value)) {
+    return { error: "Ungueltige Kategorie-ID.", count: 0 };
+  }
 
   const supabase = await createClient();
   let error: string | null = null;
@@ -346,6 +356,19 @@ export async function importPreise(data: {
   rows: ImportPreiseRow[];
   deactivateOld: boolean;
 }): Promise<ImportPreiseResult> {
+  if (data.rows.length > 5000) {
+    return { imported: 0, notFound: [], error: "Maximal 5000 Zeilen pro Import." };
+  }
+
+  // Validate no negative prices
+  for (const row of data.rows) {
+    if ((row.listenpreis != null && row.listenpreis < 0) ||
+        (row.ek_lichtengros != null && row.ek_lichtengros < 0) ||
+        (row.ek_eisenkeil != null && row.ek_eisenkeil < 0)) {
+      return { imported: 0, notFound: [], error: "Negative Preise sind nicht erlaubt." };
+    }
+  }
+
   const supabase = await createClient();
 
   // Fetch all products to build artikelnummer -> id map

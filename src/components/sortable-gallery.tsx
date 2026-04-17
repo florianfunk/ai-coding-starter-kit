@@ -131,6 +131,7 @@ function SortableImageItem({
               onClick={() => onSetHauptbild(image.storage_path)}
               disabled={disabled}
               title="Als Hauptbild setzen"
+              aria-label="Als Hauptbild setzen"
             >
               <Star className="h-3.5 w-3.5" />
               Hauptbild
@@ -143,6 +144,7 @@ function SortableImageItem({
             onClick={() => onDelete(image.id)}
             disabled={disabled}
             title="Bild entfernen"
+            aria-label="Bild entfernen"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>

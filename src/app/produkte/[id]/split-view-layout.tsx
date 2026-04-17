@@ -44,6 +44,7 @@ export function SplitViewLayout({ produktId, children }: SplitViewLayoutProps) {
           onClick={toggle}
           className="shadow-lg rounded-full h-12 w-12 p-0"
           title={showPreview ? "Vorschau ausblenden" : "Vorschau einblenden"}
+          aria-label={showPreview ? "Vorschau ausblenden" : "Vorschau einblenden"}
         >
           {showPreview ? (
             <EyeOff className="h-5 w-5" />
@@ -178,6 +179,7 @@ function PreviewInner({ produktId }: { produktId: string }) {
           variant="ghost"
           onClick={refresh}
           title="Vorschau aktualisieren"
+          aria-label="Vorschau aktualisieren"
           className="h-7 w-7 p-0"
         >
           <RefreshCw className="h-3.5 w-3.5" />

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { LayoutGrid, Layers, Package, Sparkles, LayoutTemplate, FileDown, Settings, History, HelpCircle, Users } from "lucide-react";
-import { NavLink } from "./nav-link";
+import { MainNav } from "./main-nav";
 import { ThemeToggle } from "./theme-toggle";
 import { ToastListener } from "./toast-listener";
 import { GlobalShortcuts } from "./global-shortcuts";
@@ -23,18 +22,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             </div>
           </Link>
 
-          <nav className="flex items-center gap-1 flex-1 overflow-x-auto">
-            <NavLink href="/bereiche" label="Bereiche"><LayoutGrid className="h-4 w-4" /></NavLink>
-            <NavLink href="/kategorien" label="Kategorien"><Layers className="h-4 w-4" /></NavLink>
-            <NavLink href="/produkte" label="Produkte"><Package className="h-4 w-4" /></NavLink>
-            <NavLink href="/icons" label="Icons"><Sparkles className="h-4 w-4" /></NavLink>
-            <NavLink href="/datenblatt-vorlagen" label="Vorlagen"><LayoutTemplate className="h-4 w-4" /></NavLink>
-            <NavLink href="/export/katalog" label="Katalog"><FileDown className="h-4 w-4" /></NavLink>
-            <NavLink href="/einstellungen" label="Einstellungen"><Settings className="h-4 w-4" /></NavLink>
-            <NavLink href="/aktivitaet" label="Aktivitaet"><History className="h-4 w-4" /></NavLink>
-            <NavLink href="/hilfe" label="Hilfe"><HelpCircle className="h-4 w-4" /></NavLink>
-            <NavLink href="/benutzer" label="Benutzer"><Users className="h-4 w-4" /></NavLink>
-          </nav>
+          <MainNav />
 
           <div className="flex items-center gap-2 shrink-0">
             <CommandPaletteWithTrigger />

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { compressImage } from "@/lib/image-compress";
 
 export async function setDatenblattTemplate(produktId: string, templateId: string | null) {
   const supabase = await createClient();
@@ -39,9 +40,9 @@ export async function uploadSlotBild(formData: FormData) {
   if (!ALLOWED.includes(file.type)) return { path: null, error: "Format nicht unterstützt." };
   if (file.size > 10 * 1024 * 1024) return { path: null, error: "Datei zu groß." };
   const supabase = await createClient();
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `produkte/${produktId}/datenblatt/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("produktbilder").upload(path, file, { contentType: file.type });
+  const { buffer, contentType, extension } = await compressImage(file);
+  const path = `produkte/${produktId}/datenblatt/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const { error } = await supabase.storage.from("produktbilder").upload(path, buffer, { contentType });
   if (error) return { path: null, error: error.message };
   return { path, error: null };
 }

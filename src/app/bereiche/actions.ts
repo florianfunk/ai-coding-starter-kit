@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
+import { compressImage } from "@/lib/image-compress";
 
 const bereichSchema = z.object({
   name: z.string().min(1, "Name ist Pflicht").max(200),
@@ -103,10 +104,10 @@ export async function uploadBereichBild(
     return { path: null, error: "Datei zu groß (max. 10 MB)." };
   }
   const supabase = await createClient();
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `bereiche/upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("produktbilder").upload(path, file, {
-    contentType: file.type,
+  const { buffer, contentType, extension } = await compressImage(file);
+  const path = `bereiche/upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const { error } = await supabase.storage.from("produktbilder").upload(path, buffer, {
+    contentType,
     upsert: false,
   });
   if (error) return { path: null, error: error.message };

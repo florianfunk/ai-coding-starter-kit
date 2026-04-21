@@ -1,6 +1,6 @@
 # PROJ-35: Kategorie mit 4 Bildplatzhaltern (Katalog-Layout)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-04-21
 **Last Updated:** 2026-04-21
 

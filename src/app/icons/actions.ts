@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { compressImage } from "@/lib/image-compress";
 
 const schema = z.object({
   label: z.string().min(1, "Name ist Pflicht").max(80),
@@ -77,10 +78,10 @@ export async function uploadIconBild(formData: FormData) {
   }
   if (file.size > 5 * 1024 * 1024) return { path: null, error: "Datei zu groß (max. 5 MB)." };
   const supabase = await createClient();
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-  const path = `icons/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("produktbilder").upload(path, file, {
-    contentType: file.type,
+  const { buffer, contentType, extension } = await compressImage(file);
+  const path = `icons/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const { error } = await supabase.storage.from("produktbilder").upload(path, buffer, {
+    contentType,
   });
   if (error) return { path: null, error: error.message };
   return { path, error: null };

@@ -5,15 +5,20 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
+import sharp from "sharp";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { KatalogDocument, type KatalogParams } from "@/lib/pdf/katalog-document";
+import { KatalogDocument, type KatalogParams, type PdfImage } from "@/lib/pdf/katalog-document";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const t0 = Date.now();
+  const log = (msg: string) => console.log(`[katalog-run +${Date.now() - t0}ms] ${msg}`);
   const { id: jobId } = await params;
+  log(`start jobId=${jobId}`);
   const admin = await createServiceRoleClient();
+  log("service-role client created");
 
   const { data: job, error: jobError } = await admin
     .from("katalog_jobs")
@@ -23,24 +28,38 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (jobError || !job) {
     return NextResponse.json({ error: jobError?.message ?? "Job nicht gefunden" }, { status: 404 });
   }
-  if (job.status !== "queued") {
-    return NextResponse.json({ error: `Job ist bereits im Status ${job.status}` }, { status: 409 });
+  // Atomic: Claim den Job per UPDATE WHERE status='queued'. Wenn 0 Zeilen
+  // aktualisiert wurden, läuft der Job schon woanders → idempotent mit 200 return.
+  const { data: claimed } = await admin
+    .from("katalog_jobs")
+    .update({ status: "running", progress: 5 })
+    .eq("id", jobId)
+    .eq("status", "queued")
+    .select("id");
+  if (!claimed || claimed.length === 0) {
+    log(`already claimed (status=${job.status}) — skipping duplicate render`);
+    return NextResponse.json({ ok: true, message: "already running or done" });
   }
+  log("status → running (claimed)");
 
   const p = job.parameter as KatalogParams;
 
   try {
-    await admin.from("katalog_jobs").update({ status: "running", progress: 5 }).eq("id", jobId);
 
     // Daten laden
     const { data: bereiche } = await admin.from("bereiche").select("*").order("sortierung");
+    log(`bereiche: ${bereiche?.length ?? 0}`);
     const { data: kategorien } = await admin.from("kategorien").select("*").order("sortierung");
+    log(`kategorien: ${kategorien?.length ?? 0}`);
     const { data: produkte } = await admin.from("produkte").select("*").order("sortierung");
+    log(`produkte: ${produkte?.length ?? 0}`);
     const { data: preise } = await admin.from("aktuelle_preise").select("*");
+    log(`preise: ${preise?.length ?? 0}`);
     const { data: produktIcons } = await admin.from("produkt_icons").select("produkt_id, icons(label)").order("sortierung");
     const { data: kategorieIcons } = await admin.from("kategorie_icons").select("kategorie_id, icon_id, icons(label, symbol_path)");
     const { data: einstellungen } = await admin.from("katalog_einstellungen").select("*").eq("id", 1).single();
     const { data: filialen } = await admin.from("filialen").select("*").eq("marke", p.layout).order("sortierung");
+    log(`filialen: ${filialen?.length ?? 0}`);
 
     await admin.from("katalog_jobs").update({ progress: 30 }).eq("id", jobId);
 
@@ -70,32 +89,73 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       if (r.icons?.label) arr.push(r.icons.label);
       iconLabelsByProdukt.set(r.produkt_id, arr);
     }
-    const kategorieIconsByKategorie = new Map<string, { label: string; url: string | null }[]>();
+    const kategorieIconsByKategorie = new Map<string, { label: string; url: PdfImage }[]>();
     for (const r of (kategorieIcons ?? []) as any[]) {
       if (!r.icons) continue;
-      const url = await signUrl(admin, "assets", r.icons.symbol_path);
+      const url = await downloadImage(admin, "assets", r.icons.symbol_path, { maxWidth: 150, quality: 80 });
       const arr = kategorieIconsByKategorie.get(r.kategorie_id) ?? [];
       arr.push({ label: r.icons.label, url });
       kategorieIconsByKategorie.set(r.kategorie_id, arr);
     }
 
-    // Bild-URLs signieren
-    const hauptbildByProdukt = new Map<string, string | null>();
-    for (const pr of produkte ?? []) {
-      hauptbildByProdukt.set(pr.id, await signUrl(admin, "produktbilder", pr.hauptbild_path));
+    // Bilder direkt als Buffer laden — verhindert dass @react-pdf während des Renderns
+    // auf Netzwerk wartet (das ist der Grund warum renderToBuffer sonst hängt).
+    // Download mit Parallel-Limit (sonst OOM bei 419 gleichzeitigen Sharp-Calls)
+    async function batch<T, R>(
+      items: T[],
+      limit: number,
+      fn: (item: T, index: number) => Promise<R>,
+      onProgress?: (done: number, total: number) => void,
+    ): Promise<R[]> {
+      const results: R[] = new Array(items.length);
+      let cursor = 0;
+      let done = 0;
+      const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (true) {
+          const i = cursor++;
+          if (i >= items.length) return;
+          results[i] = await fn(items[i], i);
+          done++;
+          if (done % 50 === 0 || done === items.length) onProgress?.(done, items.length);
+        }
+      });
+      await Promise.all(workers);
+      return results;
     }
-    const bereichBildUrl = new Map<string, string | null>();
-    for (const b of bereiche ?? []) {
-      bereichBildUrl.set(b.id, await signUrl(admin, "produktbilder", b.bild_path));
-    }
-    const kategorieBildUrl = new Map<string, string | null>();
-    for (const k of kategorien ?? []) {
-      kategorieBildUrl.set(k.id, await signUrl(admin, "produktbilder", k.vorschaubild_path));
-    }
+
+    // Thumbnails: 200px reicht für Tabellen-Thumbnails (28×20px gerendert)
+    log(`downloading ${produkte?.length ?? 0} product images …`);
+    const hauptbildResults = await batch(
+      produkte ?? [],
+      8,
+      async (pr) => [pr.id, await downloadImage(admin, "produktbilder", pr.hauptbild_path, { maxWidth: 200, quality: 70 })] as const,
+      (done, total) => log(`  product images: ${done}/${total}`),
+    );
+    const hauptbildByProdukt = new Map(hauptbildResults);
+    log("product images downloaded");
+
+    // Bereich-Intro-Bilder: Vollbild A4
+    const bereichBildResults = await batch(
+      bereiche ?? [],
+      4,
+      async (b) => [b.id, await downloadImage(admin, "produktbilder", b.bild_path, { maxWidth: 1600, quality: 80 })] as const,
+    );
+    const bereichBildUrl = new Map(bereichBildResults);
+    log("bereich images downloaded");
+
+    // Kategorie-Bilder
+    const kategorieBildResults = await batch(
+      kategorien ?? [],
+      8,
+      async (k) => [k.id, await downloadImage(admin, "produktbilder", k.vorschaubild_path, { maxWidth: 500, quality: 75 })] as const,
+      (done, total) => log(`  kategorie images: ${done}/${total}`),
+    );
+    const kategorieBildUrl = new Map(kategorieBildResults);
+    log("kategorie images downloaded");
     const logoField = p.layout === "lichtengros" ? "logo_lichtengros_dunkel" : "logo_eisenkeil_dunkel";
-    const logoUrl = await signUrl(admin, "assets", einstellungen?.[logoField] ?? null);
-    const coverVorneUrl = await signUrl(admin, "assets", einstellungen?.cover_vorne_path);
-    const coverHintenUrl = await signUrl(admin, "assets", einstellungen?.cover_hinten_path);
+    const logoUrl = await downloadImage(admin, "assets", einstellungen?.[logoField] ?? null, { maxWidth: 400 });
+    const coverVorneUrl = await downloadImage(admin, "assets", einstellungen?.cover_vorne_path, { maxWidth: 1600, quality: 80 });
+    const coverHintenUrl = await downloadImage(admin, "assets", einstellungen?.cover_hinten_path, { maxWidth: 1600, quality: 80 });
 
     await admin.from("katalog_jobs").update({ progress: 60 }).eq("id", jobId);
 
@@ -105,6 +165,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const copyrightText =
       (p.layout === "lichtengros" ? einstellungen?.copyright_lichtengros : einstellungen?.copyright_eisenkeil) ?? "";
 
+    log("starting renderToBuffer …");
     const buffer = await renderToBuffer(
       KatalogDocument({
         params: p,
@@ -126,6 +187,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       }),
     );
 
+    log(`renderToBuffer done, size=${(buffer as any).length ?? "?"} bytes`);
     await admin.from("katalog_jobs").update({ progress: 90 }).eq("id", jobId);
 
     const path = `${jobId}/Katalog-${p.layout}-${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -151,8 +213,33 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-async function signUrl(client: any, bucket: string, path: string | null | undefined) {
+/**
+ * Lädt ein Bild von Supabase Storage, komprimiert es und gibt einen Buffer zurück.
+ * Ohne Komprimierung wird der Katalog ~300 MB groß (Upload-Limit: 50 MB).
+ *
+ * @react-pdf akzeptiert `{ data: Buffer, format }` statt URL —
+ * verhindert dass der Renderer während des Zeichnens auf Netzwerk wartet.
+ */
+async function downloadImage(
+  client: any,
+  bucket: string,
+  path: string | null | undefined,
+  opts: { maxWidth?: number; quality?: number } = {},
+): Promise<{ data: Buffer; format: "jpg" | "png" } | null> {
   if (!path) return null;
-  const { data } = await client.storage.from(bucket).createSignedUrl(path, 60 * 60);
-  return data?.signedUrl ?? null;
+  try {
+    const { data, error } = await client.storage.from(bucket).download(path);
+    if (error || !data) return null;
+    const arrayBuffer = await (data as Blob).arrayBuffer();
+    const input = Buffer.from(arrayBuffer);
+    // Komprimieren: max 800px Breite, JPEG Q=75 — gut genug für A4-Druck
+    const output = await sharp(input)
+      .rotate() // auto-rotate based on EXIF
+      .resize({ width: opts.maxWidth ?? 800, withoutEnlargement: true })
+      .jpeg({ quality: opts.quality ?? 75, mozjpeg: true })
+      .toBuffer();
+    return { data: output, format: "jpg" };
+  } catch {
+    return null;
+  }
 }

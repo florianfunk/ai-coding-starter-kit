@@ -14,20 +14,22 @@ export type KatalogParams = {
   wechselkurs: number;
 };
 
+export type PdfImage = { data: Buffer; format: "jpg" | "png" } | null;
+
 export type KatalogData = {
   params: KatalogParams;
   bereiche: any[];
   kategorienByBereich: Map<string, any[]>;
   produkteByKategorie: Map<string, any[]>;
   preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
-  hauptbildByProdukt: Map<string, string | null>;
+  hauptbildByProdukt: Map<string, PdfImage>;
   iconLabelsByProdukt: Map<string, string[]>;
-  kategorieIconsByKategorie: Map<string, { label: string; url: string | null }[]>;
-  bereichBildUrl: Map<string, string | null>;
-  kategorieBildUrl: Map<string, string | null>;
-  logoUrl: string | null;
-  coverVorneUrl: string | null;
-  coverHintenUrl: string | null;
+  kategorieIconsByKategorie: Map<string, { label: string; url: PdfImage }[]>;
+  bereichBildUrl: Map<string, PdfImage>;
+  kategorieBildUrl: Map<string, PdfImage>;
+  logoUrl: PdfImage;
+  coverVorneUrl: PdfImage;
+  coverHintenUrl: PdfImage;
   copyrightText: string;
   filialenText: string;
   generatedAt: Date;
@@ -486,9 +488,9 @@ function KategorieSeiten({
   kategorie: any;
   produkte: any[];
   preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
-  hauptbildByProdukt: Map<string, string | null>;
-  kategorieIcons: { label: string; url: string | null }[];
-  kategorieBild: string | null;
+  hauptbildByProdukt: Map<string, PdfImage>;
+  kategorieIcons: { label: string; url: PdfImage }[];
+  kategorieBild: PdfImage;
   params: KatalogParams;
 }) {
   const spalten = activeSpalten(kategorie);
@@ -617,7 +619,7 @@ function VariantenTabelle({
   spalten: { index: number; label: string; def: ReturnType<typeof getSpaltenDefinition> }[];
   produkte: any[];
   preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
-  hauptbildByProdukt: Map<string, string | null>;
+  hauptbildByProdukt: Map<string, PdfImage>;
   params: KatalogParams;
   showHeader: boolean;
 }) {

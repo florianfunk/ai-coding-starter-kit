@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -197,10 +198,11 @@ export function CompareTable({
               >
                 {imgUrl ? (
                   <div className="w-10 h-10 rounded bg-white/10 overflow-hidden shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={imgUrl}
                       alt={(p.name as string) ?? "Produkt"}
+                      width={40}
+                      height={40}
                       className="w-full h-full object-cover"
                     />
                   </div>

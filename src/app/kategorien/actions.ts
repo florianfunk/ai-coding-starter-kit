@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -76,6 +76,8 @@ export async function createKategorie(_p: KategorieFormState, formData: FormData
   await logAudit(supabase, { tableName: "kategorien", recordId: data.id, action: "create", recordLabel: parsed.data.name });
 
   revalidatePath("/kategorien");
+  revalidateTag("kategorien", "max");
+  revalidateTag("dashboard", "max");
   redirect("/kategorien?toast=success&message=Kategorie+angelegt");
 }
 
@@ -94,6 +96,8 @@ export async function updateKategorie(id: string, _p: KategorieFormState, formDa
 
   revalidatePath("/kategorien");
   revalidatePath(`/kategorien/${id}/bearbeiten`);
+  revalidateTag("kategorien", "max");
+  revalidateTag("dashboard", "max");
   redirect("/kategorien?toast=success&message=Kategorie+gespeichert");
 }
 
@@ -106,6 +110,8 @@ export async function deleteKategorie(id: string): Promise<{ error: string | nul
   if (error) return { error: error.message };
   await logAudit(supabase, { tableName: "kategorien", recordId: id, action: "delete", recordLabel: row?.name ?? id });
   revalidatePath("/kategorien");
+  revalidateTag("kategorien", "max");
+  revalidateTag("dashboard", "max");
   return { error: null };
 }
 

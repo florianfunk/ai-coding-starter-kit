@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { ProduktForm } from "../produkt-form";
 import { updateProdukt, type ProduktFormState } from "../actions";
@@ -47,17 +47,18 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     supabase.from("kategorien").select("id,name").eq("id", produkt.kategorie_id).single(),
   ]);
 
-  const hauptbildUrl = await getSignedUrl("produktbilder", produkt.hauptbild_path);
-  const galerieMit = await Promise.all(
-    (galerie ?? []).map(async (g) => ({ ...g, url: await getSignedUrl("produktbilder", g.storage_path) })),
-  );
+  const hauptbildUrl = bildProxyUrl("produktbilder", produkt.hauptbild_path);
+  const galerieMit = (galerie ?? []).map((g) => ({
+    ...g,
+    url: bildProxyUrl("produktbilder", g.storage_path),
+  }));
 
-  const iconsFull = await Promise.all(
-    (icons ?? []).map(async (ic: any) => ({
-      id: ic.id, label: ic.label, gruppe: ic.gruppe,
-      url: await getSignedUrl("produktbilder", ic.symbol_path),
-    })),
-  );
+  const iconsFull = (icons ?? []).map((ic: any) => ({
+    id: ic.id,
+    label: ic.label,
+    gruppe: ic.gruppe,
+    url: bildProxyUrl("produktbilder", ic.symbol_path),
+  }));
 
   const templatesTyped: DatenblattTemplate[] = (templates ?? []).map((t: any) => ({
     ...t,
@@ -66,11 +67,11 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     slots: t.slots ?? [],
   }));
 
-  // Build slot-image map (with signed URLs) for the active template
+  // Build slot-image map (via Proxy-URL) for the active template
   const slotImages: Record<string, { path: string; url: string }> = {};
   for (const row of slotRows ?? []) {
     if (!row.storage_path) continue;
-    const url = await getSignedUrl("produktbilder", row.storage_path);
+    const url = bildProxyUrl("produktbilder", row.storage_path);
     if (url) slotImages[row.slot_id] = { path: row.storage_path, url };
   }
 

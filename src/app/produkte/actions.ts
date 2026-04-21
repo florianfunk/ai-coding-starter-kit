@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -94,6 +94,7 @@ export async function createProdukt(_p: ProduktFormState, formData: FormData): P
   await setProduktIcons(supabase, data.id, iconIds);
 
   revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
   redirect(`/produkte/${data.id}?toast=success&message=Produkt+angelegt`);
 }
 
@@ -116,6 +117,7 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
 
   revalidatePath("/produkte");
   revalidatePath(`/produkte/${id}`);
+  revalidateTag("dashboard", "max");
   return { error: null };
 }
 
@@ -145,6 +147,7 @@ export async function quickUpdateProdukt(
   await logAudit(supabase, { tableName: "produkte", recordId: id, action: "update", changes: { [field]: { old: null, new: dbValue } } });
 
   revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
   return { error: null };
 }
 
@@ -218,6 +221,7 @@ export async function deleteProdukt(id: string): Promise<{ error: string | null 
   if (error) return { error: error.message };
   await logAudit(supabase, { tableName: "produkte", recordId: id, action: "delete", recordLabel: row?.artikelnummer ?? id });
   revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
   redirect("/produkte?toast=success&message=Produkt+gel%C3%B6scht");
 }
 

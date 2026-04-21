@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Plus, Layers, Filter } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -43,11 +43,10 @@ export default async function KategorienPage({
 
   const bereichName = new Map((bereiche ?? []).map((b) => [b.id, b.name]));
 
-  const withUrls = await Promise.all(
-    (kategorien ?? []).map(async (k) => ({
-      ...k, vorschaubild_url: await getSignedUrl("produktbilder", k.vorschaubild_path),
-    })),
-  );
+  const withUrls = (kategorien ?? []).map((k) => ({
+    ...k,
+    vorschaubild_url: bildProxyUrl("produktbilder", k.vorschaubild_path),
+  }));
 
   const items = withUrls.map((k) => ({
     id: k.id,

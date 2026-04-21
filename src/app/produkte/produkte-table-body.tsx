@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -48,6 +49,7 @@ import {
   X,
   FolderOpen,
   Scale,
+  ImageIcon,
 } from "lucide-react";
 import { quickUpdateProdukt, bulkUpdateProdukte } from "./actions";
 import { toast } from "sonner";
@@ -62,6 +64,7 @@ interface Produkt {
   kategorie_id: string;
   sortierung: number;
   artikel_bearbeitet: boolean;
+  hauptbild_path?: string | null;
 }
 
 interface Kategorie {
@@ -188,6 +191,7 @@ export function ProdukteTable({
                 className="border-primary-foreground/50 data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary data-[state=indeterminate]:bg-primary-foreground data-[state=indeterminate]:text-primary"
               />
             </TableHead>
+            <TableHead className="w-[72px] text-primary-foreground font-semibold">Bild</TableHead>
             <TableHead className="text-primary-foreground font-semibold">Artikelnummer</TableHead>
             <TableHead className="text-primary-foreground font-semibold">Name</TableHead>
             <TableHead className="text-primary-foreground font-semibold">Bereich</TableHead>
@@ -202,7 +206,7 @@ export function ProdukteTable({
         {produkte.length === 0 ? (
           <TableBody>
             <TableRow>
-              <TableCell colSpan={10} className="py-16 text-center text-muted-foreground">
+              <TableCell colSpan={11} className="py-16 text-center text-muted-foreground">
                 <Box className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
                 <p className="text-lg font-semibold text-foreground mb-1">
                   {hasFilter ? "Keine Treffer" : "Keine Produkte"}
@@ -476,6 +480,23 @@ function ProduktRow({
           aria-label={`Produkt ${p.artikelnummer} auswaehlen`}
           className="pointer-events-auto"
         />
+      </TableCell>
+
+      {/* Thumbnail */}
+      <TableCell className="relative z-10 pointer-events-none">
+        {p.hauptbild_path ? (
+          <Image
+            src={`/api/bild/produktbilder/${p.hauptbild_path}`}
+            alt=""
+            width={56}
+            height={56}
+            className="h-14 w-14 rounded object-cover border"
+          />
+        ) : (
+          <div className="h-14 w-14 rounded bg-muted flex items-center justify-center border">
+            <ImageIcon className="h-4 w-4 text-muted-foreground/40" />
+          </div>
+        )}
       </TableCell>
 
       {/* Artikelnummer */}

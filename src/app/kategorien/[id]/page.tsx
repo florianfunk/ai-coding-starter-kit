@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,20 +28,16 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
   ]);
 
-  const vorschaubildUrl = await getSignedUrl("produktbilder", kategorie.vorschaubild_path);
-  const iconData = await Promise.all(
-    ((iconLinks ?? []) as any[]).map(async (r) => ({
-      label: r.icons?.label ?? "",
-      url: r.icons?.symbol_path ? await getSignedUrl("produktbilder", r.icons.symbol_path) : null,
-    })),
-  );
+  const vorschaubildUrl = bildProxyUrl("produktbilder", kategorie.vorschaubild_path);
+  const iconData = ((iconLinks ?? []) as any[]).map((r) => ({
+    label: r.icons?.label ?? "",
+    url: bildProxyUrl("produktbilder", r.icons?.symbol_path ?? null),
+  }));
 
-  const produkteMitBild = await Promise.all(
-    (produkte ?? []).map(async (p) => ({
-      ...p,
-      hauptbild_url: await getSignedUrl("produktbilder", p.hauptbild_path),
-    })),
-  );
+  const produkteMitBild = (produkte ?? []).map((p) => ({
+    ...p,
+    hauptbild_url: bildProxyUrl("produktbilder", p.hauptbild_path),
+  }));
 
   const prodIds = produkteMitBild.map((p) => p.id);
   const { data: preise } = prodIds.length
@@ -73,10 +70,15 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               <div className="flex items-start gap-5 flex-1">
-                <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0">
+                <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0 relative">
                   {vorschaubildUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={vorschaubildUrl} alt="" className="h-full w-full object-cover" />
+                    <Image
+                      src={vorschaubildUrl}
+                      alt=""
+                      fill
+                      sizes="128px"
+                      className="object-cover"
+                    />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
                       <ImageIcon className="h-8 w-8" />
@@ -98,8 +100,13 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                       {iconData.map((ic, i) => (
                         <div key={i} className="inline-flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border">
                           {ic.url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={ic.url} alt={ic.label} className="h-5 w-5 object-contain" />
+                            <Image
+                              src={ic.url}
+                              alt={ic.label}
+                              width={20}
+                              height={20}
+                              className="h-5 w-5 object-contain"
+                            />
                           ) : null}
                           <span className="text-xs font-medium">{ic.label}</span>
                         </div>
@@ -160,8 +167,13 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                     <TableRow key={p.id} className="group relative row-hover">
                       <TableCell className="relative z-10 pointer-events-none">
                         {p.hauptbild_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.hauptbild_url} alt="" className="h-10 w-10 rounded object-cover border" />
+                          <Image
+                            src={p.hauptbild_url}
+                            alt=""
+                            width={40}
+                            height={40}
+                            className="h-10 w-10 rounded object-cover border"
+                          />
                         ) : (
                           <div className="h-10 w-10 rounded bg-muted flex items-center justify-center border">
                             <Package className="h-4 w-4 text-muted-foreground/40" />

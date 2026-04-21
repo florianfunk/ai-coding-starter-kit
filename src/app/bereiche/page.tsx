@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Plus, Package } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
@@ -28,11 +28,10 @@ export default async function BereichePage() {
   const prodCount = new Map<string, number>();
   for (const r of prodStats ?? []) prodCount.set(r.bereich_id, (prodCount.get(r.bereich_id) ?? 0) + 1);
 
-  const withUrls = await Promise.all(
-    (bereiche ?? []).map(async (b) => ({
-      ...b, bild_url: await getSignedUrl("produktbilder", b.bild_path),
-    })),
-  );
+  const withUrls = (bereiche ?? []).map((b) => ({
+    ...b,
+    bild_url: bildProxyUrl("produktbilder", b.bild_path),
+  }));
 
   const items = withUrls.map((b) => ({
     id: b.id,

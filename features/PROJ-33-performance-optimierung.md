@@ -1,8 +1,22 @@
 # PROJ-33: Performance-Optimierung Phase 1
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-04-21
 **Last Updated:** 2026-04-21
+
+## Implementierungs-Notizen
+- **Migrationen angelegt & applied:** `0013_perf_views.sql` (Views, Materialized View, Indizes, Queue), `0014_perf_refresh_triggers.sql` (Trigger + RPC `refresh_mv_produkt_completeness`), `0015_dashboard_ohne_preis_kompatibel.sql` (ohne_preis_count nun ohne-jeglichen-Preis, zusätzlich neue Spalte `ohne_aktiven_preis_count` für strengere Logik).
+- **Interessanter Nebenbefund:** Das alte Dashboard zählte `ohne_preis_count = 135`, die exakte Count-Realität ist aber `12` (sowohl für "kein Preis-Eintrag" als auch "kein aktiver Preis"). Die alte Zahl war ein **Bug durch PostgREST-Default-Limit von 1000 Rows** — der alte Code `.limit(5000)` wurde vom Server auf 1000 gedeckelt, wodurch Produkte mit Preis fälschlich als preislos gezählt wurden. Nun korrekt.
+- **View-Invariante:** `avg_completeness` (65 %) weicht leicht vom alten Wert (61 %) ab, weil die alte Dashboard-Schleife durch das PostgREST-Limit nur über einen Teil der Produkte lief. Die neue View rechnet über alle 419. Keine Regression, nur ehrlichere Zahlen.
+- **API-Route `/api/bild/[bucket]/[...path]`** nutzt die User-Session (authentifizierter createClient) + Service-Role-Fallback, streamt die Bytes mit `cache-control: public, s-maxage=3600, stale-while-revalidate=86400`.
+- **`src/lib/cache.ts`:** Drei `unstable_cache`-Helfer (`getBereiche`, `getKategorien`, `getDashboardStats`) mit Tags und Revalidate.
+- **Server-Actions:** `revalidateTag("bereiche", "max")`, `revalidateTag("kategorien", "max")`, `revalidateTag("dashboard", "max")` überall hinzugefügt wo passend (Next.js 16 verlangt zweites Argument).
+- **Frontend-Umstellung:**
+  - Dashboard (`src/app/page.tsx`): nutzt `getDashboardStats()` — ein DB-Call statt 12+.
+  - Produktliste (`src/app/produkte/page.tsx`): nutzt `v_produkt_listing` — ein Call statt 4-5.
+  - Produktbilder auf allen Listing-/Detail-/Vergleichs-Seiten jetzt via `<Image>` und `/api/bild/**`-Proxy.
+  - Bilder in Formularen (Upload-Vorschauen mit lokalen ObjectURLs) und Icon-Picker bleiben `<img>`, weil URL-Herkunft dort gemischt ist.
+- **`next.config.ts`:** `images.remotePatterns` für `jmnszkurqgitzooczagy.supabase.co/storage/v1/**`.
 
 ## Dependencies
 - Erfordert: PROJ-5 (Produkte-CRUD), PROJ-6 (Preisverwaltung), PROJ-21 (Vollständigkeits-Indikator) — alle bereits umgesetzt

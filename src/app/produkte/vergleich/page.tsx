@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
@@ -67,13 +67,11 @@ export default async function VergleichPage({
     .map((id) => produkte.find((p) => p.id === id))
     .filter(Boolean) as typeof produkte;
 
-  // Resolve signed image URLs
+  // Resolve image URLs via Proxy (stabile URLs fürs Optimizer-Caching).
   const imageUrlMap: Record<string, string | null> = {};
-  await Promise.all(
-    orderedProdukte.map(async (p) => {
-      imageUrlMap[p.id] = await getSignedUrl("produktbilder", p.hauptbild_path);
-    }),
-  );
+  for (const p of orderedProdukte) {
+    imageUrlMap[p.id] = bildProxyUrl("produktbilder", p.hauptbild_path);
+  }
 
   return (
     <AppShell>

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { BereichForm } from "../../bereich-form";
 import { updateBereich, type BereichFormState } from "../../actions";
 
@@ -12,7 +12,7 @@ export default async function EditBereichPage({ params }: { params: Promise<{ id
   const { data: bereich } = await supabase.from("bereiche").select("*").eq("id", id).single();
   if (!bereich) notFound();
 
-  const bildUrl = await getSignedUrl("produktbilder", bereich.bild_path);
+  const bildUrl = bildProxyUrl("produktbilder", bereich.bild_path);
 
   async function action(prev: BereichFormState, formData: FormData) {
     "use server";

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -42,6 +42,8 @@ export async function createBereich(_prev: BereichFormState, formData: FormData)
   if (error || !data) return { error: error?.message ?? "Fehler beim Anlegen" };
   await logAudit(supabase, { tableName: "bereiche", recordId: data.id, action: "create", recordLabel: parsed.data.name });
   revalidatePath("/bereiche");
+  revalidateTag("bereiche", "max");
+  revalidateTag("dashboard", "max");
   redirect("/bereiche?toast=success&message=Bereich+angelegt");
 }
 
@@ -56,6 +58,8 @@ export async function updateBereich(id: string, _prev: BereichFormState, formDat
   await logAudit(supabase, { tableName: "bereiche", recordId: id, action: "update", recordLabel: parsed.data.name });
   revalidatePath("/bereiche");
   revalidatePath(`/bereiche/${id}`);
+  revalidateTag("bereiche", "max");
+  revalidateTag("dashboard", "max");
   redirect("/bereiche?toast=success&message=Bereich+gespeichert");
 }
 
@@ -78,6 +82,8 @@ export async function deleteBereich(id: string): Promise<{ error: string | null 
   if (error) return { error: error.message };
   await logAudit(supabase, { tableName: "bereiche", recordId: id, action: "delete", recordLabel: row?.name ?? id });
   revalidatePath("/bereiche");
+  revalidateTag("bereiche", "max");
+  revalidateTag("dashboard", "max");
   return { error: null };
 }
 
@@ -115,6 +121,7 @@ export async function reorderBereiche(orderedIds: string[]): Promise<{ error: st
   const failed = results.find((r) => r.error);
   if (failed?.error) return { error: failed.error.message };
   revalidatePath("/bereiche");
+  revalidateTag("bereiche", "max");
   return { error: null };
 }
 

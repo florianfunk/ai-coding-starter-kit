@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   DndContext,
   closestCenter,
@@ -102,10 +103,11 @@ function BereichCard({
 
         <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10 border">
           {item.bild_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={item.bild_url}
               alt=""
+              width={96}
+              height={64}
               className="h-full w-full object-cover"
             />
           ) : (

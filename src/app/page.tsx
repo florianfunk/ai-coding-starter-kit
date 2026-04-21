@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -9,71 +8,36 @@ import {
   FileDown, Settings, Sparkles, LayoutTemplate, ArrowRight,
   CheckCircle, AlertTriangle,
 } from "lucide-react";
-import { calculateCompleteness, completenessBarClass } from "@/lib/completeness";
+import { completenessBarClass } from "@/lib/completeness";
+import { getDashboardStats } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const supabase = await createClient();
-  const [
-    { count: bCount }, { count: kCount }, { count: pCount }, { count: prCount }, { count: iCount },
-    { count: ohneBildCount }, { count: unbearbeitetCount },
-    { data: produkteMitPreis },
-  ] = await Promise.all([
-    supabase.from("bereiche").select("*", { count: "exact", head: true }),
-    supabase.from("kategorien").select("*", { count: "exact", head: true }),
-    supabase.from("produkte").select("*", { count: "exact", head: true }),
-    supabase.from("preise").select("*", { count: "exact", head: true }),
-    supabase.from("icons").select("*", { count: "exact", head: true }),
-    supabase.from("produkte").select("*", { count: "exact", head: true }).is("hauptbild_path", null),
-    supabase.from("produkte").select("*", { count: "exact", head: true }).eq("artikel_bearbeitet", false),
-    supabase.from("preise").select("produkt_id").limit(5000),
-  ]);
+  const stats = await getDashboardStats();
 
-  const produkteWithPriceIds = new Set((produkteMitPreis ?? []).map((r) => r.produkt_id));
-  const ohnePreisCount = (pCount ?? 0) - produkteWithPriceIds.size;
+  // Fallback-Werte falls View nicht erreichbar (z.B. DB-Fehler).
+  const bereicheCount   = stats?.bereiche_count   ?? 0;
+  const kategorienCount = stats?.kategorien_count ?? 0;
+  const produkteCount   = stats?.produkte_count   ?? 0;
+  const preiseCount     = stats?.preise_count     ?? 0;
+  const iconsCount      = stats?.icons_count      ?? 0;
+  const ohnePreisCount    = stats?.ohne_preis_count    ?? 0;
+  const ohneBildCount     = stats?.ohne_bild_count     ?? 0;
+  const unbearbeitetCount = stats?.unbearbeitet_count  ?? 0;
+  const avgCompleteness   = stats?.avg_completeness    ?? 0;
+  const completePercent   = stats?.complete_percent    ?? 0;
+  const needsAttentionCount = stats?.needs_attention_count ?? 0;
 
-  // Fetch data for completeness widget
-  const [{ data: alleProdukte }, { data: alleIcons }, { data: alleGalerie }] = await Promise.all([
-    supabase.from("produkte").select("id,artikelnummer,name,kategorie_id,hauptbild_path,datenblatt_titel,datenblatt_text,datenblatt_template_id,leistung_w,lichtstrom_lm,farbtemperatur_k,schutzart_ip,masse_text,laenge_mm,breite_mm,hoehe_mm").limit(5000),
-    supabase.from("produkt_icons").select("produkt_id").limit(10000),
-    supabase.from("produkt_bilder").select("produkt_id").limit(10000),
-  ]);
+  // Farbschwellen identisch zu src/lib/completeness.ts
+  const avgColor: "red" | "yellow" | "green" =
+    avgCompleteness < 50 ? "red" : avgCompleteness <= 80 ? "yellow" : "green";
 
-  const iconCountMap: Record<string, number> = {};
-  for (const r of alleIcons ?? []) {
-    iconCountMap[r.produkt_id] = (iconCountMap[r.produkt_id] ?? 0) + 1;
-  }
-  const galerieCountMap: Record<string, number> = {};
-  for (const r of alleGalerie ?? []) {
-    galerieCountMap[r.produkt_id] = (galerieCountMap[r.produkt_id] ?? 0) + 1;
-  }
-
-  let completenessSum = 0;
-  let completeCount = 0;
-  let needsAttentionCount = 0;
-  const totalProdukte = (alleProdukte ?? []).length;
-
-  for (const p of alleProdukte ?? []) {
-    const result = calculateCompleteness(p, {
-      hasActivePrice: produkteWithPriceIds.has(p.id),
-      iconCount: iconCountMap[p.id] ?? 0,
-      galerieCount: galerieCountMap[p.id] ?? 0,
-    });
-    completenessSum += result.percent;
-    if (result.percent > 80) completeCount++;
-    if (result.percent <= 80) needsAttentionCount++;
-  }
-
-  const avgCompleteness = totalProdukte > 0 ? Math.round(completenessSum / totalProdukte) : 0;
-  const completePercent = totalProdukte > 0 ? Math.round((completeCount / totalProdukte) * 100) : 0;
-  const avgColor = avgCompleteness < 50 ? "red" as const : avgCompleteness <= 80 ? "yellow" as const : "green" as const;
-
-  const stats: StatProps[] = [
-    { label: "Bereiche",   value: bCount ?? 0,  icon: LayoutGrid, href: "/bereiche",   tone: "primary" },
-    { label: "Kategorien", value: kCount ?? 0,  icon: Layers,     href: "/kategorien", tone: "neutral" },
-    { label: "Produkte",   value: pCount ?? 0,  icon: Package,    href: "/produkte",   tone: "accent"  },
-    { label: "Preise",     value: prCount ?? 0, icon: TrendingUp, href: "/produkte",   tone: "neutral" },
+  const statCards: StatProps[] = [
+    { label: "Bereiche",   value: bereicheCount,   icon: LayoutGrid, href: "/bereiche",   tone: "primary" },
+    { label: "Kategorien", value: kategorienCount, icon: Layers,     href: "/kategorien", tone: "neutral" },
+    { label: "Produkte",   value: produkteCount,   icon: Package,    href: "/produkte",   tone: "accent"  },
+    { label: "Preise",     value: preiseCount,     icon: TrendingUp, href: "/produkte",   tone: "neutral" },
   ];
 
   const quickActions: QuickProps[] = [
@@ -94,14 +58,14 @@ export default async function HomePage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {stats.map((s) => <StatCard key={s.label} {...s} />)}
+        {statCards.map((s) => <StatCard key={s.label} {...s} />)}
       </div>
 
       {/* Aufgaben-Widget */}
       <AufgabenWidget
-        ohnePreis={ohnePreisCount > 0 ? ohnePreisCount : 0}
-        ohneBild={ohneBildCount ?? 0}
-        unbearbeitet={unbearbeitetCount ?? 0}
+        ohnePreis={ohnePreisCount}
+        ohneBild={ohneBildCount}
+        unbearbeitet={unbearbeitetCount}
       />
 
       {/* Vollstaendigkeit Widget */}
@@ -157,7 +121,7 @@ export default async function HomePage() {
       <div className="mt-8 p-4 rounded-xl border bg-background flex items-center justify-between">
         <div className="text-sm">
           <span className="text-muted-foreground">Icon-Sammlung:</span>{" "}
-          <span className="font-semibold">{iCount ?? 0} Icons</span> verfügbar
+          <span className="font-semibold">{iconsCount} Icons</span> verfügbar
         </div>
         <Link href="/icons" className="text-sm text-primary hover:underline font-medium flex items-center gap-1">
           Icons verwalten <ArrowRight className="h-3.5 w-3.5" />

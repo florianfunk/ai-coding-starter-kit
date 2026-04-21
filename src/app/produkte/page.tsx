@@ -9,6 +9,8 @@ import { Plus, Search, Filter, X, Upload } from "lucide-react";
 import { ProdukteTable } from "./produkte-table-body";
 import { ExportDialog } from "./export-dialog";
 import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
+import { getBereiche, getKategorien } from "@/lib/cache";
+import type { ProduktListing } from "@/lib/types/views";
 
 export const dynamic = "force-dynamic";
 
@@ -22,16 +24,18 @@ export default async function ProdukteListPage({
   const sp = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: bereiche }, { data: kategorien }] = await Promise.all([
-    supabase.from("bereiche").select("id,name").order("sortierung"),
-    supabase.from("kategorien").select("id,name,bereich_id").order("name"),
+  // Bereiche & Kategorien aus dem Cache — slowly-changing, per Tag invalidiert.
+  const [bereiche, kategorien] = await Promise.all([
+    getBereiche(),
+    getKategorien(),
   ]);
 
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  let query = supabase.from("produkte").select("*", { count: "exact" });
+  // Konsolidierte View: produkte + bereich_name + kategorie_name + hat_preis + icon_count + galerie_count + completeness.
+  let query = supabase.from("v_produkt_listing").select("*", { count: "exact" });
 
   if (sp.q) {
     const q = sp.q.trim();
@@ -42,57 +46,37 @@ export default async function ProdukteListPage({
   if (sp.status === "unbearbeitet") query = query.eq("artikel_bearbeitet", false);
   if (sp.status === "bearbeitet") query = query.eq("artikel_bearbeitet", true);
 
+  // Vollstaendigkeits-Filter serverseitig (spart clientseitiges Filtern + Pagination-Skew).
+  if (sp.vollstaendigkeit === "unvollstaendig") query = query.lte("completeness_percent", 80);
+  if (sp.vollstaendigkeit === "vollstaendig")   query = query.gt("completeness_percent", 80);
+
   const sort = sp.sort ?? "artikelnummer";
   const [col, dir] = sort.startsWith("-") ? [sort.slice(1), "desc"] : [sort, "asc"];
   query = query.order(col, { ascending: dir === "asc" }).range(from, to);
 
   const { data: produkte, count } = await query;
+  const listing = (produkte ?? []) as ProduktListing[];
 
-  // Fetch completeness context for visible products
-  const produktIds = (produkte ?? []).map((p) => p.id);
-  let completenessMap: Record<string, CompletenessResult> = {};
-
-  if (produktIds.length > 0) {
-    const [{ data: activePreise }, { data: iconCounts }, { data: galerieCounts }] = await Promise.all([
-      supabase.from("aktuelle_preise").select("produkt_id").in("produkt_id", produktIds),
-      supabase.from("produkt_icons").select("produkt_id").in("produkt_id", produktIds),
-      supabase.from("produkt_bilder").select("produkt_id").in("produkt_id", produktIds),
-    ]);
-
-    const priceSet = new Set((activePreise ?? []).map((r) => r.produkt_id));
-    const iconCountMap: Record<string, number> = {};
-    for (const r of iconCounts ?? []) {
-      iconCountMap[r.produkt_id] = (iconCountMap[r.produkt_id] ?? 0) + 1;
-    }
-    const galerieCountMap: Record<string, number> = {};
-    for (const r of galerieCounts ?? []) {
-      galerieCountMap[r.produkt_id] = (galerieCountMap[r.produkt_id] ?? 0) + 1;
-    }
-
-    for (const p of produkte ?? []) {
-      completenessMap[p.id] = calculateCompleteness(p, {
-        hasActivePrice: priceSet.has(p.id),
-        iconCount: iconCountMap[p.id] ?? 0,
-        galerieCount: galerieCountMap[p.id] ?? 0,
-      });
-    }
-  }
-
-  // Filter by completeness (client-side since it's computed)
-  let filteredProdukte = produkte ?? [];
-  if (sp.vollstaendigkeit === "unvollstaendig") {
-    filteredProdukte = filteredProdukte.filter((p) => (completenessMap[p.id]?.percent ?? 0) <= 80);
-  } else if (sp.vollstaendigkeit === "vollstaendig") {
-    filteredProdukte = filteredProdukte.filter((p) => (completenessMap[p.id]?.percent ?? 0) > 80);
+  // Completeness-Objekt pro Row aus den View-Feldern rekonstruieren (keine Extra-Queries).
+  // Die MV liefert nur percent/is_complete; für den Tooltip brauchen wir aber die Liste
+  // der fehlenden Felder. Die bauen wir rein in-memory mit calculateCompleteness, wobei
+  // Kontext (hasActivePrice, iconCount, galerieCount) aus der View kommt.
+  const completenessMap: Record<string, CompletenessResult> = {};
+  for (const p of listing) {
+    completenessMap[p.id] = calculateCompleteness(p as any, {
+      hasActivePrice: Boolean(p.hat_preis),
+      iconCount: p.icon_count ?? 0,
+      galerieCount: p.galerie_count ?? 0,
+    });
   }
 
   const filteredKategorien = sp.bereich
-    ? (kategorien ?? []).filter((k) => k.bereich_id === sp.bereich)
-    : (kategorien ?? []);
-  const bereichNameMap = Object.fromEntries((bereiche ?? []).map((b) => [b.id, b.name]));
-  const kategorieNameMap = Object.fromEntries((kategorien ?? []).map((k) => [k.id, k.name]));
+    ? kategorien.filter((k) => k.bereich_id === sp.bereich)
+    : kategorien;
+  const bereichNameMap = Object.fromEntries(bereiche.map((b) => [b.id, b.name]));
+  const kategorieNameMap = Object.fromEntries(kategorien.map((k) => [k.id, k.name]));
 
-  const displayCount = sp.vollstaendigkeit ? filteredProdukte.length : (count ?? 0);
+  const displayCount = count ?? 0;
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
   const hasFilter = Boolean(sp.q || sp.bereich || sp.kategorie || sp.status || sp.vollstaendigkeit);
 
@@ -141,7 +125,7 @@ export default async function ProdukteListPage({
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Bereich</label>
               <select name="bereich" defaultValue={sp.bereich ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
                 <option value="">Alle</option>
-                {(bereiche ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
             <div>
@@ -185,7 +169,7 @@ export default async function ProdukteListPage({
       <Card className="border-2">
         <CardContent className="p-0 overflow-x-auto">
           <ProdukteTable
-            produkte={filteredProdukte.map((p) => ({
+            produkte={listing.map((p) => ({
               id: p.id,
               artikelnummer: p.artikelnummer,
               name: p.name,
@@ -193,10 +177,11 @@ export default async function ProdukteListPage({
               kategorie_id: p.kategorie_id,
               sortierung: p.sortierung,
               artikel_bearbeitet: p.artikel_bearbeitet,
+              hauptbild_path: p.hauptbild_path,
             }))}
             bereichName={bereichNameMap}
             kategorieName={kategorieNameMap}
-            kategorien={(kategorien ?? []).map((k) => ({ id: k.id, name: k.name }))}
+            kategorien={kategorien.map((k) => ({ id: k.id, name: k.name }))}
             hasFilter={hasFilter}
             completenessMap={completenessMap}
           />

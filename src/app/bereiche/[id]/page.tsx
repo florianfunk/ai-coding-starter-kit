@@ -1,8 +1,9 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
-import { getSignedUrl } from "@/lib/storage";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,7 +21,7 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
   const { data: bereich } = await supabase.from("bereiche").select("*").eq("id", id).single();
   if (!bereich) notFound();
 
-  const bereichBildUrl = await getSignedUrl("produktbilder", bereich.bild_path);
+  const bereichBildUrl = bildProxyUrl("produktbilder", bereich.bild_path);
 
   const { data: kategorien } = await supabase
     .from("kategorien").select("*").eq("bereich_id", id).order("sortierung");
@@ -108,10 +109,15 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
               <CardTitle className="text-sm uppercase tracking-widest text-primary">Bild</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-[4/3] rounded-lg border-2 bg-muted overflow-hidden">
+              <div className="aspect-[4/3] rounded-lg border-2 bg-muted overflow-hidden relative">
                 {bereichBildUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={bereichBildUrl} alt="" className="h-full w-full object-cover" />
+                  <Image
+                    src={bereichBildUrl}
+                    alt=""
+                    fill
+                    sizes="(max-width: 768px) 100vw, 280px"
+                    className="object-cover"
+                  />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
                     <ImageIcon className="h-10 w-10" />

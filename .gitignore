@@ -41,3 +41,9 @@ next-env.d.ts
 # FileMaker-Migrationsdaten (groß, nicht ins Repo)
 /daten/
 scripts/migrate-dataapi-report.json
+
+# Playwright MCP artefakte (lokale Browser-Tests)
+/.playwright-mcp/
+/screenshots/
+/nav-*.png
+/page-*.png

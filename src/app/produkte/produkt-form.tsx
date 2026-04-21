@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
 
@@ -106,7 +106,10 @@ export function ProduktForm({
   const [bereichId, setBereichId] = useState<string>(defaultValues.bereich_id ?? "");
   const [hauptbildPath, setHauptbildPath] = useState<string | null>(defaultValues.hauptbild_path ?? null);
   const [hauptbildPreview, setHauptbildPreview] = useState<string | null>(defaultHauptbildUrl);
-  const [iconSet, setIconSet] = useState<Set<string>>(new Set(defaultIconIds));
+  const [iconIds, setIconIds] = useState<string[]>(() => {
+    const seen = new Set<string>();
+    return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+  });
   const [uploading, startUpload] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
 
@@ -146,11 +149,7 @@ export function ProduktForm({
   }
 
   function toggleIcon(id: string) {
-    setIconSet((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
   const thermischGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "thermisch");
@@ -239,7 +238,7 @@ export function ProduktForm({
         <AccordionItem value="datenblatt" className="border rounded-lg overflow-hidden">
           <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
             <span className="flex items-center gap-2">
-              <SectionIndicator filled={isSectionFilled("datenblatt", defaultValues, iconSet.size)} />
+              <SectionIndicator filled={isSectionFilled("datenblatt", defaultValues, iconIds.length)} />
               <FileText className="h-4 w-4 text-violet-500" />
               <span className="font-semibold">Datenblatt</span>
             </span>
@@ -253,15 +252,15 @@ export function ProduktForm({
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="datenblatt_text">Text Block 1</Label>
-                  <Textarea id="datenblatt_text" name="datenblatt_text" rows={10} defaultValue={defaultValues.datenblatt_text ?? ""} />
+                  <RichTextEditor name="datenblatt_text" defaultValue={defaultValues.datenblatt_text ?? ""} minHeight={220} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="datenblatt_text_2">Text Block 2</Label>
-                  <Textarea id="datenblatt_text_2" name="datenblatt_text_2" rows={10} defaultValue={defaultValues.datenblatt_text_2 ?? ""} />
+                  <RichTextEditor name="datenblatt_text_2" defaultValue={defaultValues.datenblatt_text_2 ?? ""} minHeight={220} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="datenblatt_text_3">Text Block 3</Label>
-                  <Textarea id="datenblatt_text_3" name="datenblatt_text_3" rows={10} defaultValue={defaultValues.datenblatt_text_3 ?? ""} />
+                  <RichTextEditor name="datenblatt_text_3" defaultValue={defaultValues.datenblatt_text_3 ?? ""} minHeight={220} />
                 </div>
               </div>
             </div>
@@ -277,7 +276,7 @@ export function ProduktForm({
             <AccordionItem key={group.tab} value={group.tab} className="border rounded-lg overflow-hidden">
               <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
                 <span className="flex items-center gap-2">
-                  <SectionIndicator filled={isSectionFilled(group.tab as SectionId, defaultValues, iconSet.size)} />
+                  <SectionIndicator filled={isSectionFilled(group.tab as SectionId, defaultValues, iconIds.length)} />
                   <SIcon className={`h-4 w-4 ${meta.color.replace("border-l-", "text-")}`} />
                   <span className="font-semibold">{meta.label}</span>
                   <span className="text-xs text-muted-foreground ml-1">({group.fields.length} Felder)</span>
@@ -298,7 +297,7 @@ export function ProduktForm({
         <AccordionItem value="thermisch" className="border rounded-lg overflow-hidden">
           <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
             <span className="flex items-center gap-2">
-              <SectionIndicator filled={isSectionFilled("thermisch", defaultValues, iconSet.size)} />
+              <SectionIndicator filled={isSectionFilled("thermisch", defaultValues, iconIds.length)} />
               <Thermometer className="h-4 w-4 text-red-400" />
               <span className="font-semibold">Thermisch & Sonstiges</span>
               <span className="text-xs text-muted-foreground ml-1">({(thermischGroup?.fields.length ?? 0) + (sonstigesGroup?.fields.length ?? 0)} Felder)</span>
@@ -320,16 +319,22 @@ export function ProduktForm({
         <AccordionItem value="icons" className="border rounded-lg overflow-hidden">
           <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
             <span className="flex items-center gap-2">
-              <SectionIndicator filled={iconSet.size > 0} />
+              <SectionIndicator filled={iconIds.length > 0} />
               <Palette className="h-4 w-4 text-primary" />
               <span className="font-semibold">Icons</span>
-              {iconSet.size > 0 && (
-                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">{iconSet.size}</span>
+              {iconIds.length > 0 && (
+                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">{iconIds.length}</span>
               )}
             </span>
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
-            <IconPicker icons={icons} selectedIds={iconSet} onToggle={toggleIcon} />
+            <IconPicker
+              icons={icons}
+              selectedIds={iconIds}
+              onToggle={toggleIcon}
+              onReorder={setIconIds}
+              showRemoveButtons
+            />
           </AccordionContent>
         </AccordionItem>
       </Accordion>

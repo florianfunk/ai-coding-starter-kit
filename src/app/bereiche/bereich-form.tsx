@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Image as ImageIcon } from "lucide-react";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { uploadBereichBild, type BereichFormState } from "./actions";
 
 const initial: BereichFormState = { error: null };
@@ -119,11 +119,10 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="beschreibung">Beschreibung</Label>
-                <Textarea
-                  id="beschreibung"
+                <RichTextEditor
                   name="beschreibung"
-                  rows={4}
                   defaultValue={defaultValues?.beschreibung ?? ""}
+                  minHeight={120}
                 />
               </div>
 

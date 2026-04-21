@@ -5,13 +5,17 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
+import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 
 const schema = z.object({
   bereich_id: z.string().uuid("Bereich ist Pflicht"),
   name: z.string().min(1, "Name ist Pflicht").max(200),
   beschreibung: z.string().max(4000).optional().nullable(),
   sortierung: z.coerce.number().int().min(0).default(0),
-  vorschaubild_path: z.string().optional().nullable(),
+  bild1_path: z.string().optional().nullable(),
+  bild2_path: z.string().optional().nullable(),
+  bild3_path: z.string().optional().nullable(),
+  bild4_path: z.string().optional().nullable(),
   spalte_1: z.string().optional().nullable(),
   spalte_2: z.string().optional().nullable(),
   spalte_3: z.string().optional().nullable(),
@@ -33,9 +37,12 @@ function parse(formData: FormData) {
   return schema.safeParse({
     bereich_id: formData.get("bereich_id"),
     name: formData.get("name"),
-    beschreibung: formData.get("beschreibung") || null,
+    beschreibung: sanitizeRichTextHtml(formData.get("beschreibung") as string | null) || null,
     sortierung: formData.get("sortierung") || 0,
-    vorschaubild_path: (formData.get("vorschaubild_path") as string) || null,
+    bild1_path: (formData.get("bild1_path") as string) || null,
+    bild2_path: (formData.get("bild2_path") as string) || null,
+    bild3_path: (formData.get("bild3_path") as string) || null,
+    bild4_path: (formData.get("bild4_path") as string) || null,
     spalte_1: spaltenVal("spalte_1"),
     spalte_2: spaltenVal("spalte_2"),
     spalte_3: spaltenVal("spalte_3"),
@@ -57,7 +64,7 @@ function flat(err: z.ZodError) {
 async function setIcons(supabase: Awaited<ReturnType<typeof createClient>>, kategorieId: string, iconIds: string[]) {
   await supabase.from("kategorie_icons").delete().eq("kategorie_id", kategorieId);
   if (iconIds.length) {
-    const rows = iconIds.map((icon_id) => ({ kategorie_id: kategorieId, icon_id }));
+    const rows = iconIds.map((icon_id, i) => ({ kategorie_id: kategorieId, icon_id, sortierung: i }));
     await supabase.from("kategorie_icons").insert(rows);
   }
 }

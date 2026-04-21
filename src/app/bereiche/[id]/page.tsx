@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
 import { DeleteKategorieButton } from "@/app/kategorien/delete-button";
+import { RichTextDisplay } from "@/components/rich-text-display";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +89,7 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
             {bereich.beschreibung && (
               <div>
                 <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Beschreibung</p>
-                <p className="text-sm leading-relaxed">{bereich.beschreibung}</p>
+                <RichTextDisplay html={bereich.beschreibung} />
               </div>
             )}
 

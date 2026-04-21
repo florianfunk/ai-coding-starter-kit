@@ -307,21 +307,31 @@ async function main() {
     const beschreibung = fieldValue(f.Beschreibung);
     const sortierung = toNum(fieldValue(f.Sortierung)) ?? 0;
 
-    let bildPath: string | null = null;
-    const bildBase64 = fieldValue(f.Bild1);
-    if (bildBase64 && bildBase64.length > 100) {
-      bildPath = await uploadBinary("produktbilder", `kategorien/${ext}`, bildBase64);
+    // Pro Slot (Bild1..Bild4) einzeln hochladen — PROJ-35.
+    const bildPaths: (string | null)[] = [];
+    for (let slot = 1; slot <= 4; slot++) {
+      const b64 = fieldValue(f[`Bild${slot}`]);
+      if (b64 && b64.length > 100) {
+        bildPaths.push(await uploadBinary("produktbilder", `kategorien/${ext}-bild${slot}`, b64));
+      } else {
+        bildPaths.push(null);
+      }
     }
+    const [bild1Path, bild2Path, bild3Path, bild4Path] = bildPaths;
 
     const r = await pg.query(
-      `insert into kategorien (external_id, bereich_id, name, beschreibung, sortierung, vorschaubild_path)
-       values ($1,$2,$3,$4,$5,$6)
+      `insert into kategorien (external_id, bereich_id, name, beschreibung, sortierung,
+                               bild1_path, bild2_path, bild3_path, bild4_path)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        on conflict (external_id) do update set
          bereich_id=excluded.bereich_id, name=excluded.name,
          beschreibung=excluded.beschreibung, sortierung=excluded.sortierung,
-         vorschaubild_path=coalesce(excluded.vorschaubild_path, kategorien.vorschaubild_path)
+         bild1_path=coalesce(excluded.bild1_path, kategorien.bild1_path),
+         bild2_path=coalesce(excluded.bild2_path, kategorien.bild2_path),
+         bild3_path=coalesce(excluded.bild3_path, kategorien.bild3_path),
+         bild4_path=coalesce(excluded.bild4_path, kategorien.bild4_path)
        returning id, (xmax = 0) as inserted`,
-      [ext, bereichUuid, name, beschreibung, sortierung, bildPath],
+      [ext, bereichUuid, name, beschreibung, sortierung, bild1Path, bild2Path, bild3Path, bild4Path],
     );
     const { id, inserted } = r.rows[0];
     kategorieExtToUuid.set(ext, id);

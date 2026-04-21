@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import { getSpaltenDefinition, formatSpaltenWert } from "@/lib/katalog-column-map";
+import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 
 // ===========================================================================
 // Types
@@ -26,7 +27,12 @@ export type KatalogData = {
   iconLabelsByProdukt: Map<string, string[]>;
   kategorieIconsByKategorie: Map<string, { label: string; url: PdfImage }[]>;
   bereichBildUrl: Map<string, PdfImage>;
-  kategorieBildUrl: Map<string, PdfImage>;
+  /**
+   * Pro Kategorie bis zu 4 Bilder (Slot 1–4). Layout auf Katalog-Seite:
+   *   Bild1 = breit mittig, Bild2 = breit unten links,
+   *   Bild3 = hochkant rechts oben, Bild4 = rechts unten.
+   */
+  kategorieBilderByKategorie: Map<string, Record<1 | 2 | 3 | 4, PdfImage>>;
   logoUrl: PdfImage;
   coverVorneUrl: PdfImage;
   coverHintenUrl: PdfImage;
@@ -228,6 +234,28 @@ const styles = StyleSheet.create({
   mainImage: { width: "100%", height: 130, objectFit: "cover" },
   secondaryImage: { width: "100%", height: 110, objectFit: "cover" },
 
+  // 4-Bild-Block (FileMaker-Anordnung) — unter Beschreibung+Icons, über der Tabelle
+  bilderBlock: {
+    flexDirection: "row",
+    gap: 4,
+    height: 150,
+    marginBottom: 12,
+  },
+  bilderLeftColumn: {
+    flex: 3,
+    flexDirection: "column",
+    gap: 4,
+  },
+  bilderRightColumn: {
+    flex: 1,
+    flexDirection: "column",
+    gap: 4,
+  },
+  bildWide: { width: "100%", flex: 1, objectFit: "cover", backgroundColor: "#f3f3f3" },
+  bildTall: { width: "100%", flex: 2, objectFit: "cover", backgroundColor: "#f3f3f3" },
+  bildSmall: { width: "100%", flex: 1, objectFit: "cover", backgroundColor: "#f3f3f3" },
+  bildEmpty: { backgroundColor: "#f3f3f3" },
+
   technicalDrawing: {
     width: "100%",
     height: 100,
@@ -335,7 +363,8 @@ function activeSpalten(kategorie: any): { index: number; label: string; def: Ret
 // Bullet-Liste aus Beschreibung bauen (Zeilen mit "•" werden als Bullets dargestellt)
 function parseBeschreibung(text: string | null | undefined): { intro: string | null; bullets: string[] } {
   if (!text) return { intro: null, bullets: [] };
-  const lines = text.split(/\r?\n/);
+  const plain = isHtmlContent(text) ? htmlToPlainText(text) : text;
+  const lines = plain.split(/\r?\n/);
   const bullets: string[] = [];
   const introLines: string[] = [];
   let hitBullet = false;
@@ -440,7 +469,7 @@ export function KatalogDocument(d: KatalogData) {
                 preisByProdukt={d.preisByProdukt}
                 hauptbildByProdukt={d.hauptbildByProdukt}
                 kategorieIcons={d.kategorieIconsByKategorie.get(k.id) ?? []}
-                kategorieBild={d.kategorieBildUrl.get(k.id) ?? null}
+                kategorieBilder={d.kategorieBilderByKategorie.get(k.id) ?? { 1: null, 2: null, 3: null, 4: null }}
                 params={d.params}
               />
             ))}
@@ -481,7 +510,7 @@ function KategorieSeiten({
   preisByProdukt,
   hauptbildByProdukt,
   kategorieIcons,
-  kategorieBild,
+  kategorieBilder,
   params,
 }: {
   bereich: any;
@@ -490,7 +519,7 @@ function KategorieSeiten({
   preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
   hauptbildByProdukt: Map<string, PdfImage>;
   kategorieIcons: { label: string; url: PdfImage }[];
-  kategorieBild: PdfImage;
+  kategorieBilder: Record<1 | 2 | 3 | 4, PdfImage>;
   params: KatalogParams;
 }) {
   const spalten = activeSpalten(kategorie);
@@ -535,25 +564,51 @@ function KategorieSeiten({
           )}
         </View>
 
-        {/* Beschreibung links + Bilder rechts */}
-        <View style={styles.topSplit}>
-          <View style={styles.leftColumn}>
-            {intro && (
-              <View style={styles.descriptionBlock}>
-                <Text style={styles.descriptionText}>{intro}</Text>
-              </View>
-            )}
-            {bullets.length > 0 && (
-              <>
-                <Text style={styles.techDatenTitle}>Technische Daten:</Text>
-                {bullets.map((b, i) => (
-                  <Text key={i} style={styles.bulletLine}>• {b}</Text>
-                ))}
-              </>
-            )}
+        {/* Beschreibung */}
+        <View style={styles.leftColumn}>
+          {intro && (
+            <View style={styles.descriptionBlock}>
+              <Text style={styles.descriptionText}>{intro}</Text>
+            </View>
+          )}
+          {bullets.length > 0 && (
+            <>
+              <Text style={styles.techDatenTitle}>Technische Daten:</Text>
+              {bullets.map((b, i) => (
+                <Text key={i} style={styles.bulletLine}>• {b}</Text>
+              ))}
+            </>
+          )}
+        </View>
+
+        {/* Bild-Block: FileMaker-Anordnung
+              ┌──────────────────────┬──────┐
+              │      Bild 1 (15×3)   │      │
+              ├──────────────────────┤Bild3 │
+              │      Bild 2 (15×3)   │(5×3) │
+              │                      ├──────┤
+              │                      │Bild4 │
+              └──────────────────────┴──────┘
+            Tatsächlich: linke Spalte enthält Bild1+Bild2 (je 1 Einheit hoch),
+            rechte Spalte enthält Bild3 (2 Einheiten hoch) über Bild4 (1 Einheit hoch).
+            Die Originalvorlage macht Bild3 doppelt so hoch wie Bild4.
+        */}
+        <View style={styles.bilderBlock}>
+          <View style={styles.bilderLeftColumn}>
+            {kategorieBilder[1]
+              ? <Image src={kategorieBilder[1]} style={styles.bildWide} />
+              : <View style={[styles.bildWide, styles.bildEmpty]} />}
+            {kategorieBilder[2]
+              ? <Image src={kategorieBilder[2]} style={styles.bildWide} />
+              : <View style={[styles.bildWide, styles.bildEmpty]} />}
           </View>
-          <View style={styles.rightColumn}>
-            {kategorieBild ? <Image src={kategorieBild} style={styles.mainImage} /> : <View style={styles.mainImage} />}
+          <View style={styles.bilderRightColumn}>
+            {kategorieBilder[3]
+              ? <Image src={kategorieBilder[3]} style={styles.bildTall} />
+              : <View style={[styles.bildTall, styles.bildEmpty]} />}
+            {kategorieBilder[4]
+              ? <Image src={kategorieBilder[4]} style={styles.bildSmall} />
+              : <View style={[styles.bildSmall, styles.bildEmpty]} />}
           </View>
         </View>
 

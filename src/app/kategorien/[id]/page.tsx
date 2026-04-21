@@ -12,6 +12,7 @@ import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Plus, Package, Pencil, ChevronRight, ImageIcon, Layers } from "lucide-react";
+import { RichTextDisplay } from "@/components/rich-text-display";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,14 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
   ]);
 
-  const vorschaubildUrl = bildProxyUrl("produktbilder", kategorie.vorschaubild_path);
+  const bildUrls = {
+    bild1: bildProxyUrl("produktbilder", kategorie.bild1_path),
+    bild2: bildProxyUrl("produktbilder", kategorie.bild2_path),
+    bild3: bildProxyUrl("produktbilder", kategorie.bild3_path),
+    bild4: bildProxyUrl("produktbilder", kategorie.bild4_path),
+  };
+  const primaryBildUrl = bildUrls.bild1 ?? bildUrls.bild2 ?? bildUrls.bild3 ?? bildUrls.bild4 ?? null;
+  const hatBilder = Boolean(bildUrls.bild1 || bildUrls.bild2 || bildUrls.bild3 || bildUrls.bild4);
   const iconData = ((iconLinks ?? []) as any[]).map((r) => ({
     label: r.icons?.label ?? "",
     url: bildProxyUrl("produktbilder", r.icons?.symbol_path ?? null),
@@ -71,9 +79,9 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
             <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               <div className="flex items-start gap-5 flex-1">
                 <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0 relative">
-                  {vorschaubildUrl ? (
+                  {primaryBildUrl ? (
                     <Image
-                      src={vorschaubildUrl}
+                      src={primaryBildUrl}
                       alt=""
                       fill
                       sizes="128px"
@@ -93,7 +101,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                     {kategorie.name}
                   </h1>
                   {kategorie.beschreibung && (
-                    <p className="text-muted-foreground mt-3 max-w-2xl leading-relaxed">{kategorie.beschreibung}</p>
+                    <RichTextDisplay html={kategorie.beschreibung} className="text-muted-foreground mt-3 max-w-2xl" />
                   )}
                   {iconData.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-4">
@@ -130,6 +138,25 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
             </div>
           </CardContent>
         </Card>
+
+        {/* KATALOG-BILDER: FileMaker-Anordnung */}
+        {hatBilder && (
+          <Card className="border-2">
+            <CardHeader className="py-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" /> Bilder für Katalog-Seite
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="aspect-[4/2] w-full max-w-2xl grid grid-cols-4 grid-rows-2 gap-2 bg-muted/30 rounded-lg border p-2">
+                <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
+                <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* PRODUKTE-TABELLE */}
         <Card className="border-2">
@@ -214,5 +241,30 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function BildKachel({
+  url,
+  label,
+  size,
+  className,
+}: {
+  url: string | null | undefined;
+  label: string;
+  size: string;
+  className?: string;
+}) {
+  return (
+    <div className={`relative overflow-hidden rounded-md border bg-background ${className ?? ""}`}>
+      {url ? (
+        <Image src={url} alt="" fill sizes="400px" className="object-cover" />
+      ) : (
+        <div className="h-full w-full flex flex-col items-center justify-center text-xs text-muted-foreground/70 gap-0.5">
+          <span className="font-medium">{label}</span>
+          <span className="text-[10px]">{size}</span>
+        </div>
+      )}
+    </div>
   );
 }

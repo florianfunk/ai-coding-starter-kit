@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
+import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 
 const bereichSchema = z.object({
   name: z.string().min(1, "Name ist Pflicht").max(200),
@@ -22,7 +23,7 @@ export type BereichFormState = { error: string | null; fieldErrors?: Record<stri
 function parseFormData(formData: FormData) {
   return bereichSchema.safeParse({
     name: formData.get("name"),
-    beschreibung: formData.get("beschreibung") || null,
+    beschreibung: sanitizeRichTextHtml(formData.get("beschreibung") as string | null) || null,
     sortierung: formData.get("sortierung") || 0,
     seitenzahl: formData.get("seitenzahl") || null,
     startseite: formData.get("startseite") || null,

@@ -2,7 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Search, X } from "lucide-react";
+import { Search, X, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export type IconItem = {
   id: string;
@@ -13,16 +30,25 @@ export type IconItem = {
 
 type Props = {
   icons: IconItem[];
-  selectedIds: Set<string>;
+  /** Ordered list of selected icon ids — order is preserved and persisted */
+  selectedIds: string[];
   onToggle: (id: string) => void;
+  onReorder: (orderedIds: string[]) => void;
   /** Show remove buttons on selected icons (default: false) */
   showRemoveButtons?: boolean;
 };
 
-export function IconPicker({ icons, selectedIds, onToggle, showRemoveButtons = false }: Props) {
+export function IconPicker({
+  icons,
+  selectedIds,
+  onToggle,
+  onReorder,
+  showRemoveButtons = false,
+}: Props) {
   const [search, setSearch] = useState("");
 
   const iconById = useMemo(() => new Map(icons.map((ic) => [ic.id, ic])), [icons]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
   const normalizedSearch = search.trim().toLowerCase();
 
@@ -45,10 +71,24 @@ export function IconPicker({ icons, selectedIds, onToggle, showRemoveButtons = f
     return Object.entries(g).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredIcons]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = selectedIds.indexOf(String(active.id));
+    const newIndex = selectedIds.indexOf(String(over.id));
+    if (oldIndex < 0 || newIndex < 0) return;
+    onReorder(arrayMove(selectedIds, oldIndex, newIndex));
+  }
+
   return (
     <div className="space-y-3">
-      {/* Hidden inputs for form submission */}
-      {[...selectedIds].map((id) => (
+      {/* Hidden inputs for form submission — order reflects drag-and-drop state */}
+      {selectedIds.map((id) => (
         <input key={id} type="hidden" name="icon_ids" value={id} />
       ))}
 
@@ -73,38 +113,34 @@ export function IconPicker({ icons, selectedIds, onToggle, showRemoveButtons = f
         )}
       </div>
 
-      {/* Selected icons preview */}
-      {selectedIds.size > 0 && (
+      {/* Selected icons preview — draggable */}
+      {selectedIds.length > 0 && (
         <div className="rounded-lg border bg-primary/5 p-3">
-          <p className="text-xs text-muted-foreground mb-2">Ausgewählt ({selectedIds.size}):</p>
-          <div className="flex flex-wrap gap-2">
-            {[...selectedIds].map((id) => {
-              const ic = iconById.get(id);
-              if (!ic) return null;
-              return (
-                <div key={id} className="relative group flex flex-col items-center gap-1">
-                  <div className="h-14 w-14 rounded-lg border-2 border-primary bg-background flex items-center justify-center overflow-hidden">
-                    {ic.url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={ic.url} alt={ic.label} className="max-h-full max-w-full object-contain p-1" />
-                    ) : (
-                      <span className="text-[10px] font-bold">{ic.label}</span>
-                    )}
-                  </div>
-                  {showRemoveButtons && (
-                    <button
-                      type="button"
-                      onClick={() => onToggle(id)}
-                      className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  )}
-                  <span className="text-[10px] text-center w-14 truncate">{ic.label}</span>
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-muted-foreground">Ausgewählt ({selectedIds.length}):</p>
+            <p className="text-[10px] text-muted-foreground/70 hidden sm:block">Zum Sortieren ziehen</p>
           </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={selectedIds} strategy={horizontalListSortingStrategy}>
+              <div className="flex flex-wrap gap-2">
+                {selectedIds.map((id) => {
+                  const ic = iconById.get(id);
+                  if (!ic) return null;
+                  return (
+                    <SortableSelectedIcon
+                      key={id}
+                      icon={ic}
+                      onRemove={showRemoveButtons ? () => onToggle(id) : undefined}
+                    />
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 
@@ -132,7 +168,7 @@ export function IconPicker({ icons, selectedIds, onToggle, showRemoveButtons = f
             </p>
             <div className="flex flex-wrap gap-2">
               {items.map((ic) => {
-                const on = selectedIds.has(ic.id);
+                const on = selectedSet.has(ic.id);
                 return (
                   <button
                     key={ic.id}
@@ -163,6 +199,66 @@ export function IconPicker({ icons, selectedIds, onToggle, showRemoveButtons = f
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SortableSelectedIcon({
+  icon,
+  onRemove,
+}: {
+  icon: IconItem;
+  onRemove?: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: icon.id,
+  });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.85 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group flex flex-col items-center gap-1 touch-none ${
+        isDragging ? "cursor-grabbing" : "cursor-grab"
+      }`}
+      {...attributes}
+      {...listeners}
+    >
+      <div
+        className={`relative h-14 w-14 rounded-lg border-2 border-primary bg-background flex items-center justify-center overflow-hidden ${
+          isDragging ? "shadow-lg ring-2 ring-primary/40" : ""
+        }`}
+      >
+        {icon.url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={icon.url} alt={icon.label} className="max-h-full max-w-full object-contain p-1 pointer-events-none" />
+        ) : (
+          <span className="text-[10px] font-bold pointer-events-none">{icon.label}</span>
+        )}
+        <GripVertical className="absolute bottom-0.5 right-0.5 h-3 w-3 text-muted-foreground/60 opacity-0 group-hover:opacity-100 transition" />
+      </div>
+      {onRemove && (
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+          aria-label={`${icon.label} entfernen`}
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+      <span className="text-[10px] text-center w-14 truncate pointer-events-none">{icon.label}</span>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import { ALL_PRODUKT_FIELDS } from "@/app/produkte/fields";
+import { RichTextPdf } from "@/lib/pdf/rich-text-pdf";
+import { ensureHtml } from "@/lib/rich-text/sanitize";
 
 export type DatenblattData = {
   produkt: any;
@@ -96,7 +98,9 @@ export function DatenblattDocument(props: DatenblattData) {
         )}
 
         {produkt.datenblatt_text && (
-          <Text style={styles.beschreibung}>{produkt.datenblatt_text}</Text>
+          <View style={styles.beschreibung}>
+            <RichTextPdf html={ensureHtml(produkt.datenblatt_text)} options={{ fontSize: 8, color: "#222" }} />
+          </View>
         )}
 
         <View style={styles.footer} fixed>

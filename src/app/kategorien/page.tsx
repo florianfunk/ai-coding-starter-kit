@@ -43,17 +43,16 @@ export default async function KategorienPage({
 
   const bereichName = new Map((bereiche ?? []).map((b) => [b.id, b.name]));
 
-  const withUrls = (kategorien ?? []).map((k) => ({
-    ...k,
-    vorschaubild_url: bildProxyUrl("produktbilder", k.vorschaubild_path),
-  }));
-
-  const items = withUrls.map((k) => ({
+  const items = (kategorien ?? []).map((k) => ({
     id: k.id,
     name: k.name,
     bereich_id: k.bereich_id,
-    bereichName: bereichName.get(k.bereich_id) ?? "\u2014",
-    vorschaubild_url: k.vorschaubild_url,
+    bereichName: bereichName.get(k.bereich_id) ?? "—",
+    // Miniatur: erstes belegtes Bild (Bild1 bevorzugt, dann 2/3/4)
+    thumbnail_url: bildProxyUrl(
+      "produktbilder",
+      k.bild1_path ?? k.bild2_path ?? k.bild3_path ?? k.bild4_path,
+    ),
     prodCount: prodCount.get(k.id) ?? 0,
     icons: iconsByKat.get(k.id) ?? [],
   }));

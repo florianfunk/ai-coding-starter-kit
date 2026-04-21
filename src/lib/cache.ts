@@ -67,7 +67,10 @@ export type CachedKategorie = {
   name: string;
   bereich_id: string;
   sortierung: number;
-  vorschaubild_path: string | null;
+  bild1_path: string | null;
+  bild2_path: string | null;
+  bild3_path: string | null;
+  bild4_path: string | null;
 };
 
 export const getKategorien = unstable_cache(
@@ -75,7 +78,7 @@ export const getKategorien = unstable_cache(
     const supabase = cacheClient();
     const { data, error } = await supabase
       .from("kategorien")
-      .select("id, name, bereich_id, sortierung, vorschaubild_path")
+      .select("id, name, bereich_id, sortierung, bild1_path, bild2_path, bild3_path, bild4_path")
       .order("name", { ascending: true })
       .limit(5000);
 

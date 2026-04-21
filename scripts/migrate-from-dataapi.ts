@@ -27,6 +27,7 @@ import { createClient } from "@supabase/supabase-js";
 import { config } from "dotenv";
 import { writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { pdf } from "pdf-to-img";
 
 config({ path: ".env.local" });
 
@@ -220,25 +221,57 @@ const supabase = createClient(
   { auth: { persistSession: false } },
 );
 
+/** Render first page of a PDF to a PNG Buffer at approx. target size. */
+async function pdfToPng(pdfBytes: Buffer, targetPx = 240): Promise<Buffer | null> {
+  try {
+    // pdf-to-img scale: 1 ≈ 72dpi → ~612px for A4. We want ~240px for icon-sized PDFs.
+    // Use scale=4 → dense rendering, then browser/img scaling handles the rest.
+    const doc = await pdf(pdfBytes, { scale: Math.max(2, targetPx / 72) });
+    for await (const page of doc) return page as Buffer;
+    return null;
+  } catch (e: any) {
+    console.warn(`  pdf->png failed: ${e.message}`);
+    return null;
+  }
+}
+
 /** Upload a FileMaker container to Supabase Storage; returns storage path (bucket-relative). */
-async function uploadContainer(bucket: string, pathPrefix: string, fmUrl: string): Promise<string | null> {
+async function uploadContainer(
+  bucket: string,
+  pathPrefix: string,
+  fmUrl: string,
+  opts: { pdfToPng?: boolean } = {},
+): Promise<string | null> {
   if (SKIP_IMAGES || !fmUrl) return null;
   const data = await fmDownloadContainer(fmUrl);
   if (!data) return null;
+
+  let bytes = data.bytes;
+  let contentType = data.contentType;
+
+  // Optional: render PDFs to PNG so they can be shown in <img> tags
+  if (opts.pdfToPng && contentType.includes("pdf")) {
+    const png = await pdfToPng(bytes);
+    if (png) {
+      bytes = png;
+      contentType = "image/png";
+    }
+  }
+
   let ext = "bin";
-  if (data.contentType.includes("jpeg") || data.contentType.includes("jpg")) ext = "jpg";
-  else if (data.contentType.includes("png")) ext = "png";
-  else if (data.contentType.includes("gif")) ext = "gif";
-  else if (data.contentType.includes("webp")) ext = "webp";
-  else if (data.contentType.includes("pdf")) ext = "pdf";
-  const hash = createHash("sha256").update(data.bytes).digest("hex").slice(0, 16);
+  if (contentType.includes("png")) ext = "png";
+  else if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
+  else if (contentType.includes("gif")) ext = "gif";
+  else if (contentType.includes("webp")) ext = "webp";
+  else if (contentType.includes("pdf")) ext = "pdf";
+  const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
   const fullPath = `${pathPrefix}-${hash}.${ext}`;
   if (DRY_RUN) {
     report.bilder.skipped += 1;
     return fullPath;
   }
-  const { error } = await supabase.storage.from(bucket).upload(fullPath, data.bytes, {
-    contentType: data.contentType,
+  const { error } = await supabase.storage.from(bucket).upload(fullPath, bytes, {
+    contentType,
     upsert: true,
   });
   if (error) {
@@ -394,7 +427,7 @@ async function main() {
           report.icons.warnings.push(`Icon ${fmId} hat kein Label — skipped`);
           continue;
         }
-        const symbolPath = await uploadContainer("assets", `icons/${fmId}`, r.Icon_Bild);
+        const symbolPath = await uploadContainer("produktbilder", `icons/${fmId}`, r.Icon_Bild, { pdfToPng: true });
         if (!DRY_RUN) {
           const res = await pg.query(
             `insert into public.icons (external_id, label, symbol_path, sortierung, icon_kategorie, fm_erstellt_von, fm_geaendert_von)
@@ -518,9 +551,13 @@ async function main() {
           report.kategorien.warnings.push(`Kategorie ${fmId} verweist auf fehlenden Bereich ${r.Bereich_ID}`);
           continue;
         }
-        // Erstes verfügbares Bild als Vorschau
-        const bildUrl = r.Bild1 || r.Bild2 || r.Bild3 || r.Bild4;
-        const vorschauPath = bildUrl ? await uploadContainer("produktbilder", `kategorien/${fmId}`, bildUrl) : null;
+        // Pro Slot ein eigener Upload — nach PROJ-35 werden alle 4 Bilder separat in bildN_path gespeichert.
+        const bildPaths: (string | null)[] = [];
+        for (let slot = 1; slot <= 4; slot++) {
+          const url = r[`Bild${slot}`] as string | undefined;
+          bildPaths.push(url ? await uploadContainer("produktbilder", `kategorien/${fmId}-bild${slot}`, url) : null);
+        }
+        const [bild1Path, bild2Path, bild3Path, bild4Path] = bildPaths;
         let katId: string;
         if (!DRY_RUN) {
           // Normalize T1-T9: "leer" → null
@@ -531,17 +568,21 @@ async function main() {
           };
           const res = await pg.query(
             `insert into public.kategorien
-               (external_id, bereich_id, name, beschreibung, sortierung, vorschaubild_path,
+               (external_id, bereich_id, name, beschreibung, sortierung,
+                bild1_path, bild2_path, bild3_path, bild4_path,
                 seitenangabe, seitenzahl, startseite, endseite, sortierung_alt, sortierung_ber,
                 fm_erstellt_von, fm_geaendert_von,
                 spalte_1, spalte_2, spalte_3, spalte_4, spalte_5, spalte_6, spalte_7, spalte_8, spalte_9)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
              on conflict (external_id) do update set
                bereich_id = excluded.bereich_id,
                name = excluded.name,
                beschreibung = excluded.beschreibung,
                sortierung = excluded.sortierung,
-               vorschaubild_path = coalesce(excluded.vorschaubild_path, public.kategorien.vorschaubild_path),
+               bild1_path = coalesce(excluded.bild1_path, public.kategorien.bild1_path),
+               bild2_path = coalesce(excluded.bild2_path, public.kategorien.bild2_path),
+               bild3_path = coalesce(excluded.bild3_path, public.kategorien.bild3_path),
+               bild4_path = coalesce(excluded.bild4_path, public.kategorien.bild4_path),
                seitenangabe = excluded.seitenangabe,
                seitenzahl = excluded.seitenzahl,
                startseite = excluded.startseite,
@@ -565,7 +606,7 @@ async function main() {
               (r.Name || "").toString().trim() || "(ohne Name)",
               r.Beschreibung || null,
               toNum(r.Sortierung) ?? 0,
-              vorschauPath,
+              bild1Path, bild2Path, bild3Path, bild4Path,
               r.Seitenangabe || null,
               toNum(r.Seitenzahl), toNum(r.Startseite), toNum(r.Endseite),
               toNum(r.Sortierung_alt), toNum(r.Sortierung_ber),

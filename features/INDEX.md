@@ -47,7 +47,9 @@
 | PROJ-31 | Benutzerverwaltung | Planned | [PROJ-31](PROJ-31-benutzerverwaltung.md) | 2026-04-17 |
 | PROJ-32 | Inline-Hilfe / FAQ | Planned | [PROJ-32](PROJ-32-inline-hilfe.md) | 2026-04-17 |
 | PROJ-33 | Performance-Optimierung Phase 1 | Approved | [PROJ-33](PROJ-33-performance-optimierung.md) | 2026-04-21 |
+| PROJ-34 | Rich-Text-Editor für Beschreibungsfelder | Planned | [PROJ-34](PROJ-34-rich-text-beschreibungen.md) | 2026-04-21 |
+| PROJ-35 | Kategorie mit 4 Bildplatzhaltern (Katalog-Layout) | In Progress | [PROJ-35](PROJ-35-kategorie-4-bilder.md) | 2026-04-21 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-34
+## Next Available ID: PROJ-36

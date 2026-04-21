@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import {
   DndContext,
   closestCenter,
@@ -123,7 +124,7 @@ function BereichCard({
           </div>
           {item.beschreibung && (
             <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
-              {item.beschreibung}
+              {isHtmlContent(item.beschreibung) ? htmlToPlainText(item.beschreibung) : item.beschreibung}
             </p>
           )}
         </div>

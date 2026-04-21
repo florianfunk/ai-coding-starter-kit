@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
+import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { ALL_PRODUKT_FIELDS } from "./fields";
 
 const baseSchema = z.object({
@@ -57,9 +58,9 @@ function parseBase(formData: FormData) {
     artikel_bearbeitet: formData.get("artikel_bearbeitet") === "on",
     hauptbild_path: (formData.get("hauptbild_path") as string) || null,
     datenblatt_titel: formData.get("datenblatt_titel") || null,
-    datenblatt_text: formData.get("datenblatt_text") || null,
-    datenblatt_text_2: formData.get("datenblatt_text_2") || null,
-    datenblatt_text_3: formData.get("datenblatt_text_3") || null,
+    datenblatt_text: sanitizeRichTextHtml(formData.get("datenblatt_text") as string | null) || null,
+    datenblatt_text_2: sanitizeRichTextHtml(formData.get("datenblatt_text_2") as string | null) || null,
+    datenblatt_text_3: sanitizeRichTextHtml(formData.get("datenblatt_text_3") as string | null) || null,
   });
 }
 

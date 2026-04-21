@@ -143,14 +143,30 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const bereichBildUrl = new Map(bereichBildResults);
     log("bereich images downloaded");
 
-    // Kategorie-Bilder
-    const kategorieBildResults = await batch(
-      kategorien ?? [],
+    // Kategorie-Bilder: pro Kategorie bis zu 4 Bilder (Bild1..Bild4)
+    // Flatten: 4 Download-Tasks pro Kategorie, danach wieder pro Kategorie gruppieren.
+    type BildSlot = 1 | 2 | 3 | 4;
+    type BildTask = { kategorieId: string; slot: BildSlot; path: string | null };
+    const bildTasks: BildTask[] = (kategorien ?? []).flatMap((k) => [
+      { kategorieId: k.id, slot: 1 as BildSlot, path: k.bild1_path },
+      { kategorieId: k.id, slot: 2 as BildSlot, path: k.bild2_path },
+      { kategorieId: k.id, slot: 3 as BildSlot, path: k.bild3_path },
+      { kategorieId: k.id, slot: 4 as BildSlot, path: k.bild4_path },
+    ]);
+    const bildDownloads = await batch(
+      bildTasks,
       8,
-      async (k) => [k.id, await downloadImage(admin, "produktbilder", k.vorschaubild_path, { maxWidth: 500, quality: 75 })] as const,
+      async (t) => [t, await downloadImage(admin, "produktbilder", t.path, { maxWidth: 500, quality: 75 })] as const,
       (done, total) => log(`  kategorie images: ${done}/${total}`),
     );
-    const kategorieBildUrl = new Map(kategorieBildResults);
+    const kategorieBilderByKategorie = new Map<string, Record<BildSlot, PdfImage>>();
+    for (const [task, img] of bildDownloads) {
+      const existing = kategorieBilderByKategorie.get(task.kategorieId) ?? {
+        1: null, 2: null, 3: null, 4: null,
+      } as Record<BildSlot, PdfImage>;
+      existing[task.slot] = img;
+      kategorieBilderByKategorie.set(task.kategorieId, existing);
+    }
     log("kategorie images downloaded");
     const logoField = p.layout === "lichtengros" ? "logo_lichtengros_dunkel" : "logo_eisenkeil_dunkel";
     const logoUrl = await downloadImage(admin, "assets", einstellungen?.[logoField] ?? null, { maxWidth: 400 });
@@ -177,7 +193,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         iconLabelsByProdukt,
         kategorieIconsByKategorie,
         bereichBildUrl,
-        kategorieBildUrl,
+        kategorieBilderByKategorie,
         logoUrl,
         coverVorneUrl,
         coverHintenUrl,

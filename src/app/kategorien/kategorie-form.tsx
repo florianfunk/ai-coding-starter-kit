@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image as ImageIcon, Table as TableIcon } from "lucide-react";
+import { Image as ImageIcon, Table as TableIcon, Upload, X } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
+import { RichTextEditor } from "@/components/rich-text-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
 import { uploadKategorieBild, type KategorieFormState } from "./actions";
@@ -17,6 +17,9 @@ import { uploadKategorieBild, type KategorieFormState } from "./actions";
 const initial: KategorieFormState = { error: null };
 
 export type IconOption = { id: string; label: string; gruppe: string | null; url: string | null };
+
+type BildSlot = 1 | 2 | 3 | 4;
+type BildState = { path: string | null; previewUrl: string | null };
 
 type Props = {
   bereiche: { id: string; name: string }[];
@@ -26,8 +29,14 @@ type Props = {
     name?: string;
     beschreibung?: string | null;
     sortierung?: number;
-    vorschaubild_path?: string | null;
-    vorschaubild_url?: string | null;
+    bild1_path?: string | null;
+    bild2_path?: string | null;
+    bild3_path?: string | null;
+    bild4_path?: string | null;
+    bild1_url?: string | null;
+    bild2_url?: string | null;
+    bild3_url?: string | null;
+    bild4_url?: string | null;
     iconIds?: string[];
     spalten?: (string | null)[];
   };
@@ -35,12 +44,28 @@ type Props = {
   submitLabel: string;
 };
 
+const SLOT_META: Record<BildSlot, { label: string; size: string; hint: string }> = {
+  1: { label: "Bild 1", size: "15 × 3 cm", hint: "Breit, mittig links" },
+  2: { label: "Bild 2", size: "15 × 3 cm", hint: "Breit, unten links" },
+  3: { label: "Bild 3", size: "5 × 3 cm",  hint: "Hochkant, oben rechts" },
+  4: { label: "Bild 4", size: "5 × 3 cm",  hint: "Rechts unten" },
+};
+
 export function KategorieForm({ bereiche, icons, defaultValues, action, submitLabel }: Props) {
-  const [state, formAction, pending] = useActionState(action, initial);
-  const [bildPath, setBildPath] = useState(defaultValues?.vorschaubild_path ?? null);
-  const [bildPreview, setBildPreview] = useState(defaultValues?.vorschaubild_url ?? null);
-  const [selected, setSelected] = useState<Set<string>>(new Set(defaultValues?.iconIds ?? []));
-  const [uploading, startUpload] = useTransition();
+  const [formState, formAction, pending] = useActionState(action, initial);
+  const [bilder, setBilder] = useState<Record<BildSlot, BildState>>({
+    1: { path: defaultValues?.bild1_path ?? null, previewUrl: defaultValues?.bild1_url ?? null },
+    2: { path: defaultValues?.bild2_path ?? null, previewUrl: defaultValues?.bild2_url ?? null },
+    3: { path: defaultValues?.bild3_path ?? null, previewUrl: defaultValues?.bild3_url ?? null },
+    4: { path: defaultValues?.bild4_path ?? null, previewUrl: defaultValues?.bild4_url ?? null },
+  });
+  const [uploadingSlot, setUploadingSlot] = useState<BildSlot | null>(null);
+  const [beschreibung, setBeschreibung] = useState<string>(defaultValues?.beschreibung ?? "");
+  const [selected, setSelected] = useState<string[]>(() => {
+    const seen = new Set<string>();
+    return (defaultValues?.iconIds ?? []).filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+  });
+  const [, startUpload] = useTransition();
   const [spalten, setSpalten] = useState<(string | null)[]>(() => {
     const init = defaultValues?.spalten ?? [];
     return Array.from({ length: 9 }, (_, i) => init[i] ?? null);
@@ -50,36 +75,43 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
     setSpalten((prev) => prev.map((v, idx) => (idx === i ? value : v)));
   }
 
-  function handleFile(file: File | null) {
+  function handleFile(slot: BildSlot, file: File | null) {
     if (!file) return;
     const fd = new FormData();
     fd.append("file", file);
+    setUploadingSlot(slot);
     startUpload(async () => {
       const r = await uploadKategorieBild(fd);
-      if (r.error) toast.error(r.error);
-      else {
-        setBildPath(r.path);
-        setBildPreview(URL.createObjectURL(file));
-        toast.success("Bild hochgeladen");
+      if (r.error) {
+        toast.error(r.error);
+      } else {
+        setBilder((prev) => ({
+          ...prev,
+          [slot]: { path: r.path, previewUrl: URL.createObjectURL(file) },
+        }));
+        toast.success(`${SLOT_META[slot].label} hochgeladen`);
       }
+      setUploadingSlot(null);
     });
+  }
+
+  function clearSlot(slot: BildSlot) {
+    setBilder((prev) => ({ ...prev, [slot]: { path: null, previewUrl: null } }));
   }
 
   function toggleIcon(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
-
 
   return (
     <Card className="max-w-5xl">
       <CardHeader><CardTitle>{submitLabel}</CardTitle></CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-5">
-          <input type="hidden" name="vorschaubild_path" value={bildPath ?? ""} />
+          <input type="hidden" name="bild1_path" value={bilder[1].path ?? ""} />
+          <input type="hidden" name="bild2_path" value={bilder[2].path ?? ""} />
+          <input type="hidden" name="bild3_path" value={bilder[3].path ?? ""} />
+          <input type="hidden" name="bild4_path" value={bilder[4].path ?? ""} />
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
             <div className="space-y-2">
@@ -94,8 +126,8 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
                 <option value="" disabled>– bitte wählen –</option>
                 {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
-              {state.fieldErrors?.bereich_id && (
-                <p className="text-sm text-destructive">{state.fieldErrors.bereich_id}</p>
+              {formState.fieldErrors?.bereich_id && (
+                <p className="text-sm text-destructive">{formState.fieldErrors.bereich_id}</p>
               )}
             </div>
             <div className="space-y-2">
@@ -107,12 +139,13 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
             <Input id="name" name="name" required defaultValue={defaultValues?.name ?? ""} className="text-lg" />
-            {state.fieldErrors?.name && <p className="text-sm text-destructive">{state.fieldErrors.name}</p>}
+            {formState.fieldErrors?.name && <p className="text-sm text-destructive">{formState.fieldErrors.name}</p>}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="beschreibung">Beschreibung</Label>
-            <Textarea id="beschreibung" name="beschreibung" rows={6} defaultValue={defaultValues?.beschreibung ?? ""} />
+            <input type="hidden" name="beschreibung" value={beschreibung} />
+            <RichTextEditor value={beschreibung} onChange={setBeschreibung} />
           </div>
 
           {/* Katalog-Spalten */}
@@ -159,38 +192,136 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
                 Icons verwalten &rarr;
               </a>
             </div>
-            <IconPicker icons={icons} selectedIds={selected} onToggle={toggleIcon} showRemoveButtons />
+            <IconPicker
+              icons={icons}
+              selectedIds={selected}
+              onToggle={toggleIcon}
+              onReorder={setSelected}
+              showRemoveButtons
+            />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="bild">Vorschaubild</Label>
-            <div className="flex items-start gap-4">
-              <div className="h-28 w-40 rounded-lg border-2 border-dashed bg-muted/30 overflow-hidden flex items-center justify-center shrink-0">
-                {bildPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={bildPreview} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                )}
-              </div>
-              <Input
-                id="bild"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={uploading}
-                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
-              />
+          {/* Bilder-Block: 4 Upload-Slots + Layout-Vorschau */}
+          <div className="space-y-4">
+            <div>
+              <Label>Bilder für Katalog-Seite</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Pro Kategorie werden bis zu 4 Bilder auf der Katalog-Seite angeordnet — breite Felder links (Bild 1 + 2), schmale Felder rechts (Bild 3 + 4).
+                Fehlende Bilder lassen den Platz im Katalog leer.
+              </p>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {([1, 2, 3, 4] as BildSlot[]).map((slot) => {
+                const meta = SLOT_META[slot];
+                const bild = bilder[slot];
+                const isUploading = uploadingSlot === slot;
+                const isWide = slot === 1 || slot === 2;
+                return (
+                  <div key={slot} className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm font-medium">{meta.label}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{meta.size}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
+                    <div
+                      className={`relative rounded border-2 border-dashed bg-background overflow-hidden flex items-center justify-center ${
+                        isWide ? "aspect-[5/1]" : "aspect-[1/2]"
+                      }`}
+                    >
+                      {bild.previewUrl ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={bild.previewUrl} alt="" className="h-full w-full object-cover" />
+                          <button
+                            type="button"
+                            aria-label="Bild entfernen"
+                            onClick={() => clearSlot(slot)}
+                            className="absolute top-1 right-1 rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                      )}
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-primary hover:underline cursor-pointer">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{isUploading ? "Lädt…" : bild.path ? "Ersetzen" : "Datei auswählen"}</span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={isUploading}
+                        onChange={(e) => handleFile(slot, e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+
+            <CategoryLayoutPreview bilder={bilder} />
           </div>
 
-          {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
+          {formState.error && <Alert variant="destructive"><AlertDescription>{formState.error}</AlertDescription></Alert>}
 
           <div className="flex gap-2">
-            <Button type="submit" disabled={pending || uploading}>{pending ? "Speichere…" : "Speichern"}</Button>
+            <Button type="submit" disabled={pending || uploadingSlot !== null}>{pending ? "Speichere…" : "Speichern"}</Button>
             <Button asChild variant="outline" type="button"><a href="/kategorien">Abbrechen</a></Button>
           </div>
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Bildet das FileMaker-Layout der Katalog-Seite nach.
+ * 4-Spalten × 2-Zeilen-Grid: Bild1 und Bild2 sind breite Felder (3 Spalten),
+ * Bild3 überspannt rechts oben zwei Zeilen hochkant, Bild4 liegt rechts unten.
+ */
+function CategoryLayoutPreview({ bilder }: { bilder: Record<BildSlot, BildState> }) {
+  return (
+    <div className="rounded-lg border bg-muted/20 p-4">
+      <p className="text-xs font-medium text-muted-foreground mb-2">Anordnung auf der Katalog-Seite</p>
+      <div className="aspect-[4/2] w-full max-w-md grid grid-cols-4 grid-rows-2 gap-1 bg-background rounded border p-1">
+        <PreviewSlot bild={bilder[1]} label="Bild 1" size="15×3 cm" className="col-span-3 row-span-1" />
+        <PreviewSlot bild={bilder[3]} label="Bild 3" size="5×3 cm"  className="col-span-1 row-span-2" />
+        <PreviewSlot bild={bilder[2]} label="Bild 2" size="15×3 cm" className="col-span-3 row-span-1" />
+        <PreviewSlot bild={bilder[4]} label="Bild 4" size="5×3 cm"  className="col-start-4 row-start-2" />
+      </div>
+    </div>
+  );
+}
+
+function PreviewSlot({
+  bild,
+  label,
+  size,
+  className,
+}: {
+  bild: BildState;
+  label: string;
+  size: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-sm border border-dashed ${
+        bild.previewUrl ? "border-primary/40" : "border-muted-foreground/30 bg-muted/40"
+      } ${className ?? ""}`}
+    >
+      {bild.previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={bild.previewUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="h-full w-full flex flex-col items-center justify-center text-[9px] text-muted-foreground/70 px-1 text-center">
+          <span className="font-medium">{label}</span>
+          <span className="opacity-70">{size}</span>
+        </div>
+      )}
+    </div>
   );
 }

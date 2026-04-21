@@ -36,7 +36,7 @@ interface KategorieItem {
   name: string;
   bereich_id: string;
   bereichName: string;
-  vorschaubild_url: string | null;
+  thumbnail_url: string | null;
   prodCount: number;
   icons: string[];
 }
@@ -93,9 +93,9 @@ function KategorieCard({
         </div>
 
         <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10 border">
-          {item.vorschaubild_url ? (
+          {item.thumbnail_url ? (
             <Image
-              src={item.vorschaubild_url}
+              src={item.thumbnail_url}
               alt=""
               width={96}
               height={64}

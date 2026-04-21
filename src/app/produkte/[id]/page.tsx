@@ -36,7 +36,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     supabase.from("bereiche").select("id,name").order("sortierung"),
     supabase.from("kategorien").select("id,name,bereich_id").order("name"),
     supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
-    supabase.from("produkt_icons").select("icon_id").eq("produkt_id", id),
+    supabase.from("produkt_icons").select("icon_id").eq("produkt_id", id).order("sortierung"),
     supabase.from("produkt_bilder").select("*").eq("produkt_id", id).order("sortierung"),
     supabase.from("preise").select("*").eq("produkt_id", id).order("gueltig_ab", { ascending: false }),
     supabase.from("datenblatt_templates").select("*").order("is_system", { ascending: false }).order("sortierung"),

@@ -46,7 +46,7 @@
 | PROJ-30 | Excel/CSV-Export | Planned | [PROJ-30](PROJ-30-csv-export.md) | 2026-04-17 |
 | PROJ-31 | Benutzerverwaltung | Planned | [PROJ-31](PROJ-31-benutzerverwaltung.md) | 2026-04-17 |
 | PROJ-32 | Inline-Hilfe / FAQ | Planned | [PROJ-32](PROJ-32-inline-hilfe.md) | 2026-04-17 |
-| PROJ-33 | Performance-Optimierung Phase 1 | In Progress | [PROJ-33](PROJ-33-performance-optimierung.md) | 2026-04-21 |
+| PROJ-33 | Performance-Optimierung Phase 1 | Approved | [PROJ-33](PROJ-33-performance-optimierung.md) | 2026-04-21 |
 
 <!-- Add features above this line -->
 

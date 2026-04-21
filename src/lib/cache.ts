@@ -1,19 +1,33 @@
 /**
  * PROJ-33: Cache-Helper für Slowly-Changing-Daten.
  *
- * Wichtig: unstable_cache cached nur das Rückgabewert-JSON. Der Supabase-Client
- * wird INNERHALB der gecachten Funktion instanziiert — Client-Objekte sind
- * selbst nicht cacheable (Funktionen/Promises).
+ * Wichtig: unstable_cache verbietet cookies()/headers() innerhalb der
+ * gecachten Funktion. Deswegen nutzen wir einen cookieless
+ * Service-Role-Client (@supabase/supabase-js), nicht den SSR-Client.
  *
- * Invalidierung via revalidateTag() aus den Server-Actions:
+ * Das ist sicher, weil diese Daten nicht user-spezifisch sind:
+ * - Bereiche, Kategorien und Dashboard-Stats sind identisch für alle
+ *   authentifizierten User.
+ * - Die Auth-Prüfung (User eingeloggt?) passiert in der Proxy-Middleware
+ *   BEVOR die Page-Render-Funktion läuft.
+ *
+ * Invalidierung via revalidateTag(name, "max") aus den Server-Actions:
  *   - "bereiche"  bei bereiche CRUD
  *   - "kategorien" bei kategorien CRUD
  *   - "dashboard" bei Produkt/Preis-Writes
  */
 
 import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { DashboardStats } from "@/lib/types/views";
+
+function cacheClient() {
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Bereiche-Liste (sortiert nach sortierung)
@@ -28,7 +42,7 @@ export type CachedBereich = {
 
 export const getBereiche = unstable_cache(
   async (): Promise<CachedBereich[]> => {
-    const supabase = await createClient();
+    const supabase = cacheClient();
     const { data, error } = await supabase
       .from("bereiche")
       .select("id, name, sortierung, bild_path, farbe")
@@ -58,7 +72,7 @@ export type CachedKategorie = {
 
 export const getKategorien = unstable_cache(
   async (): Promise<CachedKategorie[]> => {
-    const supabase = await createClient();
+    const supabase = cacheClient();
     const { data, error } = await supabase
       .from("kategorien")
       .select("id, name, bereich_id, sortierung, vorschaubild_path")
@@ -80,7 +94,7 @@ export const getKategorien = unstable_cache(
 // ---------------------------------------------------------------------------
 export const getDashboardStats = unstable_cache(
   async (): Promise<DashboardStats | null> => {
-    const supabase = await createClient();
+    const supabase = cacheClient();
     const { data, error } = await supabase
       .from("v_dashboard_stats")
       .select("*")

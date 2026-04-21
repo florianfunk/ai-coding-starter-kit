@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/server";
 
 // Muss Node.js sein — Supabase Storage Downloads benötigen Full-Node-APIs.
 export const runtime = "nodejs";
@@ -26,15 +26,15 @@ type RouteContext = {
 };
 
 export async function GET(_request: NextRequest, ctx: RouteContext) {
-  // ---- 1) Auth-Gate -------------------------------------------------------
-  // Nur authentifizierte Nutzer dürfen Bilder laden.
-  const auth = await createClient();
-  const { data: { user } } = await auth.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // ---- 2) Param-Validierung ----------------------------------------------
+  // Hinweis: Kein Auth-Gate. Next.js' Image-Optimizer ruft diese Route
+  // serverseitig ohne User-Cookies auf — ein Auth-Check würde alle
+  // <Image>-Bilder blockieren. Absicherung stattdessen:
+  //   (a) Bucket-Whitelist unten.
+  //   (b) Storage-Pfade sind UUID+Hash-basiert und nicht erratbar.
+  //   (c) Die Seiten, die solche URLs ausgeben, sind selbst auth-geschützt
+  //       via Proxy-Middleware.
+  //
+  // ---- Param-Validierung --------------------------------------------------
   const { bucket, path: pathSegments } = await ctx.params;
   if (!ALLOWED_BUCKETS.has(bucket)) {
     return NextResponse.json({ error: "Unknown bucket" }, { status: 400 });

@@ -35,7 +35,6 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     bild3: bildProxyUrl("produktbilder", kategorie.bild3_path),
     bild4: bildProxyUrl("produktbilder", kategorie.bild4_path),
   };
-  const primaryBildUrl = bildUrls.bild1 ?? bildUrls.bild2 ?? bildUrls.bild3 ?? bildUrls.bild4 ?? null;
   const hatBilder = Boolean(bildUrls.bild1 || bildUrls.bild2 || bildUrls.bild3 || bildUrls.bild4);
   const iconData = ((iconLinks ?? []) as any[]).map((r) => ({
     label: r.icons?.label ?? "",
@@ -73,26 +72,25 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* HEADER */}
+        {/* HEADER: Infos links, Katalog-Bilder rechts */}
         <Card className="border-2">
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-start justify-between gap-6">
-              <div className="flex items-start gap-5 flex-1">
-                <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0 relative">
-                  {primaryBildUrl ? (
-                    <Image
-                      src={primaryBildUrl}
-                      alt=""
-                      fill
-                      sizes="128px"
-                      className="object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
-                      <ImageIcon className="h-8 w-8" />
-                    </div>
-                  )}
-                </div>
+            <div className="flex justify-end gap-2 mb-4">
+              <Button asChild variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-colors">
+                <Link href={`/kategorien/${id}/bearbeiten`}>
+                  <Pencil className="h-4 w-4 mr-2" /> Bearbeiten
+                </Link>
+              </Button>
+              <Button asChild size="sm" className="shadow-sm">
+                <Link href={`/produkte/neu?kategorie=${id}`}>
+                  <Plus className="h-4 w-4 mr-2" /> Neues Produkt
+                </Link>
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* LINKS: Infos + Icons */}
+              <div className="lg:col-span-3 space-y-4">
                 <div>
                   <Link href={`/bereiche/${kategorie.bereich_id}`} className="text-xs uppercase tracking-widest text-primary font-semibold hover:underline">
                     {bereich?.name}
@@ -100,11 +98,18 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                   <h1 className="text-3xl font-bold tracking-tight mt-1 accent-underline inline-block">
                     {kategorie.name}
                   </h1>
-                  {kategorie.beschreibung && (
-                    <RichTextDisplay html={kategorie.beschreibung} className="text-muted-foreground mt-3 max-w-2xl" />
-                  )}
-                  {iconData.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-4">
+                </div>
+
+                {kategorie.beschreibung && (
+                  <RichTextDisplay html={kategorie.beschreibung} className="text-muted-foreground text-sm" />
+                )}
+
+                {iconData.length > 0 && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                      Eigenschaften
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       {iconData.map((ic, i) => (
                         <div key={i} className="inline-flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border">
                           {ic.url ? (
@@ -121,43 +126,32 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-              <div className="flex gap-2 shrink-0">
-                <Button asChild variant="outline" className="hover:bg-primary hover:text-primary-foreground transition-colors">
-                  <Link href={`/kategorien/${id}/bearbeiten`}>
-                    <Pencil className="h-4 w-4 mr-2" /> Bearbeiten
-                  </Link>
-                </Button>
-                <Button asChild className="shadow-sm">
-                  <Link href={`/produkte/neu?kategorie=${id}`}>
-                    <Plus className="h-4 w-4 mr-2" /> Neues Produkt
-                  </Link>
-                </Button>
+
+              {/* RECHTS: 4-Bild-Katalog-Layout */}
+              <div className="lg:col-span-2">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5" /> Katalog-Bilder
+                </div>
+                {hatBilder ? (
+                  <div className="aspect-[4/2] w-full grid grid-cols-4 grid-rows-2 gap-2 bg-muted/30 rounded-lg border p-2">
+                    <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                    <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
+                    <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                    <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
+                  </div>
+                ) : (
+                  <div className="aspect-[4/2] w-full rounded-lg border-2 border-dashed bg-muted/20 flex flex-col items-center justify-center text-muted-foreground/50">
+                    <ImageIcon className="h-8 w-8 mb-1" />
+                    <span className="text-xs">Keine Bilder hinterlegt</span>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* KATALOG-BILDER: FileMaker-Anordnung */}
-        {hatBilder && (
-          <Card className="border-2">
-            <CardHeader className="py-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" /> Bilder für Katalog-Seite
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-[4/2] w-full max-w-2xl grid grid-cols-4 grid-rows-2 gap-2 bg-muted/30 rounded-lg border p-2">
-                <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
-                <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
-                <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
-                <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* PRODUKTE-TABELLE */}
         <Card className="border-2">

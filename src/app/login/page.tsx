@@ -1,5 +1,5 @@
 import { LoginForm } from "./login-form";
-import { Card, CardContent } from "@/components/ui/card";
+import { Lightbulb } from "lucide-react";
 
 export const metadata = { title: "Anmelden – Lichtstudio" };
 
@@ -10,24 +10,22 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary p-4">
+    <div className="relative flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center font-bold text-primary text-2xl shadow-lg">
-            L
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <div className="brand-logo grid h-12 w-12 place-items-center rounded-2xl text-white">
+            <Lightbulb className="h-6 w-6" />
           </div>
           <div>
-            <p className="text-white font-bold text-xl tracking-wider leading-none">LICHTSTUDIO</p>
-            <p className="text-accent/80 text-[10px] uppercase tracking-widest mt-1">Produktverwaltung</p>
+            <p className="text-xl font-bold leading-none tracking-[-0.01em]">Lichtengros</p>
+            <p className="eyebrow mt-1 !text-[10px]">Produktverwaltung</p>
           </div>
         </div>
-        <Card className="shadow-2xl border-2">
-          <CardContent className="pt-6">
-            <h2 className="text-xl font-bold tracking-tight mb-1">Willkommen zurück</h2>
-            <p className="text-sm text-muted-foreground mb-5">Bitte melde dich an, um fortzufahren.</p>
-            <LoginForm next={params.next} />
-          </CardContent>
-        </Card>
+        <div className="glass-card p-6">
+          <h2 className="mb-1 text-xl font-bold tracking-tight">Willkommen zurück</h2>
+          <p className="mb-5 text-sm text-muted-foreground">Bitte melde dich an, um fortzufahren.</p>
+          <LoginForm next={params.next} />
+        </div>
       </div>
     </div>
   );

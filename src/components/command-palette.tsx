@@ -243,12 +243,12 @@ function CommandPaletteTrigger({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex items-center gap-2 rounded-md bg-primary-foreground/10 px-3 py-1.5 text-sm text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground transition-colors"
+      className="search-pill flex h-[34px] w-[260px] min-w-0 items-center gap-2 rounded-full px-3 text-[13px] text-muted-foreground transition-colors max-lg:w-[180px] max-md:w-[40px] max-md:justify-center max-md:px-0"
       aria-label="Suche öffnen"
     >
-      <Search className="h-4 w-4" />
-      <span className="hidden md:inline">Suche</span>
-      <kbd className="hidden md:inline-flex h-5 items-center gap-0.5 rounded border border-primary-foreground/20 bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium text-primary-foreground/60">
+      <Search className="h-4 w-4 shrink-0" />
+      <span className="flex-1 truncate text-left max-md:hidden">Alles durchsuchen…</span>
+      <kbd className="hidden font-mono text-[10px] text-muted-foreground md:inline-flex">
         <span className="text-xs">&#8984;</span>K
       </kbd>
     </button>

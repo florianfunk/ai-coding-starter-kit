@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,35 +19,37 @@ export function PageHeader({
   breadcrumbs?: Array<{ label: string; href?: string }>;
 }) {
   return (
-    <div className="space-y-3 pb-5 border-b mb-6">
+    <div className="mb-6 space-y-3 pb-5">
       {breadcrumbs && breadcrumbs.length > 0 && (
         <Breadcrumb>
           <BreadcrumbList>
             {breadcrumbs.map((crumb, i) => {
               const isLast = i === breadcrumbs.length - 1;
               return (
-                <BreadcrumbItem key={i}>
+                <Fragment key={i}>
                   {i > 0 && <BreadcrumbSeparator />}
-                  {isLast || !crumb.href ? (
-                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <Link href={crumb.href}>{crumb.label}</Link>
-                    </BreadcrumbLink>
-                  )}
-                </BreadcrumbItem>
+                  <BreadcrumbItem>
+                    {isLast || !crumb.href ? (
+                      <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={crumb.href}>{crumb.label}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
               );
             })}
           </BreadcrumbList>
         </Breadcrumb>
       )}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           {eyebrow && (
-            <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">{eyebrow}</p>
+            <p className="eyebrow mb-1 text-primary">{eyebrow}</p>
           )}
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-          {subtitle && <p className="text-muted-foreground mt-1">{subtitle}</p>}
+          <h1 className="display-lg text-foreground">{title}</h1>
+          {subtitle && <p className="mt-2 text-[15px] text-muted-foreground">{subtitle}</p>}
         </div>
         {children && <div className="flex flex-wrap gap-2 shrink-0">{children}</div>}
       </div>

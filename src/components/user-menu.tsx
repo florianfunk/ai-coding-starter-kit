@@ -28,7 +28,7 @@ export function UserMenu() {
         <Button
           variant="ghost"
           size="icon"
-          className="text-white/80 hover:text-white hover:bg-white/10"
+          className="h-[34px] w-[34px] rounded-full text-foreground hover:bg-muted"
         >
           {pending ? (
             <Loader2 className="h-5 w-5 animate-spin" />

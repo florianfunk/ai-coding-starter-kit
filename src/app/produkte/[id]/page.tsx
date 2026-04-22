@@ -88,11 +88,22 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     return updateProdukt(id, prev, formData);
   }
 
+  const completenessColor =
+    completeness.color === "green"
+      ? "hsl(var(--green))"
+      : completeness.color === "yellow"
+        ? "hsl(var(--warning))"
+        : "hsl(var(--destructive))";
+
+  const ringR = 19;
+  const ringC = 2 * Math.PI * ringR;
+  const ringOffset = ringC * (1 - completeness.percent / 100);
+
   return (
     <AppShell>
-      <div className="space-y-5">
+      <div className="flex flex-col gap-4">
         <Breadcrumb>
-          <BreadcrumbList>
+          <BreadcrumbList className="text-[12.5px] text-muted-foreground">
             <BreadcrumbItem>
               <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
             </BreadcrumbItem>
@@ -123,25 +134,54 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
           </BreadcrumbList>
         </Breadcrumb>
 
-        <div className="flex items-start justify-between gap-4 pb-4 border-b">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-1">Produkt</p>
-            <h1 className="text-3xl font-bold tracking-tight font-mono break-all">{produkt.artikelnummer}</h1>
-            <p className="text-muted-foreground mt-1">{produkt.name ?? "—"}</p>
-          </div>
-          <div className="flex gap-2 shrink-0 items-center flex-wrap justify-end">
-            <CompletenessDetail result={completeness} />
-            <Button asChild variant="outline" className="hover:bg-muted/50">
-              <Link href={`/produkte/${id}/datenblatt`}>
-                <FileText className="h-4 w-4 mr-1" /> Datenblatt
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="hover:bg-muted/50">
-              <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Zurück
-              </Link>
-            </Button>
-            <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
+        <div className="glass-card px-6 py-[22px]">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="min-w-[260px] flex-1 basis-[320px]">
+              <div className="mb-1.5 flex items-center gap-2.5">
+                <span className="eyebrow text-primary">Produkt{bereichRow ? ` · ${bereichRow.name}` : ""}</span>
+              </div>
+              <h1 className="display-lg break-all font-mono text-[34px] tracking-[-0.02em]">
+                {produkt.artikelnummer}
+              </h1>
+              <p className="mt-1.5 text-[14px] text-muted-foreground">{produkt.name ?? "—"}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className="relative h-12 w-12">
+                  <svg width={48} height={48} viewBox="0 0 48 48" className="-rotate-90">
+                    <circle cx={24} cy={24} r={ringR} stroke="hsl(var(--hairline))" strokeWidth={5} fill="none" />
+                    <circle
+                      cx={24}
+                      cy={24}
+                      r={ringR}
+                      stroke={completenessColor}
+                      strokeWidth={5}
+                      fill="none"
+                      strokeDasharray={ringC}
+                      strokeDashoffset={ringOffset}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 grid place-items-center text-[12px] font-bold tracking-[-0.015em]">
+                    {completeness.percent}
+                  </div>
+                </div>
+                <CompletenessDetail result={completeness} className="text-[12.5px]" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/produkte/${id}/datenblatt`}>
+                    <FileText className="mr-1 h-3.5 w-3.5" /> Datenblatt
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={kategorieRow ? `/kategorien/${kategorieRow.id}` : "/produkte"}>
+                    <ChevronLeft className="mr-1 h-3.5 w-3.5" /> Zurück
+                  </Link>
+                </Button>
+                <ProduktTopActions id={id} artikelnummer={produkt.artikelnummer} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -158,7 +198,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             submitLabel="Speichern"
           />
 
-          <div className="mt-8 pt-8 border-t-2 border-dashed border-muted-foreground/20 space-y-8">
+          <div className="mt-8 pt-8 border-t border-dashed border-muted-foreground/20 space-y-8">
             <DatenblattSection
               produktId={id}
               templates={templatesTyped}

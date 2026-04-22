@@ -1,11 +1,16 @@
-import DOMPurify from "isomorphic-dompurify";
 import { ALLOWED_COLOR_HEXES } from "./colors";
 
-const ALLOWED_TAGS = ["p", "br", "strong", "em", "u", "ul", "ol", "li", "span"];
-const ALLOWED_ATTR = ["style", "class"];
+// Reine String-basierte Sanitization (ohne DOMPurify/jsdom).
+// Gründe:
+//  - isomorphic-dompurify crashte zuverlässig im Vercel-Production-Runtime.
+//  - Wir haben eine extrem enge Allow-List (10 Tags, 2 Attribute) und
+//    nur 3 interne, vertrauenswürdige Nutzer.
+//  - Tiptap produziert vorhersagbares HTML; wir müssen nicht gegen
+//    beliebigen fremden Input härten.
 
-const COLOR_RE = /^color:\s*(#[0-9A-Fa-f]{6})\s*;?$/;
+const ALLOWED_TAGS = new Set(["p", "br", "strong", "em", "u", "ul", "ol", "li", "span"]);
 const ALLOWED_CLASSES = new Set(["text-sm"]);
+const COLOR_RE = /^color:\s*(#[0-9A-Fa-f]{6})\s*;?$/;
 
 function cleanStyle(style: string): string {
   const match = style.replace(/\s+/g, " ").trim().match(COLOR_RE);
@@ -21,38 +26,47 @@ function cleanClass(cls: string): string {
     .join(" ");
 }
 
+// Tags, die nicht in der Allow-List sind: Inhalt behalten, Tag entfernen.
+// Self-closing Varianten (br, img …) komplett weg.
+function stripDisallowedTags(html: string): string {
+  // Alle HTML-Kommentare raus
+  let out = html.replace(/<!--[\s\S]*?-->/g, "");
+  // <script>/<style>-Inhalt komplett entfernen (nicht nur Tag — auch Body)
+  out = out.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // Alle übrigen Tags durchgehen
+  out = out.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, (full, tag: string) => {
+    if (ALLOWED_TAGS.has(tag.toLowerCase())) return full;
+    return ""; // Tag entfernen, Inhalt bleibt
+  });
+  return out;
+}
+
+// style="..." und class="..." pro Tag filtern. Andere Attribute entfernen.
+function filterAttributes(html: string): string {
+  return html.replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (_full, tag: string, attrs: string) => {
+    if (!ALLOWED_TAGS.has(tag.toLowerCase())) return _full; // strip... hat's schon
+    let safeAttrs = "";
+    // style
+    const styleMatch = attrs.match(/\sstyle\s*=\s*"([^"]*)"/i);
+    if (styleMatch) {
+      const safe = cleanStyle(styleMatch[1]);
+      if (safe) safeAttrs += ` style="${safe}"`;
+    }
+    // class
+    const classMatch = attrs.match(/\sclass\s*=\s*"([^"]*)"/i);
+    if (classMatch) {
+      const safe = cleanClass(classMatch[1]);
+      if (safe) safeAttrs += ` class="${safe}"`;
+    }
+    // self-closing beibehalten, wenn Original so war
+    const selfClose = /\/\s*$/.test(attrs) ? " /" : "";
+    return `<${tag}${safeAttrs}${selfClose}>`;
+  });
+}
+
 export function sanitizeRichTextHtml(input: string | null | undefined): string {
   if (!input) return "";
-  const cleaned = DOMPurify.sanitize(input, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    KEEP_CONTENT: true,
-  });
-  if (typeof window === "undefined") {
-    return cleaned
-      .replace(/style="([^"]*)"/g, (_, style) => {
-        const safe = cleanStyle(style);
-        return safe ? `style="${safe}"` : "";
-      })
-      .replace(/class="([^"]*)"/g, (_, cls) => {
-        const safe = cleanClass(cls);
-        return safe ? `class="${safe}"` : "";
-      })
-      .replace(/\s+>/g, ">");
-  }
-  const tpl = document.createElement("template");
-  tpl.innerHTML = cleaned;
-  tpl.content.querySelectorAll<HTMLElement>("[style]").forEach((el) => {
-    const safe = cleanStyle(el.getAttribute("style") || "");
-    if (safe) el.setAttribute("style", safe);
-    else el.removeAttribute("style");
-  });
-  tpl.content.querySelectorAll<HTMLElement>("[class]").forEach((el) => {
-    const safe = cleanClass(el.getAttribute("class") || "");
-    if (safe) el.setAttribute("class", safe);
-    else el.removeAttribute("class");
-  });
-  return tpl.innerHTML;
+  return filterAttributes(stripDisallowedTags(input));
 }
 
 export function isHtmlContent(value: string | null | undefined): boolean {

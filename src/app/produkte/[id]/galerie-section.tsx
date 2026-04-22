@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Image as ImageIcon } from "lucide-react";
 import { SortableGallery, type GalleryImage } from "@/components/sortable-gallery";
 import {
   uploadProduktBild,
@@ -91,11 +91,30 @@ export function GalerieSection({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Galerie ({list.length}/12)</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <section id="section-images" className="glass-card overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+        <div
+          className="grid h-8 w-8 place-items-center rounded-[9px]"
+          style={{
+            background: "hsl(var(--violet) / 0.18)",
+            color: "hsl(var(--violet))",
+          }}
+        >
+          <ImageIcon className="h-[15px] w-[15px]" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
+            Galerie
+            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+              {list.length} / 12 Slots
+            </span>
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            Hauptbild, Detailaufnahmen, Anwendungsbilder
+          </div>
+        </div>
+      </div>
+      <div className="space-y-4 p-4">
         <Input
           type="file"
           accept="image/jpeg,image/png,image/webp"
@@ -111,7 +130,7 @@ export function GalerieSection({
           onDelete={handleDelete}
           disabled={pending}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

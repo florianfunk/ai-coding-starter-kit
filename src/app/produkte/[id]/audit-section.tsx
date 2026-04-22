@@ -1,20 +1,21 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { History } from "lucide-react";
 import Link from "next/link";
 
-const ACTION_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  create: { label: "Erstellt", variant: "default" },
-  update: { label: "Bearbeitet", variant: "secondary" },
-  delete: { label: "Geloescht", variant: "destructive" },
+const ACTION_LABEL: Record<string, string> = {
+  create: "Erstellt",
+  update: "Bearbeitet",
+  delete: "Gelöscht",
 };
 
 function formatTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("de-DE", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -31,37 +32,48 @@ export async function AuditSection({ produktId }: { produktId: string }) {
   if (!entries || entries.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <History className="h-4 w-4" />
-          Letzte Aenderungen
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ul className="space-y-2">
-          {entries.map((entry) => {
-            const badge = ACTION_BADGE[entry.action] ?? ACTION_BADGE.update;
-            return (
-              <li key={entry.id} className="flex items-center gap-3 text-sm">
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {formatTime(entry.created_at)}
-                </span>
-                <Badge variant={badge.variant} className="text-xs">{badge.label}</Badge>
-                <span className="text-muted-foreground truncate">
-                  {entry.user_email ?? "System"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
+    <section id="section-history" className="glass-card overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+        <div className="grid h-8 w-8 place-items-center rounded-[9px] bg-muted text-muted-foreground">
+          <History className="h-[15px] w-[15px]" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
+            Historie
+            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+              {entries.length}
+            </span>
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            Letzte Änderungen an diesem Produkt
+          </div>
+        </div>
         <Link
-          href={`/aktivitaet?tabelle=produkte`}
-          className="text-xs text-primary hover:underline mt-3 inline-block"
+          href="/aktivitaet?tabelle=produkte"
+          className="text-[12px] text-muted-foreground hover:text-primary hover:underline"
         >
-          Alle Aenderungen anzeigen
+          Alle anzeigen →
         </Link>
-      </CardContent>
-    </Card>
+      </div>
+      <ul className="divide-y divide-border/60">
+        {entries.map((entry) => {
+          const label = ACTION_LABEL[entry.action] ?? "Aktion";
+          const isCreate = entry.action === "create";
+          const isDelete = entry.action === "delete";
+          const pillClass = isCreate ? "pill-ok" : isDelete ? "pill-bad" : "pill-accent";
+          return (
+            <li key={entry.id} className="flex items-center gap-3 px-5 py-3 text-[13px]">
+              <span className={`pill ${pillClass}`}>{label}</span>
+              <span className="font-mono text-[12px] tabular-nums text-muted-foreground">
+                {formatTime(entry.created_at)}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {entry.user_email ?? "System"}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

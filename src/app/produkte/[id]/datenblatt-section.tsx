@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Upload, X, Image as ImageIcon } from "lucide-react";
@@ -78,14 +78,24 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
   const canvasH = current ? current.page_height_cm * scale : 0;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between">
-        <CardTitle>Datenblatt-Vorlage</CardTitle>
-        <a href="/datenblatt-vorlagen" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+    <section id="section-datasheet" className="glass-card overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+        <div
+          className="grid h-8 w-8 place-items-center rounded-[9px] bg-primary/12 text-primary"
+        >
+          <Edit3 className="h-[15px] w-[15px]" />
+        </div>
+        <div className="flex-1">
+          <div className="text-[15px] font-semibold tracking-[-0.012em]">Datenblatt-Vorlage</div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            Bilder-Slots für den PDF-Export
+          </div>
+        </div>
+        <a href="/datenblatt-vorlagen" className="text-[12px] text-muted-foreground hover:text-primary hover:underline">
           Vorlagen verwalten →
         </a>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+      <div className="space-y-4 p-5">
         {/* Template chooser */}
         <div className="flex flex-wrap gap-2">
           {templates.map((t) => {
@@ -216,7 +226,7 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

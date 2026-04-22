@@ -2,13 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Euro } from "lucide-react";
 import { addPreis, deletePreis, type PreisInput } from "../preise-actions";
 
 type Preis = {
@@ -48,28 +46,46 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
   const fmt = (v: number | null) => v != null ? `${v.toFixed(2)} €` : "—";
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
-          Preise
-          <Badge variant="secondary">{list.length}</Badge>
-        </CardTitle>
+    <section id="section-prices" className="glass-card overflow-hidden">
+      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+        <div
+          className="grid h-8 w-8 place-items-center rounded-[9px]"
+          style={{
+            background: "hsl(var(--warning) / 0.18)",
+            color: "hsl(var(--warning))",
+          }}
+        >
+          <Euro className="h-[15px] w-[15px]" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
+            Preise
+            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+              {list.length} {list.length === 1 ? "Eintrag" : "Einträge"}
+            </span>
+          </div>
+          {currentId && (
+            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+              Aktueller Listenpreis: {fmt(list.find((p) => p.id === currentId)?.listenpreis ?? null)}
+            </div>
+          )}
+        </div>
         <Button size="sm" variant={showForm ? "outline" : "default"} onClick={() => setShowForm((v) => !v)}>
-          <Plus className="mr-1 h-4 w-4" /> {showForm ? "Abbrechen" : "Neuer Preis"}
+          <Plus className="h-3.5 w-3.5" /> {showForm ? "Abbrechen" : "Neuer Preis"}
         </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      </div>
+      <div className="space-y-3 p-4">
         {showForm && <PreisForm onSubmit={add} pending={pending} />}
 
-        <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-hidden rounded-[10px] border border-border/60">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>Gültig ab</TableHead>
-                <TableHead className="text-right">EK Lichtengros</TableHead>
-                <TableHead className="text-right">EK Eisenkeil</TableHead>
-                <TableHead className="text-right font-semibold">Listenpreis</TableHead>
-                <TableHead>Status</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-4 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Gültig ab</TableHead>
+                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">EK Lichtengros</TableHead>
+                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">EK Eisenkeil</TableHead>
+                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Listenpreis</TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">Status</TableHead>
                 <TableHead className="w-16" />
               </TableRow>
             </TableHeader>
@@ -79,7 +95,7 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
               )}
               {list.map((p) => (
                 <TableRow key={p.id} className={p.id === currentId ? "bg-[hsl(var(--green))]/10" : ""}>
-                  <TableCell className="font-mono text-[13px] tabular-nums">{p.gueltig_ab}</TableCell>
+                  <TableCell className="pl-4 font-mono text-[13px] tabular-nums">{p.gueltig_ab}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{fmt(p.ek)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">{fmt(p.ek_eisenkeil)}</TableCell>
                   <TableCell className="text-right font-mono font-semibold tabular-nums">{fmt(p.listenpreis)}</TableCell>
@@ -102,8 +118,8 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
             </TableBody>
           </Table>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 

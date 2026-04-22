@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
@@ -36,14 +36,28 @@ type SectionId = (typeof SECTION_IDS)[number];
 
 const DEFAULT_OPEN: SectionId[] = ["datenblatt"];
 
-const SECTION_META: Record<SectionId, { label: string; icon: React.ElementType; color: string }> = {
-  datenblatt: { label: "Datenblatt", icon: FileText, color: "border-l-violet-500" },
-  elektrisch: { label: "Elektrotechnisch", icon: Zap, color: "border-l-amber-500" },
-  lichttechnisch: { label: "Lichttechnisch", icon: Sun, color: "border-l-yellow-400" },
-  mechanisch: { label: "Mechanisch", icon: Wrench, color: "border-l-emerald-500" },
-  thermisch: { label: "Thermisch & Sonstiges", icon: Thermometer, color: "border-l-red-400" },
-  icons: { label: "Icons", icon: Palette, color: "border-l-primary" },
+const SECTION_META: Record<SectionId, { label: string; icon: LucideIcon; colorVar: string }> = {
+  datenblatt: { label: "Datenblatt", icon: FileText, colorVar: "--violet" },
+  elektrisch: { label: "Elektrotechnisch", icon: Zap, colorVar: "--warning" },
+  lichttechnisch: { label: "Lichttechnisch", icon: Sun, colorVar: "--warning" },
+  mechanisch: { label: "Mechanisch", icon: Wrench, colorVar: "--green" },
+  thermisch: { label: "Thermisch & Sonstiges", icon: Thermometer, colorVar: "--destructive" },
+  icons: { label: "Icons", icon: Palette, colorVar: "--primary" },
 };
+
+function SectionBadge({ colorVar, Icon }: { colorVar: string; Icon: LucideIcon }) {
+  return (
+    <div
+      className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]"
+      style={{
+        background: `hsl(var(${colorVar}) / 0.15)`,
+        color: `hsl(var(${colorVar}))`,
+      }}
+    >
+      <Icon className="h-[15px] w-[15px]" />
+    </div>
+  );
+}
 
 function loadOpenSections(): string[] {
   if (typeof window === "undefined") return DEFAULT_OPEN;
@@ -60,24 +74,25 @@ function saveOpenSections(sections: string[]) {
   } catch { /* ignore */ }
 }
 
-/** Check if a section has any filled fields in defaultValues */
-function isSectionFilled(sectionId: SectionId, defaultValues: Record<string, any>, iconCount: number): boolean {
-  if (sectionId === "icons") return iconCount > 0;
+/** Count filled vs total fields per section, for the header progress bar */
+function sectionProgress(sectionId: SectionId, defaultValues: Record<string, any>, iconCount: number) {
+  const check = (v: unknown) => v != null && v !== "" && v !== false;
+  if (sectionId === "icons") return { done: Math.min(iconCount, 10), total: 10 };
   if (sectionId === "datenblatt") {
-    return !!(defaultValues.datenblatt_titel || defaultValues.datenblatt_text || defaultValues.datenblatt_text_2 || defaultValues.datenblatt_text_3);
+    const keys = ["datenblatt_titel", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
+    return { done: keys.filter((k) => check(defaultValues[k])).length, total: keys.length };
   }
-  // For field-group sections, check if any field has a value
   const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
+  let done = 0;
+  let total = 0;
   for (const tab of groupTabs) {
     const group = PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab);
     if (group) {
-      for (const f of group.fields) {
-        const val = defaultValues[f.col];
-        if (val != null && val !== "" && val !== false) return true;
-      }
+      total += group.fields.length;
+      for (const f of group.fields) if (check(defaultValues[f.col])) done += 1;
     }
   }
-  return false;
+  return { done, total };
 }
 
 type Bereich = { id: string; name: string };
@@ -162,9 +177,20 @@ export function ProduktForm({
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
       {/* Grunddaten -- always visible, not collapsible */}
-      <Card className="border-l-4 border-l-blue-500">
-        <CardContent className="pt-6">
-          <h3 className="text-lg font-semibold mb-4 tracking-tight">Grunddaten</h3>
+      <section id="section-base" className="glass-card">
+        <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
+          <SectionBadge colorVar="--primary" Icon={FileText} />
+          <div className="flex-1">
+            <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
+              Grunddaten
+              <span className="pill pill-accent">Pflicht</span>
+            </div>
+            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+              Artikelnummer, Name, Bereich, Kategorie, Hauptbild
+            </div>
+          </div>
+        </div>
+        <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="artikelnummer">Artikelnummer *</Label>
@@ -221,8 +247,8 @@ export function ProduktForm({
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Toggle all button */}
       <div className="flex justify-end">
@@ -235,13 +261,15 @@ export function ProduktForm({
       {/* Accordion sections */}
       <Accordion type="multiple" value={openSections} onValueChange={handleSectionsChange} className="space-y-3">
         {/* Datenblatt */}
-        <AccordionItem value="datenblatt" className="border rounded-lg overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-            <span className="flex items-center gap-2">
-              <SectionIndicator filled={isSectionFilled("datenblatt", defaultValues, iconIds.length)} />
-              <FileText className="h-4 w-4 text-violet-500" />
-              <span className="font-semibold">Datenblatt</span>
-            </span>
+        <AccordionItem id="section-datenblatt" value="datenblatt" className="glass-card overflow-hidden border-0">
+          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+            <SectionHeader
+              colorVar={SECTION_META.datenblatt.colorVar}
+              Icon={FileText}
+              label="Datenblatt"
+              required
+              progress={sectionProgress("datenblatt", defaultValues, iconIds.length)}
+            />
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
@@ -267,23 +295,23 @@ export function ProduktForm({
           </AccordionContent>
         </AccordionItem>
 
-        {/* Elektrotechnisch */}
+        {/* Elektrotechnisch, Lichttechnisch, Mechanisch */}
         {PRODUKT_FIELD_GROUPS.filter((g) => g.tab !== "thermisch" && g.tab !== "sonstiges").map((group) => {
           const meta = SECTION_META[group.tab as SectionId];
           if (!meta) return null;
-          const SIcon = meta.icon;
+          const progress = sectionProgress(group.tab as SectionId, defaultValues, iconIds.length);
           return (
-            <AccordionItem key={group.tab} value={group.tab} className="border rounded-lg overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="flex items-center gap-2">
-                  <SectionIndicator filled={isSectionFilled(group.tab as SectionId, defaultValues, iconIds.length)} />
-                  <SIcon className={`h-4 w-4 ${meta.color.replace("border-l-", "text-")}`} />
-                  <span className="font-semibold">{meta.label}</span>
-                  <span className="text-xs text-muted-foreground ml-1">({group.fields.length} Felder)</span>
-                </span>
+            <AccordionItem
+              key={group.tab}
+              id={`section-${group.tab}`}
+              value={group.tab}
+              className="glass-card overflow-hidden border-0"
+            >
+              <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+                <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {group.fields.map((f) => (
                     <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
                   ))}
@@ -294,17 +322,21 @@ export function ProduktForm({
         })}
 
         {/* Thermisch & Sonstiges (merged) */}
-        <AccordionItem value="thermisch" className="border rounded-lg overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-            <span className="flex items-center gap-2">
-              <SectionIndicator filled={isSectionFilled("thermisch", defaultValues, iconIds.length)} />
-              <Thermometer className="h-4 w-4 text-red-400" />
-              <span className="font-semibold">Thermisch & Sonstiges</span>
-              <span className="text-xs text-muted-foreground ml-1">({(thermischGroup?.fields.length ?? 0) + (sonstigesGroup?.fields.length ?? 0)} Felder)</span>
-            </span>
+        <AccordionItem
+          id="section-thermisch"
+          value="thermisch"
+          className="glass-card overflow-hidden border-0"
+        >
+          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+            <SectionHeader
+              colorVar={SECTION_META.thermisch.colorVar}
+              Icon={Thermometer}
+              label="Thermisch & Sonstiges"
+              progress={sectionProgress("thermisch", defaultValues, iconIds.length)}
+            />
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {thermischGroup?.fields.map((f) => (
                 <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />
               ))}
@@ -316,16 +348,19 @@ export function ProduktForm({
         </AccordionItem>
 
         {/* Icons */}
-        <AccordionItem value="icons" className="border rounded-lg overflow-hidden">
-          <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-            <span className="flex items-center gap-2">
-              <SectionIndicator filled={iconIds.length > 0} />
-              <Palette className="h-4 w-4 text-primary" />
-              <span className="font-semibold">Icons</span>
-              {iconIds.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">{iconIds.length}</span>
-              )}
-            </span>
+        <AccordionItem
+          id="section-icons"
+          value="icons"
+          className="glass-card overflow-hidden border-0"
+        >
+          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+            <SectionHeader
+              colorVar={SECTION_META.icons.colorVar}
+              Icon={Palette}
+              label="Icons & Tags"
+              progress={sectionProgress("icons", defaultValues, iconIds.length)}
+              countBadge={iconIds.length}
+            />
           </AccordionTrigger>
           <AccordionContent className="px-4 pb-4">
             <IconPicker
@@ -352,14 +387,52 @@ export function ProduktForm({
   );
 }
 
-function SectionIndicator({ filled }: { filled: boolean }) {
+function SectionHeader({
+  colorVar,
+  Icon,
+  label,
+  progress,
+  required,
+  countBadge,
+}: {
+  colorVar: string;
+  Icon: LucideIcon;
+  label: string;
+  progress: { done: number; total: number };
+  required?: boolean;
+  countBadge?: number;
+}) {
+  const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+  const stateVar = pct >= 100 ? "--green" : pct >= 50 ? "--warning" : "--destructive";
+  const isEmpty = progress.done === 0;
   return (
-    <span
-      className={`inline-block h-2 w-2 rounded-full shrink-0 ${filled ? "bg-emerald-500" : "bg-gray-300"}`}
-      aria-label={filled ? "Ausgefullt" : "Leer"}
-    />
+    <div className="flex flex-1 items-center gap-3">
+      <SectionBadge colorVar={colorVar} Icon={Icon} />
+      <div className="min-w-0 flex-1 text-left">
+        <div className="flex flex-wrap items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.012em]">
+          {label}
+          {required && <span className="pill pill-accent">Pflicht</span>}
+          {isEmpty && <span className="pill pill-warn">Leer</span>}
+          {countBadge != null && countBadge > 0 && (
+            <span className="pill pill-accent">{countBadge}</span>
+          )}
+        </div>
+        <div className="mt-0.5 font-mono text-[11.5px] tabular-nums text-muted-foreground">
+          {progress.done} / {progress.total} Felder · {pct}%
+        </div>
+      </div>
+      <div className="hidden w-[100px] shrink-0 sm:block">
+        <div className="prog" style={{ height: 4 }}>
+          <div
+            className="prog-fill"
+            style={{ width: `${pct}%`, background: `hsl(var(${stateVar}))` }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
+
 
 function FieldInput({ field, defaultValue }: { field: { col: string; label: string; type: string; unit?: string }; defaultValue: any }) {
   const tooltip = FIELD_TOOLTIPS[field.col];

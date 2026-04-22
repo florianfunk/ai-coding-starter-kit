@@ -92,7 +92,10 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
               {/* LINKS: Infos + Icons */}
               <div className="lg:col-span-3 space-y-4">
                 <div>
-                  <Link href={`/bereiche/${kategorie.bereich_id}`} className="text-xs uppercase tracking-widest text-primary font-semibold hover:underline">
+                  <Link
+                    href={`/bereiche/${kategorie.bereich_id}`}
+                    className="block text-xs uppercase tracking-widest text-primary font-semibold hover:underline"
+                  >
                     {bereich?.name}
                   </Link>
                   <h1 className="text-3xl font-bold tracking-tight mt-1 accent-underline inline-block">

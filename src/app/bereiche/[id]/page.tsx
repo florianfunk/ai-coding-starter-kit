@@ -53,48 +53,51 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* BEREICH HEADER — FileMaker-style */}
+        {/* BEREICH HEADER */}
         <Card className="border-2">
-          <CardContent className="pt-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_auto] gap-6 items-end">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Name</p>
+          <CardContent className="pt-6 space-y-5">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+              {/* Name — Hauptelement */}
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Name</p>
                 <h1 className="text-3xl font-bold tracking-tight accent-underline inline-block">
                   {bereich.name}
                 </h1>
               </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Sortierung</p>
-                <div className="text-3xl font-bold tracking-tight inline-block accent-underline min-w-16 text-center px-2">
+
+              {/* Farbe — kompakt: Swatch + Hex */}
+              <div className="shrink-0">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Farbe</p>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-8 w-8 rounded-md border shadow-inner shrink-0"
+                    style={{ backgroundColor: bereich.farbe || "transparent" }}
+                    title={bereich.farbe ?? "keine Farbe"}
+                  />
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {bereich.farbe ?? "—"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Sortierung — kompakt rechts */}
+              <div className="shrink-0">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Sortierung</p>
+                <div className="text-lg font-semibold tabular-nums tracking-tight">
                   {bereich.sortierung}
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr] gap-6 items-center">
-              <div>
-                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Farbfeld</p>
-                <div className="font-mono border-b-4 border-accent pb-1 text-lg inline-block min-w-32">
-                  {bereich.farbe ?? <span className="text-muted-foreground">—</span>}
-                </div>
-              </div>
-              <div
-                className="h-14 rounded-lg border-2 flex items-center justify-center shadow-inner"
-                style={{ backgroundColor: bereich.farbe || "transparent" }}
-              >
-                {!bereich.farbe && <span className="text-xs text-muted-foreground">keine Farbe</span>}
-              </div>
-            </div>
-
             {bereich.beschreibung && (
-              <div>
-                <p className="text-xs uppercase tracking-widest text-primary font-semibold mb-2">Beschreibung</p>
+              <div className="pt-2 border-t">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Beschreibung</p>
                 <RichTextDisplay html={bereich.beschreibung} />
               </div>
             )}
 
-            <div className="flex gap-2 pt-4 border-t">
-              <Button asChild className="shadow-sm">
+            <div className="flex gap-2 pt-2">
+              <Button asChild size="sm" className="shadow-sm">
                 <Link href={`/bereiche/${id}/bearbeiten`}>
                   <Pencil className="h-4 w-4 mr-2" /> Bereich bearbeiten
                 </Link>

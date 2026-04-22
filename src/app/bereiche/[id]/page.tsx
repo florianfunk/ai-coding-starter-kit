@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
@@ -112,12 +111,11 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
             <CardContent>
               <div className="aspect-[4/3] rounded-lg border-2 bg-muted overflow-hidden relative">
                 {bereichBildUrl ? (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
                     src={bereichBildUrl}
                     alt=""
-                    fill
-                    sizes="(max-width: 768px) 100vw, 280px"
-                    className="object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">

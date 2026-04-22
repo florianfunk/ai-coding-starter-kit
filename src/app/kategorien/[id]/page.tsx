@@ -113,6 +113,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                               alt={ic.label}
                               width={20}
                               height={20}
+                              unoptimized
                               className="h-5 w-5 object-contain"
                             />
                           ) : null}
@@ -199,6 +200,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                             alt=""
                             width={40}
                             height={40}
+                            unoptimized
                             className="h-10 w-10 rounded object-cover border"
                           />
                         ) : (

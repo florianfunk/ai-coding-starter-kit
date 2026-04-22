@@ -203,6 +203,7 @@ export function CompareTable({
                       alt={(p.name as string) ?? "Produkt"}
                       width={40}
                       height={40}
+                      unoptimized
                       className="w-full h-full object-cover"
                     />
                   </div>

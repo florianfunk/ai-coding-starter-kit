@@ -182,23 +182,38 @@ export function ProdukteTable({
     <>
       <Table>
         <TableHeader>
-          <TableRow className="bg-primary text-primary-foreground hover:bg-primary">
-            <TableHead className="w-8 text-primary-foreground">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-8 pl-5">
               <Checkbox
                 checked={allSelected ? true : someSelected ? "indeterminate" : false}
                 onCheckedChange={toggleAll}
-                aria-label="Alle Produkte auswaehlen"
-                className="border-primary-foreground/50 data-[state=checked]:bg-primary-foreground data-[state=checked]:text-primary data-[state=indeterminate]:bg-primary-foreground data-[state=indeterminate]:text-primary"
+                aria-label="Alle Produkte auswählen"
               />
             </TableHead>
-            <TableHead className="w-[72px] text-primary-foreground font-semibold">Bild</TableHead>
-            <TableHead className="text-primary-foreground font-semibold">Artikelnummer</TableHead>
-            <TableHead className="text-primary-foreground font-semibold">Name</TableHead>
-            <TableHead className="text-primary-foreground font-semibold">Bereich</TableHead>
-            <TableHead className="text-primary-foreground font-semibold">Kategorie</TableHead>
-            <TableHead className="text-right text-primary-foreground font-semibold">Sort</TableHead>
-            <TableHead className="text-primary-foreground font-semibold">Status</TableHead>
-            <TableHead className="text-primary-foreground font-semibold min-w-[140px]">Vollstaendigkeit</TableHead>
+            <TableHead className="w-[72px] text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Bild
+            </TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Artikelnummer
+            </TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Name
+            </TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Bereich
+            </TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Kategorie
+            </TableHead>
+            <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Sort
+            </TableHead>
+            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Status
+            </TableHead>
+            <TableHead className="min-w-[140px] text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+              Vollständigkeit
+            </TableHead>
             <TableHead className="w-10" />
             <TableHead className="w-12" />
           </TableRow>
@@ -565,16 +580,9 @@ function ProduktRow({
           {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : p.artikel_bearbeitet ? (
-            <Badge className="bg-success text-success-foreground hover:bg-success/80 text-[10px] transition-colors">
-              bearbeitet
-            </Badge>
+            <span className="pill pill-ok">bearbeitet</span>
           ) : (
-            <Badge
-              variant="outline"
-              className="text-[10px] border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              unbearbeitet
-            </Badge>
+            <span className="pill pill-bad">unbearbeitet</span>
           )}
         </button>
       </TableCell>

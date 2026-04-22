@@ -60,8 +60,10 @@ export function ColorPalettePicker({ value, onChange }: Props) {
                     onClick={() => select(farbe.hex)}
                     title={`${farbe.name} · ${farbe.hex}`}
                     className={cn(
-                      "relative aspect-square rounded-md border-2 transition-all hover:scale-110 hover:shadow-md",
-                      isActive ? "border-foreground ring-2 ring-foreground/30" : "border-transparent hover:border-muted-foreground/30",
+                      "relative aspect-square rounded-[8px] border transition-all hover:scale-110 hover:shadow-md",
+                      isActive
+                        ? "border-foreground ring-2 ring-foreground/30"
+                        : "border-border/60 hover:border-foreground/30",
                     )}
                     style={{ backgroundColor: farbe.hex }}
                     aria-label={farbe.name}

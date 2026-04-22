@@ -1,11 +1,8 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, Pencil, ChevronRight, Lock, LayoutTemplate } from "lucide-react";
+import { Plus, FileText, Pencil, ChevronRight, Lock } from "lucide-react";
 import { DeleteTemplateButton } from "./delete-button";
 import { EmptyState } from "@/components/empty-state";
 import { DuplicateButton } from "./duplicate-button";
@@ -24,75 +21,111 @@ export default async function TemplatesPage() {
 
   return (
     <AppShell>
-      <PageHeader
-        eyebrow="Layout"
-        title="Datenblatt-Vorlagen"
-        subtitle="Layouts mit Slots für Bilder, Cutting-Diagramme und Energielabel"
-      >
-        <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
-          <Link href="/datenblatt-vorlagen/neu">
-            <Plus className="mr-2 h-4 w-4" /> Neue Vorlage
-          </Link>
-        </Button>
-      </PageHeader>
-
-      {(templates ?? []).length === 0 && (
-        <EmptyState
-          icon={FileText}
-          title="Keine Vorlagen"
-          description="Erstellen Sie eine Datenblatt-Vorlage mit Slots fuer Bilder, Diagramme und Energielabel."
-          actionLabel="Vorlage anlegen"
-          actionHref="/datenblatt-vorlagen/neu"
-        />
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {(templates ?? []).map((t: any) => (
-          <Card key={t.id} className="group card-hover border-2 flex flex-col">
-            <CardContent className="p-4 space-y-3 flex-1 flex flex-col">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  {t.is_system
-                    ? <Lock className="h-3.5 w-3.5 text-primary shrink-0" />
-                    : <FileText className="h-3.5 w-3.5 text-accent shrink-0" />
-                  }
-                  <h3 className="font-semibold truncate flex-1 group-hover:text-primary transition-colors">{t.name}</h3>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs">
-                  {t.is_system
-                    ? <Badge className="bg-primary/10 text-primary hover:bg-primary/20 text-[10px]">System</Badge>
-                    : <Badge className="bg-accent/20 text-accent-foreground hover:bg-accent/30 text-[10px]">Custom</Badge>}
-                  <span className="text-muted-foreground">{(t.slots as Slot[]).length} Slots</span>
-                  <span className="text-muted-foreground">· {t.page_width_cm}×{t.page_height_cm} cm</span>
-                </div>
-              </div>
-
-              <Link href={`/datenblatt-vorlagen/${t.id}`} className="block mx-auto transition-transform hover:scale-[1.02]">
-                <TemplatePreview
-                  pageWidth={Number(t.page_width_cm)}
-                  pageHeight={Number(t.page_height_cm)}
-                  slots={t.slots as Slot[]}
-                  targetWidthPx={260}
-                />
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span>Assets</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground">Datenblatt-Vorlagen</span>
+          </div>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <h1 className="display-lg">Datenblatt-Vorlagen</h1>
+              <p className="mt-2 max-w-[560px] text-[15px] text-muted-foreground">
+                Layouts mit Slots für Bilder, Cutting-Diagramme und Energielabel.
+              </p>
+            </div>
+            <Button asChild size="sm">
+              <Link href="/datenblatt-vorlagen/neu">
+                <Plus className="h-3.5 w-3.5" /> Neue Vorlage
               </Link>
+            </Button>
+          </div>
+        </div>
 
-              <div className="flex items-center justify-between pt-2 border-t mt-auto">
-                <div className="flex gap-0.5">
-                  <DuplicateButton id={t.id} />
-                  {!t.is_system && <DeleteTemplateButton id={t.id} name={t.name} />}
-                </div>
-                <Button asChild size="sm" variant="ghost" className="hover:bg-primary/10 hover:text-primary">
-                  <Link href={`/datenblatt-vorlagen/${t.id}`}>
-                    {t.is_system
-                      ? "Ansehen"
-                      : <><Pencil className="h-3.5 w-3.5 mr-1" />Bearbeiten</>}
-                    <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+        {(templates ?? []).length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="Keine Vorlagen"
+            description="Erstellen Sie eine Datenblatt-Vorlage mit Slots für Bilder, Diagramme und Energielabel."
+            actionLabel="Vorlage anlegen"
+            actionHref="/datenblatt-vorlagen/neu"
+          />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {(templates ?? []).map((t: any) => (
+              <div key={t.id} className="glass-card card-hover group flex flex-col">
+                <div className="flex flex-1 flex-col gap-3 p-4">
+                  <div>
+                    <div className="mb-1 flex items-center gap-2">
+                      {t.is_system ? (
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-primary" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-[hsl(var(--violet))]" />
+                      )}
+                      <h3 className="flex-1 truncate text-[14.5px] font-semibold tracking-[-0.01em] transition-colors group-hover:text-primary">
+                        {t.name}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11.5px]">
+                      {t.is_system ? (
+                        <span className="pill pill-accent">System</span>
+                      ) : (
+                        <span
+                          className="pill"
+                          style={{
+                            background: "hsl(var(--violet) / 0.14)",
+                            color: "hsl(var(--violet))",
+                          }}
+                        >
+                          Custom
+                        </span>
+                      )}
+                      <span className="text-muted-foreground">{(t.slots as Slot[]).length} Slots</span>
+                      <span className="text-muted-foreground">
+                        · {t.page_width_cm}×{t.page_height_cm} cm
+                      </span>
+                    </div>
+                  </div>
+
+                  <Link
+                    href={`/datenblatt-vorlagen/${t.id}`}
+                    className="mx-auto block transition-transform hover:scale-[1.02]"
+                  >
+                    <TemplatePreview
+                      pageWidth={Number(t.page_width_cm)}
+                      pageHeight={Number(t.page_height_cm)}
+                      slots={t.slots as Slot[]}
+                      targetWidthPx={260}
+                    />
                   </Link>
-                </Button>
+
+                  <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-2">
+                    <div className="flex gap-0.5">
+                      <DuplicateButton id={t.id} />
+                      {!t.is_system && <DeleteTemplateButton id={t.id} name={t.name} />}
+                    </div>
+                    <Button asChild size="sm" variant="ghost">
+                      <Link href={`/datenblatt-vorlagen/${t.id}`}>
+                        {t.is_system ? (
+                          "Ansehen"
+                        ) : (
+                          <>
+                            <Pencil className="h-3.5 w-3.5" />
+                            Bearbeiten
+                          </>
+                        )}
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            ))}
+          </div>
+        )}
       </div>
     </AppShell>
   );

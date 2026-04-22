@@ -5,11 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
 import { DeleteKategorieButton } from "@/app/kategorien/delete-button";
 import { RichTextDisplay } from "@/components/rich-text-display";
@@ -36,103 +32,88 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild><Link href="/bereiche">Bereiche</Link></BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{bereich.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <div className="flex flex-col gap-5">
+        <div className="crumbs">
+          <Link href="/">Dashboard</Link>
+          <ChevronRight className="h-3 w-3" />
+          <Link href="/bereiche">Bereiche</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground">{bereich.name}</span>
+        </div>
 
         {/* BEREICH HEADER */}
-        <Card className="border-2">
-          <CardContent className="pt-6 space-y-5">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-              {/* Name — Hauptelement */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Name</p>
-                <h1 className="text-3xl font-bold tracking-tight accent-underline inline-block">
-                  {bereich.name}
-                </h1>
-              </div>
+        <div className="glass-card space-y-5 px-6 py-[22px]">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="min-w-0 flex-1 basis-[320px]">
+              <div className="eyebrow mb-1.5 text-primary">Bereich</div>
+              <h1 className="display-lg">{bereich.name}</h1>
+              {bereich.beschreibung && (
+                <div className="mt-3 text-[14px] text-muted-foreground">
+                  <RichTextDisplay html={bereich.beschreibung} />
+                </div>
+              )}
+            </div>
 
-              {/* Farbe — kompakt: Swatch + Hex */}
-              <div className="shrink-0">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Farbe</p>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-8 w-8 rounded-md border shadow-inner shrink-0"
-                    style={{ backgroundColor: bereich.farbe || "transparent" }}
-                    title={bereich.farbe ?? "keine Farbe"}
-                  />
-                  <span className="font-mono text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-5">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="h-9 w-9 shrink-0 rounded-[10px] border border-border/60"
+                  style={{ backgroundColor: bereich.farbe || "transparent" }}
+                  title={bereich.farbe ?? "keine Farbe"}
+                />
+                <div>
+                  <div className="eyebrow !text-[10px]">Farbe</div>
+                  <div className="mt-0.5 font-mono text-[12px] text-muted-foreground">
                     {bereich.farbe ?? "—"}
-                  </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Sortierung — kompakt rechts */}
-              <div className="shrink-0">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Sortierung</p>
-                <div className="text-lg font-semibold tabular-nums tracking-tight">
+              <div>
+                <div className="eyebrow !text-[10px]">Sortierung</div>
+                <div className="mt-0.5 text-[18px] font-semibold tabular-nums tracking-[-0.015em]">
                   {bereich.sortierung}
                 </div>
               </div>
 
-              {/* Seiten — Gruppe: Seitenzahl / Start / Ende */}
-              <div className="shrink-0 border-l pl-6">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Katalog-Seiten</p>
-                <div className="flex items-end gap-4">
-                  <div>
-                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Anzahl</p>
-                    <p className="text-lg font-semibold tabular-nums">{bereich.seitenzahl ?? "—"}</p>
+              <div className="flex items-end gap-4 border-l border-border/60 pl-5">
+                <div>
+                  <div className="eyebrow !text-[10px]">Seiten</div>
+                  <div className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {bereich.seitenzahl ?? "—"}
                   </div>
-                  <div>
-                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Start</p>
-                    <p className="text-lg font-semibold tabular-nums">{bereich.startseite ?? "—"}</p>
+                </div>
+                <div>
+                  <div className="eyebrow !text-[10px]">Start</div>
+                  <div className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {bereich.startseite ?? "—"}
                   </div>
-                  <div>
-                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Ende</p>
-                    <p className="text-lg font-semibold tabular-nums">{bereich.endseite ?? "—"}</p>
+                </div>
+                <div>
+                  <div className="eyebrow !text-[10px]">Ende</div>
+                  <div className="mt-0.5 text-[18px] font-semibold tabular-nums">
+                    {bereich.endseite ?? "—"}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {bereich.beschreibung && (
-              <div className="pt-2 border-t">
-                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-2">Beschreibung</p>
-                <RichTextDisplay html={bereich.beschreibung} />
-              </div>
-            )}
-
-            <div className="flex gap-2 pt-2">
-              <Button asChild size="sm" className="shadow-sm">
+              <Button asChild size="sm">
                 <Link href={`/bereiche/${id}/bearbeiten`}>
-                  <Pencil className="h-4 w-4 mr-2" /> Bereich bearbeiten
+                  <Pencil className="h-3.5 w-3.5" /> Bearbeiten
                 </Link>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
         {/* BILD + KATEGORIEN-TABELLE */}
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-          <Card className="border-2">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm uppercase tracking-widest text-primary">Bild</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="aspect-[210/297] rounded-lg border-2 bg-muted overflow-hidden relative">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_1fr]">
+          <div className="glass-card">
+            <div className="border-b border-border/60 px-4 py-3">
+              <div className="eyebrow !text-[10px]">Katalog-Bild</div>
+            </div>
+            <div className="p-4">
+              <div className="relative aspect-[210/297] overflow-hidden rounded-[12px] border border-border/60 bg-muted">
                 {bereichBildUrl ? (
                   <Image
                     src={bereichBildUrl}
@@ -142,81 +123,104 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
                     className="object-contain"
                   />
                 ) : (
-                  <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
+                  <div className="grid h-full w-full place-items-center text-muted-foreground/30">
                     <ImageIcon className="h-10 w-10" />
                   </div>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          <Card className="border-2">
-            <CardHeader className="bg-primary text-primary-foreground flex flex-row items-center justify-between py-3 rounded-t-xl">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Layers className="h-4 w-4" /> Kategorien ({(kategorien ?? []).length})
-              </CardTitle>
-              <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/80 h-7">
+          <div className="glass-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                <span className="text-[14.5px] font-semibold tracking-[-0.01em]">
+                  Kategorien
+                </span>
+                <span className="pill pill-accent">{(kategorien ?? []).length}</span>
+              </div>
+              <Button asChild size="sm">
                 <Link href={`/kategorien/neu?bereich=${id}`}>
-                  <Plus className="h-4 w-4 mr-1" /> Neu
+                  <Plus className="h-3.5 w-3.5" /> Neu
                 </Link>
               </Button>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="w-12 text-muted-foreground">#</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="text-right w-24">Anzahl Artikel</TableHead>
-                    <TableHead className="text-right w-24">Sortierung</TableHead>
-                    <TableHead className="text-right w-24">Startseite</TableHead>
-                    <TableHead className="text-right w-24">Endseite</TableHead>
-                    <TableHead className="w-32" />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-12 pl-5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    #
+                  </TableHead>
+                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Name
+                  </TableHead>
+                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Artikel
+                  </TableHead>
+                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Sort
+                  </TableHead>
+                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Start
+                  </TableHead>
+                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Ende
+                  </TableHead>
+                  <TableHead className="w-32" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(kategorien ?? []).length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                      <Layers className="mx-auto mb-2 h-8 w-8 opacity-30" />
+                      Noch keine Kategorien in diesem Bereich
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(kategorien ?? []).length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
-                        <Layers className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                        Noch keine Kategorien in diesem Bereich
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {(kategorien ?? []).map((k, i) => (
-                    <TableRow key={k.id} className="group relative row-hover">
-                      <TableCell className="text-muted-foreground relative z-10 pointer-events-none">{i + 1}</TableCell>
-                      <TableCell className="font-medium">
-                        <Link href={`/kategorien/${k.id}`} className="absolute inset-0 z-0" aria-label={`${k.name} öffnen`} />
-                        <span className="relative z-10 pointer-events-none group-hover:text-primary transition-colors">
-                          {k.name}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-primary relative z-10 pointer-events-none">
-                        {prodCount.get(k.id) ?? 0}
-                      </TableCell>
-                      <TableCell className="text-right relative z-10 pointer-events-none">{k.sortierung}</TableCell>
-                      <TableCell className="text-right relative z-10 pointer-events-none">{k.startseite ?? "—"}</TableCell>
-                      <TableCell className="text-right relative z-10 pointer-events-none">{k.endseite ?? "—"}</TableCell>
-                      <TableCell className="relative z-20">
-                        <div className="flex items-center justify-end gap-0.5">
-                          <Button asChild variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary">
-                            <Link href={`/kategorien/${k.id}/bearbeiten`} title="Bearbeiten">
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                          <DeleteKategorieButton id={k.id} name={k.name} />
-                          <Link href={`/kategorien/${k.id}`} className="text-muted-foreground/50 hover:text-primary p-1 transition-colors">
-                            <ChevronRight className="h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
+                )}
+                {(kategorien ?? []).map((k, i) => (
+                  <TableRow key={k.id} className="group relative border-border/60">
+                    <TableCell className="pl-5 font-mono text-[11.5px] tabular-nums text-muted-foreground/70">
+                      {String(i + 1).padStart(2, "0")}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/kategorien/${k.id}`}
+                        className="absolute inset-0 z-0"
+                        aria-label={`${k.name} öffnen`}
+                      />
+                      <span className="pointer-events-none relative z-10 transition-colors group-hover:text-primary">
+                        {k.name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-semibold tabular-nums text-primary">
+                      {prodCount.get(k.id) ?? 0}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {k.sortierung}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {k.startseite ?? "—"}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {k.endseite ?? "—"}
+                    </TableCell>
+                    <TableCell className="relative z-20">
+                      <div className="flex items-center justify-end gap-0.5">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link href={`/kategorien/${k.id}/bearbeiten`} title="Bearbeiten">
+                            <Pencil className="h-3.5 w-3.5" />
                           </Link>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                        </Button>
+                        <DeleteKategorieButton id={k.id} name={k.name} />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
     </AppShell>

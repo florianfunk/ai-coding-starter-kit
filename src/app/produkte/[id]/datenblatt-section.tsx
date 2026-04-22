@@ -78,7 +78,7 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
   const canvasH = current ? current.page_height_cm * scale : 0;
 
   return (
-    <Card className="border-l-4 border-l-violet-500">
+    <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>Datenblatt-Vorlage</CardTitle>
         <a href="/datenblatt-vorlagen" className="text-xs text-muted-foreground hover:text-primary hover:underline">
@@ -96,12 +96,14 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
                 type="button"
                 onClick={() => selectTemplate(t.id)}
                 disabled={pending}
-                className={`px-3 py-2 rounded-lg border-2 text-sm transition ${
-                  isActive ? "bg-primary text-primary-foreground border-primary" : "bg-background hover:border-primary/40"
+                className={`rounded-[10px] border px-3 py-2 text-[13px] transition ${
+                  isActive
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/70 bg-card hover:border-primary/40"
                 }`}
               >
                 <div className="font-medium">{t.name}</div>
-                <div className={`text-[10px] ${isActive ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                <div className={`mt-0.5 text-[10.5px] ${isActive ? "text-primary/70" : "text-muted-foreground"}`}>
                   {t.slots.length} Slots {t.is_system && "· System"}
                 </div>
               </button>

@@ -1,8 +1,6 @@
-import { AppShell } from "@/components/app-shell";
-import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { ChevronRight } from "lucide-react";
 import { TemplateEditor } from "../template-editor";
 
 export const dynamic = "force-dynamic";
@@ -10,11 +8,19 @@ export const dynamic = "force-dynamic";
 export default function NewTemplatePage() {
   return (
     <AppShell>
-      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2 text-muted-foreground hover:text-primary hover:bg-primary/5">
-        <Link href="/datenblatt-vorlagen"><ChevronLeft className="h-4 w-4 mr-1" /> Alle Vorlagen</Link>
-      </Button>
-      <PageHeader eyebrow="Neu anlegen" title="Neue Datenblatt-Vorlage" />
-      <TemplateEditor mode="create" />
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/datenblatt-vorlagen">Datenblatt-Vorlagen</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground">Neu</span>
+          </div>
+          <h1 className="display-lg">Neue Datenblatt-Vorlage</h1>
+        </div>
+        <TemplateEditor mode="create" />
+      </div>
     </AppShell>
   );
 }

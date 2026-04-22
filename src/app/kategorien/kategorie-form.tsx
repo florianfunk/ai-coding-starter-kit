@@ -225,7 +225,7 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
                     </div>
                     <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
                     <div
-                      className={`relative rounded border-2 border-dashed bg-background overflow-hidden flex items-center justify-center ${
+                      className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${
                         isWide ? "aspect-[5/1]" : "aspect-[1/2]"
                       }`}
                     >

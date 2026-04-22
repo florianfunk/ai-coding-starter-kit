@@ -206,7 +206,7 @@ export function ProduktForm({
           <div className="mt-4 space-y-2">
             <Label>Hauptbild</Label>
             <div className="flex items-start gap-4">
-              <div className="h-32 w-40 rounded-lg border-2 border-dashed bg-muted/50 overflow-hidden flex items-center justify-center shrink-0">
+              <div className="flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
                 {hauptbildPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={hauptbildPreview} alt="" className="h-full w-full object-contain" />
@@ -343,7 +343,7 @@ export function ProduktForm({
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">Produktdaten</p>
         <div className="flex gap-3 ml-auto">
           <Button asChild variant="outline" type="button"><a href="/produkte">Abbrechen</a></Button>
-          <Button type="submit" size="lg" disabled={pending || uploading}>
+          <Button type="submit" disabled={pending || uploading}>
             {pending ? "Speichere..." : submitLabel}
           </Button>
         </div>

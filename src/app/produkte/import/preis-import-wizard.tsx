@@ -323,7 +323,7 @@ export function PreisImportWizard() {
 
       {/* Step 1: File Upload */}
       {step === 1 && (
-        <Card className="border-2">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5" />
@@ -369,7 +369,7 @@ export function PreisImportWizard() {
               />
             </div>
 
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-4 text-sm">
+            <div className="rounded-[14px] bg-[hsl(var(--warning))]/10 border border-[hsl(var(--warning))]/30 p-4 text-sm">
               <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">
                 Hinweis zu Excel-Dateien
               </p>
@@ -432,7 +432,7 @@ export function PreisImportWizard() {
 
       {/* Step 2: Column Mapping */}
       {step === 2 && csvData && (
-        <Card className="border-2">
+        <Card>
           <CardHeader>
             <CardTitle>Spalten zuordnen</CardTitle>
           </CardHeader>
@@ -552,24 +552,24 @@ export function PreisImportWizard() {
 
       {/* Step 3: Preview + Import */}
       {step === 3 && (
-        <Card className="border-2">
+        <Card>
           <CardHeader>
             <CardTitle>Import-Vorschau</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Summary */}
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4">
-                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{foundCount}</p>
-                <p className="text-sm text-green-600 dark:text-green-500">Preise werden aktualisiert</p>
+              <div className="rounded-[14px] border border-[hsl(var(--green))]/30 bg-[hsl(var(--green))]/10 p-4">
+                <p className="mega-number !text-[28px] text-[hsl(var(--green))]">{foundCount}</p>
+                <p className="mt-1 text-[12.5px] text-foreground/70">Preise werden aktualisiert</p>
               </div>
-              <div className="rounded-lg border-2 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
-                <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{unchangedCount}</p>
-                <p className="text-sm text-amber-600 dark:text-amber-500">Keine Preisaenderung</p>
+              <div className="rounded-[14px] border border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning))]/10 p-4">
+                <p className="mega-number !text-[28px] text-[hsl(var(--warning))]">{unchangedCount}</p>
+                <p className="mt-1 text-[12.5px] text-foreground/70">Keine Preisänderung</p>
               </div>
-              <div className="rounded-lg border-2 border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4">
-                <p className="text-2xl font-bold text-red-700 dark:text-red-400">{notFoundCount}</p>
-                <p className="text-sm text-red-600 dark:text-red-500">Nicht gefunden</p>
+              <div className="rounded-[14px] border border-destructive/30 bg-destructive/10 p-4">
+                <p className="mega-number !text-[28px] text-destructive">{notFoundCount}</p>
+                <p className="mt-1 text-[12.5px] text-foreground/70">Nicht gefunden</p>
               </div>
             </div>
 

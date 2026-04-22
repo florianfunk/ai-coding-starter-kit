@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -59,7 +58,7 @@ export default async function BenutzerPage() {
       </PageHeader>
 
       {loadError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-6">
+        <div className="mb-6 rounded-[14px] border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {loadError}
         </div>
       )}
@@ -68,23 +67,31 @@ export default async function BenutzerPage() {
         <EmptyState
           icon={Users}
           title="Keine Benutzer vorhanden"
-          description="Erstellen Sie den ersten Benutzer, um die Anwendung nutzen zu koennen."
+          description="Erstellen Sie den ersten Benutzer, um die Anwendung nutzen zu können."
         />
       ) : users.length > 0 ? (
         <>
           {users.length >= 10 && (
-            <div className="rounded-lg border border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 p-3 text-sm text-yellow-800 dark:text-yellow-200 mb-4">
+            <div className="mb-4 rounded-[14px] border border-[hsl(var(--warning))]/30 bg-[hsl(var(--warning))]/10 p-3 text-sm text-foreground/80">
               Maximale Anzahl von 10 Benutzern erreicht.
             </div>
           )}
-          <div className="rounded-lg border bg-card">
+          <div className="glass-card overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>E-Mail</TableHead>
-                  <TableHead className="hidden sm:table-cell">Erstellt am</TableHead>
-                  <TableHead className="hidden md:table-cell">Letzter Login</TableHead>
-                  <TableHead>Status</TableHead>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    E-Mail
+                  </TableHead>
+                  <TableHead className="hidden text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70 sm:table-cell">
+                    Erstellt
+                  </TableHead>
+                  <TableHead className="hidden text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70 md:table-cell">
+                    Letzter Login
+                  </TableHead>
+                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Status
+                  </TableHead>
                   <TableHead className="w-12">
                     <span className="sr-only">Aktionen</span>
                   </TableHead>
@@ -92,36 +99,28 @@ export default async function BenutzerPage() {
               </TableHeader>
               <TableBody>
                 {users.map((user) => (
-                  <TableRow
-                    key={user.id}
-                    className={user.banned ? "opacity-50" : ""}
-                  >
-                    <TableCell className="font-medium">
+                  <TableRow key={user.id} className={user.banned ? "opacity-50" : ""}>
+                    <TableCell className="pl-5 font-medium">
                       {user.email}
                       {currentUser?.id === user.id && (
                         <span className="ml-2 text-xs text-muted-foreground">(Du)</span>
                       )}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    <TableCell className="hidden font-mono text-[12px] tabular-nums text-muted-foreground sm:table-cell">
                       {formatDate(user.created_at)}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
+                    <TableCell className="hidden font-mono text-[12px] tabular-nums text-muted-foreground md:table-cell">
                       {formatDate(user.last_sign_in_at)}
                     </TableCell>
                     <TableCell>
                       {user.banned ? (
-                        <Badge variant="destructive">Deaktiviert</Badge>
+                        <span className="pill pill-bad">Deaktiviert</span>
                       ) : (
-                        <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 hover:bg-emerald-100">
-                          Aktiv
-                        </Badge>
+                        <span className="pill pill-ok">Aktiv</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <UserActionsCell
-                        user={user}
-                        currentUserId={currentUser?.id ?? ""}
-                      />
+                      <UserActionsCell user={user} currentUserId={currentUser?.id ?? ""} />
                     </TableCell>
                   </TableRow>
                 ))}

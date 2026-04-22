@@ -93,7 +93,7 @@ export function RichTextEditor({
   }, [editor]);
 
   return (
-    <div className={cn("rounded-lg border bg-background overflow-hidden", className)}>
+    <div className={cn("overflow-hidden rounded-[12px] border border-border/70 bg-card", className)}>
       {name && !isControlled && <input type="hidden" name={name} value={html} />}
       <Toolbar editor={editor} />
       <Separator />
@@ -217,8 +217,8 @@ function Toolbar({ editor }: { editor: Editor | null }) {
                   title={c.name}
                   aria-label={c.name}
                   className={cn(
-                    "h-7 w-7 rounded border-2 transition-transform hover:scale-110",
-                    isActive ? "border-foreground" : "border-transparent",
+                    "h-7 w-7 rounded-[6px] border transition-transform hover:scale-110",
+                    isActive ? "border-foreground ring-2 ring-foreground/20" : "border-border/60",
                   )}
                   style={{ backgroundColor: c.hex }}
                 />
@@ -254,8 +254,8 @@ function ToolbarButton({
       aria-label={ariaLabel}
       title={title}
       className={cn(
-        "h-7 px-2 gap-1",
-        active && "bg-accent text-accent-foreground",
+        "h-7 gap-1 px-2",
+        active && "bg-primary/10 text-primary",
       )}
     >
       {children}

@@ -41,15 +41,15 @@ export default async function EinstellungenPage() {
         ]}
       />
       <Tabs defaultValue="filialen">
-        <TabsList className="bg-muted/50 p-1 h-auto">
-          <TabsTrigger value="filialen" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
-            <Building2 className="h-4 w-4" /> Filialen
+        <TabsList>
+          <TabsTrigger value="filialen" className="gap-2">
+            <Building2 className="h-3.5 w-3.5" /> Filialen
           </TabsTrigger>
-          <TabsTrigger value="katalog" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
-            <FileText className="h-4 w-4" /> Katalog
+          <TabsTrigger value="katalog" className="gap-2">
+            <FileText className="h-3.5 w-3.5" /> Katalog
           </TabsTrigger>
-          <TabsTrigger value="logos" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-2">
-            <ImageIcon className="h-4 w-4" /> Logos
+          <TabsTrigger value="logos" className="gap-2">
+            <ImageIcon className="h-3.5 w-3.5" /> Logos
           </TabsTrigger>
         </TabsList>
         <TabsContent value="filialen"><FilialenTab filialen={filialen ?? []} /></TabsContent>

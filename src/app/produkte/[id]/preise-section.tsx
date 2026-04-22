@@ -48,7 +48,7 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
   const fmt = (v: number | null) => v != null ? `${v.toFixed(2)} €` : "—";
 
   return (
-    <Card className="border-l-4 border-l-amber-500">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           Preise
@@ -78,15 +78,19 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Noch keine Preise.</TableCell></TableRow>
               )}
               {list.map((p) => (
-                <TableRow key={p.id} className={p.id === currentId ? "bg-emerald-50" : ""}>
-                  <TableCell className="font-mono text-sm">{p.gueltig_ab}</TableCell>
-                  <TableCell className="text-right">{fmt(p.ek)}</TableCell>
-                  <TableCell className="text-right">{fmt(p.ek_eisenkeil)}</TableCell>
-                  <TableCell className="text-right font-semibold">{fmt(p.listenpreis)}</TableCell>
+                <TableRow key={p.id} className={p.id === currentId ? "bg-[hsl(var(--green))]/10" : ""}>
+                  <TableCell className="font-mono text-[13px] tabular-nums">{p.gueltig_ab}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{fmt(p.ek)}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">{fmt(p.ek_eisenkeil)}</TableCell>
+                  <TableCell className="text-right font-mono font-semibold tabular-nums">{fmt(p.listenpreis)}</TableCell>
                   <TableCell>
-                    {p.id === currentId
-                      ? <Badge className="bg-emerald-600">aktuell</Badge>
-                      : p.status === "aktiv" ? <Badge variant="secondary">aktiv</Badge> : <Badge variant="outline">inaktiv</Badge>}
+                    {p.id === currentId ? (
+                      <span className="pill pill-ok">aktuell</span>
+                    ) : p.status === "aktiv" ? (
+                      <span className="pill">aktiv</span>
+                    ) : (
+                      <span className="pill">inaktiv</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button size="icon" variant="ghost" onClick={() => remove(p.id)} disabled={pending}>
@@ -112,7 +116,7 @@ function PreisForm({ onSubmit, pending }: { onSubmit: (p: PreisInput) => void; p
   const [deact, setDeact] = useState(true);
 
   return (
-    <div className="rounded-lg border-2 border-dashed border-primary/30 p-4 bg-primary/5 space-y-4">
+    <div className="space-y-4 rounded-[14px] border border-primary/20 bg-primary/5 p-4">
       <h4 className="font-semibold text-sm">Neuen Preis hinzufügen</h4>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
         <div>

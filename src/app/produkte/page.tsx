@@ -1,11 +1,9 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, Filter, X, Upload } from "lucide-react";
+import { Plus, Search, Filter, X, Upload, ChevronRight } from "lucide-react";
 import { ProdukteTable } from "./produkte-table-body";
 import { ExportDialog } from "./export-dialog";
 import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
@@ -82,92 +80,131 @@ export default async function ProdukteListPage({
 
   return (
     <AppShell>
-      <PageHeader
-        eyebrow="Artikel"
-        title="Produkte"
-        subtitle={`${displayCount} Produkte${hasFilter ? " gefunden (Filter aktiv)" : ""}`}
-      >
-        <div className="flex gap-2">
-          <ExportDialog
-            produktCount={displayCount}
-            filters={{
-              search: sp.q,
-              bereichId: sp.bereich,
-              kategorieId: sp.kategorie,
-              status: sp.status,
-              vollstaendigkeit: sp.vollstaendigkeit,
-            }}
-          />
-          <Button asChild variant="outline" size="lg" className="shadow-sm hover:shadow-md transition-shadow">
-            <Link href="/produkte/import">
-              <Upload className="mr-2 h-4 w-4" /> Preise importieren
-            </Link>
-          </Button>
-          <Button asChild size="lg" className="shadow-sm hover:shadow-md transition-shadow">
-            <Link href="/produkte/neu">
-              <Plus className="mr-2 h-4 w-4" /> Neues Produkt
-            </Link>
-          </Button>
-        </div>
-      </PageHeader>
-
-      {/* Filter */}
-      <Card className="mb-4 border-2">
-        <CardContent className="p-4">
-          <form className="grid gap-3 md:grid-cols-6 items-end">
-            <div className="md:col-span-2">
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 flex items-center gap-1">
-                <Search className="h-3 w-3" /> Suche
-              </label>
-              <Input name="q" defaultValue={sp.q ?? ""} placeholder="Artikelnr, Name, Titel…" className="h-10" />
-            </div>
+      <div className="flex flex-col gap-4">
+        <div>
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span>Katalog</span>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground">Produkte</span>
+          </div>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-6">
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Bereich</label>
-              <select name="bereich" defaultValue={sp.bereich ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
-                <option value="">Alle</option>
-                {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <h1 className="display-lg">Produkte</h1>
+              <p className="mt-2 text-[15px] text-muted-foreground">
+                {displayCount} Produkte{hasFilter ? " gefunden · Filter aktiv" : ""}
+              </p>
             </div>
-            <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Kategorie</label>
-              <select name="kategorie" defaultValue={sp.kategorie ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
-                <option value="">Alle</option>
-                {filteredKategorien.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Status</label>
-              <select name="status" defaultValue={sp.status ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
-                <option value="">Alle</option>
-                <option value="unbearbeitet">Unbearbeitet</option>
-                <option value="bearbeitet">Bearbeitet</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-1.5 block">Vollstaendigkeit</label>
-              <select name="vollstaendigkeit" defaultValue={sp.vollstaendigkeit ?? ""} className="w-full h-10 rounded-lg border px-3 bg-background text-sm hover:border-primary/50 transition-colors">
-                <option value="">Alle</option>
-                <option value="unvollstaendig">Unvollstaendig (&lt;80%)</option>
-                <option value="vollstaendig">Vollstaendig (&gt;80%)</option>
-              </select>
-            </div>
-            <div className="md:col-span-6 flex gap-2 justify-end border-t pt-3 mt-1">
-              {hasFilter && (
-                <Button asChild type="button" variant="ghost" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                  <Link href="/produkte"><X className="h-4 w-4 mr-1" /> Filter zurücksetzen</Link>
-                </Button>
-              )}
-              <Button type="submit" className="shadow-sm">
-                <Filter className="h-4 w-4 mr-1" /> Anwenden
+            <div className="flex flex-wrap gap-2">
+              <ExportDialog
+                produktCount={displayCount}
+                filters={{
+                  search: sp.q,
+                  bereichId: sp.bereich,
+                  kategorieId: sp.kategorie,
+                  status: sp.status,
+                  vollstaendigkeit: sp.vollstaendigkeit,
+                }}
+              />
+              <Button asChild variant="outline" size="sm">
+                <Link href="/produkte/import">
+                  <Upload className="h-3.5 w-3.5" /> Preise importieren
+                </Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/produkte/neu">
+                  <Plus className="h-3.5 w-3.5" /> Neues Produkt
+                </Link>
               </Button>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
 
-      {/* Tabelle */}
-      <Card className="border-2">
-        <CardContent className="p-0 overflow-x-auto">
+        <form className="glass-card grid items-end gap-3 p-4 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              <Search className="h-3 w-3" /> Suche
+            </label>
+            <Input name="q" defaultValue={sp.q ?? ""} placeholder="Artikelnr, Name, Titel…" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              Bereich
+            </label>
+            <select
+              name="bereich"
+              defaultValue={sp.bereich ?? ""}
+              className="h-[34px] w-full rounded-[9px] border border-border/70 bg-card px-3 text-[13.5px]"
+            >
+              <option value="">Alle</option>
+              {bereiche.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              Kategorie
+            </label>
+            <select
+              name="kategorie"
+              defaultValue={sp.kategorie ?? ""}
+              className="h-[34px] w-full rounded-[9px] border border-border/70 bg-card px-3 text-[13.5px]"
+            >
+              <option value="">Alle</option>
+              {filteredKategorien.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              Status
+            </label>
+            <select
+              name="status"
+              defaultValue={sp.status ?? ""}
+              className="h-[34px] w-full rounded-[9px] border border-border/70 bg-card px-3 text-[13.5px]"
+            >
+              <option value="">Alle</option>
+              <option value="unbearbeitet">Unbearbeitet</option>
+              <option value="bearbeitet">Bearbeitet</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/80">
+              Vollständigkeit
+            </label>
+            <select
+              name="vollstaendigkeit"
+              defaultValue={sp.vollstaendigkeit ?? ""}
+              className="h-[34px] w-full rounded-[9px] border border-border/70 bg-card px-3 text-[13.5px]"
+            >
+              <option value="">Alle</option>
+              <option value="unvollstaendig">Unvollständig (&lt;80%)</option>
+              <option value="vollstaendig">Vollständig (&gt;80%)</option>
+            </select>
+          </div>
+          <div className="mt-1 flex justify-end gap-2 border-t border-border/60 pt-3 md:col-span-6">
+            {hasFilter && (
+              <Button asChild type="button" variant="ghost" size="sm">
+                <Link href="/produkte">
+                  <X className="h-3.5 w-3.5" /> Filter zurücksetzen
+                </Link>
+              </Button>
+            )}
+            <Button type="submit" size="sm">
+              <Filter className="h-3.5 w-3.5" /> Anwenden
+            </Button>
+          </div>
+        </form>
+
+        <div className="glass-card overflow-hidden">
           <ProdukteTable
             produkte={listing.map((p) => ({
               id: p.id,
@@ -185,26 +222,30 @@ export default async function ProdukteListPage({
             hasFilter={hasFilter}
             completenessMap={completenessMap}
           />
-        </CardContent>
-      </Card>
-
-      {totalPages > 1 && (
-        <div className="flex justify-end gap-2 text-sm mt-4">
-          {page > 1 && (
-            <Button asChild variant="outline" size="sm">
-              <Link href={`?${new URLSearchParams({ ...sp, page: String(page - 1) }).toString()}`}>← Zurück</Link>
-            </Button>
-          )}
-          <span className="self-center text-muted-foreground px-2">
-            Seite <span className="font-semibold text-foreground">{page}</span> von {totalPages}
-          </span>
-          {page < totalPages && (
-            <Button asChild variant="outline" size="sm">
-              <Link href={`?${new URLSearchParams({ ...sp, page: String(page + 1) }).toString()}`}>Weiter →</Link>
-            </Button>
-          )}
         </div>
-      )}
+
+        {totalPages > 1 && (
+          <div className="mt-2 flex justify-end gap-2 text-sm">
+            {page > 1 && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`?${new URLSearchParams({ ...sp, page: String(page - 1) }).toString()}`}>
+                  ← Zurück
+                </Link>
+              </Button>
+            )}
+            <span className="self-center px-2 text-muted-foreground">
+              Seite <span className="font-semibold text-foreground">{page}</span> von {totalPages}
+            </span>
+            {page < totalPages && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`?${new URLSearchParams({ ...sp, page: String(page + 1) }).toString()}`}>
+                  Weiter →
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
     </AppShell>
   );
 }

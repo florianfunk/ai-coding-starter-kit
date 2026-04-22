@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { CompareTable } from "./compare-table";
 
@@ -92,17 +91,15 @@ export default async function VergleichPage({
         </Button>
       </PageHeader>
 
-      <Card className="border-2">
-        <CardContent className="p-0 overflow-x-auto">
-          <CompareTable
-            produkte={orderedProdukte}
-            preisMap={preisMap}
-            bereichMap={bereichMap}
-            kategorieMap={kategorieMap}
-            imageUrlMap={imageUrlMap}
-          />
-        </CardContent>
-      </Card>
+      <div className="glass-card overflow-x-auto">
+        <CompareTable
+          produkte={orderedProdukte}
+          preisMap={preisMap}
+          bereichMap={bereichMap}
+          kategorieMap={kategorieMap}
+          imageUrlMap={imageUrlMap}
+        />
+      </div>
     </AppShell>
   );
 }

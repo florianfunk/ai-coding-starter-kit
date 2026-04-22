@@ -97,7 +97,7 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
                     id="gruppe"
                     value={gruppe}
                     onChange={(e) => setGruppe(e.target.value)}
-                    className="flex-1 rounded-lg border px-3 py-2 bg-background text-sm"
+                    className="h-[34px] flex-1 rounded-[9px] border border-border/70 bg-card px-3 text-[13.5px]"
                   >
                     <option value="">— keine —</option>
                     {gruppen.map((g) => <option key={g} value={g}>{g}</option>)}
@@ -119,7 +119,7 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
           <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 items-start">
             <div className="space-y-2">
               <Label>Icon-Bild</Label>
-              <div className="aspect-square w-full rounded-lg border-2 border-dashed bg-muted/30 overflow-hidden flex items-center justify-center">
+              <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
                 {symbolPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={symbolPreview} alt="" className="max-h-full max-w-full object-contain p-4" />
@@ -147,12 +147,13 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
                 {uploading && <p className="text-xs text-muted-foreground">Lade hoch…</p>}
               </div>
 
-              <Alert className="bg-blue-50 border-blue-200">
-                <AlertDescription className="text-xs text-blue-900">
-                  <strong>Hinweis:</strong> Icons sollten ein einheitliches Format haben
-                  (240×240 px, quadratisch, transparenter Hintergrund bei PNG/SVG).
-                </AlertDescription>
-              </Alert>
+              <div className="flex items-start gap-2 rounded-[10px] border border-primary/20 bg-primary/5 p-3 text-[12px] text-foreground/80">
+                <strong className="font-semibold">Hinweis:</strong>
+                <span>
+                  Icons sollten ein einheitliches Format haben (240×240 px, quadratisch, transparenter
+                  Hintergrund bei PNG/SVG).
+                </span>
+              </div>
             </div>
           </div>
 
@@ -160,9 +161,11 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 justify-end mt-4">
-        <Button asChild variant="outline" type="button"><a href="/icons">Abbrechen</a></Button>
-        <Button type="submit" size="lg" disabled={pending || uploading}>
+      <div className="mt-4 flex justify-end gap-2">
+        <Button asChild variant="outline" type="button">
+          <a href="/icons">Abbrechen</a>
+        </Button>
+        <Button type="submit" disabled={pending || uploading}>
           {pending ? "Speichere…" : submitLabel}
         </Button>
       </div>

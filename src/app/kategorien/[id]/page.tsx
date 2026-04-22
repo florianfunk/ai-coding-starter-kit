@@ -5,12 +5,7 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Plus, Package, Pencil, ChevronRight, ImageIcon, Layers } from "lucide-react";
 import { RichTextDisplay } from "@/components/rich-text-display";
 
@@ -24,7 +19,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   if (!kategorie) notFound();
 
   const [{ data: bereich }, { data: produkte }, { data: iconLinks }] = await Promise.all([
-    supabase.from("bereiche").select("id,name").eq("id", kategorie.bereich_id).single(),
+    supabase.from("bereiche").select("id,name,farbe").eq("id", kategorie.bereich_id).single(),
     supabase.from("produkte").select("*").eq("kategorie_id", id).order("sortierung"),
     supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
   ]);
@@ -36,10 +31,12 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     bild4: bildProxyUrl("produktbilder", kategorie.bild4_path),
   };
   const hatBilder = Boolean(bildUrls.bild1 || bildUrls.bild2 || bildUrls.bild3 || bildUrls.bild4);
-  const iconData = ((iconLinks ?? []) as any[]).map((r) => ({
-    label: r.icons?.label ?? "",
-    url: bildProxyUrl("produktbilder", r.icons?.symbol_path ?? null),
-  }));
+  const iconData = ((iconLinks ?? []) as unknown as Array<{ icons: { label: string; symbol_path: string | null } | null }>).map(
+    (r) => ({
+      label: r.icons?.label ?? "",
+      url: bildProxyUrl("produktbilder", r.icons?.symbol_path ?? null),
+    }),
+  );
 
   const produkteMitBild = (produkte ?? []).map((p) => ({
     ...p,
@@ -55,189 +52,204 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
 
   return (
     <AppShell>
-      <div className="space-y-6">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild><Link href="/">Dashboard</Link></BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink asChild><Link href="/kategorien">Kategorien</Link></BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>{kategorie.name}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <div className="flex flex-col gap-5">
+        <div className="crumbs">
+          <Link href="/">Dashboard</Link>
+          <ChevronRight className="h-3 w-3" />
+          <Link href="/kategorien">Kategorien</Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground">{kategorie.name}</span>
+        </div>
 
-        {/* HEADER: Infos links, Katalog-Bilder rechts */}
-        <Card className="border-2">
-          <CardContent className="pt-6">
-            <div className="flex justify-end gap-2 mb-4">
-              <Button asChild variant="outline" size="sm" className="hover:bg-primary hover:text-primary-foreground transition-colors">
-                <Link href={`/kategorien/${id}/bearbeiten`}>
-                  <Pencil className="h-4 w-4 mr-2" /> Bearbeiten
-                </Link>
-              </Button>
-              <Button asChild size="sm" className="shadow-sm">
-                <Link href={`/produkte/neu?kategorie=${id}`}>
-                  <Plus className="h-4 w-4 mr-2" /> Neues Produkt
-                </Link>
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-              {/* LINKS: Infos + Icons */}
-              <div className="lg:col-span-3 space-y-4">
-                <div>
-                  <Link
-                    href={`/bereiche/${kategorie.bereich_id}`}
-                    className="block text-xs uppercase tracking-widest text-primary font-semibold hover:underline"
-                  >
-                    {bereich?.name}
-                  </Link>
-                  <h1 className="text-3xl font-bold tracking-tight mt-1 accent-underline inline-block">
-                    {kategorie.name}
-                  </h1>
-                </div>
-
-                {kategorie.beschreibung && (
-                  <RichTextDisplay html={kategorie.beschreibung} className="text-muted-foreground text-sm" />
-                )}
-
-                {iconData.length > 0 && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                      Eigenschaften
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {iconData.map((ic, i) => (
-                        <div key={i} className="inline-flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border">
-                          {ic.url ? (
-                            <Image
-                              src={ic.url}
-                              alt={ic.label}
-                              width={20}
-                              height={20}
-                              unoptimized
-                              className="h-5 w-5 object-contain"
-                            />
-                          ) : null}
-                          <span className="text-xs font-medium">{ic.label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* RECHTS: 4-Bild-Katalog-Layout */}
-              <div className="lg:col-span-2">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
-                  <ImageIcon className="h-3.5 w-3.5" /> Katalog-Bilder
-                </div>
-                {hatBilder ? (
-                  <div className="aspect-[4/2] w-full grid grid-cols-4 grid-rows-2 gap-2 bg-muted/30 rounded-lg border p-2">
-                    <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
-                    <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
-                    <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
-                    <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
-                  </div>
-                ) : (
-                  <div className="aspect-[4/2] w-full rounded-lg border-2 border-dashed bg-muted/20 flex flex-col items-center justify-center text-muted-foreground/50">
-                    <ImageIcon className="h-8 w-8 mb-1" />
-                    <span className="text-xs">Keine Bilder hinterlegt</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* PRODUKTE-TABELLE */}
-        <Card className="border-2">
-          <CardHeader className="bg-primary text-primary-foreground py-3 rounded-t-xl flex-row items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4" /> Produkte ({produkteMitBild.length})
-            </CardTitle>
-            <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/80 h-7">
-              <Link href={`/produkte/neu?kategorie=${id}`}>
-                <Plus className="h-4 w-4 mr-1" /> Neu
+        {/* HEADER */}
+        <div className="glass-card px-6 py-[22px]">
+          <div className="mb-4 flex justify-end gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/kategorien/${id}/bearbeiten`}>
+                <Pencil className="h-3.5 w-3.5" /> Bearbeiten
               </Link>
             </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {produkteMitBild.length === 0 ? (
-              <div className="py-16 text-center text-muted-foreground">
-                <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                Noch keine Produkte in dieser Kategorie
+            <Button asChild size="sm">
+              <Link href={`/produkte/neu?kategorie=${id}`}>
+                <Plus className="h-3.5 w-3.5" /> Neues Produkt
+              </Link>
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <div className="space-y-4 lg:col-span-3">
+              <div>
+                <Link
+                  href={`/bereiche/${kategorie.bereich_id}`}
+                  className="eyebrow inline-flex items-center gap-1.5 text-primary hover:underline"
+                >
+                  {bereich?.farbe && (
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-sm border border-border/50"
+                      style={{ backgroundColor: bereich.farbe }}
+                    />
+                  )}
+                  {bereich?.name}
+                </Link>
+                <h1 className="display-lg mt-2">{kategorie.name}</h1>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="w-16">Bild</TableHead>
-                    <TableHead>Artikelnummer</TableHead>
-                    <TableHead>Bezeichnung</TableHead>
-                    <TableHead className="text-right w-24">Sortierung</TableHead>
-                    <TableHead className="text-right w-28">Listenpreis</TableHead>
-                    <TableHead className="w-28">Status</TableHead>
-                    <TableHead className="w-12" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {produkteMitBild.map((p) => (
-                    <TableRow key={p.id} className="group relative row-hover">
-                      <TableCell className="relative z-10 pointer-events-none">
-                        {p.hauptbild_url ? (
+
+              {kategorie.beschreibung && (
+                <RichTextDisplay html={kategorie.beschreibung} className="text-[14px] text-muted-foreground" />
+              )}
+
+              {iconData.length > 0 && (
+                <div>
+                  <div className="eyebrow mb-2 !text-[10px]">Eigenschaften</div>
+                  <div className="flex flex-wrap gap-2">
+                    {iconData.map((ic, i) => (
+                      <div
+                        key={i}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted px-2.5 py-1"
+                      >
+                        {ic.url ? (
                           <Image
-                            src={p.hauptbild_url}
-                            alt=""
-                            width={40}
-                            height={40}
+                            src={ic.url}
+                            alt={ic.label}
+                            width={20}
+                            height={20}
                             unoptimized
-                            className="h-10 w-10 rounded object-cover border"
+                            className="h-5 w-5 object-contain"
                           />
-                        ) : (
-                          <div className="h-10 w-10 rounded bg-muted flex items-center justify-center border">
-                            <Package className="h-4 w-4 text-muted-foreground/40" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/produkte/${p.id}`} className="absolute inset-0 z-0" />
-                        <span className="relative z-10 pointer-events-none font-mono text-sm group-hover:text-primary transition-colors">
-                          {p.artikelnummer}
-                        </span>
-                      </TableCell>
-                      <TableCell className="max-w-md relative z-10 pointer-events-none">
-                        <div className="truncate">{p.name ?? "—"}</div>
-                      </TableCell>
-                      <TableCell className="text-right text-sm relative z-10 pointer-events-none">{p.sortierung}</TableCell>
-                      <TableCell className="text-right font-semibold relative z-10 pointer-events-none">
-                        {preisMap.has(p.id) ? (
-                          <span className="text-primary">{preisMap.get(p.id)!.toFixed(2)} €</span>
-                        ) : "—"}
-                      </TableCell>
-                      <TableCell className="relative z-10 pointer-events-none">
-                        {p.artikel_bearbeitet
-                          ? <Badge className="bg-success/90 text-success-foreground hover:bg-success text-[10px]">bearbeitet</Badge>
-                          : <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">unbearbeitet</Badge>}
-                      </TableCell>
-                      <TableCell className="relative z-20">
-                        <Link href={`/produkte/${p.id}`} className="inline-flex items-center text-muted-foreground/50 hover:text-primary transition-colors p-1">
-                          <ChevronRight className="h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                        ) : null}
+                        <span className="text-[12px] font-medium">{ic.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-2">
+              <div className="eyebrow mb-2 flex items-center gap-1.5 !text-[10px]">
+                <ImageIcon className="h-3 w-3" /> Katalog-Bilder
+              </div>
+              {hatBilder ? (
+                <div className="grid aspect-[4/2] w-full grid-cols-4 grid-rows-2 gap-2 rounded-[14px] border border-border/60 bg-muted/40 p-2">
+                  <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                  <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
+                  <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                  <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
+                </div>
+              ) : (
+                <div className="flex aspect-[4/2] w-full flex-col items-center justify-center gap-1 rounded-[14px] border border-dashed border-border bg-muted/40 text-muted-foreground/60">
+                  <ImageIcon className="h-8 w-8" />
+                  <span className="text-[12px]">Keine Bilder hinterlegt</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* PRODUKTE-TABELLE */}
+        <div className="glass-card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border/60 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-primary" />
+              <span className="text-[14.5px] font-semibold tracking-[-0.01em]">Produkte</span>
+              <span className="pill pill-accent">{produkteMitBild.length}</span>
+            </div>
+            <Button asChild size="sm">
+              <Link href={`/produkte/neu?kategorie=${id}`}>
+                <Plus className="h-3.5 w-3.5" /> Neu
+              </Link>
+            </Button>
+          </div>
+
+          {produkteMitBild.length === 0 ? (
+            <div className="py-16 text-center text-muted-foreground">
+              <Layers className="mx-auto mb-2 h-10 w-10 opacity-30" />
+              Noch keine Produkte in dieser Kategorie
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-16 pl-5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Bild
+                  </TableHead>
+                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Artikelnummer
+                  </TableHead>
+                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Bezeichnung
+                  </TableHead>
+                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Sort
+                  </TableHead>
+                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Listenpreis
+                  </TableHead>
+                  <TableHead className="w-28 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    Status
+                  </TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {produkteMitBild.map((p) => (
+                  <TableRow key={p.id} className="group relative border-border/60">
+                    <TableCell className="pointer-events-none relative z-10 pl-5">
+                      {p.hauptbild_url ? (
+                        <Image
+                          src={p.hauptbild_url}
+                          alt=""
+                          width={40}
+                          height={40}
+                          unoptimized
+                          className="h-10 w-10 rounded-[8px] border border-border/60 object-cover"
+                        />
+                      ) : (
+                        <div className="grid h-10 w-10 place-items-center rounded-[8px] border border-border/60 bg-muted">
+                          <Package className="h-4 w-4 text-muted-foreground/40" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Link href={`/produkte/${p.id}`} className="absolute inset-0 z-0" />
+                      <span className="pointer-events-none relative z-10 font-mono text-[13px] transition-colors group-hover:text-primary">
+                        {p.artikelnummer}
+                      </span>
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 max-w-md">
+                      <div className="truncate">{p.name ?? "—"}</div>
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {p.sortierung}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-semibold tabular-nums">
+                      {preisMap.has(p.id) ? (
+                        <span className="text-primary">{preisMap.get(p.id)!.toFixed(2)} €</span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10">
+                      {p.artikel_bearbeitet ? (
+                        <span className="pill pill-ok">bearbeitet</span>
+                      ) : (
+                        <span className="pill pill-bad">unbearbeitet</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="relative z-20">
+                      <Link
+                        href={`/produkte/${p.id}`}
+                        className="inline-flex items-center p-1 text-muted-foreground/50 transition-colors hover:text-primary"
+                      >
+                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </div>
       </div>
     </AppShell>
   );
@@ -255,11 +267,11 @@ function BildKachel({
   className?: string;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-md border bg-background ${className ?? ""}`}>
+    <div className={`relative overflow-hidden rounded-[10px] border border-border/60 bg-background ${className ?? ""}`}>
       {url ? (
         <Image src={url} alt="" fill sizes="400px" className="object-cover" />
       ) : (
-        <div className="h-full w-full flex flex-col items-center justify-center text-xs text-muted-foreground/70 gap-0.5">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-[11px] text-muted-foreground/70">
           <span className="font-medium">{label}</span>
           <span className="text-[10px]">{size}</span>
         </div>

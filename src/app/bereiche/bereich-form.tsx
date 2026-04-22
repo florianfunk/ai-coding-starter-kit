@@ -71,7 +71,6 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
                 name="name"
                 required
                 defaultValue={defaultValues?.name ?? ""}
-                className="text-xl font-bold border-0 border-b-2 border-b-accent rounded-none px-0 focus-visible:ring-0 focus-visible:border-b-primary"
               />
               {state.fieldErrors?.name && <p className="text-sm text-destructive">{state.fieldErrors.name}</p>}
             </div>
@@ -82,7 +81,7 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
                 name="sortierung"
                 type="number"
                 defaultValue={String(defaultValues?.sortierung ?? 0)}
-                className="text-xl font-semibold text-right border-0 border-b-2 border-b-accent rounded-none px-0 focus-visible:ring-0 focus-visible:border-b-primary"
+                className="text-right"
               />
             </div>
           </div>
@@ -99,7 +98,7 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6">
             <div className="space-y-2">
               <Label>Bild</Label>
-              <div className="aspect-[4/3] w-full rounded-lg border-2 border-dashed bg-muted/50 overflow-hidden flex items-center justify-center">
+              <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
                 {bildPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={bildPreview} alt="" className="h-full w-full object-cover" />
@@ -149,11 +148,11 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex justify-end gap-2">
         <Button asChild variant="outline" type="button">
           <a href="/bereiche">Abbrechen</a>
         </Button>
-        <Button type="submit" size="lg" disabled={pending || uploading}>
+        <Button type="submit" disabled={pending || uploading}>
           {pending ? "Speichere…" : submitLabel}
         </Button>
       </div>

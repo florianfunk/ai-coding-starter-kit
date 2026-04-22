@@ -48,3 +48,4 @@ scripts/migrate-dataapi-report.json
 /nav-*.png
 /page-*.png
 /qa-*.png
+.claude/scheduled_tasks.lock

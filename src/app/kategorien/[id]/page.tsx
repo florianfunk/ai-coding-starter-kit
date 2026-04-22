@@ -17,16 +17,34 @@ export const dynamic = "force-dynamic";
 
 export default async function KategorieDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  console.log("[KAT-DETAIL] start", { id });
   const supabase = await createClient();
 
-  const { data: kategorie } = await supabase.from("kategorien").select("*").eq("id", id).single();
+  const { data: kategorie, error: katErr } = await supabase.from("kategorien").select("*").eq("id", id).single();
+  console.log("[KAT-DETAIL] kategorie-query", { hasData: !!kategorie, err: katErr?.message });
   if (!kategorie) notFound();
 
-  const [{ data: bereich }, { data: produkte }, { data: iconLinks }] = await Promise.all([
-    supabase.from("bereiche").select("id,name").eq("id", kategorie.bereich_id).single(),
-    supabase.from("produkte").select("*").eq("kategorie_id", id).order("sortierung"),
-    supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
-  ]);
+  let bereich, produkte, iconLinks;
+  try {
+    const res = await Promise.all([
+      supabase.from("bereiche").select("id,name").eq("id", kategorie.bereich_id).single(),
+      supabase.from("produkte").select("*").eq("kategorie_id", id).order("sortierung"),
+      supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
+    ]);
+    bereich = res[0].data;
+    produkte = res[1].data;
+    iconLinks = res[2].data;
+    console.log("[KAT-DETAIL] parallel-query ok", {
+      bereichOk: !!bereich,
+      prodCount: produkte?.length ?? 0,
+      iconCount: iconLinks?.length ?? 0,
+      iconShape: iconLinks?.[0] ? Object.keys(iconLinks[0]) : [],
+      firstIconSample: iconLinks?.[0] ? JSON.stringify(iconLinks[0]).slice(0, 200) : null,
+    });
+  } catch (e) {
+    console.error("[KAT-DETAIL] parallel-query EXC", e);
+    throw e;
+  }
 
   const bildUrls = {
     bild1: bildProxyUrl("produktbilder", kategorie.bild1_path),
@@ -40,6 +58,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
     label: r.icons?.label ?? "",
     url: bildProxyUrl("produktbilder", r.icons?.symbol_path ?? null),
   }));
+  console.log("[KAT-DETAIL] bildUrls", bildUrls, "iconData count:", iconData.length);
 
   const produkteMitBild = (produkte ?? []).map((p) => ({
     ...p,
@@ -47,11 +66,13 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   }));
 
   const prodIds = produkteMitBild.map((p) => p.id);
-  const { data: preise } = prodIds.length
+  const { data: preise, error: preiseErr } = prodIds.length
     ? await supabase.from("aktuelle_preise").select("produkt_id, listenpreis").in("produkt_id", prodIds)
-    : { data: [] };
+    : { data: [], error: null };
+  console.log("[KAT-DETAIL] preise-query", { count: preise?.length ?? 0, err: preiseErr?.message });
   const preisMap = new Map<string, number>();
   for (const p of preise ?? []) preisMap.set(p.produkt_id, Number(p.listenpreis));
+  console.log("[KAT-DETAIL] pre-render ok");
 
   return (
     <AppShell>

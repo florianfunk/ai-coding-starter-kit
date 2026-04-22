@@ -28,6 +28,7 @@ import { config } from "dotenv";
 import { writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { pdf } from "pdf-to-img";
+import { Jimp } from "jimp";
 
 config({ path: ".env.local" });
 
@@ -235,6 +236,32 @@ async function pdfToPng(pdfBytes: Buffer, targetPx = 240): Promise<Buffer | null
   }
 }
 
+/** Detect real file type from magic bytes (FileMaker often returns octet-stream for BMP/EMF). */
+function detectKind(bytes: Buffer): "pdf" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "emf" | "wmf" | "tiff" | null {
+  const head = bytes.slice(0, 16).toString("hex");
+  if (head.startsWith("25504446")) return "pdf";
+  if (head.startsWith("ffd8ff")) return "jpeg";
+  if (head.startsWith("89504e47")) return "png";
+  if (head.startsWith("47494638")) return "gif";
+  if (head.startsWith("52494646")) return "webp";
+  if (head.startsWith("424d")) return "bmp";
+  if (head.startsWith("010000006c")) return "emf";
+  if (head.startsWith("d7cdc69a")) return "wmf";
+  if (head.startsWith("49492a00") || head.startsWith("4d4d002a")) return "tiff";
+  return null;
+}
+
+/** Convert a BMP/TIFF buffer to PNG via jimp (pure JS — handles legacy BMP variants sharp can't). */
+async function rasterToPng(bytes: Buffer): Promise<Buffer | null> {
+  try {
+    const img = await Jimp.read(bytes);
+    return Buffer.from(await img.getBuffer("image/png"));
+  } catch (e: any) {
+    console.warn(`  raster->png failed: ${e.message}`);
+    return null;
+  }
+}
+
 /** Upload a FileMaker container to Supabase Storage; returns storage path (bucket-relative). */
 async function uploadContainer(
   bucket: string,
@@ -249,13 +276,46 @@ async function uploadContainer(
   let bytes = data.bytes;
   let contentType = data.contentType;
 
-  // Optional: render PDFs to PNG so they can be shown in <img> tags
-  if (opts.pdfToPng && contentType.includes("pdf")) {
+  // Magic-byte detection: FileMaker often returns application/octet-stream for BMP/EMF/etc.
+  // Trust magic bytes over Content-Type.
+  const kind = detectKind(bytes);
+  if (kind) {
+    contentType = {
+      pdf: "application/pdf",
+      jpeg: "image/jpeg",
+      png: "image/png",
+      gif: "image/gif",
+      webp: "image/webp",
+      bmp: "image/bmp",
+      emf: "image/x-emf",
+      wmf: "image/x-wmf",
+      tiff: "image/tiff",
+    }[kind];
+  }
+
+  // PDF → PNG for icons (<img> can't render PDF)
+  if (opts.pdfToPng && kind === "pdf") {
     const png = await pdfToPng(bytes);
     if (png) {
       bytes = png;
       contentType = "image/png";
     }
+  }
+
+  // BMP/TIFF → PNG so the browser can render them inline
+  if (kind === "bmp" || kind === "tiff") {
+    const png = await rasterToPng(bytes);
+    if (png) {
+      bytes = png;
+      contentType = "image/png";
+    }
+  }
+
+  // EMF/WMF: browsers can't render these. Skip — returning null means no path stored.
+  if (kind === "emf" || kind === "wmf") {
+    report.bilder.failed += 1;
+    console.warn(`  skipping ${kind.toUpperCase()} (not browser-renderable): ${pathPrefix}`);
+    return null;
   }
 
   let ext = "bin";
@@ -264,6 +324,8 @@ async function uploadContainer(
   else if (contentType.includes("gif")) ext = "gif";
   else if (contentType.includes("webp")) ext = "webp";
   else if (contentType.includes("pdf")) ext = "pdf";
+  else if (contentType.includes("bmp")) ext = "bmp";
+  else if (contentType.includes("tiff")) ext = "tiff";
   const hash = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
   const fullPath = `${pathPrefix}-${hash}.${ext}`;
   if (DRY_RUN) {

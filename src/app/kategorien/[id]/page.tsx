@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
@@ -79,11 +80,12 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
               <div className="flex items-start gap-5 flex-1">
                 <div className="h-24 w-32 rounded-lg border-2 bg-muted overflow-hidden shrink-0 relative">
                   {primaryBildUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={primaryBildUrl}
                       alt=""
-                      className="h-full w-full object-cover"
+                      fill
+                      sizes="128px"
+                      className="object-cover"
                     />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
@@ -106,10 +108,12 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                       {iconData.map((ic, i) => (
                         <div key={i} className="inline-flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1 border">
                           {ic.url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
+                            <Image
                               src={ic.url}
                               alt={ic.label}
+                              width={20}
+                              height={20}
+                              unoptimized
                               className="h-5 w-5 object-contain"
                             />
                           ) : null}
@@ -191,10 +195,12 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                     <TableRow key={p.id} className="group relative row-hover">
                       <TableCell className="relative z-10 pointer-events-none">
                         {p.hauptbild_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={p.hauptbild_url}
                             alt=""
+                            width={40}
+                            height={40}
+                            unoptimized
                             className="h-10 w-10 rounded object-cover border"
                           />
                         ) : (
@@ -254,8 +260,7 @@ function BildKachel({
   return (
     <div className={`relative overflow-hidden rounded-md border bg-background ${className ?? ""}`}>
       {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <Image src={url} alt="" fill sizes="400px" className="object-cover" />
       ) : (
         <div className="h-full w-full flex flex-col items-center justify-center text-xs text-muted-foreground/70 gap-0.5">
           <span className="font-medium">{label}</span>

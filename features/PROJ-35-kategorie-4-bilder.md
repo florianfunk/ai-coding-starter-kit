@@ -1,8 +1,9 @@
 # PROJ-35: Kategorie mit 4 Bildplatzhaltern (Katalog-Layout)
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-04-21
-**Last Updated:** 2026-04-21
+**Last Updated:** 2026-04-22
+**Deployed:** 2026-04-22 — https://lichtengross.vercel.app (Commit `4e196fe`)
 
 ## Dependencies
 - Requires: PROJ-4 (Kategorien verwalten)

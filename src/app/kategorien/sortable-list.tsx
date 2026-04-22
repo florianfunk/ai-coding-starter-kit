@@ -36,6 +36,7 @@ interface KategorieItem {
   name: string;
   bereich_id: string;
   bereichName: string;
+  bereichFarbe: string | null;
   thumbnail_url: string | null;
   prodCount: number;
   icons: string[];
@@ -88,8 +89,19 @@ function KategorieCard({
           aria-label={`${item.name} oeffnen`}
         />
 
-        <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-base shrink-0 relative z-10">
-          {index + 1}
+        <div
+          className={`h-11 w-11 rounded-xl flex items-center justify-center font-bold text-base shrink-0 relative z-10 border-2 ${
+            item.bereichFarbe ? "" : "bg-primary/10 border-transparent"
+          }`}
+          style={
+            item.bereichFarbe
+              ? { backgroundColor: item.bereichFarbe, borderColor: item.bereichFarbe }
+              : undefined
+          }
+        >
+          <span className={item.bereichFarbe ? "text-foreground/80" : "text-primary"}>
+            {index + 1}
+          </span>
         </div>
 
         <div className="h-16 w-24 rounded-lg bg-muted overflow-hidden shrink-0 relative z-10 border">
@@ -114,7 +126,16 @@ function KategorieCard({
               {item.name}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">{item.bereichName}</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+            {item.bereichFarbe && (
+              <span
+                className="inline-block h-2.5 w-2.5 rounded-sm border border-border/50"
+                style={{ backgroundColor: item.bereichFarbe }}
+                aria-hidden
+              />
+            )}
+            {item.bereichName}
+          </p>
           <div className="flex flex-wrap gap-1 mt-1.5">
             {item.icons.slice(0, 6).map((label) => (
               <Badge key={label} variant="secondary" className="text-[10px]">

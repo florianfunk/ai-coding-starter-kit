@@ -18,7 +18,7 @@ export default async function KategorienPage({
   const { bereich } = await searchParams;
   const supabase = await createClient();
 
-  const { data: bereiche } = await supabase.from("bereiche").select("id,name").order("sortierung");
+  const { data: bereiche } = await supabase.from("bereiche").select("id,name,farbe").order("sortierung");
 
   let q = supabase.from("kategorien").select("*").order("sortierung").limit(1000);
   if (bereich) q = q.eq("bereich_id", bereich);
@@ -41,21 +41,27 @@ export default async function KategorienPage({
     iconsByKat.set(r.kategorie_id, arr);
   }
 
-  const bereichName = new Map((bereiche ?? []).map((b) => [b.id, b.name]));
+  const bereichInfo = new Map(
+    (bereiche ?? []).map((b) => [b.id, { name: b.name, farbe: b.farbe as string | null }]),
+  );
 
-  const items = (kategorien ?? []).map((k) => ({
-    id: k.id,
-    name: k.name,
-    bereich_id: k.bereich_id,
-    bereichName: bereichName.get(k.bereich_id) ?? "—",
-    // Miniatur: erstes belegtes Bild (Bild1 bevorzugt, dann 2/3/4)
-    thumbnail_url: bildProxyUrl(
-      "produktbilder",
-      k.bild1_path ?? k.bild2_path ?? k.bild3_path ?? k.bild4_path,
-    ),
-    prodCount: prodCount.get(k.id) ?? 0,
-    icons: iconsByKat.get(k.id) ?? [],
-  }));
+  const items = (kategorien ?? []).map((k) => {
+    const info = bereichInfo.get(k.bereich_id);
+    return {
+      id: k.id,
+      name: k.name,
+      bereich_id: k.bereich_id,
+      bereichName: info?.name ?? "—",
+      bereichFarbe: info?.farbe ?? null,
+      // Miniatur: erstes belegtes Bild (Bild1 bevorzugt, dann 2/3/4)
+      thumbnail_url: bildProxyUrl(
+        "produktbilder",
+        k.bild1_path ?? k.bild2_path ?? k.bild3_path ?? k.bild4_path,
+      ),
+      prodCount: prodCount.get(k.id) ?? 0,
+      icons: iconsByKat.get(k.id) ?? [],
+    };
+  });
 
   return (
     <AppShell>

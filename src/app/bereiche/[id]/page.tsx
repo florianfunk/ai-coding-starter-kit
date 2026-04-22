@@ -87,6 +87,25 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
                   {bereich.sortierung}
                 </div>
               </div>
+
+              {/* Seiten — Gruppe: Seitenzahl / Start / Ende */}
+              <div className="shrink-0 border-l pl-6">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">Katalog-Seiten</p>
+                <div className="flex items-end gap-4">
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Anzahl</p>
+                    <p className="text-lg font-semibold tabular-nums">{bereich.seitenzahl ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Start</p>
+                    <p className="text-lg font-semibold tabular-nums">{bereich.startseite ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-wider text-muted-foreground/70">Ende</p>
+                    <p className="text-lg font-semibold tabular-nums">{bereich.endseite ?? "—"}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {bereich.beschreibung && (
@@ -113,34 +132,20 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
               <CardTitle className="text-sm uppercase tracking-widest text-primary">Bild</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="aspect-[4/3] rounded-lg border-2 bg-muted overflow-hidden relative">
+              <div className="aspect-[210/297] rounded-lg border-2 bg-muted overflow-hidden relative">
                 {bereichBildUrl ? (
                   <Image
                     src={bereichBildUrl}
                     alt=""
                     fill
                     sizes="(max-width: 768px) 100vw, 280px"
-                    className="object-cover"
+                    className="object-contain"
                   />
                 ) : (
                   <div className="h-full w-full flex items-center justify-center text-muted-foreground/30">
                     <ImageIcon className="h-10 w-10" />
                   </div>
                 )}
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-4 text-center">
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Seitenzahl</p>
-                  <p className="font-semibold">{bereich.seitenzahl ?? "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Start</p>
-                  <p className="font-semibold">{bereich.startseite ?? "—"}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Ende</p>
-                  <p className="font-semibold">{bereich.endseite ?? "—"}</p>
-                </div>
               </div>
             </CardContent>
           </Card>

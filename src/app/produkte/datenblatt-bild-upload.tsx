@@ -6,7 +6,8 @@ import { Image as ImageIcon, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { uploadSlotBild } from "./datenblatt-actions";
+import { EnhanceBildButton } from "@/components/enhance-bild-button";
+import { uploadSlotBild, getSlotBildSignedUrl } from "./datenblatt-actions";
 
 type Props = {
   name: string;
@@ -80,15 +81,26 @@ export function DatenblattBildUpload({ name, label, produktId, defaultPath, defa
               </span>
             )}
             {path && !uploading && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onRemove}
-                className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
-              >
-                <X className="h-3 w-3" /> Entfernen
-              </Button>
+              <>
+                <EnhanceBildButton
+                  bucket="produktbilder"
+                  path={path}
+                  onReplaced={async (newPath) => {
+                    const r = await getSlotBildSignedUrl(newPath);
+                    setPath(newPath);
+                    setPreviewUrl(r.url ?? null);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onRemove}
+                  className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-destructive"
+                >
+                  <X className="h-3 w-3" /> Entfernen
+                </Button>
+              </>
             )}
           </div>
         </div>

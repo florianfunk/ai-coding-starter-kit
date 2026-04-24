@@ -53,6 +53,7 @@ export default async function EditKategoriePage({ params }: { params: Promise<{ 
       <KategorieForm
         bereiche={bereiche ?? []}
         icons={iconOptions}
+        kategorieId={id}
         defaultValues={{
           bereich_id: kat.bereich_id,
           name: kat.name,

@@ -10,9 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image as ImageIcon, Table as TableIcon, Upload, X } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
-import { uploadKategorieBild, type KategorieFormState } from "./actions";
+import { uploadKategorieBild, replaceKategorieBildPath, type KategorieFormState } from "./actions";
+import { getSlotBildSignedUrl } from "../produkte/datenblatt-actions";
 
 const initial: KategorieFormState = { error: null };
 
@@ -24,6 +26,9 @@ type BildState = { path: string | null; previewUrl: string | null };
 type Props = {
   bereiche: { id: string; name: string }[];
   icons: IconOption[];
+  /** ID der Kategorie beim Bearbeiten — bei "neu" undefined. Wird fürs
+   *  sofortige Persistieren von KI-bearbeiteten Bildern gebraucht. */
+  kategorieId?: string;
   defaultValues?: {
     bereich_id?: string;
     name?: string;
@@ -51,7 +56,7 @@ const SLOT_META: Record<BildSlot, { label: string; size: string; hint: string }>
   4: { label: "Bild 4", size: "5 × 3 cm",  hint: "Rechts unten" },
 };
 
-export function KategorieForm({ bereiche, icons, defaultValues, action, submitLabel }: Props) {
+export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, action, submitLabel }: Props) {
   const [formState, formAction, pending] = useActionState(action, initial);
   const [bilder, setBilder] = useState<Record<BildSlot, BildState>>({
     1: { path: defaultValues?.bild1_path ?? null, previewUrl: defaultValues?.bild1_url ?? null },
@@ -97,6 +102,24 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
 
   function clearSlot(slot: BildSlot) {
     setBilder((prev) => ({ ...prev, [slot]: { path: null, previewUrl: null } }));
+  }
+
+  async function handleEnhanced(slot: BildSlot, newPath: string) {
+    // Wenn wir im Bearbeiten-Modus sind, direkt in die DB schreiben — sonst
+    // würde das Original-Bild (das bereits aus dem Storage gelöscht wurde)
+    // weiter von der Kategorie-Zeile referenziert. Bei "neu" nur Form-State.
+    if (kategorieId) {
+      const r = await replaceKategorieBildPath(kategorieId, `bild${slot}_path`, newPath);
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
+    }
+    const { url } = await getSlotBildSignedUrl(newPath);
+    setBilder((prev) => ({
+      ...prev,
+      [slot]: { path: newPath, previewUrl: url ?? prev[slot].previewUrl },
+    }));
   }
 
   function toggleIcon(id: string) {
@@ -233,14 +256,26 @@ export function KategorieForm({ bereiche, icons, defaultValues, action, submitLa
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={bild.previewUrl} alt="" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            aria-label="Bild entfernen"
-                            onClick={() => clearSlot(slot)}
-                            className="absolute top-1 right-1 rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
+                          <div className="absolute top-1 right-1 flex items-center gap-1">
+                            {bild.path && (
+                              <EnhanceBildButton
+                                bucket="produktbilder"
+                                path={bild.path}
+                                deleteOriginal={!!kategorieId}
+                                onReplaced={(newPath) => handleEnhanced(slot, newPath)}
+                                size="icon"
+                                className="border shadow-sm"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              aria-label="Bild entfernen"
+                              onClick={() => clearSlot(slot)}
+                              className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
                         </>
                       ) : (
                         <ImageIcon className="h-6 w-6 text-muted-foreground/40" />

@@ -1,11 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { uploadAsset } from "./actions";
+import { EnhanceBildButton } from "@/components/enhance-bild-button";
+import { uploadAsset, replaceAssetPath } from "./actions";
 
 const ASSETS: { field: string; label: string }[] = [
   { field: "cover_vorne_path", label: "Cover vorne" },

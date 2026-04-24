@@ -11,7 +11,9 @@ import {
   deleteGalerieBild,
   reorderGalerieBilder,
   setHauptbild,
+  replaceGalerieBildPath,
 } from "../actions";
+import { getSlotBildSignedUrl } from "../datenblatt-actions";
 
 type Bild = { id: string; storage_path: string; alt_text: string | null; url: string | null };
 
@@ -90,6 +92,20 @@ export function GalerieSection({
     });
   }
 
+  async function handleEnhanced(bildId: string, oldPath: string, newPath: string) {
+    const r = await replaceGalerieBildPath(bildId, produktId, oldPath, newPath);
+    if (r.error) {
+      toast.error(r.error);
+      return;
+    }
+    const { url } = await getSlotBildSignedUrl(newPath);
+    setList((prev) =>
+      prev.map((b) =>
+        b.id === bildId ? { ...b, storage_path: newPath, url: url ?? b.url } : b,
+      ),
+    );
+  }
+
   return (
     <section id="section-images" className="glass-card">
       <div className="card-head">
@@ -120,6 +136,7 @@ export function GalerieSection({
           onReorder={handleReorder}
           onSetHauptbild={handleSetHauptbild}
           onDelete={handleDelete}
+          onEnhanced={handleEnhanced}
           disabled={pending}
         />
       </div>

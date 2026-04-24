@@ -32,6 +32,13 @@ export async function setSlotBild(produktId: string, templateId: string, slotId:
   return { error: null };
 }
 
+/** Liefert eine signed URL zu einem Pfad im Bucket `produktbilder` (1h). */
+export async function getSlotBildSignedUrl(path: string): Promise<{ url: string | null }> {
+  const supabase = await createClient();
+  const { data } = await supabase.storage.from("produktbilder").createSignedUrl(path, 60 * 60);
+  return { url: data?.signedUrl ?? null };
+}
+
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 export async function uploadSlotBild(formData: FormData) {
   const file = formData.get("file") as File | null;

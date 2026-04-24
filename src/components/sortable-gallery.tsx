@@ -23,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { cn } from "@/lib/utils";
 
 export type GalleryImage = {
@@ -39,6 +40,7 @@ interface SortableGalleryProps {
   onReorder: (orderedIds: string[]) => Promise<void>;
   onSetHauptbild: (storagePath: string) => Promise<void>;
   onDelete: (imageId: string) => void;
+  onEnhanced?: (imageId: string, oldPath: string, newPath: string) => Promise<void>;
   disabled?: boolean;
 }
 
@@ -47,6 +49,7 @@ function SortableImageItem({
   isHauptbild,
   onSetHauptbild,
   onDelete,
+  onEnhanced,
   disabled,
   overlay,
 }: {
@@ -54,6 +57,7 @@ function SortableImageItem({
   isHauptbild: boolean;
   onSetHauptbild: (storagePath: string) => void;
   onDelete: (imageId: string) => void;
+  onEnhanced?: (imageId: string, oldPath: string, newPath: string) => Promise<void>;
   disabled?: boolean;
   overlay?: boolean;
 }) {
@@ -137,6 +141,16 @@ function SortableImageItem({
               Hauptbild
             </Button>
           )}
+          {onEnhanced && !overlay && (
+            <EnhanceBildButton
+              bucket="produktbilder"
+              path={image.storage_path}
+              disabled={disabled}
+              deleteOriginal
+              onReplaced={(newPath) => onEnhanced(image.id, image.storage_path, newPath)}
+              size="icon"
+            />
+          )}
           <Button
             size="sm"
             variant="destructive"
@@ -160,6 +174,7 @@ export function SortableGallery({
   onReorder,
   onSetHauptbild,
   onDelete,
+  onEnhanced,
   disabled,
 }: SortableGalleryProps) {
   const [items, setItems] = useState(images);
@@ -231,6 +246,7 @@ export function SortableGallery({
               isHauptbild={hauptbildPath === image.storage_path}
               onSetHauptbild={onSetHauptbild}
               onDelete={onDelete}
+              onEnhanced={onEnhanced}
               disabled={disabled}
             />
           ))}

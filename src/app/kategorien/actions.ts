@@ -135,6 +135,33 @@ export async function reorderKategorien(orderedIds: string[]): Promise<{ error: 
   return { error: null };
 }
 
+const KATEGORIE_BILD_SLOTS = ["bild1_path", "bild2_path", "bild3_path", "bild4_path"] as const;
+type KategorieBildSlot = (typeof KATEGORIE_BILD_SLOTS)[number];
+
+/**
+ * Persistiert einen neuen Storage-Pfad für einen Kategorie-Bild-Slot
+ * (bild1..bild4) direkt in der DB. Wird vom KI-Enhance-Button genutzt,
+ * damit die Änderung sofort wirksam ist (ohne Formular-Submit).
+ */
+export async function replaceKategorieBildPath(
+  kategorieId: string,
+  slot: string,
+  newPath: string,
+): Promise<{ error: string | null }> {
+  if (!KATEGORIE_BILD_SLOTS.includes(slot as KategorieBildSlot)) {
+    return { error: `Unbekannter Slot: ${slot}` };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("kategorien")
+    .update({ [slot]: newPath })
+    .eq("id", kategorieId);
+  if (error) return { error: error.message };
+  revalidatePath(`/kategorien/${kategorieId}/bearbeiten`);
+  revalidatePath("/kategorien");
+  return { error: null };
+}
+
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 export async function uploadKategorieBild(formData: FormData) {
   const file = formData.get("file") as File | null;

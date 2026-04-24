@@ -5,13 +5,14 @@
 -- damit er ohne Deploy in den Einstellungen geändert werden kann. Zugriff nur
 -- für authentifizierte Nutzer (wie alle anderen Einstellungen auch).
 
-create table public.ai_einstellungen (
+create table if not exists public.ai_einstellungen (
   id               integer primary key default 1 check (id = 1),
   replicate_token  text,
   updated_at       timestamptz not null default now(),
   updated_by       uuid references auth.users(id)
 );
 
+drop trigger if exists ai_einstellungen_set_updated on public.ai_einstellungen;
 create trigger ai_einstellungen_set_updated
   before update on public.ai_einstellungen
   for each row execute function public.set_updated_at();

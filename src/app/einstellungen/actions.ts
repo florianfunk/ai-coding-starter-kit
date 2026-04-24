@@ -96,6 +96,27 @@ type AssetField = (typeof ASSET_FIELDS)[number];
 
 const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 
+/**
+ * Persistiert einen neuen Storage-Pfad in ein Asset-Feld (Cover/Logo).
+ * Wird vom KI-Enhance-Button in LogosTab genutzt.
+ */
+export async function replaceAssetPath(
+  field: string,
+  newPath: string,
+): Promise<{ error: string | null }> {
+  if (!ASSET_FIELDS.includes(field as AssetField)) {
+    return { error: `Unbekanntes Feld: ${field}` };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("katalog_einstellungen")
+    .update({ [field]: newPath })
+    .eq("id", 1);
+  if (error) return { error: error.message };
+  revalidatePath("/einstellungen");
+  return { error: null };
+}
+
 export async function uploadAsset(formData: FormData) {
   const file = formData.get("file") as File | null;
   const field = String(formData.get("field") ?? "") as AssetField;

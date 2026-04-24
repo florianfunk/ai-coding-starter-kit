@@ -76,7 +76,7 @@
 ```
 
 ### Data Model
-Alle technischen Felder flach in `produkte`-Tabelle (siehe PROJ-2). Galeriebilder in separater Tabelle `produkt_bilder` mit Sortier-Feld. Icon-Leiste (im Datenblatt oben) in `produkt_icons` (n:m).
+Alle technischen Felder flach in `produkte`-Tabelle (siehe PROJ-2). Galeriebilder in separater Tabelle `produkt_bilder` mit Sortier-Feld. Icon-Leiste (im Datenblatt oben) in `produkt_icons` (n:m) — zusätzlich Spalte `wert text` pro Zuordnung (Freitext, entspricht FileMaker `Icon_Wert_1..10`: z.B. "4,8", "24VDC", "430"). Unter jedem ausgewählten Icon im Formular erscheint ein Input-Feld zum Pflegen.
 
 **Dirty-State-Handling**: Das Formular merkt sich geänderte Felder und warnt beim Verlassen, wenn nicht gespeichert.
 

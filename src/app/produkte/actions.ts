@@ -93,13 +93,35 @@ function parseBase(formData: FormData) {
   });
 }
 
-async function setProduktIcons(supabase: Awaited<ReturnType<typeof createClient>>, produktId: string, iconIds: string[]) {
+async function setProduktIcons(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  produktId: string,
+  iconIds: string[],
+  iconWerte: Record<string, string>,
+) {
   await supabase.from("produkt_icons").delete().eq("produkt_id", produktId);
   if (iconIds.length) {
     await supabase.from("produkt_icons").insert(
-      iconIds.map((icon_id, i) => ({ produkt_id: produktId, icon_id, sortierung: i })),
+      iconIds.map((icon_id, i) => ({
+        produkt_id: produktId,
+        icon_id,
+        sortierung: i,
+        wert: iconWerte[icon_id] ?? null,
+      })),
     );
   }
+}
+
+function readIconWerte(formData: FormData, iconIds: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const id of iconIds) {
+    const raw = formData.get(`icon_wert__${id}`);
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) continue;
+    out[id] = trimmed.slice(0, 120);
+  }
+  return out;
 }
 
 export async function createProdukt(_p: ProduktFormState, formData: FormData): Promise<ProduktFormState> {
@@ -121,7 +143,8 @@ export async function createProdukt(_p: ProduktFormState, formData: FormData): P
   }
 
   const iconIds = formData.getAll("icon_ids").map(String).filter(Boolean);
-  await setProduktIcons(supabase, data.id, iconIds);
+  const iconWerte = readIconWerte(formData, iconIds);
+  await setProduktIcons(supabase, data.id, iconIds, iconWerte);
 
   revalidatePath("/produkte");
   revalidateTag("dashboard", "max");
@@ -141,7 +164,8 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
   }
 
   const iconIds = formData.getAll("icon_ids").map(String).filter(Boolean);
-  await setProduktIcons(supabase, id, iconIds);
+  const iconWerte = readIconWerte(formData, iconIds);
+  await setProduktIcons(supabase, id, iconIds, iconWerte);
 
   await logAudit(supabase, { tableName: "produkte", recordId: id, action: "update", recordLabel: parsed.data.artikelnummer });
 
@@ -278,15 +302,20 @@ export async function duplicateProdukt(id: string): Promise<{ id?: string; error
     return { error: error?.message ?? "Fehler beim Duplizieren" };
   }
 
-  // Copy produkt_icons (n:m) for the new product
+  // Copy produkt_icons (n:m) for the new product — inkl. Wert pro Icon
   const { data: srcIcons } = await supabase
     .from("produkt_icons")
-    .select("icon_id, sortierung")
+    .select("icon_id, sortierung, wert")
     .eq("produkt_id", id);
 
   if (srcIcons && srcIcons.length > 0) {
     await supabase.from("produkt_icons").insert(
-      srcIcons.map((row) => ({ produkt_id: data.id, icon_id: row.icon_id, sortierung: row.sortierung })),
+      srcIcons.map((row) => ({
+        produkt_id: data.id,
+        icon_id: row.icon_id,
+        sortierung: row.sortierung,
+        wert: row.wert,
+      })),
     );
   }
 

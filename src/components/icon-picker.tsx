@@ -36,6 +36,10 @@ type Props = {
   onReorder: (orderedIds: string[]) => void;
   /** Show remove buttons on selected icons (default: false) */
   showRemoveButtons?: boolean;
+  /** Freitext-Wert pro Icon (z.B. "24VDC", "4,8"). Wenn gesetzt, erscheint
+   *  unter jedem ausgewählten Icon ein Input zum Pflegen des Werts. */
+  values?: Record<string, string>;
+  onValueChange?: (id: string, value: string) => void;
 };
 
 export function IconPicker({
@@ -44,6 +48,8 @@ export function IconPicker({
   onToggle,
   onReorder,
   showRemoveButtons = false,
+  values,
+  onValueChange,
 }: Props) {
   const [search, setSearch] = useState("");
 
@@ -143,6 +149,8 @@ export function IconPicker({
                       key={id}
                       icon={ic}
                       onRemove={showRemoveButtons ? () => onToggle(id) : undefined}
+                      value={onValueChange ? (values?.[id] ?? "") : undefined}
+                      onValueChange={onValueChange ? (v) => onValueChange(id, v) : undefined}
                     />
                   );
                 })}
@@ -241,9 +249,14 @@ export function IconPicker({
 function SortableSelectedIcon({
   icon,
   onRemove,
+  value,
+  onValueChange,
 }: {
   icon: IconItem;
   onRemove?: () => void;
+  /** Falls definiert: Input-Feld unter dem Icon zum Pflegen des Freitext-Werts */
+  value?: string;
+  onValueChange?: (v: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: icon.id,
@@ -255,36 +268,56 @@ function SortableSelectedIcon({
     zIndex: isDragging ? 50 : undefined,
   };
 
+  const hasWert = onValueChange !== undefined;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative group flex flex-col items-center gap-1.5 touch-none select-none ${
-        isDragging ? "cursor-grabbing" : "cursor-grab"
-      }`}
-      {...attributes}
-      {...listeners}
+      className="relative group flex flex-col items-center gap-1 select-none"
     >
+      {/* Drag-Handle nur über dem Icon/Label, damit das Input anklickbar bleibt */}
       <div
-        className={`relative h-14 w-14 rounded-lg bg-background flex items-center justify-center overflow-hidden transition-all ${
-          isDragging
-            ? "shadow-xl ring-2 ring-primary scale-105"
-            : "group-hover:shadow-md"
+        className={`flex flex-col items-center gap-1.5 touch-none ${
+          isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
+        {...attributes}
+        {...listeners}
       >
-        {icon.url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={icon.url}
-            alt={icon.label}
-            className="max-h-full max-w-full object-contain p-1 pointer-events-none"
-          />
-        ) : (
-          <span className="text-[10px] font-bold pointer-events-none text-center px-1 leading-tight">
-            {icon.label}
-          </span>
-        )}
+        <div
+          className={`relative h-14 w-14 rounded-lg bg-background flex items-center justify-center overflow-hidden transition-all ${
+            isDragging ? "shadow-xl ring-2 ring-primary scale-105" : "group-hover:shadow-md"
+          }`}
+        >
+          {icon.url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={icon.url}
+              alt={icon.label}
+              className="max-h-full max-w-full object-contain p-1 pointer-events-none"
+            />
+          ) : (
+            <span className="text-[10px] font-bold pointer-events-none text-center px-1 leading-tight">
+              {icon.label}
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] text-center w-14 truncate pointer-events-none font-medium">
+          {icon.label}
+        </span>
       </div>
+      {hasWert && (
+        <input
+          type="text"
+          value={value ?? ""}
+          onChange={(e) => onValueChange!(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
+          maxLength={120}
+          aria-label={`Wert für ${icon.label}`}
+          placeholder="—"
+          className="h-7 w-14 rounded-md border border-input bg-background px-1.5 text-[11px] text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/40"
+        />
+      )}
       {onRemove && (
         <button
           type="button"
@@ -299,9 +332,6 @@ function SortableSelectedIcon({
           <X className="h-3 w-3" strokeWidth={3} />
         </button>
       )}
-      <span className="text-[10px] text-center w-14 truncate pointer-events-none font-medium">
-        {icon.label}
-      </span>
     </div>
   );
 }

@@ -792,7 +792,7 @@ async function main() {
           report.produkte.inserted++;
         }
 
-        // produkt_icons n:m (10 Slots)
+        // produkt_icons n:m (10 Slots). Pro Slot zusätzlich Icon_Wert_N (Freitext).
         if (!DRY_RUN) {
           await pg.query(`delete from public.produkt_icons where produkt_id = $1`, [artikelUuid]);
           for (let i = 1; i <= 10; i++) {
@@ -803,10 +803,14 @@ async function main() {
               report.produkt_icons.warnings.push(`Artikel ${fmId}: Icon ${iconFmId} nicht gefunden`);
               continue;
             }
+            const rawWert = r[`Icon_Wert_${i}`];
+            const wert = rawWert === "" || rawWert === null || rawWert === undefined
+              ? null
+              : String(rawWert).trim() || null;
             await pg.query(
-              `insert into public.produkt_icons (produkt_id, icon_id, sortierung)
-               values ($1,$2,$3) on conflict do nothing`,
-              [artikelUuid, iconUuid, i],
+              `insert into public.produkt_icons (produkt_id, icon_id, sortierung, wert)
+               values ($1,$2,$3,$4) on conflict do nothing`,
+              [artikelUuid, iconUuid, i, wert],
             );
             report.produkt_icons.inserted++;
           }

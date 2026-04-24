@@ -123,6 +123,7 @@ type Props = {
   icons: Icon[];
   defaultValues?: Record<string, any>;
   defaultIconIds?: string[];
+  defaultIconWerte?: Record<string, string>;
   defaultHauptbildUrl?: string | null;
   defaultDatenblattBildUrls?: DatenblattBildUrls;
   produktId?: string;
@@ -132,7 +133,7 @@ type Props = {
 
 export function ProduktForm({
   bereiche, kategorien, icons,
-  defaultValues = {}, defaultIconIds = [],
+  defaultValues = {}, defaultIconIds = [], defaultIconWerte = {},
   defaultHauptbildUrl = null, defaultDatenblattBildUrls = {},
   produktId,
   action, submitLabel,
@@ -146,6 +147,7 @@ export function ProduktForm({
     const seen = new Set<string>();
     return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
   });
+  const [iconWerte, setIconWerte] = useState<Record<string, string>>(() => ({ ...defaultIconWerte }));
   const marken = useMemo<Marke[]>(() => {
     const raw = defaultValues.marken;
     if (Array.isArray(raw) && raw.length) {
@@ -171,6 +173,17 @@ export function ProduktForm({
       return next;
     });
   }, []);
+
+  const setIconWert = useCallback((id: string, value: string) => {
+    setIconWerte((prev) => {
+      if ((prev[id] ?? "") === value) return prev;
+      const next = { ...prev };
+      if (value.length === 0) delete next[id];
+      else next[id] = value;
+      return next;
+    });
+    markDirty("icons");
+  }, [markDirty]);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
@@ -216,6 +229,13 @@ export function ProduktForm({
 
   function toggleIcon(id: string) {
     setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    // Abwahl: zugehörigen Wert verwerfen
+    setIconWerte((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     markDirty("icons");
   }
 
@@ -619,7 +639,20 @@ export function ProduktForm({
               onToggle={toggleIcon}
               onReorder={setIconIds}
               showRemoveButtons
+              values={iconWerte}
+              onValueChange={setIconWert}
             />
+            {/* Hidden inputs für Icon-Werte (Key: icon_wert__<iconId>) */}
+            {iconIds.map((id) =>
+              iconWerte[id] ? (
+                <input
+                  key={`wert-${id}`}
+                  type="hidden"
+                  name={`icon_wert__${id}`}
+                  value={iconWerte[id]}
+                />
+              ) : null,
+            )}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

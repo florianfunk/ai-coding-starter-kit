@@ -33,7 +33,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     supabase.from("bereiche").select("id,name").order("sortierung"),
     supabase.from("kategorien").select("id,name,bereich_id").order("name"),
     supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
-    supabase.from("produkt_icons").select("icon_id").eq("produkt_id", id).order("sortierung"),
+    supabase.from("produkt_icons").select("icon_id, wert").eq("produkt_id", id).order("sortierung"),
     supabase.from("produkt_bilder").select("*").eq("produkt_id", id).order("sortierung"),
     supabase
       .from("preise")
@@ -231,6 +231,11 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
               icons={iconsFull}
               defaultValues={produkt}
               defaultIconIds={(produktIcons ?? []).map((r) => r.icon_id)}
+              defaultIconWerte={Object.fromEntries(
+                (produktIcons ?? [])
+                  .filter((r) => r.wert !== null && r.wert !== undefined && r.wert !== "")
+                  .map((r) => [r.icon_id, r.wert as string]),
+              )}
               defaultHauptbildUrl={hauptbildUrl}
               defaultDatenblattBildUrls={defaultDatenblattBildUrls}
               produktId={id}

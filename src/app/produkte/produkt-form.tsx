@@ -404,12 +404,6 @@ export function ProduktForm({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
-
-      <div className="flex justify-end">
-        <Button asChild variant="ghost" type="button" className="text-muted-foreground">
-          <a href="/produkte">Abbrechen</a>
-        </Button>
-      </div>
     </form>
   );
 }

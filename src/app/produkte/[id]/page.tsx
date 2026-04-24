@@ -230,6 +230,15 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             <PreiseSection produktId={id} preise={preise ?? []} />
             <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
             <AuditSection produktId={id} />
+
+            <div className="mt-2 flex justify-center pt-2">
+              <Link
+                href="/produkte"
+                className="text-[13px] text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+              >
+                ← Zurück zur Produktliste
+              </Link>
+            </div>
           </div>
 
           <ProduktRail

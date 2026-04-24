@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown, Images } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
@@ -20,10 +20,6 @@ import { PRODUKT_FIELD_GROUPS } from "./fields";
 import { DatenblattBildUpload } from "./datenblatt-bild-upload";
 
 type Marke = "lichtengros" | "eisenkeil";
-const MARKE_OPTIONS: { value: Marke; label: string }[] = [
-  { value: "lichtengros", label: "Lichtengros" },
-  { value: "eisenkeil", label: "Eisenkeil" },
-];
 
 export type DatenblattBildUrls = {
   bild_detail_1_path?: string | null;
@@ -143,15 +139,19 @@ export function ProduktForm({
   const [bereichId, setBereichId] = useState<string>(defaultValues.bereich_id ?? "");
   const [hauptbildPath, setHauptbildPath] = useState<string | null>(defaultValues.hauptbild_path ?? null);
   const [hauptbildPreview, setHauptbildPreview] = useState<string | null>(defaultHauptbildUrl);
+  const [hauptbildZoom, setHauptbildZoom] = useState(false);
   const [iconIds, setIconIds] = useState<string[]>(() => {
     const seen = new Set<string>();
     return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
   });
-  const [marken, setMarken] = useState<Marke[]>(() => {
+  const marken = useMemo<Marke[]>(() => {
     const raw = defaultValues.marken;
-    if (Array.isArray(raw) && raw.length) return raw.filter((m): m is Marke => m === "lichtengros" || m === "eisenkeil");
+    if (Array.isArray(raw) && raw.length) {
+      const filtered = raw.filter((m): m is Marke => m === "lichtengros" || m === "eisenkeil");
+      if (filtered.length) return filtered;
+    }
     return ["lichtengros"];
-  });
+  }, [defaultValues.marken]);
   const [uploading, startUpload] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
   const [dirtySections, setDirtySections] = useState<Set<string>>(new Set());
@@ -169,11 +169,6 @@ export function ProduktForm({
       return next;
     });
   }, []);
-
-  const toggleMarke = useCallback((m: Marke) => {
-    setMarken((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
-    markDirty("base");
-  }, [markDirty]);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
@@ -290,45 +285,27 @@ export function ProduktForm({
             <Label htmlFor="artikel_bearbeitet">Artikel bearbeitet</Label>
           </div>
 
-          <div className="mt-4 space-y-2">
-            <Label>Marken *</Label>
-            {/* Hidden inputs transport the selected marken via FormData (multi-value) */}
-            {marken.map((m) => <input key={m} type="hidden" name="marken" value={m} />)}
-            <div className="flex flex-wrap gap-3">
-              {MARKE_OPTIONS.map((opt) => {
-                const checked = marken.includes(opt.value);
-                return (
-                  <label
-                    key={opt.value}
-                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition ${
-                      checked ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleMarke(opt.value)}
-                      aria-label={opt.label}
-                    />
-                    {opt.label}
-                  </label>
-                );
-              })}
-            </div>
-            {state.fieldErrors?.marken && <p className="text-sm text-destructive">{state.fieldErrors.marken}</p>}
-            {marken.length === 0 && <p className="text-xs text-muted-foreground">Mindestens eine Marke auswählen.</p>}
-          </div>
+          {/* Marken werden intern als "lichtengros" gesetzt; keine UI-Auswahl */}
+          {marken.map((m) => <input key={m} type="hidden" name="marken" value={m} />)}
 
           <div className="mt-4 space-y-2">
             <Label>Hauptbild</Label>
             <div className="flex items-start gap-4">
-              <div className="flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
-                {hauptbildPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={hauptbildPreview} alt="" className="h-full w-full object-contain" />
-                ) : (
+              {hauptbildPreview ? (
+                <button
+                  type="button"
+                  onClick={() => setHauptbildZoom(true)}
+                  className="group relative flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-primary"
+                  aria-label="Hauptbild vergrößern"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={hauptbildPreview} alt="" className="h-full w-full object-contain transition-transform group-hover:scale-[1.03]" />
+                </button>
+              ) : (
+                <div className="flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
                   <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                )}
-              </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
                   onChange={(e) => handleHauptbild(e.target.files?.[0] ?? null)} />
@@ -338,6 +315,20 @@ export function ProduktForm({
           </div>
         </div>
       </section>
+
+      <Dialog open={hauptbildZoom} onOpenChange={setHauptbildZoom}>
+        <DialogContent className="max-w-[90vw] p-2 sm:max-w-4xl">
+          <DialogTitle className="sr-only">Hauptbild Vorschau</DialogTitle>
+          {hauptbildPreview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={hauptbildPreview}
+              alt="Hauptbild"
+              className="max-h-[85vh] w-full object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Toggle all button */}
       <div className="flex justify-end">

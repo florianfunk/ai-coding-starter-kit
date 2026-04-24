@@ -269,7 +269,7 @@ function SortableSelectedIcon({
         className={`relative h-14 w-14 rounded-lg bg-background flex items-center justify-center overflow-hidden transition-all ${
           isDragging
             ? "shadow-xl ring-2 ring-primary scale-105"
-            : "ring-2 ring-primary/70 group-hover:ring-primary group-hover:shadow-md"
+            : "group-hover:shadow-md"
         }`}
       >
         {icon.url ? (

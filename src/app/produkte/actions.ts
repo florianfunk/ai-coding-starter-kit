@@ -368,6 +368,36 @@ export async function setHauptbild(
   return { error: null };
 }
 
+/**
+ * Ersetzt den Storage-Pfad eines Galeriebildes (nach Upscale/BG-Remove).
+ * Aktualisiert auch hauptbild_path, falls das Galeriebild als Hauptbild
+ * markiert war.
+ */
+export async function replaceGalerieBildPath(
+  bildId: string,
+  produktId: string,
+  oldPath: string,
+  newPath: string,
+): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("produkt_bilder")
+    .update({ storage_path: newPath })
+    .eq("id", bildId);
+  if (error) return { error: error.message };
+
+  // Hauptbild-Referenz ggf. mitziehen
+  await supabase
+    .from("produkte")
+    .update({ hauptbild_path: newPath })
+    .eq("id", produktId)
+    .eq("hauptbild_path", oldPath);
+
+  revalidatePath(`/produkte/${produktId}`);
+  return { error: null };
+}
+
 // ---------------------------------------------------------------------------
 // Preis-Import
 // ---------------------------------------------------------------------------
@@ -388,13 +418,13 @@ export type ImportPreiseResult = {
 
 export async function importPreise(data: {
   rows: ImportPreiseRow[];
+  // TODO(PROJ-17): Wizard-Flow auf Spur-Auswahl umstellen — deactivateOld ist obsolet.
   deactivateOld: boolean;
 }): Promise<ImportPreiseResult> {
   if (data.rows.length > 5000) {
     return { imported: 0, notFound: [], error: "Maximal 5000 Zeilen pro Import." };
   }
 
-  // Validate no negative prices
   for (const row of data.rows) {
     if ((row.listenpreis != null && row.listenpreis < 0) ||
         (row.ek_lichtengros != null && row.ek_lichtengros < 0) ||
@@ -405,7 +435,6 @@ export async function importPreise(data: {
 
   const supabase = await createClient();
 
-  // Fetch all products to build artikelnummer -> id map
   const { data: produkte, error: fetchErr } = await supabase
     .from("produkte")
     .select("id, artikelnummer");
@@ -421,6 +450,7 @@ export async function importPreise(data: {
 
   let imported = 0;
   const notFound: string[] = [];
+  const today = new Date().toISOString().slice(0, 10);
 
   for (const row of data.rows) {
     const key = row.artikelnummer.trim().toLowerCase();
@@ -431,31 +461,23 @@ export async function importPreise(data: {
       continue;
     }
 
-    // If deactivateOld: set existing active prices to inactive
-    if (data.deactivateOld) {
-      await supabase
-        .from("preise")
-        .update({ status: "inaktiv" })
-        .eq("produkt_id", produktId)
-        .eq("status", "aktiv");
+    const gueltig_ab = row.gueltig_ab ?? today;
+    const inserts: Array<{ produkt_id: string; spur: "listenpreis" | "lichtengros" | "eisenkeil"; gueltig_ab: string; preis: number; quelle: string }> = [];
+
+    if (row.listenpreis != null) {
+      inserts.push({ produkt_id: produktId, spur: "listenpreis", gueltig_ab, preis: row.listenpreis, quelle: "import:preis-wizard" });
+    }
+    if (row.ek_lichtengros != null) {
+      inserts.push({ produkt_id: produktId, spur: "lichtengros", gueltig_ab, preis: row.ek_lichtengros, quelle: "import:preis-wizard" });
+    }
+    if (row.ek_eisenkeil != null) {
+      inserts.push({ produkt_id: produktId, spur: "eisenkeil", gueltig_ab, preis: row.ek_eisenkeil, quelle: "import:preis-wizard" });
     }
 
-    // Insert new price record
-    const insertData: Record<string, unknown> = {
-      produkt_id: produktId,
-      status: "aktiv",
-    };
+    if (inserts.length === 0) continue;
 
-    if (row.listenpreis != null) insertData.listenpreis = row.listenpreis;
-    if (row.ek_lichtengros != null) insertData.ek_lichtengros = row.ek_lichtengros;
-    if (row.ek_eisenkeil != null) insertData.ek_eisenkeil = row.ek_eisenkeil;
-    if (row.gueltig_ab) insertData.gueltig_ab = row.gueltig_ab;
-
-    const { error: insertErr } = await supabase.from("preise").insert(insertData);
-
-    if (!insertErr) {
-      imported++;
-    }
+    const { error: insertErr } = await supabase.from("preise").insert(inserts);
+    if (!insertErr) imported++;
   }
 
   revalidatePath("/produkte");
@@ -499,22 +521,17 @@ export async function matchArtikelnummern(
 
   if (matchedIds.length > 0) {
     const { data: preise } = await supabase
-      .from("preise")
+      .from("aktuelle_preise_flat")
       .select("produkt_id, listenpreis, ek_lichtengros, ek_eisenkeil")
-      .in("produkt_id", matchedIds)
-      .eq("status", "aktiv")
-      .order("gueltig_ab", { ascending: false });
+      .in("produkt_id", matchedIds);
 
     if (preise) {
       for (const p of preise) {
-        // Only keep the first (most recent) price per product
-        if (!priceMap[p.produkt_id]) {
-          priceMap[p.produkt_id] = {
-            listenpreis: p.listenpreis,
-            ek_lichtengros: p.ek_lichtengros,
-            ek_eisenkeil: p.ek_eisenkeil,
-          };
-        }
+        priceMap[p.produkt_id] = {
+          listenpreis: p.listenpreis,
+          ek_lichtengros: p.ek_lichtengros,
+          ek_eisenkeil: p.ek_eisenkeil,
+        };
       }
     }
   }

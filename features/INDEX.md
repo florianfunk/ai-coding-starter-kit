@@ -19,7 +19,7 @@
 | PROJ-3 | Bereiche verwalten (CRUD) | In Progress | [PROJ-3](PROJ-3-bereiche-verwalten.md) | 2026-04-16 |
 | PROJ-4 | Kategorien verwalten (CRUD) | In Progress | [PROJ-4](PROJ-4-kategorien-verwalten.md) | 2026-04-16 |
 | PROJ-5 | Produkte/Artikel verwalten (CRUD) | In Progress | [PROJ-5](PROJ-5-produkte-verwalten.md) | 2026-04-16 |
-| PROJ-6 | Preisverwaltung pro Produkt (drei Spuren) | Architected | [PROJ-6](PROJ-6-preisverwaltung.md) | 2026-04-16 |
+| PROJ-6 | Preisverwaltung pro Produkt (drei Spuren) | In Progress | [PROJ-6](PROJ-6-preisverwaltung.md) | 2026-04-16 |
 | PROJ-7 | Suche & Filter | In Progress | [PROJ-7](PROJ-7-suche-und-filter.md) | 2026-04-16 |
 | PROJ-8 | Filialen- & Katalog-Einstellungen | In Progress | [PROJ-8](PROJ-8-filialen-und-katalog-einstellungen.md) | 2026-04-16 |
 | PROJ-9 | PDF-Export Einzel-Datenblatt | In Progress | [PROJ-9](PROJ-9-pdf-datenblatt.md) | 2026-04-16 |

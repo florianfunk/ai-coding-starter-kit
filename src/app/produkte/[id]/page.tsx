@@ -35,7 +35,13 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
     supabase.from("produkt_icons").select("icon_id").eq("produkt_id", id).order("sortierung"),
     supabase.from("produkt_bilder").select("*").eq("produkt_id", id).order("sortierung"),
-    supabase.from("preise").select("*").eq("produkt_id", id).order("gueltig_ab", { ascending: false }),
+    supabase
+      .from("preise")
+      .select("id, produkt_id, spur, gueltig_ab, preis, quelle, created_at")
+      .eq("produkt_id", id)
+      .order("spur")
+      .order("gueltig_ab", { ascending: false })
+      .order("created_at", { ascending: false }),
     supabase.from("datenblatt_templates").select("*").order("is_system", { ascending: false }).order("sortierung"),
     produkt.datenblatt_template_id
       ? supabase.from("produkt_datenblatt_slots").select("slot_id,storage_path").eq("produkt_id", id).eq("template_id", produkt.datenblatt_template_id)
@@ -81,7 +87,8 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     if (url) slotImages[row.slot_id] = { path: row.storage_path, url };
   }
 
-  const hasActivePrice = (preise ?? []).some((p) => p.status === "aktiv");
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const hasActivePrice = (preise ?? []).some((p) => p.gueltig_ab <= todayIso);
   const iconCount = (produktIcons ?? []).length;
   const galerieCount = (galerie ?? []).length;
   const hasTemplate = Boolean(produkt.datenblatt_template_id);

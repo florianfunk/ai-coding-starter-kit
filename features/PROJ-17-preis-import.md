@@ -4,7 +4,9 @@
 **Created:** 2026-04-17
 
 ## Dependencies
-- Requires: PROJ-6 (Preisverwaltung)
+- Requires: PROJ-6 (Preisverwaltung) — neues Modell mit drei getrennten Spuren (Lichtengros / Eisenkeil / Listenpreis)
+
+> **Hinweis (2026-04-24):** PROJ-6 wurde neu konzipiert. Ein Import befüllt jetzt genau **eine** Preisspur. Die ACs unten gehen teilweise noch vom alten Modell (eine Datei mit mehreren Preisspalten) aus und müssen in einer weiteren `/requirements`-Runde überarbeitet werden.
 
 ## User Stories
 - Als Nutzer moechte ich eine Excel/CSV-Datei mit Preisen hochladen koennen, damit ich nicht 419 Preise einzeln eintippen muss.

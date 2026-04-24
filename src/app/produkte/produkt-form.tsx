@@ -113,6 +113,7 @@ export function ProduktForm({
   });
   const [uploading, startUpload] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
+  const [dirty, setDirty] = useState(false);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
@@ -134,7 +135,10 @@ export function ProduktForm({
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
-    if (state.error === null && state !== initial && !pending) toast.success("Gespeichert");
+    if (state.error === null && state !== initial && !pending) {
+      toast.success("Gespeichert");
+      setDirty(false);
+    }
   }, [state, pending]);
 
   function handleHauptbild(file: File | null) {
@@ -145,19 +149,29 @@ export function ProduktForm({
     startUpload(async () => {
       const r = await uploadProduktBild(fd);
       if (r.error) toast.error(r.error);
-      else { setHauptbildPath(r.path); setHauptbildPreview(URL.createObjectURL(file)); }
+      else {
+        setHauptbildPath(r.path);
+        setHauptbildPreview(URL.createObjectURL(file));
+        setDirty(true);
+      }
     });
   }
 
   function toggleIcon(id: string) {
     setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setDirty(true);
   }
 
   const thermischGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "thermisch");
   const sonstigesGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "sonstiges");
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form
+      action={formAction}
+      onInput={() => setDirty(true)}
+      onChange={() => setDirty(true)}
+      className="space-y-6"
+    >
       <input type="hidden" name="hauptbild_path" value={hauptbildPath ?? ""} />
 
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
@@ -175,7 +189,7 @@ export function ProduktForm({
               Artikelnummer, Name, Bereich, Kategorie, Hauptbild
             </div>
           </div>
-          <SectionSaveButton pending={pending || uploading} />
+          <SectionSaveButton pending={pending || uploading} dirty={dirty} />
         </div>
         <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -258,7 +272,7 @@ export function ProduktForm({
               progress={sectionProgress("datenblatt", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -298,7 +312,7 @@ export function ProduktForm({
               <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
                 <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
-              <SectionSaveButton pending={pending || uploading} floating />
+              <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
               <AccordionContent className="px-4 pb-4">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {group.fields.map((f) => (
@@ -324,7 +338,7 @@ export function ProduktForm({
               progress={sectionProgress("thermisch", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {thermischGroup?.fields.map((f) => (
@@ -352,7 +366,7 @@ export function ProduktForm({
               countBadge={iconIds.length}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
           <AccordionContent className="px-4 pb-4">
             <IconPicker
               icons={icons}
@@ -376,22 +390,26 @@ export function ProduktForm({
 
 /** Compact Save-Button for the dark section header.
  *  Triggers the parent form's submit. In Accordion items we render it
- *  `floating` (absolute) so it sits on top of the trigger button without
- *  nesting a <button> inside another <button>. */
+ *  `floating` (absolute, pinned to the top of the header bar) so it sits
+ *  on the dark trigger strip without nesting a <button> inside another
+ *  <button>. Only renders when the form has unsaved changes. */
 function SectionSaveButton({
   pending,
+  dirty,
   floating,
 }: {
   pending: boolean;
+  dirty: boolean;
   floating?: boolean;
 }) {
+  if (!dirty && !pending) return null;
   return (
     <button
       type="submit"
       disabled={pending}
       onClick={(e) => e.stopPropagation()}
       className={`${
-        floating ? "absolute right-3 top-1/2 -translate-y-1/2 z-10" : "shrink-0"
+        floating ? "absolute right-3 top-2 z-10" : "shrink-0"
       } inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-semibold tracking-[-0.003em] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15),inset_0_0.5px_0_rgba(255,255,255,0.22)] transition-all hover:-translate-y-px hover:shadow-[0_4px_10px_rgba(217,4,22,0.35)] disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none`}
       style={{ background: "#D90416" }}
     >

@@ -40,7 +40,7 @@ export default async function VergleichPage({
 
   // Load current prices for these products
   const { data: preise } = await supabase
-    .from("aktuelle_preise")
+    .from("aktuelle_preise_flat")
     .select("produkt_id, listenpreis, ek")
     .in("produkt_id", ids);
 

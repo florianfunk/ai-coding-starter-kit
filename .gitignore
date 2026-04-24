@@ -45,7 +45,11 @@ scripts/migrate-dataapi-report.json
 # Playwright MCP artefakte (lokale Browser-Tests)
 /.playwright-mcp/
 /screenshots/
-/nav-*.png
-/page-*.png
-/qa-*.png
+/*.png
 .claude/scheduled_tasks.lock
+
+# Lokale Debug-/HTTP-Dateien
+/cookies.txt
+
+# Supabase CLI lokaler Cache
+/supabase/.temp/

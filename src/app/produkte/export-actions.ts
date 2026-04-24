@@ -168,7 +168,7 @@ export async function exportProdukte(options: ExportOptions): Promise<ExportResu
 
     const [preiseResult, bereicheResult, kategorienResult] = await Promise.all([
       needPreise
-        ? supabase.from("aktuelle_preise").select("produkt_id,listenpreis,ek,ek_eisenkeil,gueltig_ab").in("produkt_id", produktIds)
+        ? supabase.from("aktuelle_preise_flat").select("produkt_id,listenpreis,ek,ek_eisenkeil,gueltig_ab").in("produkt_id", produktIds)
         : { data: [] },
       needBereich
         ? supabase.from("bereiche").select("id,name")

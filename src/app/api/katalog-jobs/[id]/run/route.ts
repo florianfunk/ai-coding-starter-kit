@@ -53,7 +53,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     log(`kategorien: ${kategorien?.length ?? 0}`);
     const { data: produkte } = await admin.from("produkte").select("*").order("sortierung");
     log(`produkte: ${produkte?.length ?? 0}`);
-    const { data: preise } = await admin.from("aktuelle_preise").select("*");
+    const { data: preise } = await admin.from("aktuelle_preise_flat").select("*");
     log(`preise: ${preise?.length ?? 0}`);
     const { data: produktIcons } = await admin.from("produkt_icons").select("produkt_id, icons(label)").order("sortierung");
     const { data: kategorieIcons } = await admin.from("kategorie_icons").select("kategorie_id, icon_id, icons(label, symbol_path)");

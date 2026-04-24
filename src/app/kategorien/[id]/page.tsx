@@ -46,7 +46,7 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   const prodIds = produkteMitBild.map((p) => p.id);
   const { data: preise } = prodIds.length
     ? await supabase
-        .from("aktuelle_preise")
+        .from("aktuelle_preise_flat")
         .select("produkt_id, listenpreis, ek_lichtengros, ek_eisenkeil")
         .in("produkt_id", prodIds)
     : { data: [] };

@@ -15,7 +15,9 @@ import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
+import { getSlotBildSignedUrl } from "./datenblatt-actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
 import { DatenblattBildUpload } from "./datenblatt-bild-upload";
 
@@ -310,6 +312,17 @@ export function ProduktForm({
                 <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
                   onChange={(e) => handleHauptbild(e.target.files?.[0] ?? null)} />
                 {uploading && <p className="text-sm text-muted-foreground">Lade hoch...</p>}
+                {hauptbildPath && !uploading && (
+                  <EnhanceBildButton
+                    bucket="produktbilder"
+                    path={hauptbildPath}
+                    onReplaced={async (newPath) => {
+                      const r = await getSlotBildSignedUrl(newPath);
+                      setHauptbildPath(newPath);
+                      setHauptbildPreview(r.url ?? null);
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Image as ImageIcon, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EnhanceBildButton } from "@/components/enhance-bild-button";
@@ -30,6 +31,7 @@ export function DatenblattBildUpload({ name, label, produktId, defaultPath, defa
   const [path, setPath] = useState<string | null>(defaultPath);
   const [previewUrl, setPreviewUrl] = useState<string | null>(defaultUrl);
   const [uploading, startUpload] = useTransition();
+  const [zoom, setZoom] = useState(false);
 
   function onFileChange(file: File | null) {
     if (!file) return;
@@ -57,14 +59,21 @@ export function DatenblattBildUpload({ name, label, produktId, defaultPath, defa
       <Label htmlFor={name}>{label}</Label>
       <input type="hidden" name={name} value={path ?? ""} />
       <div className="flex items-start gap-3">
-        <div className="flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-dashed border-border bg-muted/40">
-          {previewUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt={label} className="h-full w-full object-contain" />
-          ) : (
+        {previewUrl ? (
+          <button
+            type="button"
+            onClick={() => setZoom(true)}
+            className="group relative flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-dashed border-border bg-muted/40 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-primary"
+            aria-label={`${label} vergrößern`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={previewUrl} alt={label} className="h-full w-full object-contain transition-transform group-hover:scale-[1.03]" />
+          </button>
+        ) : (
+          <div className="flex h-24 w-32 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-dashed border-border bg-muted/40">
             <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-          )}
-        </div>
+          </div>
+        )}
         <div className="flex flex-1 flex-col gap-1.5">
           <Input
             id={name}
@@ -105,6 +114,20 @@ export function DatenblattBildUpload({ name, label, produktId, defaultPath, defa
           </div>
         </div>
       </div>
+
+      <Dialog open={zoom} onOpenChange={setZoom}>
+        <DialogContent className="max-w-4xl p-2 bg-background">
+          <DialogTitle className="sr-only">{label} Vorschau</DialogTitle>
+          {previewUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={previewUrl}
+              alt={label}
+              className="max-h-[80vh] w-full object-contain"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -618,11 +618,18 @@
   .card-head .card-head-title {
     color: #fff;
     font-size: 15px;
+    font-weight: 600;
     line-height: 1.2;
+    letter-spacing: -0.01em;
   }
   .card-head .card-head-sub {
-    color: rgba(255,255,255,0.68);
-    font-size: 11.5px;
+    color: rgba(255,255,255,0.82);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.35;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.003em;
   }
   .card-head-icon {
     width: 26px;
@@ -638,9 +645,14 @@
   .card-head-icon svg { width: 14px; height: 14px; }
   .card-head .pill,
   .card-head .btn-ghost {
-    color: #fff;
-    background: rgba(255,255,255,0.1);
-    border: 0.5px solid rgba(255,255,255,0.18);
+    color: rgba(255,255,255,0.92);
+    background: rgba(255,255,255,0.12);
+    border: 0.5px solid rgba(255,255,255,0.22);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-size: 10.5px;
+    padding: 3px 10px;
   }
 
   /* ===== Num badge used by lists (Bereiche/Kategorien) ===== */

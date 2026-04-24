@@ -76,6 +76,12 @@ export function AufgabenCard({
     });
   }
 
+  const totalCount = tasks.reduce((sum, t) => sum + t.count, 0);
+  const subLabel =
+    tasks.length === 0
+      ? "Alle Produkte sind vollständig gepflegt"
+      : `${totalCount} Produkte über ${tasks.length} Kategorien`;
+
   return (
     <div className="glass-card">
       <div className="card-head">
@@ -84,9 +90,7 @@ export function AufgabenCard({
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="card-head-title">Deine Aufgaben</h3>
-          <div className="card-head-sub">
-            {tasks.length === 0 ? "Alles erledigt" : `${tasks.length} offen`}
-          </div>
+          <div className="card-head-sub">{subLabel}</div>
         </div>
         <span className="pill">Heute</span>
       </div>

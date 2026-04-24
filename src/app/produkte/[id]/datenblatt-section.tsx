@@ -78,20 +78,17 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
   const canvasH = current ? current.page_height_cm * scale : 0;
 
   return (
-    <section id="section-datasheet" className="glass-card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-        <div
-          className="grid h-8 w-8 place-items-center rounded-[9px] bg-primary/12 text-primary"
+    <section id="section-datasheet" className="glass-card">
+      <div className="card-head">
+        <div className="card-head-icon"><Edit3 /></div>
+        <div className="min-w-0 flex-1">
+          <div className="card-head-title">Datenblatt-Vorlage</div>
+          <div className="card-head-sub">Bilder-Slots für den PDF-Export</div>
+        </div>
+        <a
+          href="/datenblatt-vorlagen"
+          className="text-[12px] font-medium text-white/80 hover:text-white"
         >
-          <Edit3 className="h-[15px] w-[15px]" />
-        </div>
-        <div className="flex-1">
-          <div className="text-[15px] font-semibold tracking-[-0.012em]">Datenblatt-Vorlage</div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-            Bilder-Slots für den PDF-Export
-          </div>
-        </div>
-        <a href="/datenblatt-vorlagen" className="text-[12px] text-muted-foreground hover:text-primary hover:underline">
           Vorlagen verwalten →
         </a>
       </div>

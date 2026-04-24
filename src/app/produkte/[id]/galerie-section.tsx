@@ -91,25 +91,17 @@ export function GalerieSection({
   }
 
   return (
-    <section id="section-images" className="glass-card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-        <div
-          className="grid h-8 w-8 place-items-center rounded-[9px]"
-          style={{
-            background: "hsl(var(--violet) / 0.18)",
-            color: "hsl(var(--violet))",
-          }}
-        >
-          <ImageIcon className="h-[15px] w-[15px]" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
-            Galerie
-            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+    <section id="section-images" className="glass-card">
+      <div className="card-head">
+        <div className="card-head-icon"><ImageIcon /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="card-head-title">Galerie</span>
+            <span className="font-mono text-[11px] text-white/60">
               {list.length} / 12 Slots
             </span>
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+          <div className="card-head-sub">
             Hauptbild, Detailaufnahmen, Anwendungsbilder
           </div>
         </div>

@@ -46,26 +46,18 @@ export function PreiseSection({ produktId, preise }: { produktId: string; preise
   const fmt = (v: number | null) => v != null ? `${v.toFixed(2)} €` : "—";
 
   return (
-    <section id="section-prices" className="glass-card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-        <div
-          className="grid h-8 w-8 place-items-center rounded-[9px]"
-          style={{
-            background: "hsl(var(--warning) / 0.18)",
-            color: "hsl(var(--warning))",
-          }}
-        >
-          <Euro className="h-[15px] w-[15px]" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
-            Preise
-            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+    <section id="section-prices" className="glass-card">
+      <div className="card-head">
+        <div className="card-head-icon"><Euro /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="card-head-title">Preise</span>
+            <span className="font-mono text-[11px] text-white/60">
               {list.length} {list.length === 1 ? "Eintrag" : "Einträge"}
             </span>
           </div>
           {currentId && (
-            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            <div className="card-head-sub">
               Aktueller Listenpreis: {fmt(list.find((p) => p.id === currentId)?.listenpreis ?? null)}
             </div>
           )}

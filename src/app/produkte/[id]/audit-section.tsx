@@ -32,25 +32,23 @@ export async function AuditSection({ produktId }: { produktId: string }) {
   if (!entries || entries.length === 0) return null;
 
   return (
-    <section id="section-history" className="glass-card overflow-hidden">
-      <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-        <div className="grid h-8 w-8 place-items-center rounded-[9px] bg-muted text-muted-foreground">
-          <History className="h-[15px] w-[15px]" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
-            Historie
-            <span className="font-mono text-[11.5px] font-normal text-muted-foreground/70">
+    <section id="section-history" className="glass-card">
+      <div className="card-head">
+        <div className="card-head-icon"><History /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="card-head-title">Historie</span>
+            <span className="font-mono text-[11px] text-white/60">
               {entries.length}
             </span>
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+          <div className="card-head-sub">
             Letzte Änderungen an diesem Produkt
           </div>
         </div>
         <Link
           href="/aktivitaet?tabelle=produkte"
-          className="text-[12px] text-muted-foreground hover:text-primary hover:underline"
+          className="text-[12px] font-medium text-white/80 hover:text-white"
         >
           Alle anzeigen →
         </Link>

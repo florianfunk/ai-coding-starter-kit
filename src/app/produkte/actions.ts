@@ -9,6 +9,8 @@ import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { compressImage } from "@/lib/image-compress";
 import { ALL_PRODUKT_FIELDS } from "./fields";
 
+const MARKE_VALUES = ["lichtengros", "eisenkeil"] as const;
+
 const baseSchema = z.object({
   artikelnummer: z.string().min(1, "Artikelnummer ist Pflicht").max(120),
   bereich_id: z.string().uuid("Bereich Pflicht"),
@@ -21,6 +23,19 @@ const baseSchema = z.object({
   datenblatt_text: z.string().max(20000).optional().nullable(),
   datenblatt_text_2: z.string().max(20000).optional().nullable(),
   datenblatt_text_3: z.string().max(20000).optional().nullable(),
+  // PROJ-36: Datenblatt-Felder
+  info_kurz: z.string().max(500).optional().nullable(),
+  treiber: z.string().max(1000).optional().nullable(),
+  marken: z.array(z.enum(MARKE_VALUES)).min(1, "Mindestens eine Marke wählen"),
+  bild_detail_1_path: z.string().optional().nullable(),
+  bild_detail_2_path: z.string().optional().nullable(),
+  bild_detail_1_text: z.string().max(500).optional().nullable(),
+  bild_detail_2_text: z.string().max(500).optional().nullable(),
+  bild_detail_3_text: z.string().max(500).optional().nullable(),
+  bild_zeichnung_1_path: z.string().optional().nullable(),
+  bild_zeichnung_2_path: z.string().optional().nullable(),
+  bild_zeichnung_3_path: z.string().optional().nullable(),
+  bild_energielabel_path: z.string().optional().nullable(),
 });
 
 export type ProduktFormState = { error: string | null; fieldErrors?: Record<string, string> };
@@ -50,6 +65,7 @@ function parseTechFields(formData: FormData): Record<string, any> {
 }
 
 function parseBase(formData: FormData) {
+  const marken = formData.getAll("marken").map(String).filter(Boolean);
   return baseSchema.safeParse({
     artikelnummer: formData.get("artikelnummer"),
     bereich_id: formData.get("bereich_id"),
@@ -62,6 +78,18 @@ function parseBase(formData: FormData) {
     datenblatt_text: sanitizeRichTextHtml(formData.get("datenblatt_text") as string | null) || null,
     datenblatt_text_2: sanitizeRichTextHtml(formData.get("datenblatt_text_2") as string | null) || null,
     datenblatt_text_3: sanitizeRichTextHtml(formData.get("datenblatt_text_3") as string | null) || null,
+    info_kurz: formData.get("info_kurz") || null,
+    treiber: formData.get("treiber") || null,
+    marken,
+    bild_detail_1_path: (formData.get("bild_detail_1_path") as string) || null,
+    bild_detail_2_path: (formData.get("bild_detail_2_path") as string) || null,
+    bild_detail_1_text: formData.get("bild_detail_1_text") || null,
+    bild_detail_2_text: formData.get("bild_detail_2_text") || null,
+    bild_detail_3_text: formData.get("bild_detail_3_text") || null,
+    bild_zeichnung_1_path: (formData.get("bild_zeichnung_1_path") as string) || null,
+    bild_zeichnung_2_path: (formData.get("bild_zeichnung_2_path") as string) || null,
+    bild_zeichnung_3_path: (formData.get("bild_zeichnung_3_path") as string) || null,
+    bild_energielabel_path: (formData.get("bild_energielabel_path") as string) || null,
   });
 }
 

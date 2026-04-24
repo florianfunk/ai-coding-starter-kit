@@ -45,10 +45,19 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
 
   const prodIds = produkteMitBild.map((p) => p.id);
   const { data: preise } = prodIds.length
-    ? await supabase.from("aktuelle_preise").select("produkt_id, listenpreis").in("produkt_id", prodIds)
+    ? await supabase
+        .from("aktuelle_preise")
+        .select("produkt_id, listenpreis, ek_lichtengros, ek_eisenkeil")
+        .in("produkt_id", prodIds)
     : { data: [] };
-  const preisMap = new Map<string, number>();
-  for (const p of preise ?? []) preisMap.set(p.produkt_id, Number(p.listenpreis));
+  type PreisEntry = { listenpreis: number | null; ekLG: number | null; ekEK: number | null };
+  const preisMap = new Map<string, PreisEntry>();
+  for (const p of preise ?? [])
+    preisMap.set(p.produkt_id, {
+      listenpreis: p.listenpreis != null ? Number(p.listenpreis) : null,
+      ekLG: p.ek_lichtengros != null ? Number(p.ek_lichtengros) : null,
+      ekEK: p.ek_eisenkeil != null ? Number(p.ek_eisenkeil) : null,
+    });
 
   return (
     <AppShell>
@@ -185,6 +194,12 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                   <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
                     Listenpreis
                   </TableHead>
+                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    EK Lichtengros
+                  </TableHead>
+                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                    EK Eisenkeil
+                  </TableHead>
                   <TableHead className="w-28 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
                     Status
                   </TableHead>
@@ -223,11 +238,21 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                       {p.sortierung}
                     </TableCell>
                     <TableCell className="pointer-events-none relative z-10 text-right font-semibold tabular-nums">
-                      {preisMap.has(p.id) ? (
-                        <span className="text-primary">{preisMap.get(p.id)!.toFixed(2)} €</span>
+                      {preisMap.get(p.id)?.listenpreis != null ? (
+                        <span className="text-primary">{preisMap.get(p.id)!.listenpreis!.toFixed(2)} €</span>
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {preisMap.get(p.id)?.ekLG != null
+                        ? `${preisMap.get(p.id)!.ekLG!.toFixed(2)} €`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
+                      {preisMap.get(p.id)?.ekEK != null
+                        ? `${preisMap.get(p.id)!.ekEK!.toFixed(2)} €`
+                        : "—"}
                     </TableCell>
                     <TableCell className="pointer-events-none relative z-10">
                       {p.artikel_bearbeitet ? (

@@ -26,6 +26,7 @@ Pain Points heute: FileMaker-Lizenzkosten, keine parallele Bearbeitung, schwerer
 | P0 (MVP) | PROJ-8 Filialen- & Katalog-Einstellungen | Planned |
 | P0 (MVP) | PROJ-9 PDF-Export: Einzel-Datenblatt | Planned |
 | P0 (MVP) | PROJ-10 PDF-Export: Gesamtkatalog | Planned |
+| P1       | PROJ-36 Datenblatt-Felder pflegen (UI) | Planned |
 
 ## Success Metrics
 - Alle bestehenden FileMaker-Daten (20 Bereiche, ~70 Kategorien, ~400+ Produkte, Preise, Bilder) erfolgreich migriert

@@ -6,15 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown } from "lucide-react";
+import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown, Images } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
+import { DatenblattBildUpload } from "./datenblatt-bild-upload";
+
+type Marke = "lichtengros" | "eisenkeil";
+const MARKE_OPTIONS: { value: Marke; label: string }[] = [
+  { value: "lichtengros", label: "Lichtengros" },
+  { value: "eisenkeil", label: "Eisenkeil" },
+];
+
+export type DatenblattBildUrls = {
+  bild_detail_1_path?: string | null;
+  bild_detail_2_path?: string | null;
+  bild_zeichnung_1_path?: string | null;
+  bild_zeichnung_2_path?: string | null;
+  bild_zeichnung_3_path?: string | null;
+  bild_energielabel_path?: string | null;
+};
 
 const FIELD_TOOLTIPS: Record<string, string> = {
   schutzart_ip: "Die IP-Schutzart gibt den Schutzgrad gegen Beruhrung, Fremdkorper und Wasser an (z.B. IP20 = kein Wasserschutz, IP67 = wasserdicht).",
@@ -31,19 +49,29 @@ const initial: ProduktFormState = { error: null };
 
 const STORAGE_KEY = "produkt-form-sections";
 
-const SECTION_IDS = ["datenblatt", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
+const SECTION_IDS = ["datenblatt", "datenblatt-bilder", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
 
 const DEFAULT_OPEN: SectionId[] = ["datenblatt"];
 
 const SECTION_META: Record<SectionId, { label: string; icon: LucideIcon; colorVar: string }> = {
   datenblatt: { label: "Datenblatt", icon: FileText, colorVar: "--violet" },
+  "datenblatt-bilder": { label: "Datenblatt-Bilder", icon: Images, colorVar: "--violet" },
   elektrisch: { label: "Elektrotechnisch", icon: Zap, colorVar: "--warning" },
   lichttechnisch: { label: "Lichttechnisch", icon: Sun, colorVar: "--warning" },
   mechanisch: { label: "Mechanisch", icon: Wrench, colorVar: "--green" },
   thermisch: { label: "Thermisch & Sonstiges", icon: Thermometer, colorVar: "--destructive" },
   icons: { label: "Icons", icon: Palette, colorVar: "--primary" },
 };
+
+const DATENBLATT_BILDER_KEYS = [
+  "bild_detail_1_path",
+  "bild_detail_2_path",
+  "bild_zeichnung_1_path",
+  "bild_zeichnung_2_path",
+  "bild_zeichnung_3_path",
+  "bild_energielabel_path",
+] as const;
 
 function loadOpenSections(): string[] {
   if (typeof window === "undefined") return DEFAULT_OPEN;
@@ -65,8 +93,14 @@ function sectionProgress(sectionId: SectionId, defaultValues: Record<string, any
   const check = (v: unknown) => v != null && v !== "" && v !== false;
   if (sectionId === "icons") return { done: Math.min(iconCount, 10), total: 10 };
   if (sectionId === "datenblatt") {
-    const keys = ["datenblatt_titel", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
+    const keys = ["datenblatt_titel", "info_kurz", "treiber", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
     return { done: keys.filter((k) => check(defaultValues[k])).length, total: keys.length };
+  }
+  if (sectionId === "datenblatt-bilder") {
+    return {
+      done: DATENBLATT_BILDER_KEYS.filter((k) => check(defaultValues[k])).length,
+      total: DATENBLATT_BILDER_KEYS.length,
+    };
   }
   const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
   let done = 0;
@@ -92,6 +126,7 @@ type Props = {
   defaultValues?: Record<string, any>;
   defaultIconIds?: string[];
   defaultHauptbildUrl?: string | null;
+  defaultDatenblattBildUrls?: DatenblattBildUrls;
   produktId?: string;
   action: (prev: ProduktFormState, formData: FormData) => Promise<ProduktFormState>;
   submitLabel: string;
@@ -100,7 +135,8 @@ type Props = {
 export function ProduktForm({
   bereiche, kategorien, icons,
   defaultValues = {}, defaultIconIds = [],
-  defaultHauptbildUrl = null, produktId,
+  defaultHauptbildUrl = null, defaultDatenblattBildUrls = {},
+  produktId,
   action, submitLabel,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initial);
@@ -110,6 +146,11 @@ export function ProduktForm({
   const [iconIds, setIconIds] = useState<string[]>(() => {
     const seen = new Set<string>();
     return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
+  });
+  const [marken, setMarken] = useState<Marke[]>(() => {
+    const raw = defaultValues.marken;
+    if (Array.isArray(raw) && raw.length) return raw.filter((m): m is Marke => m === "lichtengros" || m === "eisenkeil");
+    return ["lichtengros"];
   });
   const [uploading, startUpload] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
@@ -128,6 +169,11 @@ export function ProduktForm({
       return next;
     });
   }, []);
+
+  const toggleMarke = useCallback((m: Marke) => {
+    setMarken((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
+    markDirty("base");
+  }, [markDirty]);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
@@ -245,6 +291,34 @@ export function ProduktForm({
           </div>
 
           <div className="mt-4 space-y-2">
+            <Label>Marken *</Label>
+            {/* Hidden inputs transport the selected marken via FormData (multi-value) */}
+            {marken.map((m) => <input key={m} type="hidden" name="marken" value={m} />)}
+            <div className="flex flex-wrap gap-3">
+              {MARKE_OPTIONS.map((opt) => {
+                const checked = marken.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm cursor-pointer transition ${
+                      checked ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggleMarke(opt.value)}
+                      aria-label={opt.label}
+                    />
+                    {opt.label}
+                  </label>
+                );
+              })}
+            </div>
+            {state.fieldErrors?.marken && <p className="text-sm text-destructive">{state.fieldErrors.marken}</p>}
+            {marken.length === 0 && <p className="text-xs text-muted-foreground">Mindestens eine Marke auswählen.</p>}
+          </div>
+
+          <div className="mt-4 space-y-2">
             <Label>Hauptbild</Label>
             <div className="flex items-start gap-4">
               <div className="flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
@@ -295,9 +369,35 @@ export function ProduktForm({
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="datenblatt_titel">Titel</Label>
+                  <Input id="datenblatt_titel" name="datenblatt_titel" defaultValue={defaultValues.datenblatt_titel ?? ""} className="text-base" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="info_kurz">
+                    Info-Zeile
+                    <span className="ml-1 text-xs text-muted-foreground">(unter der Artikelnummer)</span>
+                  </Label>
+                  <Input
+                    id="info_kurz"
+                    name="info_kurz"
+                    defaultValue={defaultValues.info_kurz ?? ""}
+                    placeholder="z. B. STEPLIGHT 3W 2700K 124lm CRI90 IP65 inkl. TRAFO N.DIM.-WEISS"
+                    maxLength={500}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="datenblatt_titel">Titel</Label>
-                <Input id="datenblatt_titel" name="datenblatt_titel" defaultValue={defaultValues.datenblatt_titel ?? ""} className="text-base" />
+                <Label htmlFor="treiber">Treiber</Label>
+                <Textarea
+                  id="treiber"
+                  name="treiber"
+                  defaultValue={defaultValues.treiber ?? ""}
+                  placeholder="z. B. inkl. Treiber 24V DC, 30W, dimmbar"
+                  rows={2}
+                  maxLength={1000}
+                />
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -312,6 +412,121 @@ export function ProduktForm({
                   <Label htmlFor="datenblatt_text_3">Text Block 3</Label>
                   <RichTextEditor name="datenblatt_text_3" defaultValue={defaultValues.datenblatt_text_3 ?? ""} minHeight={220} />
                 </div>
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* Datenblatt-Bilder (PROJ-36) */}
+        <AccordionItem
+          id="section-datenblatt-bilder"
+          value="datenblatt-bilder"
+          className="glass-card overflow-hidden border-0 relative"
+          onInput={() => markDirty("datenblatt-bilder")}
+          onChange={() => markDirty("datenblatt-bilder")}
+        >
+          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+            <SectionHeader
+              colorVar={SECTION_META["datenblatt-bilder"].colorVar}
+              Icon={Images}
+              label="Datenblatt-Bilder"
+              progress={sectionProgress("datenblatt-bilder", defaultValues, iconIds.length)}
+            />
+          </AccordionTrigger>
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt-bilder")} floating />
+          <AccordionContent className="px-4 pb-4">
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                  <DatenblattBildUpload
+                    name="bild_detail_1_path"
+                    label="Detail-Bild 1"
+                    produktId={produktId}
+                    defaultPath={defaultValues.bild_detail_1_path ?? null}
+                    defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
+                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bild_detail_1_text" className="text-xs">Detail-Text 1</Label>
+                    <Textarea
+                      id="bild_detail_1_text"
+                      name="bild_detail_1_text"
+                      defaultValue={defaultValues.bild_detail_1_text ?? ""}
+                      rows={2}
+                      maxLength={500}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                  <DatenblattBildUpload
+                    name="bild_detail_2_path"
+                    label="Detail-Bild 2"
+                    produktId={produktId}
+                    defaultPath={defaultValues.bild_detail_2_path ?? null}
+                    defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
+                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="bild_detail_2_text" className="text-xs">Detail-Text 2</Label>
+                    <Textarea
+                      id="bild_detail_2_text"
+                      name="bild_detail_2_text"
+                      defaultValue={defaultValues.bild_detail_2_text ?? ""}
+                      rows={2}
+                      maxLength={500}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="bild_detail_3_text" className="text-xs">
+                  Detail-Text 3
+                  <span className="ml-1 text-muted-foreground">(erscheint neben Zeichnung 1 im PDF)</span>
+                </Label>
+                <Textarea
+                  id="bild_detail_3_text"
+                  name="bild_detail_3_text"
+                  defaultValue={defaultValues.bild_detail_3_text ?? ""}
+                  rows={2}
+                  maxLength={500}
+                  className="text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <DatenblattBildUpload
+                  name="bild_zeichnung_1_path"
+                  label="Zeichnung 1"
+                  produktId={produktId}
+                  defaultPath={defaultValues.bild_zeichnung_1_path ?? null}
+                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_1_path ?? null}
+                />
+                <DatenblattBildUpload
+                  name="bild_zeichnung_2_path"
+                  label="Zeichnung 2"
+                  produktId={produktId}
+                  defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
+                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
+                />
+                <DatenblattBildUpload
+                  name="bild_zeichnung_3_path"
+                  label="Zeichnung 3"
+                  produktId={produktId}
+                  defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
+                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
+                />
+              </div>
+
+              <div className="border-t pt-4">
+                <DatenblattBildUpload
+                  name="bild_energielabel_path"
+                  label="Energielabel-Bild"
+                  produktId={produktId}
+                  defaultPath={defaultValues.bild_energielabel_path ?? null}
+                  defaultUrl={defaultDatenblattBildUrls.bild_energielabel_path ?? null}
+                />
               </div>
             </div>
           </AccordionContent>

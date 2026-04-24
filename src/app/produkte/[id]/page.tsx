@@ -50,6 +50,16 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     url: bildProxyUrl("produktbilder", g.storage_path),
   }));
 
+  // PROJ-36: URLs für Datenblatt-Bilder (Detail, Zeichnung, Energielabel)
+  const defaultDatenblattBildUrls = {
+    bild_detail_1_path: bildProxyUrl("produktbilder", produkt.bild_detail_1_path),
+    bild_detail_2_path: bildProxyUrl("produktbilder", produkt.bild_detail_2_path),
+    bild_zeichnung_1_path: bildProxyUrl("produktbilder", produkt.bild_zeichnung_1_path),
+    bild_zeichnung_2_path: bildProxyUrl("produktbilder", produkt.bild_zeichnung_2_path),
+    bild_zeichnung_3_path: bildProxyUrl("produktbilder", produkt.bild_zeichnung_3_path),
+    bild_energielabel_path: bildProxyUrl("produktbilder", produkt.bild_energielabel_path),
+  };
+
   const iconsFull = (icons ?? []).map((ic: any) => ({
     id: ic.id,
     label: ic.label,
@@ -215,6 +225,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
               defaultValues={produkt}
               defaultIconIds={(produktIcons ?? []).map((r) => r.icon_id)}
               defaultHauptbildUrl={hauptbildUrl}
+              defaultDatenblattBildUrls={defaultDatenblattBildUrls}
               produktId={id}
               action={action}
               submitLabel="Speichern"

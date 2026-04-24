@@ -113,7 +113,21 @@ export function ProduktForm({
   });
   const [uploading, startUpload] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
-  const [dirty, setDirty] = useState(false);
+  const [dirtySections, setDirtySections] = useState<Set<string>>(new Set());
+
+  const isDirty = useCallback(
+    (id: string) => dirtySections.has(id),
+    [dirtySections],
+  );
+
+  const markDirty = useCallback((id: string) => {
+    setDirtySections((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
 
   const filteredKategorien = useMemo(
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
@@ -137,7 +151,7 @@ export function ProduktForm({
     if (state.error) toast.error(state.error);
     if (state.error === null && state !== initial && !pending) {
       toast.success("Gespeichert");
-      setDirty(false);
+      setDirtySections(new Set());
     }
   }, [state, pending]);
 
@@ -152,32 +166,32 @@ export function ProduktForm({
       else {
         setHauptbildPath(r.path);
         setHauptbildPreview(URL.createObjectURL(file));
-        setDirty(true);
+        markDirty("base");
       }
     });
   }
 
   function toggleIcon(id: string) {
     setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    setDirty(true);
+    markDirty("icons");
   }
 
   const thermischGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "thermisch");
   const sonstigesGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "sonstiges");
 
   return (
-    <form
-      action={formAction}
-      onInput={() => setDirty(true)}
-      onChange={() => setDirty(true)}
-      className="space-y-6"
-    >
+    <form action={formAction} className="space-y-6">
       <input type="hidden" name="hauptbild_path" value={hauptbildPath ?? ""} />
 
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
       {/* Grunddaten -- always visible, not collapsible */}
-      <section id="section-base" className="glass-card">
+      <section
+        id="section-base"
+        className="glass-card"
+        onInput={() => markDirty("base")}
+        onChange={() => markDirty("base")}
+      >
         <div className="card-head">
           <div className="card-head-icon"><FileText /></div>
           <div className="min-w-0 flex-1">
@@ -189,7 +203,7 @@ export function ProduktForm({
               Artikelnummer, Name, Bereich, Kategorie, Hauptbild
             </div>
           </div>
-          <SectionSaveButton pending={pending || uploading} dirty={dirty} />
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("base")} />
         </div>
         <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -262,7 +276,13 @@ export function ProduktForm({
       {/* Accordion sections */}
       <Accordion type="multiple" value={openSections} onValueChange={handleSectionsChange} className="space-y-3">
         {/* Datenblatt */}
-        <AccordionItem id="section-datenblatt" value="datenblatt" className="glass-card overflow-hidden border-0 relative">
+        <AccordionItem
+          id="section-datenblatt"
+          value="datenblatt"
+          className="glass-card overflow-hidden border-0 relative"
+          onInput={() => markDirty("datenblatt")}
+          onChange={() => markDirty("datenblatt")}
+        >
           <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
               colorVar={SECTION_META.datenblatt.colorVar}
@@ -272,7 +292,7 @@ export function ProduktForm({
               progress={sectionProgress("datenblatt", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -308,11 +328,13 @@ export function ProduktForm({
               id={`section-${group.tab}`}
               value={group.tab}
               className="glass-card overflow-hidden border-0 relative"
+              onInput={() => markDirty(group.tab)}
+              onChange={() => markDirty(group.tab)}
             >
               <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
                 <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
-              <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
+              <SectionSaveButton pending={pending || uploading} dirty={isDirty(group.tab)} floating />
               <AccordionContent className="px-4 pb-4">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {group.fields.map((f) => (
@@ -329,6 +351,8 @@ export function ProduktForm({
           id="section-thermisch"
           value="thermisch"
           className="glass-card overflow-hidden border-0 relative"
+          onInput={() => markDirty("thermisch")}
+          onChange={() => markDirty("thermisch")}
         >
           <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
@@ -338,7 +362,7 @@ export function ProduktForm({
               progress={sectionProgress("thermisch", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("thermisch")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {thermischGroup?.fields.map((f) => (
@@ -356,6 +380,8 @@ export function ProduktForm({
           id="section-icons"
           value="icons"
           className="glass-card overflow-hidden border-0 relative"
+          onInput={() => markDirty("icons")}
+          onChange={() => markDirty("icons")}
         >
           <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
@@ -366,7 +392,7 @@ export function ProduktForm({
               countBadge={iconIds.length}
             />
           </AccordionTrigger>
-          <SectionSaveButton pending={pending || uploading} dirty={dirty} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("icons")} floating />
           <AccordionContent className="px-4 pb-4">
             <IconPicker
               icons={icons}

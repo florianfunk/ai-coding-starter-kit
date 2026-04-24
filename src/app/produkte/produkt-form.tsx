@@ -45,20 +45,6 @@ const SECTION_META: Record<SectionId, { label: string; icon: LucideIcon; colorVa
   icons: { label: "Icons", icon: Palette, colorVar: "--primary" },
 };
 
-function SectionBadge({ colorVar, Icon }: { colorVar: string; Icon: LucideIcon }) {
-  return (
-    <div
-      className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]"
-      style={{
-        background: `hsl(var(${colorVar}) / 0.15)`,
-        color: `hsl(var(${colorVar}))`,
-      }}
-    >
-      <Icon className="h-[15px] w-[15px]" />
-    </div>
-  );
-}
-
 function loadOpenSections(): string[] {
   if (typeof window === "undefined") return DEFAULT_OPEN;
   try {
@@ -178,14 +164,14 @@ export function ProduktForm({
 
       {/* Grunddaten -- always visible, not collapsible */}
       <section id="section-base" className="glass-card">
-        <div className="flex items-center gap-3 border-b border-border/60 px-5 py-4">
-          <SectionBadge colorVar="--primary" Icon={FileText} />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 text-[15px] font-semibold tracking-[-0.012em]">
-              Grunddaten
-              <span className="pill pill-accent">Pflicht</span>
+        <div className="card-head">
+          <div className="card-head-icon"><FileText /></div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="card-head-title">Grunddaten</span>
+              <span className="pill">Pflicht</span>
             </div>
-            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            <div className="card-head-sub">
               Artikelnummer, Name, Bereich, Kategorie, Hauptbild
             </div>
           </div>
@@ -262,7 +248,7 @@ export function ProduktForm({
       <Accordion type="multiple" value={openSections} onValueChange={handleSectionsChange} className="space-y-3">
         {/* Datenblatt */}
         <AccordionItem id="section-datenblatt" value="datenblatt" className="glass-card overflow-hidden border-0">
-          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+          <AccordionTrigger className="card-head hover:no-underline">
             <SectionHeader
               colorVar={SECTION_META.datenblatt.colorVar}
               Icon={FileText}
@@ -307,7 +293,7 @@ export function ProduktForm({
               value={group.tab}
               className="glass-card overflow-hidden border-0"
             >
-              <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+              <AccordionTrigger className="card-head hover:no-underline">
                 <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -327,7 +313,7 @@ export function ProduktForm({
           value="thermisch"
           className="glass-card overflow-hidden border-0"
         >
-          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+          <AccordionTrigger className="card-head hover:no-underline">
             <SectionHeader
               colorVar={SECTION_META.thermisch.colorVar}
               Icon={Thermometer}
@@ -353,7 +339,7 @@ export function ProduktForm({
           value="icons"
           className="glass-card overflow-hidden border-0"
         >
-          <AccordionTrigger className="gap-3 px-4 py-3 hover:no-underline data-[state=open]:bg-muted/60">
+          <AccordionTrigger className="card-head hover:no-underline">
             <SectionHeader
               colorVar={SECTION_META.icons.colorVar}
               Icon={Palette}
@@ -388,14 +374,13 @@ export function ProduktForm({
 }
 
 function SectionHeader({
-  colorVar,
   Icon,
   label,
   progress,
   required,
   countBadge,
 }: {
-  colorVar: string;
+  colorVar?: string;
   Icon: LucideIcon;
   label: string;
   progress: { done: number; total: number };
@@ -403,29 +388,29 @@ function SectionHeader({
   countBadge?: number;
 }) {
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
-  const stateVar = pct >= 100 ? "--green" : pct >= 50 ? "--warning" : "--destructive";
+  const stateColor = pct >= 100 ? "#193073" : pct >= 50 ? "#FFC10D" : "#D90416";
   const isEmpty = progress.done === 0;
   return (
     <div className="flex flex-1 items-center gap-3">
-      <SectionBadge colorVar={colorVar} Icon={Icon} />
+      <div className="card-head-icon"><Icon /></div>
       <div className="min-w-0 flex-1 text-left">
-        <div className="flex flex-wrap items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.012em]">
-          {label}
-          {required && <span className="pill pill-accent">Pflicht</span>}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="card-head-title">{label}</span>
+          {required && <span className="pill">Pflicht</span>}
           {isEmpty && <span className="pill pill-warn">Leer</span>}
           {countBadge != null && countBadge > 0 && (
-            <span className="pill pill-accent">{countBadge}</span>
+            <span className="pill">{countBadge}</span>
           )}
         </div>
-        <div className="mt-0.5 font-mono text-[11.5px] tabular-nums text-muted-foreground">
+        <div className="card-head-sub font-mono">
           {progress.done} / {progress.total} Felder · {pct}%
         </div>
       </div>
       <div className="hidden w-[100px] shrink-0 sm:block">
-        <div className="prog" style={{ height: 4 }}>
+        <div className="prog" style={{ height: 4, background: "rgba(255,255,255,0.15)" }}>
           <div
             className="prog-fill"
-            style={{ width: `${pct}%`, background: `hsl(var(${stateVar}))` }}
+            style={{ width: `${pct}%`, background: stateColor }}
           />
         </div>
       </div>

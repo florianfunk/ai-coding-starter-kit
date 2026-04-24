@@ -9,7 +9,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-[18px] border border-border/60 bg-card text-card-foreground shadow-sm",
+      "glass-card text-card-foreground",
       className
     )}
     {...props}
@@ -17,13 +17,19 @@ const Card = React.forwardRef<
 ))
 Card.displayName = "Card"
 
+/** Dark section header — Brand V2 `.card-head` bar.
+ *  Children stack vertically by default; pass `flex-row` in className
+ *  to lay them out horizontally (e.g. title + side action). */
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn(
+      "card-head flex-col !items-start gap-1",
+      className
+    )}
     {...props}
   />
 ))
@@ -35,10 +41,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn(
-      "text-xl font-semibold leading-none tracking-[-0.015em]",
-      className
-    )}
+    className={cn("card-head-title", className)}
     {...props}
   />
 ))
@@ -50,7 +53,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("card-head-sub", className)}
     {...props}
   />
 ))
@@ -60,7 +63,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  <div ref={ref} className={cn("p-6", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"
 

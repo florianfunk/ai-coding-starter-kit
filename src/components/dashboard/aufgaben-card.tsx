@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { AlertTriangle, CheckCircle, Euro, Image as ImageIcon, FileText, ChevronRight } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Euro,
+  Image as ImageIcon,
+  FileText,
+  ChevronRight,
+  CheckSquare,
+} from "lucide-react";
 
 type Task = {
   id: string;
@@ -70,13 +78,17 @@ export function AufgabenCard({
 
   return (
     <div className="glass-card">
-      <div className="flex items-center justify-between px-5 pt-[18px]">
-        <div>
-          <h3 className="display-sm">Deine Aufgaben</h3>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {tasks.length === 0 ? "Alles erledigt." : `${tasks.length} offen`}
-          </p>
+      <div className="card-head">
+        <div className="card-head-icon">
+          <CheckSquare className="h-3.5 w-3.5" />
         </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="card-head-title">Deine Aufgaben</h3>
+          <div className="card-head-sub">
+            {tasks.length === 0 ? "Alles erledigt" : `${tasks.length} offen`}
+          </div>
+        </div>
+        <span className="pill">Heute</span>
       </div>
 
       {tasks.length === 0 ? (

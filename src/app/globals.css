@@ -4,20 +4,21 @@
 
 @layer base {
   :root {
-    /* ---------- Apple-inspired palette (v3) ----------
-       Primary = Apple Blue #007aff
-       Accent (status warnings) = #ff9f0a (kept as semantic only)
+    /* ---------- Brand V2 palette (Lichtengros) ----------
+       Primary CTA = Monza red #D90416
+       Accent = Lucky Point navy #193073 (hero, links)
+       Warning = Amber #FFC10D / #B88700
     */
-    --background: 240 8% 96%;          /* #f5f5f7 */
-    --foreground: 240 3% 12%;          /* #1d1d1f */
+    --background: 225 10% 96%;          /* #F4F5F7 */
+    --foreground: 240 3% 12%;           /* #1d1d1f */
     --card: 0 0% 100%;
     --card-foreground: 240 3% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 3% 12%;
 
-    --primary: 211 100% 50%;            /* #007aff */
+    --primary: 355 96% 43%;             /* #D90416 Monza */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 211 100% 45%;
+    --primary-hover: 355 97% 35%;        /* #AE0312 */
 
     --secondary: 240 6% 93%;
     --secondary-foreground: 240 3% 12%;
@@ -25,28 +26,39 @@
     --muted: 240 6% 93%;
     --muted-foreground: 240 3% 45%;
 
-    --accent: 211 100% 50%;             /* aligns with primary */
+    --accent: 224 64% 28%;               /* #193073 navy */
     --accent-foreground: 0 0% 100%;
-    --accent-hover: 211 100% 45%;
+    --accent-hover: 222 59% 35%;         /* #24428f */
 
-    --destructive: 4 90% 58%;           /* #ff3b30 */
+    --destructive: 355 96% 43%;          /* Monza — same as primary */
     --destructive-foreground: 0 0% 100%;
-    --destructive-hover: 4 90% 50%;
+    --destructive-hover: 355 97% 35%;
 
-    --success: 142 69% 49%;             /* #34c759 */
+    --success: 224 64% 28%;              /* navy — palette has no green */
     --success-foreground: 0 0% 100%;
 
-    --warning: 33 100% 52%;             /* #ff9f0a */
-    --warning-foreground: 0 0% 100%;
+    --warning: 45 100% 52%;              /* #FFC10D */
+    --warning-foreground: 28 100% 13%;   /* dark text on amber */
+    --warning-ink: 43 100% 36%;          /* #B88700 — for text on light bg */
 
-    --violet: 283 67% 59%;              /* #af52de */
-    --pink: 344 100% 59%;               /* #ff2d55 */
-    --teal: 196 93% 67%;                /* #5ac8fa */
-    --green: 142 69% 49%;               /* #34c759 */
+    --violet: 224 64% 28%;               /* navy */
+    --pink: 355 96% 43%;                 /* monza */
+    --teal: 224 64% 28%;                 /* navy */
+    --green: 224 64% 28%;                /* navy */
+
+    /* Brand V2 raw hex (used where gradients are not desired) */
+    --brand-navy: #193073;
+    --brand-navy-2: #24428f;
+    --brand-red: #D90416;
+    --brand-red-2: #AE0312;
+    --brand-amber: #FFC10D;
+    --brand-amber-ink: #B88700;
+    --brand-chrome-header: #363940;
+    --brand-chrome-surface: #434750;
 
     --border: 240 5% 85%;
     --input: 240 5% 85%;
-    --ring: 211 100% 50%;
+    --ring: 224 64% 28%;                /* navy focus ring */
     --radius: 1.125rem;                 /* 18px — Apple standard */
 
     /* Extended surfaces & hairlines (v3) */
@@ -58,21 +70,21 @@
     --subtle: 240 3% 45%;
     --faint: 240 3% 62%;
 
-    --chart-1: 211 100% 50%;
-    --chart-2: 283 67% 59%;
-    --chart-3: 142 69% 49%;
-    --chart-4: 33 100% 52%;
-    --chart-5: 344 100% 59%;
+    --chart-1: 224 64% 28%;
+    --chart-2: 355 96% 43%;
+    --chart-3: 45 100% 52%;
+    --chart-4: 222 59% 55%;
+    --chart-5: 355 100% 64%;
 
-    /* Sidebar (kept for shadcn sidebar component) */
-    --sidebar-background: 0 0% 100% / 0.72;
-    --sidebar-foreground: 240 3% 12%;
-    --sidebar-primary: 211 100% 50%;
+    /* Sidebar — dark chrome (Brand V2) */
+    --sidebar-background: 220 8% 26%;    /* #434750 */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 355 96% 43%;      /* monza */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 6% 93%;
-    --sidebar-accent-foreground: 240 3% 12%;
-    --sidebar-border: 240 5% 85%;
-    --sidebar-ring: 211 100% 50%;
+    --sidebar-accent: 220 8% 30%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 0% / 0.3;
+    --sidebar-ring: 355 96% 43%;
   }
 
   .dark {
@@ -83,9 +95,9 @@
     --popover: 240 4% 11%;
     --popover-foreground: 240 8% 96%;
 
-    --primary: 211 100% 52%;
+    --primary: 355 100% 62%;             /* brighter red on dark */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 211 100% 58%;
+    --primary-hover: 355 96% 43%;
 
     --secondary: 240 4% 14%;
     --secondary-foreground: 240 8% 90%;
@@ -93,26 +105,27 @@
     --muted: 240 4% 14%;
     --muted-foreground: 240 5% 65%;
 
-    --accent: 211 100% 52%;
+    --accent: 222 65% 58%;               /* navy lifted for dark */
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 4 86% 58%;
+    --destructive: 355 100% 62%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 142 72% 56%;
+    --success: 222 65% 58%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 33 100% 52%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 45 100% 52%;
+    --warning-foreground: 28 100% 13%;
+    --warning-ink: 45 100% 62%;
 
-    --violet: 283 67% 66%;
-    --pink: 344 100% 64%;
-    --teal: 196 93% 67%;
-    --green: 142 72% 56%;
+    --violet: 222 65% 58%;
+    --pink: 355 100% 62%;
+    --teal: 222 65% 58%;
+    --green: 222 65% 58%;
 
     --border: 240 5% 20%;
     --input: 240 5% 20%;
-    --ring: 211 100% 52%;
+    --ring: 222 65% 58%;
 
     --surface: 240 4% 11% / 0.72;
     --surface-solid: 240 4% 11%;
@@ -122,14 +135,14 @@
     --subtle: 240 5% 60%;
     --faint: 240 5% 40%;
 
-    --sidebar-background: 240 4% 9% / 0.72;
-    --sidebar-foreground: 240 8% 96%;
-    --sidebar-primary: 211 100% 52%;
+    --sidebar-background: 217 16% 18%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 355 100% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4% 14%;
-    --sidebar-accent-foreground: 240 8% 96%;
-    --sidebar-border: 240 5% 20%;
-    --sidebar-ring: 211 100% 52%;
+    --sidebar-accent: 217 16% 22%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 0% / 0.4;
+    --sidebar-ring: 355 100% 62%;
   }
 }
 
@@ -258,49 +271,8 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ===== Mesh background ===== */
-  .mesh-bg {
-    position: fixed;
-    inset: -20%;
-    z-index: -1;
-    pointer-events: none;
-    filter: blur(80px);
-    opacity: 0.8;
-  }
-  .mesh-bg::before,
-  .mesh-bg::after {
-    content: '';
-    position: absolute;
-    border-radius: 50%;
-    animation: meshShift 24s ease-in-out infinite;
-  }
-  .mesh-bg::before {
-    width: 55%;
-    height: 55%;
-    top: -10%;
-    left: -10%;
-    background: radial-gradient(circle, #c9b8ff 0%, transparent 70%);
-  }
-  .mesh-bg::after {
-    width: 50%;
-    height: 50%;
-    bottom: -10%;
-    right: -10%;
-    background: radial-gradient(circle, #ffd1a8 0%, transparent 70%);
-    animation-delay: -12s;
-  }
-  .dark .mesh-bg { opacity: 0.35; filter: blur(100px); }
-  .dark .mesh-bg::before {
-    background: radial-gradient(circle, #5b3fff 0%, transparent 70%);
-  }
-  .dark .mesh-bg::after {
-    background: radial-gradient(circle, #ff7a45 0%, transparent 70%);
-  }
-  @keyframes meshShift {
-    0%,100% { transform: translate(0,0) rotate(0); }
-    33% { transform: translate(6%,-4%) rotate(3deg); }
-    66% { transform: translate(-4%,6%) rotate(-2deg); }
-  }
+  /* Mesh bg removed for Brand V2 — solid neutral surface */
+  .mesh-bg { display: none !important; }
 
   @keyframes floatIn {
     from { opacity: 0; transform: translateY(12px) scale(0.98); }
@@ -320,24 +292,25 @@
     color: hsl(var(--muted-foreground));
   }
   .pill-ok {
-    background: rgba(52,199,89,0.14);
-    color: #0d7a28;
+    background: rgba(25,48,115,0.10);
+    color: #193073;
   }
-  .dark .pill-ok { background: rgba(48,209,88,0.18); color: hsl(var(--success)); }
+  .dark .pill-ok { background: rgba(25,48,115,0.3); color: #93a9e6; }
   .pill-warn {
-    background: rgba(255,159,10,0.14);
-    color: #a85d00;
+    background: rgba(255,193,13,0.2);
+    color: #8a6500;
   }
-  .dark .pill-warn { background: rgba(255,159,10,0.2); color: hsl(var(--warning)); }
+  .dark .pill-warn { background: rgba(255,193,13,0.22); color: #FFC10D; }
   .pill-bad {
-    background: rgba(255,59,48,0.12);
-    color: #b8231a;
+    background: rgba(217,4,22,0.10);
+    color: #AE0312;
   }
-  .dark .pill-bad { background: rgba(255,69,58,0.18); color: hsl(var(--destructive)); }
+  .dark .pill-bad { background: rgba(217,4,22,0.22); color: #ff6670; }
   .pill-accent {
-    background: rgba(0,122,255,0.12);
-    color: hsl(var(--primary));
+    background: rgba(25,48,115,0.10);
+    color: #193073;
   }
+  .dark .pill-accent { background: rgba(25,48,115,0.3); color: #93a9e6; }
 
   .chip {
     display: inline-flex;
@@ -476,46 +449,274 @@
   }
   .list-row:hover { background: hsl(var(--hairline-soft)); }
 
-  /* ===== Hero surface ===== */
+  /* ===== Hero surface (Brand V2 — navy) ===== */
   .hero-surface {
     position: relative;
     border-radius: 32px;
     overflow: hidden;
-    background: linear-gradient(135deg, rgba(255,209,168,0.35), rgba(201,184,255,0.35), rgba(168,217,255,0.35));
-    border: 0.5px solid hsl(var(--hairline));
+    background: #193073;
+    border: 1px solid #193073;
     padding: 36px 40px;
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 0 rgba(16,24,40,0.02), 0 10px 24px -8px rgba(25,48,115,0.28);
+    color: #fff;
+  }
+  .hero-surface h1,
+  .hero-surface h2,
+  .hero-surface p,
+  .hero-surface .display-xl,
+  .hero-surface .display-lg,
+  .hero-surface .display-md {
+    color: #fff !important;
+  }
+  .hero-surface .eyebrow {
+    color: rgba(255,255,255,0.78) !important;
+  }
+  .hero-surface .text-muted-foreground {
+    color: rgba(255,255,255,0.82) !important;
+  }
+  .hero-surface kbd {
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    border: 0.5px solid rgba(255,255,255,0.22);
   }
   .dark .hero-surface {
-    background: linear-gradient(135deg, rgba(175,82,222,0.22), rgba(10,132,255,0.18), rgba(255,122,69,0.18));
+    background: #193073;
+    border: 1px solid rgba(255,255,255,0.1);
+    box-shadow: none;
   }
-  .hero-noise {
-    position: absolute;
-    inset: 0;
-    opacity: 0.5;
-    pointer-events: none;
-    mix-blend-mode: overlay;
-    background-image: radial-gradient(rgba(0,0,0,0.08) 1px, transparent 1px);
-    background-size: 3px 3px;
+  /* Hero noise kept for legacy — renders nothing on brand-v2 */
+  .hero-noise { display: none; }
+
+  /* ===== App shell — Brand V2 dark header ===== */
+  .topnav-bar {
+    height: 56px;
+    background: #363940;
+    border-bottom: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -16px rgba(0,0,0,0.35);
+    color: rgba(255,255,255,0.85);
+  }
+  .dark .topnav-bar {
+    background: #232b33;
+    border-bottom: 1px solid rgba(0,0,0,0.4);
   }
 
-  /* ===== App shell ===== */
-  .topnav-bar {
+  .topnav-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: rgba(255,255,255,0.7);
+    transition: all .15s;
+    position: relative;
+  }
+  .topnav-btn:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+  }
+
+  .navlink-dark {
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.65);
+    letter-spacing: -0.005em;
+    transition: all .15s;
+    text-decoration: none;
+  }
+  .navlink-dark:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.06);
+  }
+  .navlink-dark.active {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.1);
+  }
+
+  .search-pill-dark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    width: 280px;
+    min-width: 0;
+    transition: all .15s;
+    margin: 0 6px;
+  }
+  .search-pill-dark:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.14);
+    color: rgba(255,255,255,0.85);
+  }
+  .kbd-dark {
+    font-family: var(--font-mono), 'SF Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.55);
+    border: 0.5px solid rgba(255,255,255,0.08);
+  }
+
+  .user-btn-dark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px 3px 3px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid rgba(255,255,255,0.06);
+    transition: all .15s;
+    color: inherit;
+  }
+  .user-btn-dark:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.12);
+  }
+
+  @media (max-width: 1180px) {
+    .topnav-bar .nav-links { display: none; }
+    .search-pill-dark { width: 200px; }
+  }
+  @media (max-width: 860px) {
+    .search-pill-dark { width: 40px; padding: 0; justify-content: center; }
+    .search-pill-dark .search-label,
+    .search-pill-dark .kbd-dark { display: none; }
+    .user-btn-dark .user-meta { display: none; }
+  }
+
+  /* ===== Card head (dark section header, Brand V2) ===== */
+  .card-head {
+    background: #434750;
+    color: #fff;
+    padding: 10px 16px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 0.5px solid rgba(255,255,255,0.12);
+    position: relative;
+  }
+  .card-head .eyebrow { display: none; }
+  .card-head h3,
+  .card-head .display-sm,
+  .card-head .display-md {
+    color: #fff !important;
+    font-size: 15px !important;
+    line-height: 1.2 !important;
+    margin: 0 !important;
+  }
+  .card-head .card-head-title {
+    color: #fff;
+    font-size: 15px;
+    line-height: 1.2;
+  }
+  .card-head .card-head-sub {
+    color: rgba(255,255,255,0.68);
+    font-size: 11.5px;
+  }
+  .card-head-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: rgba(217,4,22,0.18);
+    box-shadow: inset 0 0 0 0.5px rgba(217,4,22,0.32);
+    color: #ff4d5a;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .card-head-icon svg { width: 14px; height: 14px; }
+  .card-head .pill,
+  .card-head .btn-ghost {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+    border: 0.5px solid rgba(255,255,255,0.18);
+  }
+
+  /* ===== Num badge used by lists (Bereiche/Kategorien) ===== */
+  .num-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.5);
+  }
+
+  /* ===== Bereich row (Bereiche list) ===== */
+  .bereich-row {
+    display: grid;
+    grid-template-columns: 14px 22px 64px minmax(180px, 1fr) auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    position: relative;
+    transition: background .1s;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .bereich-row > * { min-width: 0; }
+  .bereich-row + .bereich-row::before {
+    content: '';
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: 0;
+    height: 0.5px;
+    background: hsl(var(--divider));
+  }
+  .bereich-row:hover { background: hsl(var(--hairline-soft)); }
+  .bereich-row .row-actions { opacity: 0; transition: opacity .12s; display: flex; gap: 2px; }
+  .bereich-row:hover .row-actions { opacity: 1; }
+  @media (max-width: 820px) {
+    .bereich-row { grid-template-columns: 14px 22px 56px minmax(120px, 1fr) auto; gap: 10px; padding: 12px 14px; }
+    .bereich-row .row-actions { display: none !important; }
+  }
+
+  /* ===== Page grid tile (Kategorien grid) ===== */
+  .page-grid-tile {
+    border-radius: var(--radius);
+    overflow: hidden;
+    position: relative;
     background: hsl(var(--surface));
     backdrop-filter: saturate(180%) blur(30px);
     -webkit-backdrop-filter: saturate(180%) blur(30px);
-    border-bottom: 0.5px solid hsl(var(--hairline));
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 0 0 0.5px rgba(0,0,0,0.04);
+    transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-grid-tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
   }
 
-  .brand-logo {
-    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--violet)));
-    box-shadow: inset 0 0.5px 0 rgba(255,255,255,0.4);
+  /* Primary CTA override (Brand V2 Monza) — applied when using btn-primary utility */
+  .btn-monza {
+    background: var(--brand-red);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), inset 0 0.5px 0 rgba(255,255,255,0.2);
+    transition: all .15s cubic-bezier(.2,.8,.2,1);
   }
-
-  .search-pill {
-    background: hsl(var(--hairline-soft));
+  .btn-monza:hover {
+    background: var(--brand-red-2);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(217,4,22,0.35);
   }
-  .search-pill:hover { background: hsl(var(--hairline)); }
 
   /* ===== Legacy helpers kept for compatibility ===== */
   .accent-underline {

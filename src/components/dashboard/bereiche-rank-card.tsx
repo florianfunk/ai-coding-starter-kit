@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Folders } from "lucide-react";
 
 export type BereichRank = {
   id: string;
@@ -14,22 +15,24 @@ export function BereicheRankCard({ bereiche }: { bereiche: BereichRank[] }) {
 
   return (
     <div className="glass-card">
-      <div className="flex items-center justify-between px-5 pt-[18px] pb-3">
-        <div>
-          <div className="eyebrow">Sortiment</div>
-          <h3 className="display-sm mt-0.5">Bereiche nach Produkten</h3>
+      <div className="card-head">
+        <div className="card-head-icon">
+          <Folders className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="card-head-title">Bereiche nach Produkten</h3>
+          <div className="card-head-sub">Sortiment</div>
         </div>
       </div>
       <div className="p-2 pb-3">
         {sorted.map((b, i) => {
-          const barColor = b.farbe || `hsl(${(i * 47) % 360},70%,55%)`;
+          const fallbackColor = `hsl(${(i * 47) % 360},55%,40%)`;
+          const barColor = b.farbe ?? fallbackColor;
           return (
             <Link key={b.id} href={`/bereiche/${b.id}`} className="list-row rounded-xl">
               <div
                 className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-lg text-[10.5px] font-semibold text-white"
-                style={{
-                  background: b.farbe ?? `hsl(${(i * 47) % 360},70%,60%)`,
-                }}
+                style={{ background: barColor }}
               >
                 {String(i + 1).padStart(2, "0")}
               </div>

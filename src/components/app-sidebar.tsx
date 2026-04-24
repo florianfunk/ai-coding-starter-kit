@@ -6,53 +6,64 @@ import {
   LayoutGrid,
   Layers,
   Package,
-  Euro,
   Sparkles,
   LayoutTemplate,
   FileDown,
   Settings,
   Users,
   History,
-  Image as ImageIcon,
   Home,
   HelpCircle,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 
-type NavItem = { id: string; href: string; label: string; icon: LucideIcon };
+type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { label: string; items: NavItem[] };
 
-const groups: NavGroup[] = [
+const mainGroups: NavGroup[] = [
   {
     label: "Übersicht",
-    items: [{ id: "dashboard", href: "/", label: "Dashboard", icon: Home }],
+    items: [{ href: "/", label: "Dashboard", icon: Home }],
   },
   {
     label: "Katalog",
     items: [
-      { id: "bereiche", href: "/bereiche", label: "Bereiche", icon: LayoutGrid },
-      { id: "kategorien", href: "/kategorien", label: "Kategorien", icon: Layers },
-      { id: "produkte", href: "/produkte", label: "Produkte", icon: Package },
+      { href: "/bereiche", label: "Bereiche", icon: LayoutGrid },
+      { href: "/kategorien", label: "Kategorien", icon: Layers },
+      { href: "/produkte", label: "Produkte", icon: Package },
     ],
   },
   {
     label: "Assets",
     items: [
-      { id: "icons", href: "/icons", label: "Icons", icon: Sparkles },
-      { id: "vorlagen", href: "/datenblatt-vorlagen", label: "Datenblatt-Vorlagen", icon: LayoutTemplate },
+      { href: "/icons", label: "Icons", icon: Sparkles },
+      { href: "/datenblatt-vorlagen", label: "Datenblatt-Vorlagen", icon: LayoutTemplate },
     ],
   },
   {
     label: "System",
     items: [
-      { id: "export", href: "/export/katalog", label: "Export", icon: FileDown },
-      { id: "benutzer", href: "/benutzer", label: "Benutzer", icon: Users },
-      { id: "einstellungen", href: "/einstellungen", label: "Einstellungen", icon: Settings },
-      { id: "aktivitaet", href: "/aktivitaet", label: "Aktivität", icon: History },
-      { id: "hilfe", href: "/hilfe", label: "Hilfe", icon: HelpCircle },
+      { href: "/export/katalog", label: "Export", icon: FileDown },
+      { href: "/benutzer", label: "Benutzer", icon: Users },
+      { href: "/aktivitaet", label: "Aktivität", icon: History },
     ],
   },
+];
+
+const footerItems: NavItem[] = [
+  { href: "/einstellungen", label: "Einstellungen", icon: Settings },
+  { href: "/hilfe", label: "Hilfe", icon: HelpCircle },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -64,36 +75,112 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside
-      className="sticky top-[52px] hidden lg:flex shrink-0 flex-col gap-4 overflow-y-auto px-3 py-4"
-      style={{ width: 236, height: "calc(100vh - 52px)" }}
+    <Sidebar
+      collapsible="icon"
+      className="top-[56px] !h-[calc(100vh-56px)] border-r border-[rgba(0,0,0,0.25)]"
     >
-      {groups.map((g) => (
-        <div key={g.label}>
-          <div className="eyebrow px-2.5 pt-1 pb-2 text-[10.5px]">{g.label}</div>
-          <div className="flex flex-col gap-0.5">
-            {g.items.map((n) => {
-              const active = isActive(pathname, n.href);
-              const Icon = n.icon;
-              return (
-                <Link
-                  key={n.id}
-                  href={n.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-2.5 py-2 text-[13.5px] transition-colors",
-                    active
-                      ? "bg-primary/10 font-medium text-primary"
-                      : "text-foreground/80 hover:bg-muted",
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="flex-1">{n.label}</span>
-                </Link>
-              );
-            })}
+      <SidebarContent className="gap-3.5 px-2.5 pt-3">
+        {mainGroups.map((group) => (
+          <SidebarGroup key={group.label} className="gap-0 py-0">
+            <SidebarGroupLabel className="px-2.5 pb-1.5 text-[10.5px] font-bold uppercase tracking-[0.11em] text-white/40">
+              {group.label}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-px">
+                {group.items.map((item) => {
+                  const active = isActive(pathname, item.href);
+                  const Icon = item.icon;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        asChild
+                        tooltip={item.label}
+                        className={`relative h-auto gap-[11px] rounded-lg px-2.5 py-2 text-[13.5px] transition-colors ${
+                          active
+                            ? "!bg-[rgba(217,4,22,0.16)] !text-white font-semibold shadow-[inset_0_0_0_0.5px_rgba(217,4,22,0.28)] hover:!bg-[rgba(217,4,22,0.2)]"
+                            : "text-white/70 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        <Link href={item.href}>
+                          {active && (
+                            <span
+                              aria-hidden
+                              className="absolute -left-[13px] top-1.5 bottom-1.5 w-[3px] rounded-r-[3px]"
+                              style={{
+                                background: "#D90416",
+                                boxShadow: "0 0 8px rgba(217,4,22,0.6)",
+                              }}
+                            />
+                          )}
+                          <Icon
+                            className="!size-4"
+                            style={{ color: active ? "#ff4d5a" : "rgba(255,255,255,0.55)" }}
+                          />
+                          <span className="flex-1 text-left">{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </SidebarContent>
+
+      <SidebarFooter className="gap-2.5 px-2.5 pb-3">
+        <div className="rounded-[11px] border-[0.5px] border-white/10 bg-white/5 p-3 group-data-[collapsible=icon]:hidden">
+          <div className="mb-1.5 flex items-center gap-2">
+            <div
+              className="grid h-5 w-5 place-items-center rounded-[6px] text-white shadow-[0_2px_8px_rgba(217,4,22,0.35),inset_0_0.5px_0_rgba(255,255,255,0.25)]"
+              style={{ background: "#D90416" }}
+            >
+              <Sparkles className="h-[11px] w-[11px]" />
+            </div>
+            <span className="text-[12px] font-semibold tracking-[-0.005em] text-white">
+              Vorschläge bereit
+            </span>
           </div>
+          <p className="mb-2.5 text-[11.5px] leading-[1.4] text-white/60">
+            KI-Beschreibungen warten auf Prüfung.
+          </p>
+          <Link
+            href="/produkte?status=unbearbeitet"
+            className="flex h-7 w-full items-center justify-center rounded-[7px] text-[12px] font-semibold tracking-[-0.003em] text-white shadow-[0_2px_8px_rgba(217,4,22,0.35),inset_0_0.5px_0_rgba(255,255,255,0.25)]"
+            style={{ background: "#D90416" }}
+          >
+            Jetzt prüfen
+          </Link>
         </div>
-      ))}
-    </aside>
+
+        <SidebarMenu className="gap-px">
+          {footerItems.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.label}
+                  className={`h-auto gap-[11px] rounded-lg px-2.5 py-2 text-[13.5px] ${
+                    active
+                      ? "!bg-[rgba(217,4,22,0.16)] !text-white font-semibold"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  <Link href={item.href}>
+                    <Icon
+                      className="!size-4"
+                      style={{ color: active ? "#ff4d5a" : "rgba(255,255,255,0.55)" }}
+                    />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
   );
 }

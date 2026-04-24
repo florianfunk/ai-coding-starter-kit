@@ -1,3 +1,5 @@
+import { PieChart } from "lucide-react";
+
 export function VollstaendigkeitCard({
   avg,
   completePercent,
@@ -14,9 +16,9 @@ export function VollstaendigkeitCard({
   const partial = Math.max(0, total - complete - attention);
 
   const segments = [
-    { label: "Vollständig", count: complete, color: "hsl(var(--green))" },
-    { label: "Teilweise", count: partial, color: "hsl(var(--warning))" },
-    { label: "Lückenhaft", count: attention, color: "hsl(var(--destructive))" },
+    { label: "Vollständig", count: complete, color: "#193073" },
+    { label: "Teilweise", count: partial, color: "#FFC10D" },
+    { label: "Lückenhaft", count: attention, color: "#D90416" },
   ];
 
   const totalAll = Math.max(1, complete + partial + attention);
@@ -26,11 +28,16 @@ export function VollstaendigkeitCard({
 
   return (
     <div className="glass-card">
-      <div className="px-5 pt-[18px] pb-3">
-        <div className="eyebrow">Datenqualität</div>
-        <h3 className="display-sm mt-0.5">Vollständigkeit</h3>
+      <div className="card-head">
+        <div className="card-head-icon">
+          <PieChart className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="card-head-title">Vollständigkeit</h3>
+          <div className="card-head-sub">Datenqualität</div>
+        </div>
       </div>
-      <div className="flex items-center gap-[18px] px-5 pb-[18px]">
+      <div className="flex items-center gap-[18px] px-5 py-[18px]">
         <div className="relative h-[108px] w-[108px] shrink-0">
           <svg width={108} height={108} viewBox="0 0 108 108" className="-rotate-90">
             <circle cx={54} cy={54} r={r} stroke="hsl(var(--hairline))" strokeWidth={8} fill="none" />
@@ -47,8 +54,8 @@ export function VollstaendigkeitCard({
             />
             <defs>
               <linearGradient id="vollGradient" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stopColor="#30d158" />
-                <stop offset="100%" stopColor="#007aff" />
+                <stop offset="0%" stopColor="#193073" />
+                <stop offset="100%" stopColor="#D90416" />
               </linearGradient>
             </defs>
           </svg>

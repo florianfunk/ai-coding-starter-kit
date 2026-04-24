@@ -237,19 +237,19 @@ export function CommandPalette({ onOpenRef }: { onOpenRef?: React.MutableRefObje
   );
 }
 
-/** Small trigger button for the header navigation */
+/** Small trigger button for the header navigation (Brand V2 dark pill) */
 function CommandPaletteTrigger({ onOpen }: { onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="search-pill flex h-[34px] w-[260px] min-w-0 items-center gap-2 rounded-full px-3 text-[13px] text-muted-foreground transition-colors max-lg:w-[180px] max-md:w-[40px] max-md:justify-center max-md:px-0"
+      className="search-pill-dark"
       aria-label="Suche öffnen"
     >
-      <Search className="h-4 w-4 shrink-0" />
-      <span className="flex-1 truncate text-left max-md:hidden">Alles durchsuchen…</span>
-      <kbd className="hidden font-mono text-[10px] text-muted-foreground md:inline-flex">
-        <span className="text-xs">&#8984;</span>K
+      <Search className="h-[14px] w-[14px] shrink-0" />
+      <span className="search-label flex-1 truncate text-left">Alles durchsuchen…</span>
+      <kbd className="kbd-dark">
+        <span className="text-[10px]">&#8984;</span>K
       </kbd>
     </button>
   );

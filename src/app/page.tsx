@@ -69,16 +69,16 @@ export default async function HomePage() {
 
         <div className="bento">
           <div className="b-3">
-            <StatTile label="Bereiche" value={bereicheCount} icon={LayoutGrid} href="/bereiche" colorVar="violet" />
+            <StatTile label="Bereiche" value={bereicheCount} icon={LayoutGrid} href="/bereiche" tone="red" />
           </div>
           <div className="b-3">
-            <StatTile label="Kategorien" value={kategorienCount} icon={Layers} href="/kategorien" colorVar="primary" />
+            <StatTile label="Kategorien" value={kategorienCount} icon={Layers} href="/kategorien" tone="red" />
           </div>
           <div className="b-3">
-            <StatTile label="Produkte" value={produkteCount} icon={Package} href="/produkte" colorVar="green" />
+            <StatTile label="Produkte" value={produkteCount} icon={Package} href="/produkte" tone="navy" />
           </div>
           <div className="b-3">
-            <StatTile label="Preise aktiv" value={preiseCount} icon={Euro} href="/produkte" colorVar="warning" />
+            <StatTile label="Preise aktiv" value={preiseCount} icon={Euro} href="/produkte" tone="amber" />
           </div>
         </div>
 

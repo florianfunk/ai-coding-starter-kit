@@ -175,6 +175,7 @@ export function ProduktForm({
               Artikelnummer, Name, Bereich, Kategorie, Hauptbild
             </div>
           </div>
+          <SectionSaveButton pending={pending || uploading} />
         </div>
         <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -247,8 +248,8 @@ export function ProduktForm({
       {/* Accordion sections */}
       <Accordion type="multiple" value={openSections} onValueChange={handleSectionsChange} className="space-y-3">
         {/* Datenblatt */}
-        <AccordionItem id="section-datenblatt" value="datenblatt" className="glass-card overflow-hidden border-0">
-          <AccordionTrigger className="card-head hover:no-underline">
+        <AccordionItem id="section-datenblatt" value="datenblatt" className="glass-card overflow-hidden border-0 relative">
+          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
               colorVar={SECTION_META.datenblatt.colorVar}
               Icon={FileText}
@@ -257,6 +258,7 @@ export function ProduktForm({
               progress={sectionProgress("datenblatt", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
+          <SectionSaveButton pending={pending || uploading} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
               <div className="space-y-2">
@@ -291,11 +293,12 @@ export function ProduktForm({
               key={group.tab}
               id={`section-${group.tab}`}
               value={group.tab}
-              className="glass-card overflow-hidden border-0"
+              className="glass-card overflow-hidden border-0 relative"
             >
-              <AccordionTrigger className="card-head hover:no-underline">
+              <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
                 <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
+              <SectionSaveButton pending={pending || uploading} floating />
               <AccordionContent className="px-4 pb-4">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {group.fields.map((f) => (
@@ -311,9 +314,9 @@ export function ProduktForm({
         <AccordionItem
           id="section-thermisch"
           value="thermisch"
-          className="glass-card overflow-hidden border-0"
+          className="glass-card overflow-hidden border-0 relative"
         >
-          <AccordionTrigger className="card-head hover:no-underline">
+          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
               colorVar={SECTION_META.thermisch.colorVar}
               Icon={Thermometer}
@@ -321,6 +324,7 @@ export function ProduktForm({
               progress={sectionProgress("thermisch", defaultValues, iconIds.length)}
             />
           </AccordionTrigger>
+          <SectionSaveButton pending={pending || uploading} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
               {thermischGroup?.fields.map((f) => (
@@ -337,9 +341,9 @@ export function ProduktForm({
         <AccordionItem
           id="section-icons"
           value="icons"
-          className="glass-card overflow-hidden border-0"
+          className="glass-card overflow-hidden border-0 relative"
         >
-          <AccordionTrigger className="card-head hover:no-underline">
+          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
             <SectionHeader
               colorVar={SECTION_META.icons.colorVar}
               Icon={Palette}
@@ -348,6 +352,7 @@ export function ProduktForm({
               countBadge={iconIds.length}
             />
           </AccordionTrigger>
+          <SectionSaveButton pending={pending || uploading} floating />
           <AccordionContent className="px-4 pb-4">
             <IconPicker
               icons={icons}
@@ -360,16 +365,38 @@ export function ProduktForm({
         </AccordionItem>
       </Accordion>
 
-      <div className="sticky bottom-0 z-40 -mx-6 px-6 py-3 border-t-2 border-primary/20 bg-background/95 backdrop-blur shadow-[0_-4px_16px_rgba(0,0,0,0.08)] flex items-center justify-between">
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider hidden sm:block">Produktdaten</p>
-        <div className="flex gap-3 ml-auto">
-          <Button asChild variant="outline" type="button"><a href="/produkte">Abbrechen</a></Button>
-          <Button type="submit" disabled={pending || uploading}>
-            {pending ? "Speichere..." : submitLabel}
-          </Button>
-        </div>
+      <div className="flex justify-end">
+        <Button asChild variant="ghost" type="button" className="text-muted-foreground">
+          <a href="/produkte">Abbrechen</a>
+        </Button>
       </div>
     </form>
+  );
+}
+
+/** Compact Save-Button for the dark section header.
+ *  Triggers the parent form's submit. In Accordion items we render it
+ *  `floating` (absolute) so it sits on top of the trigger button without
+ *  nesting a <button> inside another <button>. */
+function SectionSaveButton({
+  pending,
+  floating,
+}: {
+  pending: boolean;
+  floating?: boolean;
+}) {
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      onClick={(e) => e.stopPropagation()}
+      className={`${
+        floating ? "absolute right-3 top-1/2 -translate-y-1/2 z-10" : "shrink-0"
+      } inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 text-[12px] font-semibold tracking-[-0.003em] text-white shadow-[0_1px_2px_rgba(0,0,0,0.15),inset_0_0.5px_0_rgba(255,255,255,0.22)] transition-all hover:-translate-y-px hover:shadow-[0_4px_10px_rgba(217,4,22,0.35)] disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none`}
+      style={{ background: "#D90416" }}
+    >
+      {pending ? "Speichere…" : "Speichern"}
+    </button>
   );
 }
 

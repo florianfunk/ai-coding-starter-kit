@@ -13,13 +13,14 @@
 % ─── Geometrie: 18 mm Innenränder rundum (Briefing 2.) ──────────────────────
 \RequirePackage[a4paper,
                 left=18mm, right=18mm,
-                top=14mm, bottom=14mm,
+                top=14mm, bottom=20mm,
                 headheight=0pt, headsep=0pt,
-                footskip=9mm,
+                footskip=14mm,
                 marginparwidth=0pt]{geometry}
 
 \RequirePackage{fontspec}
 \RequirePackage[table,RGB]{xcolor}
+\RequirePackage{eso-pic}
 \RequirePackage{graphicx}
 \graphicspath{{/srv/assets/lichtengross/}{/srv/assets/}{./}}
 \DeclareGraphicsExtensions{.pdf,.jpg,.jpeg,.png}
@@ -105,7 +106,17 @@
     {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten \(\cdot\) v1.0}}%
   \end{minipage}%
 }
-\fancyfoot[C]{\parbox{\textwidth}{\rendermyfoot}}
+\fancyfoot[C]{}
+% Absolut positionierter Footer 5mm vom Page-Bottom
+\AddToShipoutPictureFG{%
+  \AtPageLowerLeft{%
+    \put(\LenToUnit{18mm},\LenToUnit{5mm}){%
+      \begin{minipage}[b]{\dimexpr\paperwidth-36mm\relax}%
+        \rendermyfoot%
+      \end{minipage}%
+    }%
+  }%
+}
 \renewcommand{\headrulewidth}{0pt}
 
 % ─── Helper: Letterspaced Mono Eyebrow / Caps ──────────────────────────────

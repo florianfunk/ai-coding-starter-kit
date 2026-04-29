@@ -70,6 +70,11 @@ export function KatalogJobStatus({
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      // Bei bereits abgeschlossenen Jobs (done/error) trotzdem einmal die
+      // Server-Daten laden — sonst fehlt die PDF-URL bzw. der Fehlertext
+      // beim ersten Render der Seite (LOW-2 Fix).
+      if (status === "done" && !pdfUrl) fetchStatus();
+      else if (status === "error" && !errorText) fetchStatus();
       return;
     }
 
@@ -83,7 +88,7 @@ export function KatalogJobStatus({
         intervalRef.current = null;
       }
     };
-  }, [isActive, fetchStatus]);
+  }, [isActive, fetchStatus, status, pdfUrl, errorText]);
 
   return (
     <div className="space-y-2">

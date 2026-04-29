@@ -3,22 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getSignedUrl } from "@/lib/storage";
-import type { KatalogParams } from "@/lib/pdf/katalog-document";
-
-export type StartKatalogResult = { jobId?: string; error: string | null };
-
-export async function startKatalogJob(params: KatalogParams): Promise<StartKatalogResult> {
-  const supabase = await createClient();
-  const { data: job, error } = await supabase
-    .from("katalog_jobs")
-    .insert({ status: "queued", parameter: params as any })
-    .select("id")
-    .single();
-  if (error || !job) return { error: error?.message ?? "Job-Anlage fehlgeschlagen" };
-
-  revalidatePath("/export/katalog");
-  return { jobId: job.id, error: null };
-}
 
 export async function deleteKatalogJob(jobId: string): Promise<{ error: string | null }> {
   const supabase = await createClient();

@@ -8,21 +8,46 @@ import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 
 export type KatalogParams = {
   layout: "lichtengros" | "eisenkeil";
-  preisauswahl: "listenpreis" | "ek";
+  /**
+   * Preisspur, die im Katalog gedruckt wird.
+   * Drei Spuren (PROJ-37). Backwards-Compat: Alt-Jobs mit `"ek"` werden vom
+   * Job-Runner auf `"lichtengros"` gemappt.
+   */
+  preisauswahl: "lichtengros" | "eisenkeil" | "listenpreis";
   preisAenderung: "plus" | "minus";
   preisProzent: number;
   waehrung: "EUR" | "CHF";
   wechselkurs: number;
+  sprache?: "de";
+  /**
+   * Whitelist der zu druckenden Produkte (PROJ-37). NULL/undefined = alle.
+   * Job-Runner entfernt Bereiche/Kategorien aus den Maps, deren Produkte
+   * komplett rausgefiltert wurden — der Renderer iteriert nur über sichtbare.
+   */
+  produktIds?: string[] | null;
 };
 
 export type PdfImage = { data: Buffer; format: "jpg" | "png" } | null;
+
+/**
+ * Drei Preisspuren pro Produkt (siehe `aktuelle_preise_flat`).
+ * Beibehaltene Legacy-Spalten:
+ *   - `ek` ist Alias für `lichtengros` (Backwards-Compat zur alten `"ek"`-Spur).
+ */
+export type ProduktPreise = {
+  listenpreis: number | null;
+  lichtengros: number | null;
+  eisenkeil: number | null;
+  /** Alias für `lichtengros` — Renderer-Backwards-Compat. */
+  ek: number | null;
+};
 
 export type KatalogData = {
   params: KatalogParams;
   bereiche: any[];
   kategorienByBereich: Map<string, any[]>;
   produkteByKategorie: Map<string, any[]>;
-  preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
+  preisByProdukt: Map<string, ProduktPreise | null>;
   hauptbildByProdukt: Map<string, PdfImage>;
   iconLabelsByProdukt: Map<string, string[]>;
   kategorieIconsByKategorie: Map<string, { label: string; url: PdfImage }[]>;
@@ -329,16 +354,43 @@ const styles = StyleSheet.create({
 // Helpers
 // ===========================================================================
 
-function calcPrice(
-  p: { listenpreis: number; ek: number | null } | null | undefined,
+/**
+ * Berechnet den im Katalog gedruckten Preis.
+ *
+ * Rückgabewert:
+ *   - `number` → kommerziell auf 2 Nachkommastellen gerundet, ≥ 0
+ *   - `null`   → keine Preisspalte in der gewählten Spur gesetzt → "auf Anfrage"
+ *
+ * Backwards-Compat: Eingabe-Spur `"ek"` (Alt-Schema) wird auf `"lichtengros"` gemappt.
+ *
+ * Rundungs-Strategie: Erst Faktor + Währungs-Konversion, dann eine einzige Rundung
+ * am Ende (kommerziell, half-up). Negative Endwerte werden auf `0.00` gekappt
+ * (Edge-Case bei großem Minus-Aufschlag).
+ */
+export function calcPrice(
+  p: ProduktPreise | null | undefined,
   params: KatalogParams,
 ): number | null {
   if (!p) return null;
-  const base = params.preisauswahl === "ek" ? (p.ek ?? p.listenpreis) : p.listenpreis;
+
+  const spur =
+    (params.preisauswahl as string) === "ek" ? "lichtengros" : params.preisauswahl;
+  const base =
+    spur === "lichtengros" ? p.lichtengros :
+    spur === "eisenkeil"   ? p.eisenkeil   :
+    /* listenpreis */        p.listenpreis;
+
+  if (base == null) return null;
+
   const factor = 1 + (params.preisAenderung === "plus" ? 1 : -1) * (params.preisProzent / 100);
   let final = base * factor;
   if (params.waehrung === "CHF") final *= params.wechselkurs;
-  return final;
+
+  if (!Number.isFinite(final)) return null;
+  if (final < 0) final = 0;
+
+  // Kommerzielle Rundung (half-up), 2 Nachkommastellen
+  return Math.round(final * 100) / 100;
 }
 
 function spaltenOf(kategorie: any): (string | null)[] {
@@ -516,7 +568,7 @@ function KategorieSeiten({
   bereich: any;
   kategorie: any;
   produkte: any[];
-  preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
+  preisByProdukt: Map<string, ProduktPreise | null>;
   hauptbildByProdukt: Map<string, PdfImage>;
   kategorieIcons: { label: string; url: PdfImage }[];
   kategorieBilder: Record<1 | 2 | 3 | 4, PdfImage>;
@@ -673,7 +725,7 @@ function VariantenTabelle({
 }: {
   spalten: { index: number; label: string; def: ReturnType<typeof getSpaltenDefinition> }[];
   produkte: any[];
-  preisByProdukt: Map<string, { listenpreis: number; ek: number | null } | null>;
+  preisByProdukt: Map<string, ProduktPreise | null>;
   hauptbildByProdukt: Map<string, PdfImage>;
   params: KatalogParams;
   showHeader: boolean;

@@ -86,7 +86,7 @@ export function formatSpaltenWert(
 ): string {
   if (!def.field) return "";
   if (def.field === "__preis__") {
-    if (preis == null) return "—";
+    if (preis == null) return "auf Anfrage";
     return new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(preis);
   }
   const raw = produkt[def.field];

@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Plus, Search, Filter, X, Upload, ChevronRight } from "lucide-react";
 import { ProdukteTable } from "./produkte-table-body";
 import { ExportDialog } from "./export-dialog";
+import { KatalogDruckenDialog } from "@/components/katalog-drucken/katalog-drucken-dialog";
 import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
-import { getBereiche, getKategorien } from "@/lib/cache";
+import { getBereiche, getKategorien, getKatalogTree } from "@/lib/cache";
 import type { ProduktListing } from "@/lib/types/views";
 
 const PAGE_SIZE = 50;
@@ -21,10 +22,14 @@ export default async function ProdukteListPage({
   const supabase = await createClient();
 
   // Bereiche & Kategorien aus dem Cache — slowly-changing, per Tag invalidiert.
-  const [bereiche, kategorien] = await Promise.all([
+  // KatalogTree + Wechselkurs nur für den Druck-Wizard (PROJ-37).
+  const [bereiche, kategorien, katalogTree, einstellungen] = await Promise.all([
     getBereiche(),
     getKategorien(),
+    getKatalogTree(),
+    supabase.from("katalog_einstellungen").select("wechselkurs_eur_chf").eq("id", 1).single(),
   ]);
+  const wechselkurs = Number(einstellungen.data?.wechselkurs_eur_chf ?? 1);
 
   const page = Math.max(1, Number(sp.page ?? "1"));
   const from = (page - 1) * PAGE_SIZE;
@@ -96,6 +101,7 @@ export default async function ProdukteListPage({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <KatalogDruckenDialog tree={katalogTree} wechselkurs={wechselkurs} />
               <ExportDialog
                 produktCount={displayCount}
                 filters={{

@@ -230,6 +230,62 @@ export const getKategorieIconLabels = unstable_cache(
   { tags: ["kategorien", "icons"], revalidate: 3600 },
 );
 
+// ---------------------------------------------------------------------------
+// Katalog-Tree (Bereich → Kategorie → Produkt) für den Druck-Wizard (PROJ-37).
+// Liefert die komplette Hierarchie sortiert. Bei ~500 Produkten unkritisch
+// in Größe; einmaliger Lookup beim Öffnen des Wizards.
+// ---------------------------------------------------------------------------
+export type KatalogTreeBereich = {
+  id: string;
+  name: string;
+  kategorien: {
+    id: string;
+    name: string;
+    produkte: { id: string; artikelnummer: string; name: string }[];
+  }[];
+};
+
+export const getKatalogTree = unstable_cache(
+  async (): Promise<KatalogTreeBereich[]> => {
+    const supabase = cacheClient();
+    const [bereiche, kategorien, produkte] = await Promise.all([
+      supabase.from("bereiche").select("id, name, sortierung").order("sortierung"),
+      supabase.from("kategorien").select("id, name, bereich_id, sortierung").order("sortierung"),
+      supabase
+        .from("produkte")
+        .select("id, artikelnummer, name, kategorie_id, bereich_id, sortierung")
+        .order("sortierung")
+        .limit(20000),
+    ]);
+
+    const produkteByKategorie = new Map<string, { id: string; artikelnummer: string; name: string }[]>();
+    for (const p of produkte.data ?? []) {
+      const arr = produkteByKategorie.get(p.kategorie_id) ?? [];
+      arr.push({ id: p.id, artikelnummer: p.artikelnummer ?? "", name: p.name ?? "" });
+      produkteByKategorie.set(p.kategorie_id, arr);
+    }
+
+    const kategorienByBereich = new Map<string, typeof kategorien.data>();
+    for (const k of kategorien.data ?? []) {
+      const arr = kategorienByBereich.get(k.bereich_id) ?? [];
+      arr.push(k);
+      kategorienByBereich.set(k.bereich_id, arr);
+    }
+
+    return (bereiche.data ?? []).map((b) => ({
+      id: b.id,
+      name: b.name ?? "",
+      kategorien: (kategorienByBereich.get(b.id) ?? []).map((k) => ({
+        id: k.id,
+        name: k.name ?? "",
+        produkte: produkteByKategorie.get(k.id) ?? [],
+      })),
+    }));
+  },
+  ["katalog-tree-v1"],
+  { tags: ["bereiche", "kategorien", "produkte"], revalidate: 300 },
+);
+
 export const getDatenblattTemplates = unstable_cache(
   async (): Promise<any[]> => {
     const supabase = cacheClient();

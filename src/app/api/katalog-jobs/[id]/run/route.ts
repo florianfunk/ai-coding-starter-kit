@@ -7,7 +7,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import sharp from "sharp";
 import { createServiceRoleClient } from "@/lib/supabase/server";
-import { KatalogDocument, type KatalogParams, type PdfImage } from "@/lib/pdf/katalog-document";
+import {
+  KatalogDocument,
+  type KatalogParams,
+  type PdfImage,
+  type ProduktPreise,
+} from "@/lib/pdf/katalog-document";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -42,7 +47,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
   log("status → running (claimed)");
 
-  const p = job.parameter as KatalogParams;
+  const p = normalizeParams(job.parameter, log);
 
   try {
 
@@ -51,8 +56,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     log(`bereiche: ${bereiche?.length ?? 0}`);
     const { data: kategorien } = await admin.from("kategorien").select("*").order("sortierung");
     log(`kategorien: ${kategorien?.length ?? 0}`);
-    const { data: produkte } = await admin.from("produkte").select("*").order("sortierung");
-    log(`produkte: ${produkte?.length ?? 0}`);
+    const { data: produkteRaw } = await admin.from("produkte").select("*").order("sortierung");
+    log(`produkte: ${produkteRaw?.length ?? 0}`);
     const { data: preise } = await admin.from("aktuelle_preise_flat").select("*");
     log(`preise: ${preise?.length ?? 0}`);
     const { data: produktIcons } = await admin.from("produkt_icons").select("produkt_id, icons(label)").order("sortierung");
@@ -63,24 +68,54 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     await admin.from("katalog_jobs").update({ progress: 30 }).eq("id", jobId);
 
-    // Maps bauen
-    const kategorienByBereich = new Map<string, any[]>();
-    for (const k of kategorien ?? []) {
-      const arr = kategorienByBereich.get(k.bereich_id) ?? [];
-      arr.push(k);
-      kategorienByBereich.set(k.bereich_id, arr);
+    // Inhalts-Filter (PROJ-37): Produkt-Whitelist anwenden, falls vorhanden.
+    // NULL/undefined = alle Produkte (Default-Verhalten wie vor PROJ-37).
+    const produkte =
+      p.produktIds && p.produktIds.length > 0
+        ? (produkteRaw ?? []).filter((pr) => p.produktIds!.includes(pr.id))
+        : (produkteRaw ?? []);
+    log(`produkte nach Filter: ${produkte.length} (von ${produkteRaw?.length ?? 0})`);
+    if (produkte.length === 0) {
+      throw new Error("Keine Produkte ausgewählt — der Katalog wäre leer.");
     }
+
+    // Maps bauen — nur über die gefilterten Produkte. Kategorien/Bereiche ohne
+    // ausgewählte Produkte werden anschließend ausgesiebt, damit Index und
+    // Trennseiten keine Toten Einträge enthalten.
     const produkteByKategorie = new Map<string, any[]>();
-    for (const pr of produkte ?? []) {
+    for (const pr of produkte) {
       const arr = produkteByKategorie.get(pr.kategorie_id) ?? [];
       arr.push(pr);
       produkteByKategorie.set(pr.kategorie_id, arr);
     }
-    const preisByProdukt = new Map<string, { listenpreis: number; ek: number | null } | null>();
+    // Nur Kategorien, die nach Filter ≥1 Produkt haben.
+    const filteredKategorien = (kategorien ?? []).filter((k) =>
+      (produkteByKategorie.get(k.id)?.length ?? 0) > 0,
+    );
+    const kategorienByBereich = new Map<string, any[]>();
+    for (const k of filteredKategorien) {
+      const arr = kategorienByBereich.get(k.bereich_id) ?? [];
+      arr.push(k);
+      kategorienByBereich.set(k.bereich_id, arr);
+    }
+    // Nur Bereiche, die nach Filter ≥1 Kategorie mit Produkten haben.
+    const filteredBereiche = (bereiche ?? []).filter((b) =>
+      (kategorienByBereich.get(b.id)?.length ?? 0) > 0,
+    );
+    log(
+      `nach Inhaltsauswahl: ${filteredBereiche.length} bereiche, ${filteredKategorien.length} kategorien, ${produkte.length} produkte`,
+    );
+
+    // Preis-Map (drei Spuren). View `aktuelle_preise_flat` liefert die Spur-Spalten:
+    //   listenpreis, ek_lichtengros, ek_eisenkeil  (ek = Alias für ek_lichtengros)
+    const preisByProdukt = new Map<string, ProduktPreise | null>();
     for (const pr of preise ?? []) {
+      const lichtengros = pr.ek_lichtengros != null ? Number(pr.ek_lichtengros) : null;
       preisByProdukt.set(pr.produkt_id, {
-        listenpreis: Number(pr.listenpreis),
-        ek: pr.ek != null ? Number(pr.ek) : null,
+        listenpreis: pr.listenpreis != null ? Number(pr.listenpreis) : null,
+        lichtengros,
+        eisenkeil:   pr.ek_eisenkeil != null ? Number(pr.ek_eisenkeil) : null,
+        ek: lichtengros, // Backwards-Compat
       });
     }
     const iconLabelsByProdukt = new Map<string, string[]>();
@@ -123,10 +158,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       return results;
     }
 
-    // Thumbnails: 200px reicht für Tabellen-Thumbnails (28×20px gerendert)
-    log(`downloading ${produkte?.length ?? 0} product images …`);
+    // Thumbnails: 200px reicht für Tabellen-Thumbnails (28×20px gerendert).
+    // Nur für die bereits gefilterten Produkte — sonst laden wir Bilder, die nie gerendert werden.
+    log(`downloading ${produkte.length} product images …`);
     const hauptbildResults = await batch(
-      produkte ?? [],
+      produkte,
       8,
       async (pr) => [pr.id, await downloadImage(admin, "produktbilder", pr.hauptbild_path, { maxWidth: 200, quality: 70 })] as const,
       (done, total) => log(`  product images: ${done}/${total}`),
@@ -134,9 +170,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const hauptbildByProdukt = new Map(hauptbildResults);
     log("product images downloaded");
 
-    // Bereich-Intro-Bilder: Vollbild A4
+    // Bereich-Intro-Bilder: Vollbild A4 — nur für gefilterte Bereiche
     const bereichBildResults = await batch(
-      bereiche ?? [],
+      filteredBereiche,
       4,
       async (b) => [b.id, await downloadImage(admin, "produktbilder", b.bild_path, { maxWidth: 1600, quality: 80 })] as const,
     );
@@ -145,9 +181,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
     // Kategorie-Bilder: pro Kategorie bis zu 4 Bilder (Bild1..Bild4)
     // Flatten: 4 Download-Tasks pro Kategorie, danach wieder pro Kategorie gruppieren.
+    // Nur für gefilterte Kategorien — sonst Wartezeit für unbenutzte Bilder.
     type BildSlot = 1 | 2 | 3 | 4;
     type BildTask = { kategorieId: string; slot: BildSlot; path: string | null };
-    const bildTasks: BildTask[] = (kategorien ?? []).flatMap((k) => [
+    const bildTasks: BildTask[] = filteredKategorien.flatMap((k) => [
       { kategorieId: k.id, slot: 1 as BildSlot, path: k.bild1_path },
       { kategorieId: k.id, slot: 2 as BildSlot, path: k.bild2_path },
       { kategorieId: k.id, slot: 3 as BildSlot, path: k.bild3_path },
@@ -185,7 +222,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const buffer = await renderToBuffer(
       KatalogDocument({
         params: p,
-        bereiche: bereiche ?? [],
+        bereiche: filteredBereiche,
         kategorienByBereich,
         produkteByKategorie,
         preisByProdukt,
@@ -258,4 +295,63 @@ async function downloadImage(
   } catch {
     return null;
   }
+}
+
+/**
+ * Normalisiert die in `katalog_jobs.parameter` gespeicherten Wizard-Parameter.
+ *
+ * Backwards-Compat (PROJ-37):
+ *   - Alt-Schema: `preisauswahl: "listenpreis" | "ek"`. Wert `"ek"` → `"lichtengros"`.
+ *   - Neue Felder werden mit Defaults aufgefüllt, wenn sie im JSON fehlen.
+ *
+ * Wirft eine sprechende Fehlermeldung, wenn das Layout-Feld unbrauchbar ist —
+ * der Renderer kann ohne Layout nicht arbeiten.
+ */
+export function normalizeParams(raw: any, log: (msg: string) => void = () => {}): KatalogParams {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Job hat keine Parameter (parameter ist leer oder kein Objekt).");
+  }
+
+  const layout =
+    raw.layout === "eisenkeil" ? "eisenkeil" :
+    raw.layout === "lichtengros" ? "lichtengros" :
+    null;
+  if (!layout) {
+    throw new Error(`Ungültiges Layout: ${JSON.stringify(raw.layout)}`);
+  }
+
+  let preisauswahl: KatalogParams["preisauswahl"];
+  if (raw.preisauswahl === "lichtengros" || raw.preisauswahl === "eisenkeil" || raw.preisauswahl === "listenpreis") {
+    preisauswahl = raw.preisauswahl;
+  } else if (raw.preisauswahl === "ek") {
+    log("Backwards-Compat: alte Spur 'ek' → 'lichtengros'");
+    preisauswahl = "lichtengros";
+  } else {
+    log(`Unbekannte Preisspur ${JSON.stringify(raw.preisauswahl)} → fallback auf 'listenpreis'`);
+    preisauswahl = "listenpreis";
+  }
+
+  const preisAenderung = raw.preisAenderung === "minus" ? "minus" : "plus";
+  const preisProzent = Number.isFinite(Number(raw.preisProzent)) ? Number(raw.preisProzent) : 0;
+  const waehrung = raw.waehrung === "CHF" ? "CHF" : "EUR";
+  const wechselkurs = Number.isFinite(Number(raw.wechselkurs)) && Number(raw.wechselkurs) > 0
+    ? Number(raw.wechselkurs)
+    : 1;
+
+  // Inhaltsauswahl: NULL/undefined oder leeres Array = alle Produkte.
+  // Im Zweifel "alles" — Wizard schickt ohnehin null, wenn alles ausgewählt ist.
+  const produktIds: string[] | null = Array.isArray(raw.produktIds) && raw.produktIds.length > 0
+    ? raw.produktIds.filter((x: unknown) => typeof x === "string")
+    : null;
+
+  return {
+    layout,
+    preisauswahl,
+    preisAenderung,
+    preisProzent,
+    waehrung,
+    wechselkurs,
+    sprache: "de",
+    produktIds,
+  };
 }

@@ -34,7 +34,7 @@
 
 ((# ═════ HERO: Linke Spalte (Eyebrow + Title + Article-Bar) | Rechte Spalte (Quickfacts) ═════ #))
 \noindent
-\begin{minipage}[t]{0.55\linewidth}
+\begin{minipage}[t][28mm][s]{0.55\linewidth}
   \vspace{0pt}
   ((* if produkt.eyebrow *))
   \noindent
@@ -48,17 +48,14 @@
   ((* if produkt.title_accent *))
   {\displayfont\bfseries\fontsize{18pt}{20pt}\selectfont\color{accentdeep}(((produkt.title_accent | e)))}
   ((* endif *))
-  \par\vfill
+  \vfill
 
-  % Article-Bar — schwarze Box, feste Breite 94mm passend zur Spalte.
+  % Article-Bar — schwarze Box, ans Bottom der linken Spalte gepinnt.
   \noindent\colorbox{ink}{%
     \begin{minipage}{86mm}\vspace{1.6mm}\hspace{0pt}%
-      \begin{tabular*}{86mm}{@{\extracolsep{\fill}}lll}
+      \begin{tabular*}{86mm}{@{\extracolsep{\fill}}ll}
         {\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{accent}\MakeUppercase{Artikelnr.}} &
-        {\monofont\fontsize{10.5pt}{12pt}\selectfont\color{paper}(((produkt.artikelnummer | e)))} &
-        ((* if produkt.pill *))%
-        \fcolorbox{paper!25}{ink}{\parbox{16mm}{\centering\monofont\fontsize{7.6pt}{9pt}\selectfont\addfontfeature{LetterSpace=12}\color{paper}\MakeUppercase{(((produkt.pill | e)))}}}%
-        ((* else *))~((* endif *))
+        {\monofont\fontsize{10.5pt}{12pt}\selectfont\color{paper}(((produkt.artikelnummer | e)))}
       \end{tabular*}\vspace{1.6mm}%
     \end{minipage}%
   }

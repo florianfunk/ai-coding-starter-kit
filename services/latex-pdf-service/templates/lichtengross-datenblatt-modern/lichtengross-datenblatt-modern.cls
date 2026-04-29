@@ -170,20 +170,21 @@
 
 % ─── Spec-Group-Heading (klein, accentdeep, monospace) ─────────────────────
 \newcommand{\specgroup}[1]{%
-  \par\vspace{0.8mm}%
+  \par\vspace{0.4mm}%
   {\monofont\bfseries\fontsize{6.8pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{accentdeep}\MakeUppercase{#1}}%
-  \par\vspace{0.2mm}%
+  \par\vspace{0.1mm}%
 }
 
 % ─── Spec-Row: Key links (Sans), Value rechts (Mono), gepunktete Trennlinie
 \newcommand{\specrow}[2]{%
+  {\renewcommand{\arraystretch}{0.85}%
   \noindent\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lr}
     {\fontsize{7.6pt}{8.6pt}\selectfont\color{ink2}#1} &
     {\monofont\bfseries\fontsize{7.6pt}{8.6pt}\selectfont\color{ink}#2} \\
-  \end{tabular*}\par
-  \vspace{-0.8mm}%
+  \end{tabular*}}\par
+  \vspace{-1.4mm}%
   {\color{hairstrong}\dotfill}%
-  \vspace{-0.2mm}\par
+  \vspace{-1mm}\par
 }
 
 % ─── Quickfact-Cell ─────────────────────────────────────────────────────────

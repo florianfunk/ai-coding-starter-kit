@@ -13,9 +13,9 @@
 % ─── Geometrie: 18 mm Innenränder rundum (Briefing 2.) ──────────────────────
 \RequirePackage[a4paper,
                 left=18mm, right=18mm,
-                top=14mm, bottom=18mm,
+                top=14mm, bottom=14mm,
                 headheight=0pt, headsep=0pt,
-                footskip=14mm,
+                footskip=9mm,
                 marginparwidth=0pt]{geometry}
 
 \RequirePackage{fontspec}
@@ -165,7 +165,7 @@
   \begin{minipage}[b]{0.38\linewidth}\raggedleft
     {\monofont\fontsize{8}{10}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{#2}}%
   \end{minipage}\par
-  \vspace{1.4mm}{\color{hairstrong}\hrule height 0.4pt}\vspace{2.6mm}%
+  \vspace{0.6mm}{\color{hairstrong}\hrule height 0.4pt}\vspace{1.2mm}%
 }
 
 % ─── Spec-Group-Heading (klein, accentdeep, monospace) ─────────────────────

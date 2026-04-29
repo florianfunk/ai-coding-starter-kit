@@ -7,30 +7,40 @@ export default async function DatenblattPreviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ layout?: string }>;
+  searchParams: Promise<{ layout?: string; style?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  const layout = sp.layout ?? "lichtengros";
+  const layout = sp.layout === "eisenkeil" ? "eisenkeil" : "lichtengros";
+  const style = sp.style === "klassisch" ? "klassisch" : "modern";
+  const qs = `?layout=${layout}&style=${style}`;
   return (
     <AppShell>
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">Datenblatt-Vorschau</h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <span className="text-xs text-muted-foreground mr-1">Marke</span>
             <Button asChild variant={layout === "lichtengros" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=lichtengros`}>Lichtengros</Link>
+              <Link href={`?layout=lichtengros&style=${style}`}>Lichtengros</Link>
             </Button>
             <Button asChild variant={layout === "eisenkeil" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=eisenkeil`}>Eisenkeil</Link>
+              <Link href={`?layout=eisenkeil&style=${style}`}>Eisenkeil</Link>
             </Button>
-            <Button asChild>
-              <a href={`/produkte/${id}/datenblatt/raw?layout=${layout}&download=1`}>Download PDF</a>
+            <span className="text-xs text-muted-foreground ml-3 mr-1">Stil</span>
+            <Button asChild variant={style === "modern" ? "default" : "outline"} size="sm">
+              <Link href={`?layout=${layout}&style=modern`}>Modern</Link>
+            </Button>
+            <Button asChild variant={style === "klassisch" ? "default" : "outline"} size="sm">
+              <Link href={`?layout=${layout}&style=klassisch`}>Klassisch</Link>
+            </Button>
+            <Button asChild className="ml-2">
+              <a href={`/produkte/${id}/datenblatt/raw${qs}&download=1`}>Download PDF</a>
             </Button>
           </div>
         </div>
         <iframe
-          src={`/produkte/${id}/datenblatt/raw?layout=${layout}`}
+          src={`/produkte/${id}/datenblatt/raw${qs}`}
           className="w-full h-[80vh] border rounded"
         />
       </div>

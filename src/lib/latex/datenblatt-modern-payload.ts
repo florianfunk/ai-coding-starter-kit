@@ -174,23 +174,22 @@ function buildQuickfacts(produkt: any): ModernDatenblattPayload["quickfacts"] {
 
 /** Spec-Gruppen exakt nach Briefing 6.5.2. */
 function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
+  // Konsolidierte Specs — Leistung/CCT/CRI/Spannung/IP sind schon in Quickfacts,
+  // hier nur das, was im Detail relevant ist. Pro Gruppe max. 4 Zeilen.
   const groups = [
     {
-      title: "Elektrik",
+      title: "Elektrik & Sicherheit",
       rows: [
-        ["Systemleistung", fmtValue(produkt.leistung_w, "W/m")],
-        ["Nennspannung", produkt.nennspannung_v ? `${produkt.nennspannung_v} V${produkt.spannungsart ? " " + produkt.spannungsart : ""}` : ""],
         ["Mit Betriebsgerät", produkt.mit_betriebsgeraet === true ? "Ja" : produkt.mit_betriebsgeraet === false ? "Nein" : ""],
         ["Schutzklasse / IP", [produkt.schutzklasse, produkt.ip_schutzart || produkt.schutzart_ip].filter(Boolean).join(" · ")],
+        ["Effizienz", fmtValue(produkt.gesamteffizienz_lm_w, "lm/W")],
+        ["Energieeffizienzklasse", produkt.energieeffizienzklasse || ""],
       ],
     },
     {
       title: "Photometrie",
       rows: [
-        ["Lichtstrom", fmtValue(produkt.lichtstrom_lm, "lm/m")],
-        ["Effizienz", fmtValue(produkt.gesamteffizienz_lm_w, "lm/W")],
-        ["Farbtemperatur", fmtValue(produkt.farbtemperatur_k, "K")],
-        ["CRI / SDCM", [produkt.farbwiedergabeindex_cri ? `Ra ${produkt.farbwiedergabeindex_cri}` : null, produkt.farbkonsistenz_sdcm ? `SDCM ${String(produkt.farbkonsistenz_sdcm).replace(/^SDCM\s*/i, "")}` : null].filter(Boolean).join(" · ")],
+        ["SDCM", produkt.farbkonsistenz_sdcm ? `SDCM ${String(produkt.farbkonsistenz_sdcm).replace(/^SDCM\s*/i, "")}` : ""],
         ["Abstrahlwinkel", produkt.abstrahlwinkel_grad ? `${produkt.abstrahlwinkel_grad}°` : ""],
       ],
     },
@@ -198,11 +197,10 @@ function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
       title: "Bestückung & Geometrie",
       rows: [
         ["LED-Chip", produkt.led_chip ? `SMD ${produkt.led_chip}` : ""],
-        ["LED pro Meter / Pitch", [produkt.anzahl_led_pro_meter ? `${produkt.anzahl_led_pro_meter}/m` : null, produkt.abstand_led_zu_led_mm ? `${produkt.abstand_led_zu_led_mm} mm` : null].filter(Boolean).join(" · ")],
-        ["Maße L × B × H", produkt.masse_text || [produkt.laenge_mm, produkt.breite_mm, produkt.hoehe_mm].every((v) => v != null && v !== "") ? `${produkt.laenge_mm} × ${produkt.breite_mm} × ${produkt.hoehe_mm} mm` : ""],
+        ["LED/m · Pitch", [produkt.anzahl_led_pro_meter ? `${produkt.anzahl_led_pro_meter}/m` : null, produkt.abstand_led_zu_led_mm ? `${produkt.abstand_led_zu_led_mm} mm` : null].filter(Boolean).join(" · ")],
+        ["Maße L × B × H", [produkt.laenge_mm, produkt.breite_mm, produkt.hoehe_mm].every((v) => v != null && v !== "") ? `${produkt.laenge_mm} × ${produkt.breite_mm} × ${produkt.hoehe_mm} mm` : (produkt.masse_text || "")],
         ["Abschnitt / Max. Länge", [produkt.laenge_einzelabschnitt_mm ? `${produkt.laenge_einzelabschnitt_mm} mm` : null, produkt.maximale_laenge_m ? `${produkt.maximale_laenge_m} m` : null].filter(Boolean).join(" · ")],
-        ["Min. Biegeradius", fmtValue(produkt.kleinster_biegeradius_mm, "mm")],
-        ["Rollenlänge", fmtValue(produkt.rollenlaenge_m, "m")],
+        ["Min. Biegeradius / Rolle", [produkt.kleinster_biegeradius_mm ? `${produkt.kleinster_biegeradius_mm} mm` : null, produkt.rollenlaenge_m ? `${produkt.rollenlaenge_m} m` : null].filter(Boolean).join(" · ")],
       ],
     },
     {
@@ -214,9 +212,8 @@ function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
             : null,
           produkt.tc_max_c ? `${produkt.tc_max_c} °C` : null,
         ].filter(Boolean).join(" · ")],
-        ["Lebensdauer", fmtValue(produkt.lebensdauer_h, "h")],
-        ["Energieeffizienzklasse", produkt.energieeffizienzklasse || ""],
-        ["Zertifikate", produkt.zertifikate || (produkt.ce ? "CE" : "") + (produkt.rohs ? (produkt.ce ? " · RoHS" : "RoHS") : "")],
+        ["Lebensdauer L70", fmtValue(produkt.lebensdauer_h, "h")],
+        ["Zertifikate", produkt.zertifikate || ""],
       ],
     },
   ];

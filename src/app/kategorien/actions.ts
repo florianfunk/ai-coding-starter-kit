@@ -86,6 +86,7 @@ export async function createKategorie(_p: KategorieFormState, formData: FormData
   revalidatePath("/kategorien");
   revalidateTag("kategorien", "max");
   revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
   redirect("/kategorien?toast=success&message=Kategorie+angelegt");
 }
 
@@ -120,6 +121,7 @@ export async function deleteKategorie(id: string): Promise<{ error: string | nul
   revalidatePath("/kategorien");
   revalidateTag("kategorien", "max");
   revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
   return { error: null };
 }
 

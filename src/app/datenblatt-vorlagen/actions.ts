@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -36,6 +36,7 @@ export async function createTemplate(input: z.infer<typeof templateSchema>) {
     .single();
   if (error || !data) return { error: error?.message ?? "Fehler", id: null };
   revalidatePath("/datenblatt-vorlagen");
+  revalidateTag("datenblatt-templates", "max");
   return { error: null, id: data.id };
 }
 
@@ -57,6 +58,7 @@ export async function updateTemplate(id: string, input: z.infer<typeof templateS
   if (error) return { error: error.message };
   revalidatePath("/datenblatt-vorlagen");
   revalidatePath(`/datenblatt-vorlagen/${id}`);
+  revalidateTag("datenblatt-templates", "max");
   return { error: null };
 }
 
@@ -72,6 +74,7 @@ export async function deleteTemplate(id: string) {
   const { error } = await supabase.from("datenblatt_templates").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/datenblatt-vorlagen");
+  revalidateTag("datenblatt-templates", "max");
   return { error: null };
 }
 
@@ -94,5 +97,6 @@ export async function duplicateTemplate(id: string) {
     .single();
   if (error || !data) return { error: error?.message ?? "Fehler", id: null };
   revalidatePath("/datenblatt-vorlagen");
+  revalidateTag("datenblatt-templates", "max");
   return { error: null, id: data.id };
 }

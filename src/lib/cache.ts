@@ -113,3 +113,138 @@ export const getDashboardStats = unstable_cache(
   ["dashboard-stats-v1"],
   { tags: ["dashboard"], revalidate: 60 },
 );
+
+// ---------------------------------------------------------------------------
+// Icons-Liste — wird im Produkt-Detail (Icon-Picker) und an vielen anderen
+// Stellen benötigt. Ändert sich extrem selten.
+// ---------------------------------------------------------------------------
+export type CachedIcon = {
+  id: string;
+  label: string;
+  gruppe: string | null;
+  symbol_path: string | null;
+};
+
+export const getIcons = unstable_cache(
+  async (): Promise<CachedIcon[]> => {
+    const supabase = cacheClient();
+    const { data, error } = await supabase
+      .from("icons")
+      .select("id, label, gruppe, symbol_path, sortierung")
+      .order("gruppe")
+      .order("sortierung")
+      .order("label")
+      .limit(2000);
+
+    if (error) {
+      console.error("getIcons error:", error);
+      return [];
+    }
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      label: r.label,
+      gruppe: r.gruppe,
+      symbol_path: r.symbol_path,
+    })) as CachedIcon[];
+  },
+  ["icons-list-v1"],
+  { tags: ["icons"], revalidate: 3600 },
+);
+
+// ---------------------------------------------------------------------------
+// Datenblatt-Templates — system + custom, ändert sich nur durch Admin-Pflege.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Counts pro Bereich (kategorien_count + produkte_count). Wird auf der
+// Bereiche-Listenpage und im Dashboard-Widget gebraucht. Identisch für alle
+// User, ändert sich selten. Tag "produkte" wird via revalidateTag invalidiert
+// wenn Produkte/Kategorien angelegt oder gelöscht werden.
+// ---------------------------------------------------------------------------
+export type BereichCounts = {
+  bereich_id: string;
+  kategorien_count: number;
+  produkte_count: number;
+};
+
+export const getBereichCounts = unstable_cache(
+  async (): Promise<BereichCounts[]> => {
+    const supabase = cacheClient();
+    // 2 leichte Queries (nur bereich_id), in JS aggregiert. Indizes auf
+    // produkte.bereich_id und kategorien.bereich_id existieren.
+    const [{ data: katStats }, { data: prodStats }] = await Promise.all([
+      supabase.from("kategorien").select("bereich_id").limit(10000),
+      supabase.from("produkte").select("bereich_id").limit(20000),
+    ]);
+    const katMap = new Map<string, number>();
+    for (const r of katStats ?? []) katMap.set(r.bereich_id, (katMap.get(r.bereich_id) ?? 0) + 1);
+    const prodMap = new Map<string, number>();
+    for (const r of prodStats ?? []) prodMap.set(r.bereich_id, (prodMap.get(r.bereich_id) ?? 0) + 1);
+    const ids = new Set<string>([...katMap.keys(), ...prodMap.keys()]);
+    return Array.from(ids).map((id) => ({
+      bereich_id: id,
+      kategorien_count: katMap.get(id) ?? 0,
+      produkte_count: prodMap.get(id) ?? 0,
+    }));
+  },
+  ["bereich-counts-v1"],
+  { tags: ["bereich-counts"], revalidate: 300 },
+);
+
+// ---------------------------------------------------------------------------
+// Produkt-Counts pro Kategorie. Identisch für alle User.
+// ---------------------------------------------------------------------------
+export const getKategorieCounts = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const supabase = cacheClient();
+    const { data } = await supabase.from("produkte").select("kategorie_id").limit(20000);
+    const out: Record<string, number> = {};
+    for (const r of data ?? []) out[r.kategorie_id] = (out[r.kategorie_id] ?? 0) + 1;
+    return out;
+  },
+  ["kategorie-counts-v1"],
+  { tags: ["kategorie-counts"], revalidate: 300 },
+);
+
+// ---------------------------------------------------------------------------
+// Icons pro Kategorie (Labels). Wird auf der Kategorien-Liste gebraucht.
+// ---------------------------------------------------------------------------
+export const getKategorieIconLabels = unstable_cache(
+  async (): Promise<Record<string, string[]>> => {
+    const supabase = cacheClient();
+    const { data } = await supabase
+      .from("kategorie_icons")
+      .select("kategorie_id, icons(label)")
+      .limit(20000);
+    const out: Record<string, string[]> = {};
+    for (const r of (data ?? []) as unknown as Array<{
+      kategorie_id: string;
+      icons: { label: string } | null;
+    }>) {
+      const arr = out[r.kategorie_id] ?? [];
+      if (r.icons?.label) arr.push(r.icons.label);
+      out[r.kategorie_id] = arr;
+    }
+    return out;
+  },
+  ["kategorie-icon-labels-v1"],
+  { tags: ["kategorien", "icons"], revalidate: 3600 },
+);
+
+export const getDatenblattTemplates = unstable_cache(
+  async (): Promise<any[]> => {
+    const supabase = cacheClient();
+    const { data, error } = await supabase
+      .from("datenblatt_templates")
+      .select("*")
+      .order("is_system", { ascending: false })
+      .order("sortierung");
+
+    if (error) {
+      console.error("getDatenblattTemplates error:", error);
+      return [];
+    }
+    return data ?? [];
+  },
+  ["datenblatt-templates-v1"],
+  { tags: ["datenblatt-templates"], revalidate: 3600 },
+);

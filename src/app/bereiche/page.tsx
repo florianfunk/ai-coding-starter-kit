@@ -6,45 +6,36 @@ import { Button } from "@/components/ui/button";
 import { Plus, ChevronRight, Folders, Layers, Package, Upload, Download } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SortableBereicheList } from "./sortable-list";
-
-export const dynamic = "force-dynamic";
+import { getBereichCounts } from "@/lib/cache";
 
 export default async function BereichePage() {
   const supabase = await createClient();
-  const { data: bereiche } = await supabase
-    .from("bereiche")
-    .select("*")
-    .order("sortierung", { ascending: true })
-    .limit(500);
+  // Bereiche bewusst frisch (enthält beschreibung/startseite — nicht im Cache),
+  // aber Counts kommen aus dem Cache (5 Min TTL, via Tag invalidiert).
+  const [{ data: bereiche }, counts] = await Promise.all([
+    supabase
+      .from("bereiche")
+      .select("*")
+      .order("sortierung", { ascending: true })
+      .limit(500),
+    getBereichCounts(),
+  ]);
 
-  const ids = (bereiche ?? []).map((b) => b.id);
-  const { data: katStats } = ids.length
-    ? await supabase.from("kategorien").select("bereich_id").in("bereich_id", ids).limit(5000)
-    : { data: [] };
-  const { data: prodStats } = ids.length
-    ? await supabase.from("produkte").select("bereich_id").in("bereich_id", ids).limit(5000)
-    : { data: [] };
+  const countsMap = new Map(counts.map((c) => [c.bereich_id, c]));
 
-  const katCount = new Map<string, number>();
-  for (const r of katStats ?? []) katCount.set(r.bereich_id, (katCount.get(r.bereich_id) ?? 0) + 1);
-  const prodCount = new Map<string, number>();
-  for (const r of prodStats ?? []) prodCount.set(r.bereich_id, (prodCount.get(r.bereich_id) ?? 0) + 1);
-
-  const withUrls = (bereiche ?? []).map((b) => ({
-    ...b,
-    bild_url: bildProxyUrl("produktbilder", b.bild_path),
-  }));
-
-  const items = withUrls.map((b) => ({
-    id: b.id,
-    name: b.name,
-    beschreibung: b.beschreibung,
-    farbe: b.farbe,
-    startseite: b.startseite,
-    bild_url: b.bild_url,
-    katCount: katCount.get(b.id) ?? 0,
-    prodCount: prodCount.get(b.id) ?? 0,
-  }));
+  const items = (bereiche ?? []).map((b) => {
+    const c = countsMap.get(b.id);
+    return {
+      id: b.id,
+      name: b.name,
+      beschreibung: b.beschreibung,
+      farbe: b.farbe,
+      startseite: b.startseite,
+      bild_url: bildProxyUrl("produktbilder", b.bild_path),
+      katCount: c?.kategorien_count ?? 0,
+      prodCount: c?.produkte_count ?? 0,
+    };
+  });
 
   const totalKategorien = items.reduce((a, b) => a + b.katCount, 0);
   const totalProdukte = items.reduce((a, b) => a + b.prodCount, 0);

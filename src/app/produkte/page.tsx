@@ -10,8 +10,6 @@ import { calculateCompleteness, type CompletenessResult } from "@/lib/completene
 import { getBereiche, getKategorien } from "@/lib/cache";
 import type { ProduktListing } from "@/lib/types/views";
 
-export const dynamic = "force-dynamic";
-
 const PAGE_SIZE = 50;
 
 export default async function ProdukteListPage({
@@ -33,7 +31,8 @@ export default async function ProdukteListPage({
   const to = from + PAGE_SIZE - 1;
 
   // Konsolidierte View: produkte + bereich_name + kategorie_name + hat_preis + icon_count + galerie_count + completeness.
-  let query = supabase.from("v_produkt_listing").select("*", { count: "exact" });
+  // count "estimated" nutzt pg_class statistics statt full table scan — viel schneller bei großen Listen.
+  let query = supabase.from("v_produkt_listing").select("*", { count: "estimated" });
 
   if (sp.q) {
     const q = sp.q.trim();

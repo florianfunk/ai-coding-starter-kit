@@ -16,23 +16,30 @@ import { calculateCompleteness } from "@/lib/completeness";
 import { AuditSection } from "./audit-section";
 import { ProduktTabs } from "./produkt-tabs";
 import { ProduktRail, buildSectionStats, buildChecks } from "./produkt-rail";
+import { getBereiche, getKategorien, getIcons, getDatenblattTemplates } from "@/lib/cache";
 
 export default async function ProduktDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: produkt } = await supabase.from("produkte").select("*").eq("id", id).single();
-  if (!produkt) notFound();
+  // Slowly-changing Lookups (Bereiche, Kategorien, Icons, Templates) aus dem
+  // unstable_cache holen — kein DB-Roundtrip, wenn der Cache warm ist.
+  const [bereiche, kategorien, iconsCached, templatesCached] = await Promise.all([
+    getBereiche(),
+    getKategorien(),
+    getIcons(),
+    getDatenblattTemplates(),
+  ]);
 
+  // Produkt + produkt-spezifische Daten parallel — alle anderen Lookups
+  // kamen aus dem Cache.
   const [
-    { data: bereiche }, { data: kategorien }, { data: icons },
-    { data: produktIcons }, { data: galerie }, { data: preise },
-    { data: templates }, { data: slotRows },
-    { data: bereichRow }, { data: kategorieRow },
+    { data: produkt },
+    { data: produktIcons },
+    { data: galerie },
+    { data: preise },
   ] = await Promise.all([
-    supabase.from("bereiche").select("id,name").order("sortierung"),
-    supabase.from("kategorien").select("id,name,bereich_id").order("name"),
-    supabase.from("icons").select("id,label,gruppe,symbol_path").order("gruppe").order("sortierung").order("label"),
+    supabase.from("produkte").select("*").eq("id", id).single(),
     supabase.from("produkt_icons").select("icon_id, wert").eq("produkt_id", id).order("sortierung"),
     supabase.from("produkt_bilder").select("*").eq("produkt_id", id).order("sortierung"),
     supabase
@@ -42,13 +49,22 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
       .order("spur")
       .order("gueltig_ab", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase.from("datenblatt_templates").select("*").order("is_system", { ascending: false }).order("sortierung"),
-    produkt.datenblatt_template_id
-      ? supabase.from("produkt_datenblatt_slots").select("slot_id,storage_path").eq("produkt_id", id).eq("template_id", produkt.datenblatt_template_id)
-      : Promise.resolve({ data: [] }),
-    supabase.from("bereiche").select("id,name,farbe").eq("id", produkt.bereich_id).single(),
-    supabase.from("kategorien").select("id,name").eq("id", produkt.kategorie_id).single(),
   ]);
+
+  if (!produkt) notFound();
+
+  // Slot-Rows nur abfragen, wenn ein Template gewählt ist (sonst leeres Array).
+  const { data: slotRows } = produkt.datenblatt_template_id
+    ? await supabase
+        .from("produkt_datenblatt_slots")
+        .select("slot_id,storage_path")
+        .eq("produkt_id", id)
+        .eq("template_id", produkt.datenblatt_template_id)
+    : { data: [] as Array<{ slot_id: string; storage_path: string | null }> };
+
+  // Bereich + Kategorie aus dem Cache lookup'en — keine extra DB-Queries.
+  const bereichRow = bereiche.find((b) => b.id === produkt.bereich_id) ?? null;
+  const kategorieRow = kategorien.find((k) => k.id === produkt.kategorie_id) ?? null;
 
   const hauptbildUrl = bildProxyUrl("produktbilder", produkt.hauptbild_path);
   const galerieMit = (galerie ?? []).map((g) => ({
@@ -66,14 +82,14 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     bild_energielabel_path: bildProxyUrl("produktbilder", produkt.bild_energielabel_path),
   };
 
-  const iconsFull = (icons ?? []).map((ic: any) => ({
+  const iconsFull = iconsCached.map((ic) => ({
     id: ic.id,
     label: ic.label,
     gruppe: ic.gruppe,
     url: bildProxyUrl("produktbilder", ic.symbol_path),
   }));
 
-  const templatesTyped: DatenblattTemplate[] = (templates ?? []).map((t: any) => ({
+  const templatesTyped: DatenblattTemplate[] = templatesCached.map((t: any) => ({
     ...t,
     page_width_cm: Number(t.page_width_cm),
     page_height_cm: Number(t.page_height_cm),

@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ChevronRight, Layers, Package, Filter } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { SortableKategorienList } from "./sortable-list";
-
-export const dynamic = "force-dynamic";
+import { getBereiche, getKategorieCounts, getKategorieIconLabels } from "@/lib/cache";
 
 export default async function KategorienPage({
   searchParams,
@@ -17,34 +16,20 @@ export default async function KategorienPage({
   const { bereich } = await searchParams;
   const supabase = await createClient();
 
-  const { data: bereiche } = await supabase
-    .from("bereiche")
-    .select("id,name,farbe")
-    .order("sortierung");
+  // Bereiche, Counts und Icon-Labels aus dem Cache.
+  const [bereiche, prodCountMap, iconsByKat] = await Promise.all([
+    getBereiche(),
+    getKategorieCounts(),
+    getKategorieIconLabels(),
+  ]);
 
+  // Kategorien aktuell aus DB (enthält bild1..bild4_path und sortierung — bewusst frisch).
   let q = supabase.from("kategorien").select("*").order("sortierung").limit(1000);
   if (bereich) q = q.eq("bereich_id", bereich);
   const { data: kategorien } = await q;
 
-  const ids = (kategorien ?? []).map((k) => k.id);
-  const { data: prodStats } = ids.length
-    ? await supabase.from("produkte").select("kategorie_id").in("kategorie_id", ids).limit(5000)
-    : { data: [] };
-  const prodCount = new Map<string, number>();
-  for (const r of prodStats ?? []) prodCount.set(r.kategorie_id, (prodCount.get(r.kategorie_id) ?? 0) + 1);
-
-  const { data: iconLinks } = ids.length
-    ? await supabase.from("kategorie_icons").select("kategorie_id, icons(label)").in("kategorie_id", ids)
-    : { data: [] };
-  const iconsByKat = new Map<string, string[]>();
-  for (const r of (iconLinks ?? []) as unknown as Array<{ kategorie_id: string; icons: { label: string } | null }>) {
-    const arr = iconsByKat.get(r.kategorie_id) ?? [];
-    if (r.icons?.label) arr.push(r.icons.label);
-    iconsByKat.set(r.kategorie_id, arr);
-  }
-
   const bereichInfo = new Map(
-    (bereiche ?? []).map((b) => [b.id, { name: b.name, farbe: b.farbe as string | null }]),
+    bereiche.map((b) => [b.id, { name: b.name, farbe: b.farbe as string | null }]),
   );
 
   const items = (kategorien ?? []).map((k) => {
@@ -59,8 +44,8 @@ export default async function KategorienPage({
         "produktbilder",
         k.bild1_path ?? k.bild2_path ?? k.bild3_path ?? k.bild4_path,
       ),
-      prodCount: prodCount.get(k.id) ?? 0,
-      icons: iconsByKat.get(k.id) ?? [],
+      prodCount: prodCountMap[k.id] ?? 0,
+      icons: iconsByKat[k.id] ?? [],
     };
   });
 

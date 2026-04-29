@@ -148,6 +148,8 @@ export async function createProdukt(_p: ProduktFormState, formData: FormData): P
 
   revalidatePath("/produkte");
   revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
+  revalidateTag("kategorie-counts", "max");
   redirect(`/produkte/${data.id}?toast=success&message=Produkt+angelegt`);
 }
 
@@ -172,6 +174,9 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
   revalidatePath("/produkte");
   revalidatePath(`/produkte/${id}`);
   revalidateTag("dashboard", "max");
+  // Bereich/Kategorie kann sich beim Update ändern — Counts invalidieren.
+  revalidateTag("bereich-counts", "max");
+  revalidateTag("kategorie-counts", "max");
   return { error: null };
 }
 
@@ -264,6 +269,9 @@ export async function bulkUpdateProdukte(
   }
 
   revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
+  revalidateTag("kategorie-counts", "max");
   return { error, count };
 }
 
@@ -276,6 +284,8 @@ export async function deleteProdukt(id: string): Promise<{ error: string | null 
   await logAudit(supabase, { tableName: "produkte", recordId: id, action: "delete", recordLabel: row?.artikelnummer ?? id });
   revalidatePath("/produkte");
   revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
+  revalidateTag("kategorie-counts", "max");
   redirect("/produkte?toast=success&message=Produkt+gel%C3%B6scht");
 }
 
@@ -322,6 +332,9 @@ export async function duplicateProdukt(id: string): Promise<{ id?: string; error
   await logAudit(supabase, { tableName: "produkte", recordId: data.id, action: "create", recordLabel: copy.artikelnummer });
 
   revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
+  revalidateTag("bereich-counts", "max");
+  revalidateTag("kategorie-counts", "max");
   return { id: data.id, error: null };
 }
 

@@ -136,7 +136,7 @@ function PreviewInner({ produktId }: { produktId: string }) {
   const [iframeKey, setIframeKey] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const iframeSrc = `/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=${style}`;
+  const iframeSrc = `/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=${style}&_=${iframeKey}`;
 
   const switchLayout = useCallback(
     (l: "lichtengros" | "eisenkeil") => {

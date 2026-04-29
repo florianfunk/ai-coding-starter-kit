@@ -40,7 +40,7 @@ export default async function DatenblattPreviewPage({
           </div>
         </div>
         <iframe
-          src={`/produkte/${id}/datenblatt/raw${qs}`}
+          src={`/produkte/${id}/datenblatt/raw${qs}&_=${Date.now()}`}
           className="w-full h-[80vh] border rounded"
         />
       </div>

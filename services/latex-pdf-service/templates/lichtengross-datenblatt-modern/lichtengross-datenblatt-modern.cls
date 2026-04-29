@@ -110,7 +110,7 @@
 % Absolut positionierter Footer 5mm vom Page-Bottom
 \AddToShipoutPictureFG{%
   \AtPageLowerLeft{%
-    \put(\LenToUnit{18mm},\LenToUnit{5mm}){%
+    \put(\LenToUnit{18mm},\LenToUnit{10mm}){%
       \begin{minipage}[b]{\dimexpr\paperwidth-36mm\relax}%
         \rendermyfoot%
       \end{minipage}%

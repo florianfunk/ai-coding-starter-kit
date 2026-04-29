@@ -1,0 +1,116 @@
+\documentclass{lichtengross-datenblatt}
+
+% LICHTENGROSS / EISENKEIL — PRODUKTDATENBLATT (A4, einseitig)
+% Source of truth: daten/Datenblatt.pdf (FileMaker-Export). Variantenwechsel
+% via meta.brand: "lichtengross" oder "eisenkeil". Layout identisch, nur
+% Logo + Footer-Firmenname unterscheiden sich.
+
+% Footer-Inhalte: die Klasse reicht sie via \fancyfoot weiter (mehrseitig).
+\setfooterleft{(((meta.filiale | e)))}
+\setfooterright{(((meta.stand | e)))}
+
+\begin{document}
+
+((# ═════ HEADER: "PRODUKTDATENBLATT" links, Logo rechts, Trennlinie ═════ #))
+\begin{minipage}[c]{0.55\linewidth}
+  {\fontsize{8pt}{10pt}\selectfont\color{lgText}\letterspaced{PRODUKTDATENBLATT}}
+\end{minipage}\hfill
+\begin{minipage}[c]{0.42\linewidth}\raggedleft
+  ((* if logo_filename *))
+  \includegraphics[height=8.5mm,keepaspectratio]{(((logo_filename)))}%
+  ((* else *))
+  {\fontsize{12pt}{14pt}\selectfont\bfseries\letterspaced{(((meta.brand_label | e)))}}%
+  ((* endif *))
+\end{minipage}
+
+\vspace{1.2mm}{\color{lgInk}\hrule height 0.6pt}\vspace{3mm}
+
+((# ═════ ARTIKELNUMMER + UNTERTITEL (linker Block) ═════ #))
+{\fontsize{8.5pt}{10pt}\selectfont\color{lgMuted}Artikelnummer:}~%
+{\fontsize{11pt}{13pt}\selectfont\bfseries\color{lgText}(((produkt.artikelnummer | e)))}\\[0.4mm]
+((* if produkt.untertitel *))
+{\fontsize{8pt}{10pt}\selectfont\color{lgText}(((produkt.untertitel | e)))}
+((* endif *))
+
+\vspace{2.5mm}
+
+((# ═════ HAUPTBILD LINKS / TECHNISCHE DATEN RECHTS ═════ #))
+\noindent
+\begin{minipage}[t]{0.56\linewidth}
+  \vspace{0pt}%
+  \parbox[c][55mm][c]{\linewidth}{%
+    \centering
+    ((* if hauptbild *))
+    \includegraphics[width=\linewidth,height=53mm,keepaspectratio]{(((hauptbild)))}%
+    ((* else *))
+    {\fontsize{8pt}{10pt}\selectfont\itshape\color{lgMuted}(kein Bild)}%
+    ((* endif *))
+  }%
+\end{minipage}\hfill
+\begin{minipage}[t]{0.40\linewidth}
+  \vspace{0pt}%
+  {\fontsize{8.5pt}{10.5pt}\selectfont\color{lgText}\letterspaced{TECHNISCHE DATEN}}\\[1mm]
+  {\color{lgInk}\hrule height 0.5pt}\vspace{1.4mm}
+  {\fontsize{7.6pt}{9.6pt}\selectfont%
+  ((* for row in tech_rows *))
+  \mbox{$\bullet$}~(((row.label | e))): (((row.value | e)))\par
+  ((* endfor *))
+  ((* if tech_rows | length == 0 *))
+  \itshape\color{lgMuted}(keine technischen Daten)
+  ((* endif *))
+  }
+\end{minipage}
+
+\vspace{3mm}
+
+((# ═════ ICON-LEISTE: 8 Slots à ~10mm Box + ~3mm Wertfeld ═════
+        Layout der FileMaker-Vorlage: kleine Boxen mit Symbol oben, schmaler
+        Wert-Streifen darunter. Exakt 8 Slots passen in eine Reihe (215mm
+        Druckbreite − 2·15mm Rand = 185mm). #))
+\noindent
+((* for icon in icons *))
+\iconcell{(((icon.filename | e)))}{(((icon.label | e)))}{(((icon.wert | e)))}{(((icon.highlight | e)))}%
+((* if not loop.last *))\hspace{0.6mm}((* endif *))%
+((* endfor *))
+
+\vspace{2mm}
+
+((# ═════ TECHNISCHE ZEICHNUNG (Maße) — wenn vorhanden ═════ #))
+((* if zeichnung *))
+\noindent\begin{center}
+  \includegraphics[width=0.78\linewidth,height=18mm,keepaspectratio]{(((zeichnung)))}
+\end{center}
+\vspace{1mm}
+((* endif *))
+
+((# ═════ DETAILS: 3 Bilder nebeneinander ═════ #))
+{\fontsize{8.5pt}{10.5pt}\selectfont\color{lgText}\letterspaced{DETAILS}}\\[0.6mm]
+{\color{lgInk}\hrule height 0.5pt}\vspace{1.4mm}
+\noindent
+((* for d in details *))
+\parbox[c][28mm][c]{0.323\linewidth}{%
+  \centering
+  ((* if d.filename *))
+  \includegraphics[width=\linewidth,height=28mm,keepaspectratio]{(((d.filename | e)))}%
+  ((* else *))
+  {\fontsize{7pt}{9pt}\selectfont\itshape\color{lgMuted}---}%
+  ((* endif *))
+}((* if not loop.last *))\hspace{0.4mm}((* endif *))%
+((* endfor *))
+
+\vspace{2mm}
+
+((# ═════ FLIESSTEXT (Beschreibung) ═════ #))
+((* if beschreibung_body *))
+{\fontsize{6.4pt}{8.4pt}\selectfont\color{lgText}%
+(((beschreibung_body | e)))\par}
+((* endif *))
+
+((# ═════ WARNHINWEIS (ACHTUNG…) — hervorgehoben mit oberer Trennlinie ═════ #))
+((* if warnung *))
+\vspace{1.4mm}
+{\color{lgLine}\hrule height 0.4pt}\vspace{1mm}
+{\fontsize{6.4pt}{8.4pt}\selectfont\bfseries\color{lgText}(((warnung | e)))}
+((* endif *))
+
+\end{document}

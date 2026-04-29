@@ -1,0 +1,37 @@
+services:
+  lichtengross-pdf-service:
+    build: .
+    image: lichtengross-pdf-service
+    container_name: lichtengross-pdf-service
+    restart: unless-stopped
+    environment:
+      - WORKER_TOKEN=${WORKER_TOKEN}
+    expose:
+      - "8080"
+    volumes:
+      - lichtengross-tectonic-cache:/var/cache/tectonic
+      - ./templates:/srv/templates:ro
+      - ./assets:/srv/assets:ro
+    networks:
+      - pdf-service-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.lichtengross-pdf.rule=Host(`pdf.lichtengross.funk.solutions`)"
+      - "traefik.http.routers.lichtengross-pdf.entrypoints=websecure"
+      - "traefik.http.routers.lichtengross-pdf.tls=true"
+      - "traefik.http.routers.lichtengross-pdf.tls.certresolver=letsencrypt"
+      - "traefik.http.services.lichtengross-pdf.loadbalancer.server.port=8080"
+
+volumes:
+  lichtengross-tectonic-cache:
+
+networks:
+  pdf-service-net:
+    external: true
+    name: pdf-service-net

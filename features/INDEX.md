@@ -22,7 +22,7 @@
 | PROJ-6 | Preisverwaltung pro Produkt (drei Spuren) | In Progress | [PROJ-6](PROJ-6-preisverwaltung.md) | 2026-04-16 |
 | PROJ-7 | Suche & Filter | In Progress | [PROJ-7](PROJ-7-suche-und-filter.md) | 2026-04-16 |
 | PROJ-8 | Filialen- & Katalog-Einstellungen | In Progress | [PROJ-8](PROJ-8-filialen-und-katalog-einstellungen.md) | 2026-04-16 |
-| PROJ-9 | PDF-Export Einzel-Datenblatt | In Progress | [PROJ-9](PROJ-9-pdf-datenblatt.md) | 2026-04-16 |
+| PROJ-9 | PDF-Export Einzel-Datenblatt | Approved | [PROJ-9](PROJ-9-pdf-datenblatt.md) | 2026-04-16 |
 | PROJ-10 | PDF-Export Gesamtkatalog | In Progress | [PROJ-10](PROJ-10-pdf-gesamtkatalog.md) | 2026-04-16 |
 | PROJ-11 | Bulk-Bearbeitung | Planned | [PROJ-11](PROJ-11-bulk-bearbeitung.md) | 2026-04-17 |
 | PROJ-12 | Produkt duplizieren | Planned | [PROJ-12](PROJ-12-produkt-duplizieren.md) | 2026-04-17 |
@@ -50,7 +50,7 @@
 | PROJ-34 | Rich-Text-Editor für Beschreibungsfelder | Deployed | [PROJ-34](PROJ-34-rich-text-beschreibungen.md) | 2026-04-21 |
 | PROJ-35 | Kategorie mit 4 Bildplatzhaltern (Katalog-Layout) | Deployed | [PROJ-35](PROJ-35-kategorie-4-bilder.md) | 2026-04-21 |
 | PROJ-36 | Datenblatt-Felder pflegen (UI) | Deployed | [PROJ-36](PROJ-36-datenblatt-felder-pflegen.md) | 2026-04-22 |
-| PROJ-37 | Katalog-Druck-Wizard mit Inhaltsauswahl | Planned | [PROJ-37](PROJ-37-katalog-druck-wizard.md) | 2026-04-29 |
+| PROJ-37 | Katalog-Druck-Wizard mit Inhaltsauswahl | In Progress | [PROJ-37](PROJ-37-katalog-druck-wizard.md) | 2026-04-29 |
 
 <!-- Add features above this line -->
 

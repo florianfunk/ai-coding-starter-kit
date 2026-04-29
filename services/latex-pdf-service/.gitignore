@@ -1,0 +1,7 @@
+.env
+.token.txt
+generated/
+dev-fixtures/*.pdf
+*.bak
+__pycache__/
+*.pyc

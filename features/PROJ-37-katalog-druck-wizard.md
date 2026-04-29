@@ -1,6 +1,6 @@
 # PROJ-37: Katalog-Druck-Wizard mit Inhaltsauswahl
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-04-29
 **Last Updated:** 2026-04-29
 
@@ -452,4 +452,35 @@ Nach dem QA-Pass wurden beide Low-Bugs direkt behoben.
 - TypeScript: **0 Fehler**
 
 Beide Bugs bleiben als Closed-Items in dieser Doku — als Audit-Spur und Beleg, dass die Tests die Fixes abdecken.
+
+---
+
+## Deployment (2026-04-29)
+
+| | |
+|---|---|
+| **Production-URL** | https://lichtengross.vercel.app |
+| **Production-Alias** | https://lichtengross-soulschoki-5679s-projects.vercel.app |
+| **Branch-Alias** | https://lichtengross-git-main-soulschoki-5679s-projects.vercel.app |
+| **Deployment-ID** | `dpl_584tuthhBckgiywBcJ8o5NemGQYR` |
+| **Commit** | `c418899` (`feat(PROJ-37): Katalog-Druck-Wizard mit Inhaltsauswahl`) |
+| **Build-Dauer** | ~57 Sekunden |
+| **Region** | iad1 (Vercel Default) |
+| **Bundler** | Turbopack |
+| **Runtime** | Node.js (Lambda Functions) |
+| **Inspector** | https://vercel.com/soulschoki-5679s-projects/lichtengross/584tuthhBckgiywBcJ8o5NemGQYR |
+
+### Deploy-Verifikation
+- ✅ HTTP 200 vom Production-Server
+- ✅ HSTS + Cache-Control Header korrekt
+- ✅ `/produkte` lädt mit allen 423 Produkten
+- ✅ Wizard öffnet, beide Tabs funktionieren, Counter zeigt `423 / 423 Produkte in 20 Bereichen und 79 Kategorien`
+- ✅ Browser-Konsole frei von PROJ-37-relevanten Errors (nur favicon-404)
+- ✅ Alle Echtdaten aus Supabase-Production werden gerendert
+
+### Deploy-Methode
+Auto-Deploy via `git push origin main` → Vercel-GitHub-Integration. Keine Migration nötig (`katalog_jobs.parameter` ist `jsonb`, View `aktuelle_preise_flat` lieferte alle drei Spuren bereits seit PROJ-6).
+
+### Rollback-Option
+Falls Probleme auftreten: Im Vercel-Dashboard das vorherige Deployment `dpl_Dyttp82fZvvnFHrcPkQGL9MBwb9Q` (PROJ-9, `f4bb327`) als „Promote to Production" auswählen. Es ist als `isRollbackCandidate: true` markiert.
 

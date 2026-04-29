@@ -1,9 +1,12 @@
 \documentclass{lichtengross-datenblatt-modern}
 
-% Modernes Lichtengross/Eisenkeil-Datenblatt nach Claude-Design-Briefing
-% (daten/handoff/Datenblatt.html). Eine A4-Seite mit Masthead, Hero,
-% Article-Bar, Image-Gallery, 2-Spalten-Content (Specs + Beschreibung) und
-% Footer mit Energie-Skala.
+% Modernes Datenblatt nach Claude-Design-Briefing v2
+% (daten/handoff/Datenblatt.html). Eine A4-Seite. Layout:
+%   Masthead   — Logo links, Doc-Meta (2 Zeilen) rechts, Trennlinie
+%   Hero       — Eyebrow + H1 + Article-Bar links | Quickfacts 3x2 rechts
+%   Gallery    — 3 Bilder (1.4fr / 1fr / 1fr), feste Hoehe
+%   Content    — Specs links (1.05fr), Beschreibung rechts (1fr)
+%   Footer     — Firma+Stand | Energie-Skala | Version (Trennlinie oben)
 
 \setfootercompany{(((meta.filiale | e)))}
 \setfooterdate{(((meta.stand | e)))}
@@ -14,37 +17,24 @@
 
 ((# ═════ MASTHEAD ═════ #))
 \noindent
-\begin{minipage}[t]{0.55\linewidth}
+\begin{minipage}[c]{0.55\linewidth}
   \vspace{0pt}
   ((* if logo_filename *))
-  \includegraphics[height=10mm,keepaspectratio]{(((logo_filename)))}%
+  \includegraphics[height=7mm,keepaspectratio]{(((logo_filename)))}%
   ((* else *))
-  \begin{tikzpicture}[baseline=0pt]
-    \node[draw=ink, line width=1pt, minimum width=10mm, minimum height=10mm, inner sep=0pt, anchor=south west] (m) at (0,0) {%
-      \displayfont\bfseries\fontsize{14pt}{16pt}\selectfont (((meta.brand_initial | e)))%
-    };
-    \node[anchor=west] at (m.east) {%
-      \begin{minipage}[c]{60mm}
-        {\displayfont\bfseries\fontsize{11pt}{13pt}\selectfont\addfontfeature{LetterSpace=4}\color{ink}\MakeUppercase{(((meta.brand_name | e)))}}%
-        \,{\monofont\fontsize{9pt}{11pt}\selectfont\color{muted}· (((meta.brand_suffix | e)))}\\[0.6mm]
-        {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{(((meta.brand_sub | e)))}}
-      \end{minipage}
-    };
-  \end{tikzpicture}
+  {\displayfont\bfseries\fontsize{14pt}{16pt}\selectfont\addfontfeature{LetterSpace=4}\color{ink}\MakeUppercase{(((meta.brand_name | e)))}}%
   ((* endif *))
 \end{minipage}\hfill
-\begin{minipage}[t]{0.42\linewidth}
-  \vspace{0pt}\raggedleft
+\begin{minipage}[c]{0.42\linewidth}\raggedleft
   {\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Produktdatenblatt}}\\
-  {\monofont\bfseries\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{ink}\MakeUppercase{(((meta.revision | e)))}}\\
-  {\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{DE \(\cdot\) A4 \(\cdot\) Seite 1/1}}
+  {\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Seite 1/1}}
 \end{minipage}
 
-\vspace{1mm}{\color{ink}\hrule height 0.4pt}\vspace{2.5mm}
+\vspace{1.4mm}{\color{ink}\hrule height 0.4pt}\vspace{4mm}
 
-((# ═════ HERO: Title + Quickfacts ═════ #))
+((# ═════ HERO: Linke Spalte (Eyebrow + Title + Article-Bar) | Rechte Spalte (Quickfacts) ═════ #))
 \noindent
-\begin{minipage}[b]{0.58\linewidth}
+\begin{minipage}[t]{0.55\linewidth}
   \vspace{0pt}
   ((* if produkt.eyebrow *))
   \noindent
@@ -54,18 +44,27 @@
   {\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=18}\color{accentdeep}\MakeUppercase{(((produkt.eyebrow | e)))}}
   \par\vspace{2.5mm}
   ((* endif *))
-  {\displayfont\bfseries\fontsize{15pt}{17pt}\selectfont\color{ink}(((produkt.title | e)))}\\[1mm]
+  {\displayfont\bfseries\fontsize{18pt}{20pt}\selectfont\color{ink}(((produkt.title | e)))}\\[0.6mm]
   ((* if produkt.title_accent *))
-  {\displayfont\bfseries\fontsize{15pt}{17pt}\selectfont\color{accentdeep}(((produkt.title_accent | e)))}
+  {\displayfont\bfseries\fontsize{18pt}{20pt}\selectfont\color{accentdeep}(((produkt.title_accent | e)))}
   ((* endif *))
-  \par\vspace{2mm}
-  ((* if produkt.subtitle *))
-  {\fontsize{10pt}{14pt}\selectfont\color{ink2}(((produkt.subtitle | e)))}
-  ((* endif *))
+  \par\vfill
+
+  % Article-Bar — schwarze Box, feste Breite 94mm passend zur Spalte.
+  \noindent\colorbox{ink}{%
+    \begin{minipage}{86mm}\vspace{1.6mm}\hspace{0pt}%
+      \begin{tabular*}{86mm}{@{\extracolsep{\fill}}lll}
+        {\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{accent}\MakeUppercase{Artikelnr.}} &
+        {\monofont\fontsize{10.5pt}{12pt}\selectfont\color{paper}(((produkt.artikelnummer | e)))} &
+        ((* if produkt.pill *))%
+        \fcolorbox{paper!25}{ink}{\parbox{16mm}{\centering\monofont\fontsize{7.6pt}{9pt}\selectfont\addfontfeature{LetterSpace=12}\color{paper}\MakeUppercase{(((produkt.pill | e)))}}}%
+        ((* else *))~((* endif *))
+      \end{tabular*}\vspace{1.6mm}%
+    \end{minipage}%
+  }
 \end{minipage}\hfill
-\begin{minipage}[b]{0.40\linewidth}
+\begin{minipage}[t]{0.43\linewidth}
   \vspace{0pt}
-  % 6 Quickfacts in einem 3x2-Grid mit dünnen Trennlinien (HTML: gap 1px / hair)
   \setlength{\arrayrulewidth}{0.4pt}\arrayrulecolor{hair}
   \renewcommand{\arraystretch}{1.0}
   \noindent\begin{tabular}{|p{0.295\linewidth}|p{0.295\linewidth}|p{0.295\linewidth}|}
@@ -79,39 +78,21 @@
   \end{tabular}
 \end{minipage}
 
-\vspace{2.5mm}
+\vspace{4mm}
 
-((# ═════ ARTICLE BAR (schwarz, 3-Spalten) ═════ #))
-\noindent\colorbox{ink}{%
-  \parbox{\linewidth-0pt}{%
-    \vspace{1.6mm}\hspace{4mm}%
-    \begin{minipage}{\linewidth-8mm}
-      \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lll}
-        {\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{accent}\MakeUppercase{Artikelnr.}} &
-        {\monofont\fontsize{12pt}{14pt}\selectfont\color{paper}(((produkt.artikelnummer | e)))} &
-        ((* if produkt.pill *))%
-        \fcolorbox{paper!25}{ink}{\parbox{20mm}{\centering\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=12}\color{paper}\MakeUppercase{(((produkt.pill | e)))}}}%
-        ((* endif *))
-      \end{tabular*}
-    \end{minipage}\vspace{1.6mm}%
-  }%
-}
-
-\vspace{2.5mm}
-
-((# ═════ IMAGE GALLERY: 3 Bilder, 1.4 / 1 / 1 ═════ #))
+((# ═════ IMAGE GALLERY: 3 Bilder, 1.4fr / 1fr / 1fr, feste Hoehe ═════ #))
 \noindent
 \begin{minipage}[t]{0.43\linewidth}
   \vspace{0pt}
   ((* if figA_filename *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=\linewidth,height=19mm,keepaspectratio]{(((figA_filename | e)))}%
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
+      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figA_filename | e)))}%
     }%
   }
   ((* else *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
       {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Produktansicht}}\\[0.5mm]
       {\monofont\fontsize{7pt}{9pt}\selectfont\color{muted}\MakeUppercase{Strip auf Rolle}}
     }%
@@ -122,13 +103,13 @@
   \vspace{0pt}
   ((* if figB_filename *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=\linewidth,height=19mm,keepaspectratio]{(((figB_filename | e)))}%
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
+      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figB_filename | e)))}%
     }%
   }
   ((* else *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
       {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Detail}}
     }%
   }
@@ -138,22 +119,22 @@
   \vspace{0pt}
   ((* if figC_filename *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=\linewidth,height=19mm,keepaspectratio]{(((figC_filename | e)))}%
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
+      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figC_filename | e)))}%
     }%
   }
   ((* else *))
   \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][20mm][c]{\linewidth-3pt}{\centering
+    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
       {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Anwendung}}
     }%
   }
   ((* endif *))
 \end{minipage}
 
-\vspace{2.5mm}
+\vspace{4mm}
 
-\enlargethispage{60mm}
+
 ((# ═════ CONTENT: 2-Spalten — Specs links, Beschreibung rechts ═════ #))
 \noindent
 \begin{minipage}[t]{0.51\linewidth}
@@ -196,6 +177,5 @@
   \end{tcolorbox}
   ((* endif *))
 \end{minipage}
-
 
 \end{document}

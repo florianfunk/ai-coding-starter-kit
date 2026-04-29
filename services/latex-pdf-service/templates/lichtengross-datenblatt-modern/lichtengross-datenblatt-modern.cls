@@ -13,9 +13,9 @@
 % ─── Geometrie: 18 mm Innenränder rundum (Briefing 2.) ──────────────────────
 \RequirePackage[a4paper,
                 left=18mm, right=18mm,
-                top=18mm, bottom=18mm,
+                top=14mm, bottom=18mm,
                 headheight=0pt, headsep=0pt,
-                footskip=16mm,
+                footskip=14mm,
                 marginparwidth=0pt]{geometry}
 
 \RequirePackage{fontspec}
@@ -95,14 +95,14 @@
 \renewcommand{\footrulewidth}{0pt}
 
 \newcommand{\rendermyfoot}{%
-  {\color{ink}\rule{\textwidth}{0.4pt}}\\[2mm]
-  \noindent\begin{minipage}[c]{0.36\linewidth}%
-    {\monofont\bfseries\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=10}\color{ink}\MakeUppercase{\lgFooterCompany}}%
-    \,{\monofont\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{\(\cdot\) Stand \lgFooterDate}}%
+  {\color{ink}\rule{\textwidth}{0.4pt}}\\[1.6mm]
+  \noindent\begin{minipage}[c]{0.40\textwidth}%
+    {\monofont\bfseries\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{ink}\MakeUppercase{\lgFooterCompany}}%
+    \,{\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{\(\cdot\) Stand \lgFooterDate}}%
   \end{minipage}\hfill%
-  \begin{minipage}[c]{0.28\linewidth}\centering\energyscale{\lgFooterEnergy}\end{minipage}\hfill%
-  \begin{minipage}[c]{0.34\linewidth}\raggedleft%
-    {\monofont\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten \(\cdot\) v1.0}}%
+  \begin{minipage}[c]{0.22\textwidth}\centering\energyscale{\lgFooterEnergy}\end{minipage}\hfill%
+  \begin{minipage}[c]{0.36\textwidth}\raggedleft%
+    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten \(\cdot\) v1.0}}%
   \end{minipage}%
 }
 \fancyfoot[C]{\parbox{\textwidth}{\rendermyfoot}}

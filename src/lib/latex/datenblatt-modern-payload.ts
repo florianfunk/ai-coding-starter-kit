@@ -85,7 +85,7 @@ async function downloadAndCompress(
   return { base64: out.toString("base64"), ext };
 }
 
-function brandConfig(brand: ModernBrand, einstellungen: any) {
+function brandConfig(brand: ModernBrand, _einstellungen: any) {
   if (brand === "eisenkeil") {
     return {
       brand_initial: "E",
@@ -93,10 +93,10 @@ function brandConfig(brand: ModernBrand, einstellungen: any) {
       brand_suffix: "",
       brand_sub: "Lighting Distribution",
       defaultFiliale: "EISENKEIL",
-      logoPath:
-        einstellungen?.logo_eisenkeil_hell ??
-        einstellungen?.logo_eisenkeil_dunkel ??
-        null,
+      // Logo liegt statisch im Worker unter /srv/assets/lichtengross/.
+      // Das Template referenziert es ueber den Dateinamen ohne Pfad —
+      // \graphicspath in der Klasse loest /srv/assets/lichtengross/ auf.
+      logoFilename: "eisenkeil_logo.png",
     };
   }
   return {
@@ -105,10 +105,7 @@ function brandConfig(brand: ModernBrand, einstellungen: any) {
     brand_suffix: "S.R.L.",
     brand_sub: "Professional Lighting Components",
     defaultFiliale: "LICHT.ENGROS S.R.L.",
-    logoPath:
-      einstellungen?.logo_lichtengros_hell ??
-      einstellungen?.logo_lichtengros_dunkel ??
-      null,
+    logoFilename: "lichtengross_logo.png",
   };
 }
 
@@ -267,13 +264,8 @@ export async function buildModernDatenblattPayload(
     images[figC_filename] = figC.base64;
   }
 
-  // Logo
-  const logo = await downloadAndCompress(supabase, "assets", cfg.logoPath, "logo");
-  let logo_filename = "";
-  if (logo) {
-    logo_filename = `logo.${logo.ext}`;
-    images[logo_filename] = logo.base64;
-  }
+  // Logo: statisches Brand-Asset aus dem Worker (kein Supabase-Download).
+  const logo_filename = cfg.logoFilename;
 
   const { body, warnung } = splitBeschreibung(produkt.datenblatt_text);
   const allParagraphs = splitParagraphs(body);

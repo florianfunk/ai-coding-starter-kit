@@ -441,49 +441,78 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
     <Card className="max-w-5xl">
       <CardHeader><CardTitle>{submitLabel}</CardTitle></CardHeader>
       <CardContent>
-        <form action={formAction} className="space-y-5">
+        {/*
+          flex-col + per-section order-Klassen, damit der Bilder-Block direkt
+          nach dem Header (Name/Bereich/Sortierung) gerendert wird — vor
+          Beschreibung, Katalog-Spalten und Icon-Auswahl.
+        */}
+        <form action={formAction} className="flex flex-col gap-5">
           <input type="hidden" name="bild1_path" value={bilder[1].path ?? ""} />
           <input type="hidden" name="bild2_path" value={bilder[2].path ?? ""} />
           <input type="hidden" name="bild3_path" value={bilder[3].path ?? ""} />
           <input type="hidden" name="bild4_path" value={bilder[4].path ?? ""} />
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="bereich_id">Bereich *</Label>
+          {/*
+            Kompakter Header: großer Name links, kleiner Bereich + Sortierung
+            rechts oben. Bereich+Sortierung sind dadurch viel platzsparender,
+            ohne ihre Wichtigkeit zu verlieren.
+          */}
+          <div className="order-1 grid grid-cols-1 gap-3 md:grid-cols-[1fr_200px_90px]">
+            <div className="space-y-1.5">
+              <Label htmlFor="name" className="text-xs text-muted-foreground">
+                Name *
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10 text-lg"
+              />
+              {formState.fieldErrors?.name && (
+                <p className="text-sm text-destructive">{formState.fieldErrors.name}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bereich_id" className="text-xs text-muted-foreground">
+                Bereich *
+              </Label>
               <select
                 id="bereich_id"
                 name="bereich_id"
                 defaultValue={defaultValues?.bereich_id ?? ""}
                 required
-                className="w-full rounded-lg border px-3 py-2 bg-background text-sm"
+                className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
               >
-                <option value="" disabled>– bitte wählen –</option>
-                {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                <option value="" disabled>
+                  – bitte wählen –
+                </option>
+                {bereiche.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
               </select>
               {formState.fieldErrors?.bereich_id && (
                 <p className="text-sm text-destructive">{formState.fieldErrors.bereich_id}</p>
               )}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="sortierung">Sortierung</Label>
-              <Input id="sortierung" name="sortierung" type="number" defaultValue={String(defaultValues?.sortierung ?? 0)} />
+            <div className="space-y-1.5">
+              <Label htmlFor="sortierung" className="text-xs text-muted-foreground">
+                Sortierung
+              </Label>
+              <Input
+                id="sortierung"
+                name="sortierung"
+                type="number"
+                defaultValue={String(defaultValues?.sortierung ?? 0)}
+                className="h-10 text-right tabular-nums"
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="text-lg"
-            />
-            {formState.fieldErrors?.name && <p className="text-sm text-destructive">{formState.fieldErrors.name}</p>}
-          </div>
-
-          <div className="space-y-2">
+          <div className="order-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="beschreibung">Beschreibung</Label>
               <AITeaserButton
@@ -507,7 +536,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
           </div>
 
           {/* Katalog-Spalten */}
-          <div className="space-y-3">
+          <div className="order-4 space-y-3">
             <div className="flex items-center gap-2">
               <TableIcon className="h-4 w-4 text-muted-foreground" />
               <Label>Katalog-Spalten</Label>
@@ -543,7 +572,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
           </div>
 
           {/* Icon-Auswahl */}
-          <div className="space-y-3">
+          <div className="order-5 space-y-3">
             <div className="flex items-center justify-between">
               <Label>Icons</Label>
               <a href="/icons" className="text-xs text-muted-foreground hover:text-primary hover:underline">
@@ -560,8 +589,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             />
           </div>
 
-          {/* Bilder-Block: 4 Upload-Slots + Layout-Vorschau */}
-          <div className="space-y-4">
+          {/* Bilder-Block: 4 Upload-Slots — direkt nach dem Header (order-2) */}
+          <div className="order-2 space-y-4">
             <div>
               <Label>Bilder für Katalog-Seite</Label>
               <p className="text-xs text-muted-foreground mt-1">
@@ -722,6 +751,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             </DndContext>
           </div>
 
+          {/* Modals werden via Radix Portal in <body> gerendert — ihr DOM-Ort
+              im Form ist visuell egal. */}
           <ImageZoomModal
             open={zoomUrl !== null}
             onOpenChange={(o) => !o && setZoomUrl(null)}
@@ -743,9 +774,13 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             onAcceptManual={acceptManualCrop}
           />
 
-          {formState.error && <Alert variant="destructive"><AlertDescription>{formState.error}</AlertDescription></Alert>}
+          {formState.error && (
+            <Alert variant="destructive" className="order-6">
+              <AlertDescription>{formState.error}</AlertDescription>
+            </Alert>
+          )}
 
-          <div className="flex gap-2">
+          <div className="order-7 flex gap-2">
             <Button type="submit" disabled={pending || uploadingSlot !== null}>{pending ? "Speichere…" : "Speichern"}</Button>
             <Button asChild variant="outline" type="button"><a href="/kategorien">Abbrechen</a></Button>
           </div>

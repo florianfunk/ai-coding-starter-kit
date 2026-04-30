@@ -1,9 +1,10 @@
 # PROJ-40: Kategorie-Bilder Tools (Drag & Drop, Zoom, Smart-Crop)
 
-**Status:** Approved
+**Status:** Deployed
 **Priorität:** P1
 **Erstellt:** 2026-04-30
 **Last Updated:** 2026-04-30
+**Deployed:** 2026-04-30
 
 ## Vision
 Die vier Bildslots im Kategorie-Editor (Katalog-Layout: 2× breit + 2× hochkant) sollen leichter zu pflegen sein. Bilder per Drag & Drop tauschen, in groß ansehen, und mit einem Klick auf das passende Seitenverhältnis zuschneiden lassen — mit Vorschlag und Möglichkeit, das Original wiederherzustellen.
@@ -143,3 +144,20 @@ const cropped = await sharp(buffer)
 
 ### Production-Ready Decision
 **✅ READY** — Code-Review sauber, E2E-Smoke grün, Sicherheits-Checks bestanden, keine Bugs.
+
+## Deployment
+**Deployment-Datum:** 2026-04-30
+**Production-URL:** https://lichtengross.vercel.app
+**Vercel-Deployment:** dpl_dSHmgfmnikdrEa8sKfjUkH7iJZ4M
+**Git-Commit:** `cf2d503 feat(PROJ-40): Kategorie-Bilder Tools — DnD, Zoom, Smart-Crop`
+**Git-Tag:** `v1.0.0-PROJ-40`
+**Status:** READY
+
+### Smoke-Test (Production)
+- ✅ `GET /kategorien` → 200, 1.7s
+- ✅ `GET /kategorien/{id}/bearbeiten` → 200, 2.3s (DnD-Wrapper geladen)
+- ✅ Datenblatt-PDF nicht regrediert: 200, 72 KB
+
+### Hinweise
+- Echte DnD-Geste in Production manuell testen — automatisierte Tests prüften nur UI-Sichtbarkeit (Playwright + @dnd-kit ist fragil bei Pointer-Events)
+- Smart-Crop nutzt Sharp `position: attention` — empirisch testen, ob das Ergebnis pro Bildtyp passt

@@ -54,8 +54,8 @@
 | PROJ-38 | Datenblatt-Vorlagen mit LaTeX-Layout-Varianten | Deployed | [PROJ-38](PROJ-38-datenblatt-vorlagen-latex.md) | 2026-04-30 |
 | PROJ-39 | KI-Teaser-Texte für Beschreibungen | Deployed | [PROJ-39](PROJ-39-ki-teaser-texte.md) | 2026-04-30 |
 | PROJ-40 | Kategorie-Bilder Tools (DnD, Zoom, Smart-Crop) | Deployed | [PROJ-40](PROJ-40-kategorie-bilder-tools.md) | 2026-04-30 |
-| PROJ-41 | Manuelles Crop-Rechteck für Kategorie-Bilder | Approved | [PROJ-41](PROJ-41-manuelles-crop-rechteck.md) | 2026-04-30 |
-| PROJ-42 | KI-Bild-Generierung für Kategorie-Slots (gpt-image-2) | Approved | [PROJ-42](PROJ-42-ki-bild-generierung.md) | 2026-04-30 |
+| PROJ-41 | Manuelles Crop-Rechteck für Kategorie-Bilder | Deployed | [PROJ-41](PROJ-41-manuelles-crop-rechteck.md) | 2026-04-30 |
+| PROJ-42 | KI-Bild-Generierung für Kategorie-Slots (gpt-image-2) | Deployed | [PROJ-42](PROJ-42-ki-bild-generierung.md) | 2026-04-30 |
 
 <!-- Add features above this line -->
 

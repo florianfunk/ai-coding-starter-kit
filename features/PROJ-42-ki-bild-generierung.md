@@ -1,9 +1,10 @@
 # PROJ-42: KI-Bild-Generierung für Kategorie-Slots
 
-**Status:** Approved
+**Status:** Deployed
 **Priorität:** P1
 **Erstellt:** 2026-04-30
 **Last Updated:** 2026-04-30
+**Deployed:** 2026-04-30
 
 ## Vision
 Wenn für einen Kategorie-Bildslot kein passendes Foto vorliegt, soll der Pfleger per Knopfdruck ein Studio-qualitatives Produktbild von OpenAIs `gpt-image-2` generieren lassen können. Ein kurzer Prompt beschreibt das Motiv; ein fester Stil-Wrapper sorgt für katalog-kompatible Bildqualität (weißer Hintergrund, Studio-Beleuchtung, fotorealistisch).

@@ -1,6 +1,7 @@
 # PROJ-41: Manuelles Crop-Rechteck für Kategorie-Bilder
 
-## Status: Approved
+## Status: Deployed
+**Deployed:** 2026-04-30
 
 ## Implementation Notes
 
@@ -277,3 +278,20 @@ Stabilität: Tests passieren einzeln zuverlässig, in der vollen Suite gelegentl
 
 ## Deployment
 _To be added by /deploy_
+
+## Deployment
+**Deployment-Datum:** 2026-04-30
+**Production-URL:** https://lichtengross.vercel.app
+**Vercel-Deployment:** dpl_H9osHzghRjJjf4QBk1kRKt9LHSbe (PROJ-41 Spec) / dpl_GYEwQiVcg95rAb5ToKgMDf427z54 (final mit PROJ-42)
+**Git-Commits:** `9853582` (Implementation) + `44bd685` (Spec)
+**Git-Tag:** `v1.0.0-PROJ-41`
+**Status:** READY
+
+### Smoke-Test (Production)
+- ✅ `GET /kategorien/{id}/bearbeiten` → 200, 2.5s
+- ✅ `GET /kategorien` → 200, 1.6s
+- ✅ Datenblatt-PDF nicht regrediert: 200, 72 KB
+
+### Hinweise
+- EXIF-Bug (Medium) bleibt für Folge-PR — nicht-blockierend, betrifft nur EXIF-rotierte Bilder
+- Smart-Crop-Startwert (Low) wurde nicht implementiert; Editor startet zentriert

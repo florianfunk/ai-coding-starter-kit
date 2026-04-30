@@ -20,7 +20,7 @@
 \begin{minipage}[c]{0.55\linewidth}
   \vspace{0pt}
   ((* if logo_filename *))
-  \includegraphics[height=7mm,keepaspectratio]{(((logo_filename)))}%
+  \includegraphics[height=3.5mm,keepaspectratio]{(((logo_filename)))}%
   ((* else *))
   {\displayfont\bfseries\fontsize{14pt}{16pt}\selectfont\addfontfeature{LetterSpace=4}\color{ink}\MakeUppercase{(((meta.brand_name | e)))}}%
   ((* endif *))
@@ -136,7 +136,7 @@
 \noindent
 \begin{minipage}[t]{0.51\linewidth}
   \vspace{0pt}
-  \sectionhead{Technische Daten}{01 / Spezifikation}
+  \sectionhead{Technische Daten}{}
 
   ((* for group in spec_groups *))
   \specgroup{(((group.title | e)))}
@@ -147,12 +147,7 @@
 \end{minipage}\hfill
 \begin{minipage}[t]{0.45\linewidth}
   \vspace{0pt}
-  \sectionhead{Anwendung \& Hinweise}{02 / Beschreibung}
-
-  ((* if produkt.lead *))
-  {\displayfont\bfseries\fontsize{11pt}{13pt}\selectfont\color{ink}(((produkt.lead | e)))}
-  \par\vspace{2.5mm}
-  ((* endif *))
+  \sectionhead{Anwendung \& Hinweise}{}
 
   ((* for para in paragraphs *))
   {\fontsize{9.5pt}{14pt}\selectfont\color{ink2}(((para | e)))}
@@ -167,10 +162,9 @@
     borderline west={2pt}{0pt}{warnfg},
     boxsep=2mm, top=2mm, bottom=2mm, left=3mm, right=3mm,
   ]
-  \noindent\begin{tabular*}{\linewidth}{@{}p{14mm}p{\linewidth-16mm}@{}}
-    {\monofont\bfseries\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{warnfg}\MakeUppercase{Achtung}} &
-    {\fontsize{9pt}{12pt}\selectfont\color{ink2}(((warnung | e)))} \\
-  \end{tabular*}
+  {\monofont\bfseries\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{warnfg}\MakeUppercase{Achtung}}\par
+  \vspace{1.5mm}
+  {\fontsize{9pt}{12pt}\selectfont\color{ink2}(((warnung | e)))}
   \end{tcolorbox}
   ((* endif *))
 \end{minipage}

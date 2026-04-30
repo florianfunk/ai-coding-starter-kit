@@ -38,7 +38,7 @@
 \RequirePackage[hidelinks]{hyperref}
 
 % ─── Farb-Tokens (1:1 aus Briefing 4.) ─────────────────────────────────────
-\definecolor{paper}{HTML}{FAF8F4}
+\definecolor{paper}{HTML}{FFFFFF}
 \definecolor{ink}{HTML}{111111}
 \definecolor{ink2}{HTML}{2A2A28}
 \definecolor{muted}{HTML}{6F6C66}
@@ -170,11 +170,9 @@
 % ─── Section-Head: Heading links + Section-Nr rechts + dünne Linie ────────
 \newcommand{\sectionhead}[2]{%
   \par\noindent
-  \begin{minipage}[b]{0.6\linewidth}\raggedright
+  \begin{minipage}[b]{\linewidth}\raggedright
     {\displayfont\bfseries\fontsize{11}{13}\selectfont\addfontfeature{LetterSpace=4}\color{ink}\MakeUppercase{#1}}%
-  \end{minipage}\hfill
-  \begin{minipage}[b]{0.38\linewidth}\raggedleft
-    {\monofont\fontsize{8}{10}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{#2}}%
+    \ifx\\#2\\\else\hfill{\monofont\fontsize{8}{10}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{#2}}\fi
   \end{minipage}\par
   \vspace{0.6mm}{\color{hairstrong}\hrule height 0.4pt}\vspace{1.2mm}%
 }

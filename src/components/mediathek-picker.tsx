@@ -252,15 +252,19 @@ export function MediathekPicker({
                     title={item.smartTitle || item.name}
                   >
                     {/* 4:3-Vorschaubild — passt zur typischen Bildform der meisten
-                        Produktfotos; deutlich höher als zuvor. object-contain
-                        zeigt das ganze Bild ohne Cropping. */}
-                    <div className="relative aspect-[4/3] w-full bg-muted/40 p-2">
+                        Produktfotos. Aspect-ratio direkt am Container, kein
+                        zusätzliches Padding (das würde das Aspect-Ratio brechen).
+                        object-contain zeigt das ganze Bild ohne Cropping. */}
+                    <div
+                      className="relative w-full bg-muted/40"
+                      style={{ aspectRatio: "4 / 3" }}
+                    >
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={url}
                           alt={item.smartTitle || item.name}
-                          className="h-full w-full object-contain"
+                          className="absolute inset-0 h-full w-full object-contain p-2"
                           loading="lazy"
                         />
                       ) : (

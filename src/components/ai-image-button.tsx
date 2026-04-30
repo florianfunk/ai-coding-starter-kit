@@ -35,6 +35,10 @@ interface Props {
   onClose?: () => void;
   /** Disabled-Hint, z.B. wenn kein API-Key konfiguriert (Tooltip via title-Attribut) */
   disabledHint?: string | null;
+  /** True wenn der Slot bereits ein Bild hat → Edit-Modus (Referenzbild) wird genutzt */
+  hasReferenceImage?: boolean;
+  /** Vorschau-URL des Referenzbilds (für Hint im Modal) */
+  referenceImageUrl?: string | null;
 }
 
 export function AIImageButton({
@@ -47,6 +51,8 @@ export function AIImageButton({
   loading,
   onClose,
   disabledHint,
+  hasReferenceImage = false,
+  referenceImageUrl = null,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState("");
@@ -106,19 +112,44 @@ export function AIImageButton({
             </DialogTitle>
             <DialogDescription>
               {slotLabel ? `${slotLabel} — ` : ""}
-              Beschreibe nur das Motiv. Stil (Studio, weißer Hintergrund, Katalog-Qualität)
-              wird automatisch ergänzt.
+              {hasReferenceImage
+                ? "Das aktuelle Bild wird als Referenz mitgegeben — Motiv und Aufbau bleiben erhalten."
+                : "Beschreibe nur das Motiv. Stil (Studio, weißer Hintergrund, Katalog-Qualität) wird automatisch ergänzt."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {hasReferenceImage && referenceImageUrl && (
+              <div className="flex items-start gap-3 rounded-[10px] border border-border/60 bg-muted/30 p-2.5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={referenceImageUrl}
+                  alt="Referenzbild"
+                  className="h-12 w-20 rounded-md border border-border/60 object-cover"
+                />
+                <div className="min-w-0 flex-1 text-[12px] leading-relaxed">
+                  <div className="font-medium">Referenzbild aktiv</div>
+                  <div className="text-muted-foreground">
+                    Beschreibe, was an Motiv/Stil/Komposition geändert werden soll —
+                    z. B. „gleiches Produkt, aber heller Hintergrund". Bei leerem Prompt: ähnliches Bild in Studio-Qualität.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="ki-bild-prompt">Motiv-Beschreibung</Label>
+              <Label htmlFor="ki-bild-prompt">
+                {hasReferenceImage ? "Anweisung (Edit-Prompt)" : "Motiv-Beschreibung"}
+              </Label>
               <Textarea
                 id="ki-bild-prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="z. B. LED-Strip warmweiß unter einem modernen Hängeschrank in einer Küche, leuchtet die Arbeitsfläche aus"
+                placeholder={
+                  hasReferenceImage
+                    ? "z. B. gleiches Produkt, aber heller weißer Hintergrund, frontalere Perspektive"
+                    : "z. B. LED-Strip warmweiß unter einem modernen Hängeschrank in einer Küche, leuchtet die Arbeitsfläche aus"
+                }
                 rows={3}
                 maxLength={500}
                 disabled={loading}
@@ -146,7 +177,9 @@ export function AIImageButton({
                   <img src={previewUrl} alt="KI-Vorschlag" className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-sm text-muted-foreground">
-                    Beschreibe das Motiv und klick „Generieren"
+                    {hasReferenceImage
+                      ? 'Anweisung eingeben und „Generieren" klicken'
+                      : 'Beschreibe das Motiv und klick „Generieren"'}
                   </span>
                 )}
               </div>

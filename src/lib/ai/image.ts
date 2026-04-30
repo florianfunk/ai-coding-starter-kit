@@ -9,6 +9,7 @@
  */
 
 const OPENAI_IMAGE_ENDPOINT = "https://api.openai.com/v1/images/generations";
+const OPENAI_IMAGE_EDIT_ENDPOINT = "https://api.openai.com/v1/images/edits";
 const MODEL = "gpt-image-2";
 
 /**
@@ -20,6 +21,19 @@ export const STUDIO_PROMPT_PREFIX = [
   "Sauberer weißer bzw. neutraler Hintergrund, professionelle Studiobeleuchtung, scharf, detailreich, fotorealistisch.",
   "Kein Text, keine Wasserzeichen, kein Logo, keine Personen außer wenn ausdrücklich gewünscht.",
   "Motiv:",
+].join(" ");
+
+/**
+ * Stil-Wrapper für den Edit-Modus (Referenzbild vorhanden).
+ * Bittet das Modell, das Referenzbild als Vorlage für Komposition/Motiv zu nutzen,
+ * aber Studio-Qualität zu erzeugen.
+ */
+export const STUDIO_EDIT_PREFIX = [
+  "Erstelle ein neues Studio-Produktfoto in höchster Qualität für einen professionellen Beleuchtungs-Katalog,",
+  "basierend auf dem beigefügten Referenzbild als Vorlage für Motiv, Produkt und Bildaufbau.",
+  "Sauberer weißer bzw. neutraler Hintergrund, professionelle Studiobeleuchtung, scharf, detailreich, fotorealistisch.",
+  "Kein Text, keine Wasserzeichen, kein Logo, keine Personen außer wenn ausdrücklich gewünscht.",
+  "Anweisung:",
 ].join(" ");
 
 export type ImageSize = "1024x1024" | "1024x1536" | "1536x1024" | "2048x2048";
@@ -94,4 +108,71 @@ async function safeReadError(res: Response): Promise<string> {
   } catch {
     return `${res.status} ${res.statusText}`;
   }
+}
+
+// ----------------------------------------------------------------------------
+// Edit-Modus: gpt-image-2 mit Referenzbild
+// ----------------------------------------------------------------------------
+// /v1/images/edits nimmt das Referenzbild via multipart/form-data und nutzt
+// es als Komposition/Motiv-Vorlage. Anders als generations gibt der Endpoint
+// keine `response_format`-Option, sondern liefert immer base64 zurück.
+
+export interface EditImageInput {
+  /** Roh-Prompt vom User (Anweisung). Wird mit STUDIO_EDIT_PREFIX gewrappt. */
+  userPrompt: string;
+  /** Referenzbild (Original-Buffer aus dem Slot). */
+  refBuffer: Buffer;
+  /** MIME-Type des Referenzbilds (image/png, image/jpeg, image/webp). */
+  refContentType: string;
+  size: ImageSize;
+  quality?: ImageQuality;
+  apiKey: string;
+}
+
+export async function editImage(
+  input: EditImageInput,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const fullPrompt = `${STUDIO_EDIT_PREFIX} ${input.userPrompt.trim()}`;
+
+  const ext = input.refContentType.includes("png")
+    ? "png"
+    : input.refContentType.includes("webp")
+      ? "webp"
+      : "jpg";
+  const refFile = new File([new Uint8Array(input.refBuffer)], `reference.${ext}`, {
+    type: input.refContentType,
+  });
+
+  const fd = new FormData();
+  fd.append("model", MODEL);
+  fd.append("prompt", fullPrompt);
+  fd.append("image[]", refFile);
+  fd.append("size", input.size);
+  fd.append("quality", input.quality ?? "high");
+  fd.append("n", "1");
+
+  const res = await fetch(OPENAI_IMAGE_EDIT_ENDPOINT, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.apiKey}`,
+      // Content-Type wird automatisch von FormData inkl. boundary gesetzt
+    },
+    body: fd,
+  });
+
+  if (!res.ok) {
+    const errText = await safeReadError(res);
+    throw new ImageGenerationError(`gpt-image-2 (edit): ${errText}`, res.status);
+  }
+
+  const data = (await res.json()) as {
+    data?: { b64_json?: string }[];
+  };
+
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    throw new ImageGenerationError("gpt-image-2 (edit): Leere Antwort (kein b64_json).");
+  }
+
+  return { buffer: Buffer.from(b64, "base64"), contentType: "image/png" };
 }

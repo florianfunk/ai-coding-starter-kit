@@ -10,6 +10,7 @@ import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { compressImage } from "@/lib/image-compress";
 import {
   generateImage,
+  editImage,
   ImageGenerationError,
   type ImageSize,
 } from "@/lib/ai/image";
@@ -368,6 +369,8 @@ export async function cropKategorieBildManuell(input: unknown): Promise<Kategori
 const aiImageGenSchema = z.object({
   aspect: z.enum(["wide", "tall"]),
   userPrompt: z.string().min(3, "Prompt zu kurz").max(500, "Prompt zu lang"),
+  /** Optional: Pfad eines bestehenden Slot-Bilds, das als Referenz dient. */
+  referencePath: z.string().min(1).optional().nullable(),
 });
 
 const AI_GEN_SOURCE_SIZE: Record<"wide" | "tall", ImageSize> = {
@@ -398,7 +401,7 @@ export async function generateKategorieBildKi(
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
   }
-  const { aspect, userPrompt } = parsed.data;
+  const { aspect, userPrompt, referencePath } = parsed.data;
 
   // Rate-Limit (KI-Bilder sind teuer ~$0.17/Stück bei high quality)
   if (!checkAiRateLimit("global")) {
@@ -424,15 +427,59 @@ export async function generateKategorieBildKi(
     };
   }
 
-  // 1) Bild generieren (gpt-image-2 liefert PNG-Buffer)
+  // Wenn ein Referenzbild übergeben wurde: Edit-Modus mit Storage-Download.
+  // Das Referenzbild ist normalerweise das aktuelle Slot-Bild, das wir auf
+  // max. 2048px Kante runterskalieren — gpt-image-2 akzeptiert nur Kanten
+  // ≤ 3840px und der Upload soll schnell gehen.
+  let referenceBuffer: Buffer | null = null;
+  let referenceContentType = "image/jpeg";
+  if (referencePath) {
+    const { data: refDownload, error: refErr } = await supabase.storage
+      .from("produktbilder")
+      .download(referencePath);
+    if (refErr || !refDownload) {
+      return {
+        ok: false,
+        error: `Referenzbild nicht ladbar: ${refErr?.message ?? "unknown"}`,
+      };
+    }
+    const rawRef = Buffer.from(await refDownload.arrayBuffer());
+    try {
+      // Auf max. 2048×2048 (contain) skalieren — schneller Upload, hält Aspect
+      referenceBuffer = await sharp(rawRef, { failOn: "none" })
+        .rotate()
+        .resize({ width: 2048, height: 2048, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      referenceContentType = "image/jpeg";
+    } catch (e) {
+      return {
+        ok: false,
+        error: `Referenzbild verarbeiten fehlgeschlagen: ${e instanceof Error ? e.message : "Sharp-Fehler"}`,
+      };
+    }
+  }
+
+  // 1) Bild generieren — entweder pure Generation oder Edit mit Referenz
   let generated: { buffer: Buffer; contentType: string };
   try {
-    generated = await generateImage({
-      userPrompt,
-      size: AI_GEN_SOURCE_SIZE[aspect],
-      quality: "high",
-      apiKey: settings.openai_api_key,
-    });
+    if (referenceBuffer) {
+      generated = await editImage({
+        userPrompt,
+        refBuffer: referenceBuffer,
+        refContentType: referenceContentType,
+        size: AI_GEN_SOURCE_SIZE[aspect],
+        quality: "high",
+        apiKey: settings.openai_api_key,
+      });
+    } else {
+      generated = await generateImage({
+        userPrompt,
+        size: AI_GEN_SOURCE_SIZE[aspect],
+        quality: "high",
+        apiKey: settings.openai_api_key,
+      });
+    }
   } catch (e) {
     if (e instanceof ImageGenerationError) {
       return { ok: false, error: e.message };

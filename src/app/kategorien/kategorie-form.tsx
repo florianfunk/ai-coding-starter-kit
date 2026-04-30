@@ -153,6 +153,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
       const r = await generateKategorieBildKi({
         aspect: SLOT_ASPECT[slot],
         userPrompt,
+        // Wenn Slot bereits ein Bild hat: als Referenz mitschicken (Edit-Modus)
+        referencePath: bilder[slot].path ?? null,
       });
       if (!r.ok) {
         toast.error(r.error);
@@ -743,6 +745,8 @@ function BildSlotCard({
                   void aiImage.onAccept();
                 }}
                 onClose={aiImage.onClose}
+                hasReferenceImage
+                referenceImageUrl={bild.previewUrl}
               />
               <button
                 type="button"

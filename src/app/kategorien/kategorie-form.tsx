@@ -804,11 +804,14 @@ function BildSlotCard({
   // Echte Slot-Aspects entsprechen den physischen Katalog-Maßen:
   //  - Bild 1, 2: 15×3 cm → 5:1 (breit, quer)
   //  - Bild 3, 4: 5×3 cm  → 5:3 (klein, leicht quer)
-  // Einheitliche Slot-Höhe für alle 4 Cards, damit das Layout konsistent ist
-  // und Bilder in Bild 1+2 nicht oben/unten abgeschnitten werden.
-  // Wir nutzen aspect-[5/3] für alle, das matcht Bild 3+4 (5×3 cm Original).
-  // Bild 1+2 zeigen das Bild mit object-contain, damit nichts gecroppt wird.
-  const slotAspectClass = "aspect-[5/3]";
+  // Slot-Aspect so gewählt, dass linke Spalte (Bild 1+2 untereinander) und
+  // rechte Spalte (Bild 3+4 untereinander) auf GLEICHE Gesamthöhe kommen.
+  // Linke Spalte ist 2× so breit wie die rechte → linke Cards müssen 2× so
+  // flach sein, damit ihre Höhe pro Card halb so groß ist wie die rechten.
+  //   - Bild 1, 2 (links, breit):    aspect 10:3  → flach
+  //   - Bild 3, 4 (rechts, schmal):  aspect 5:3   → höher
+  // object-contain hält die Bilder vollständig sichtbar (kein Cropping).
+  const slotAspectClass = slot === 1 || slot === 2 ? "aspect-[10/3]" : "aspect-[5/3]";
   const hasImage = !!bild.previewUrl;
 
   // Drag-Source: nur wenn ein Bild da ist

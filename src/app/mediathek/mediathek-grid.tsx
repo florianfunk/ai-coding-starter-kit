@@ -568,10 +568,10 @@ function MediathekTile({
         className="block w-full"
         aria-label={`Details für ${item.name}`}
       >
-        <div className="aspect-square w-full overflow-hidden bg-muted/30">
+        <div className="aspect-[4/3] w-full overflow-hidden bg-muted/30">
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={item.name} className="h-full w-full object-cover" loading="lazy" />
+            <img src={url} alt={item.name} className="h-full w-full object-contain" loading="lazy" />
           ) : (
             <div className="grid h-full place-items-center">
               <ImageIcon className="h-8 w-8 text-muted-foreground/40" />

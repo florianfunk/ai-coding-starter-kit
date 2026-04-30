@@ -571,8 +571,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             </div>
           </div>
 
-          {/* Icon-Auswahl */}
-          <div className="order-5 space-y-3">
+          {/* Icon-Auswahl — direkt nach dem Header (order-2) */}
+          <div className="order-2 space-y-3">
             <div className="flex items-center justify-between">
               <Label>Icons</Label>
               <a href="/icons" className="text-xs text-muted-foreground hover:text-primary hover:underline">
@@ -589,8 +589,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             />
           </div>
 
-          {/* Bilder-Block: 4 Upload-Slots — direkt nach dem Header (order-2) */}
-          <div className="order-2 space-y-4">
+          {/* Bilder-Block: 4 Upload-Slots — am Ende (order-5) */}
+          <div className="order-5 space-y-4">
             <div>
               <Label>Bilder für Katalog-Seite</Label>
               <p className="text-xs text-muted-foreground mt-1">

@@ -251,9 +251,10 @@ export function MediathekPicker({
                     }`}
                     title={item.smartTitle || item.name}
                   >
-                    {/* Großes quadratisches Vorschaubild — object-contain damit alles
-                        sichtbar bleibt, kein Cropping. */}
-                    <div className="relative aspect-square w-full bg-muted/40 p-2">
+                    {/* 4:3-Vorschaubild — passt zur typischen Bildform der meisten
+                        Produktfotos; deutlich höher als zuvor. object-contain
+                        zeigt das ganze Bild ohne Cropping. */}
+                    <div className="relative aspect-[4/3] w-full bg-muted/40 p-2">
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

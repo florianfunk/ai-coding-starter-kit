@@ -1,8 +1,9 @@
 # PROJ-38: Datenblatt-Vorlagen mit LaTeX-Layout-Varianten
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-04-30
 **Last Updated:** 2026-04-30
+**Deployed:** 2026-04-30
 
 ## Implementation Notes (Backend)
 
@@ -419,4 +420,19 @@ Keine neuen NPM-Pakete nötig.
 **✅ READY** — Keine Critical/High-Bugs, alle Acceptance Criteria erfüllt, E2E-Tests grün auf Chromium + Mobile Safari, DB-Constraints verifiziert.
 
 ## Deployment
-_To be added by /deploy_
+**Deployment-Datum:** 2026-04-30
+**Production-URL:** https://lichtengross.vercel.app
+**Vercel-Deployment:** dpl_AxsLBEvCK5mM9fKcLtF7NBcvRxmr
+**Git-Commit:** `6e580ba feat(PROJ-38): Datenblatt-Vorlagen mit LaTeX-Layout-Varianten`
+**Build-Dauer:** 54s
+**Status:** READY
+
+### Smoke-Test (Production)
+- ✅ `GET /datenblatt-vorlagen` → 200, 1.5s
+- ✅ `GET /datenblatt-vorlagen/preview-lichtengross-datenblatt-modern.png` → 200, 150 KB PNG (1241×1754)
+- ✅ `GET /produkte/{id}/datenblatt/raw` → 200, 72 KB PDF (cold-start 6.1s, warm 4.0–4.3s)
+
+### Hinweise
+- **Performance (Low):** Render-Zeit auf Production warm bei 4.0–4.3s, leicht über dem PROJ-9-SLO (<3s). Cold-Start 6.1s. Empfehlung: Beobachten und ggf. in PROJ-33-Performance-Phase 2 optimieren (Lambda-Warmup, sharp-Resize-Tuning).
+- **DB-Migration `0023`** wurde vor dem Deploy direkt auf der Live-Supabase angewendet (Konsistenzbedingung: Code im Deploy nutzt die neuen Spalten).
+- **LaTeX-Worker** (`pdf.lichtengross.funk.solutions`) wurde während der Session per `deploy-latex-template.sh` mehrfach hot-deployed (Template-Polish-Commits) — keine Worker-Aktion mehr nötig.

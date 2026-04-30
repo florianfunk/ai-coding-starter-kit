@@ -4,12 +4,96 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { compressImage } from "@/lib/image-compress";
 
+/**
+ * PROJ-38: Vorlage wechseln und vorhandene Slot-Bilder anhand kind+position
+ * automatisch in die neue Vorlage uebernehmen.
+ *
+ * Rueckgabe:
+ *   - error?: Fehlermeldung
+ *   - mapped: wieviele Slot-Bilder konnten uebernommen werden
+ *   - total:  wieviele Slots hat die neue Vorlage gesamt
+ */
 export async function setDatenblattTemplate(produktId: string, templateId: string | null) {
   const supabase = await createClient();
-  const { error } = await supabase.from("produkte").update({ datenblatt_template_id: templateId }).eq("id", produktId);
-  if (error) return { error: error.message };
+
+  // 1. Aktuelle Vorlage des Produkts lesen (fuer Mapping)
+  const { data: produkt } = await supabase
+    .from("produkte")
+    .select("datenblatt_template_id")
+    .eq("id", produktId)
+    .single();
+  const oldTemplateId = produkt?.datenblatt_template_id ?? null;
+
+  // 2. Neue Vorlagen-ID setzen
+  const { error: updErr } = await supabase
+    .from("produkte")
+    .update({ datenblatt_template_id: templateId })
+    .eq("id", produktId);
+  if (updErr) return { error: updErr.message, mapped: 0, total: 0 };
+
+  // 3. Slot-Bilder uebernehmen (nur wenn beide Vorlagen verschieden + neue Vorlage gesetzt)
+  let mapped = 0;
+  let total = 0;
+  if (templateId && oldTemplateId && templateId !== oldTemplateId) {
+    const [{ data: oldT }, { data: newT }] = await Promise.all([
+      supabase.from("datenblatt_templates").select("slots").eq("id", oldTemplateId).single(),
+      supabase.from("datenblatt_templates").select("slots").eq("id", templateId).single(),
+    ]);
+    type SlotRef = { id: string; kind: string; position?: string };
+    const oldSlots: SlotRef[] = (oldT?.slots as SlotRef[]) ?? [];
+    const newSlots: SlotRef[] = (newT?.slots as SlotRef[]) ?? [];
+    total = newSlots.length;
+
+    if (oldSlots.length > 0 && newSlots.length > 0) {
+      // Bestehende Slot-Bilder der alten Vorlage laden
+      const { data: oldSlotImages } = await supabase
+        .from("produkt_datenblatt_slots")
+        .select("slot_id, storage_path")
+        .eq("produkt_id", produktId)
+        .eq("template_id", oldTemplateId);
+
+      const oldPathById = new Map<string, string>();
+      for (const r of oldSlotImages ?? []) {
+        if (r.storage_path) oldPathById.set(r.slot_id, r.storage_path);
+      }
+
+      // Mapping: alter Slot (kind+position) → neuer Slot (kind+position)
+      const upserts: Array<{ produkt_id: string; template_id: string; slot_id: string; storage_path: string }> = [];
+      for (const newSlot of newSlots) {
+        if (!newSlot.position) continue;
+        const matchOld = oldSlots.find(
+          (o) => o.kind === newSlot.kind && o.position === newSlot.position,
+        );
+        if (!matchOld) continue;
+        const oldPath = oldPathById.get(matchOld.id);
+        if (!oldPath) continue;
+        upserts.push({
+          produkt_id: produktId,
+          template_id: templateId,
+          slot_id: newSlot.id,
+          storage_path: oldPath,
+        });
+      }
+
+      if (upserts.length > 0) {
+        const { error: upErr } = await supabase
+          .from("produkt_datenblatt_slots")
+          .upsert(upserts, { onConflict: "produkt_id,template_id,slot_id" });
+        if (!upErr) mapped = upserts.length;
+      }
+    }
+  } else if (templateId) {
+    // Vorlage erstmals gesetzt — nur die Slot-Anzahl der neuen Vorlage zaehlen
+    const { data: newT } = await supabase
+      .from("datenblatt_templates")
+      .select("slots")
+      .eq("id", templateId)
+      .single();
+    total = ((newT?.slots as unknown[]) ?? []).length;
+  }
+
   revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
+  return { error: null, mapped, total };
 }
 
 export async function setSlotBild(produktId: string, templateId: string, slotId: string, storagePath: string | null) {

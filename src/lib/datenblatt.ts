@@ -1,5 +1,19 @@
 export type SlotKind = "image" | "energielabel" | "cutting";
 
+/**
+ * Semantischer Platzhalter im LaTeX-Layout. Wird beim Vorlagen-Wechsel als
+ * Mapping-Schluessel verwendet (PROJ-38): Slot mit kind+position aus alter
+ * Vorlage uebernimmt das Bild des Slots mit gleichem kind+position aus neuer
+ * Vorlage.
+ */
+export type SlotPosition =
+  | "hero"
+  | "detail-1"
+  | "detail-2"
+  | "energy-override"
+  | "cutting-1"
+  | (string & {});
+
 export type Slot = {
   id: string;
   label: string;
@@ -8,6 +22,10 @@ export type Slot = {
   width_cm: number;
   height_cm: number;
   kind: SlotKind;
+  /** PROJ-38: Semantische Position im Layout. Optional fuer Backwards-Compat. */
+  position?: SlotPosition;
+  /** PROJ-38: Ob der Slot leer bleiben darf. Default true. */
+  optional?: boolean;
 };
 
 export type DatenblattTemplate = {
@@ -15,6 +33,12 @@ export type DatenblattTemplate = {
   name: string;
   beschreibung: string | null;
   is_system: boolean;
+  /** PROJ-38: Genau eine Vorlage hat is_default=true (DB-Constraint). */
+  is_default?: boolean;
+  /** PROJ-38: Verweist auf services/latex-pdf-service/templates/<key>. NULL = Skeleton. */
+  latex_template_key?: string | null;
+  /** PROJ-38: Pfad zum eingecheckten Vorschau-PNG unter /public. */
+  preview_image_path?: string | null;
   page_width_cm: number;
   page_height_cm: number;
   slots: Slot[];

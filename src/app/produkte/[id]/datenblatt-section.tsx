@@ -37,7 +37,11 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
     startTransition(async () => {
       const r = await setDatenblattTemplate(produktId, id);
       if (r.error) { toast.error(r.error); setCurrentId(prev); return; }
-      toast.success("Vorlage ausgewählt");
+      // PROJ-38: Mapping-Resultat im Toast anzeigen, wenn Bilder uebernommen wurden
+      const msg = r.total > 0 && prev !== null && prev !== id
+        ? `Vorlage gewechselt — ${r.mapped} von ${r.total} Bildern übernommen`
+        : "Vorlage ausgewählt";
+      toast.success(msg);
       // Force reload to pull slot images for the new template
       window.location.reload();
     });
@@ -93,25 +97,38 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
         </a>
       </div>
       <div className="space-y-4 p-5">
-        {/* Template chooser */}
-        <div className="flex flex-wrap gap-2">
+        {/* Template chooser — PROJ-38: Vorschaubild + Slot-Anzahl */}
+        <div className="flex flex-wrap gap-3">
           {templates.map((t) => {
             const isActive = t.id === currentId;
+            const preview = (t as DatenblattTemplate & { preview_image_path?: string | null }).preview_image_path;
             return (
               <button
                 key={t.id}
                 type="button"
                 onClick={() => selectTemplate(t.id)}
                 disabled={pending}
-                className={`rounded-[10px] border px-3 py-2 text-[13px] transition ${
+                className={`group flex items-center gap-3 rounded-[10px] border p-2 pr-3 text-left text-[13px] transition ${
                   isActive
-                    ? "border-primary bg-primary/10 text-primary"
+                    ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
                     : "border-border/70 bg-card hover:border-primary/40"
                 }`}
               >
-                <div className="font-medium">{t.name}</div>
-                <div className={`mt-0.5 text-[10.5px] ${isActive ? "text-primary/70" : "text-muted-foreground"}`}>
-                  {t.slots.length} Slots {t.is_system && "· System"}
+                <div className="h-12 w-9 shrink-0 overflow-hidden rounded border border-border/70 bg-white">
+                  {preview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={preview} alt={`Vorschau ${t.name}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[8px] uppercase tracking-wide text-muted-foreground/60">
+                      A4
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{t.name}</div>
+                  <div className={`mt-0.5 text-[10.5px] ${isActive ? "text-primary/70" : "text-muted-foreground"}`}>
+                    {t.slots.length} Slots {t.is_system && "· System"}
+                  </div>
                 </div>
               </button>
             );

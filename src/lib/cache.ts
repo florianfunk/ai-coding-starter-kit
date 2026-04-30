@@ -301,6 +301,6 @@ export const getDatenblattTemplates = unstable_cache(
     }
     return data ?? [];
   },
-  ["datenblatt-templates-v1"],
+  ["datenblatt-templates-v2"],
   { tags: ["datenblatt-templates"], revalidate: 3600 },
 );

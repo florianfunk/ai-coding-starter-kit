@@ -89,12 +89,16 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     url: bildProxyUrl("produktbilder", ic.symbol_path),
   }));
 
-  const templatesTyped: DatenblattTemplate[] = templatesCached.map((t: any) => ({
-    ...t,
-    page_width_cm: Number(t.page_width_cm),
-    page_height_cm: Number(t.page_height_cm),
-    slots: t.slots ?? [],
-  }));
+  // PROJ-38: Nur Vorlagen mit aktiviertem LaTeX-Layout in der Auswahl anzeigen.
+  // Skeletons (latex_template_key IS NULL) sind unsichtbar fuer den Pfleger.
+  const templatesTyped: DatenblattTemplate[] = templatesCached
+    .filter((t: any) => Boolean(t.latex_template_key))
+    .map((t: any) => ({
+      ...t,
+      page_width_cm: Number(t.page_width_cm),
+      page_height_cm: Number(t.page_height_cm),
+      slots: t.slots ?? [],
+    }));
 
   const slotImages: Record<string, { path: string; url: string }> = {};
   for (const row of slotRows ?? []) {
@@ -218,7 +222,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
 
               <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline" size="sm">
-                  <Link href={`/produkte/${id}/datenblatt`}>
+                  <Link href={`/produkte/${id}/datenblatt`} target="_blank" rel="noopener noreferrer">
                     <FileText className="h-3.5 w-3.5" /> Datenblatt
                   </Link>
                 </Button>

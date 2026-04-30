@@ -223,15 +223,40 @@ function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
     .filter((g) => g.rows.length > 0);
 }
 
+/**
+ * PROJ-38: Resolved-Vorlage mit Slot-Definitionen.
+ * Wird vom Layout-Registry-Adapter durchgereicht.
+ */
+export type ResolvedTemplateForPayload = {
+  id: string;
+  slots: Array<{
+    id: string;
+    kind: "image" | "energielabel" | "cutting";
+    position?: string;
+  }>;
+};
+
 export async function buildModernDatenblattPayload(
   supabase: SupabaseClient,
   produktId: string,
   brand: ModernBrand,
+  template?: ResolvedTemplateForPayload,
 ): Promise<ModernDatenblattPayload> {
-  const [{ data: produkt }, { data: einstellungen }, { data: filialen }] = await Promise.all([
-    supabase.from("produkte").select("*").eq("id", produktId).single(),
+  const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: slotBilder }] = await Promise.all([
+    supabase
+      .from("produkte")
+      .select("*, bereiche(name), kategorien(name)")
+      .eq("id", produktId)
+      .single(),
     supabase.from("katalog_einstellungen").select("*").eq("id", 1).single(),
     supabase.from("filialen").select("name").eq("marke", brand).order("sortierung").limit(1),
+    template
+      ? supabase
+          .from("produkt_datenblatt_slots")
+          .select("slot_id, storage_path")
+          .eq("produkt_id", produktId)
+          .eq("template_id", template.id)
+      : Promise.resolve({ data: [] as { slot_id: string; storage_path: string | null }[] }),
   ]);
 
   if (!produkt) throw new Error(`Produkt ${produktId} nicht gefunden`);
@@ -241,23 +266,42 @@ export async function buildModernDatenblattPayload(
 
   const images: Record<string, string> = {};
 
+  // PROJ-38: Slot-Bilder pro position aufloesen.
+  // Vorrang: produkt_datenblatt_slots-Eintrag fuer die aktive Vorlage; Fallback: Stammdaten-Pfad.
+  const slotPathByPosition = new Map<string, string>();
+  if (template && Array.isArray(slotBilder)) {
+    const pathBySlotId = new Map<string, string>();
+    for (const sb of slotBilder) {
+      if (sb.storage_path) pathBySlotId.set(sb.slot_id, sb.storage_path);
+    }
+    for (const slot of template.slots) {
+      if (slot.position && pathBySlotId.has(slot.id)) {
+        slotPathByPosition.set(slot.position, pathBySlotId.get(slot.id)!);
+      }
+    }
+  }
+
+  const heroPath    = slotPathByPosition.get("hero")     ?? produkt.hauptbild_path;
+  const detail1Path = slotPathByPosition.get("detail-1") ?? produkt.bild_detail_1_path;
+  const detail2Path = slotPathByPosition.get("detail-2") ?? produkt.bild_detail_2_path;
+
   // Hauptbild → figA
-  const figA = await downloadAndCompress(supabase, "produktbilder", produkt.hauptbild_path, "hero");
+  const figA = await downloadAndCompress(supabase, "produktbilder", heroPath, "hero");
   let figA_filename: string | null = null;
   if (figA) {
     figA_filename = `figA.${figA.ext}`;
     images[figA_filename] = figA.base64;
   }
 
-  // figB = bild_detail_1, figC = bild_detail_2
-  const figB = await downloadAndCompress(supabase, "produktbilder", produkt.bild_detail_1_path, "detail");
+  // figB = detail-1, figC = detail-2
+  const figB = await downloadAndCompress(supabase, "produktbilder", detail1Path, "detail");
   let figB_filename: string | null = null;
   if (figB) {
     figB_filename = `figB.${figB.ext}`;
     images[figB_filename] = figB.base64;
   }
 
-  const figC = await downloadAndCompress(supabase, "produktbilder", produkt.bild_detail_2_path, "detail");
+  const figC = await downloadAndCompress(supabase, "produktbilder", detail2Path, "detail");
   let figC_filename: string | null = null;
   if (figC) {
     figC_filename = `figC.${figC.ext}`;
@@ -309,7 +353,7 @@ export async function buildModernDatenblattPayload(
     },
     produkt: {
       artikelnummer: produkt.artikelnummer ?? "",
-      eyebrow: produkt.kategorie_label || "Produktdatenblatt",
+      eyebrow: [produkt.bereiche?.name, produkt.kategorien?.name].filter(Boolean).join(" · "),
       title: title ?? "",
       title_accent: titleAccent,
       // Subtitle nur, wenn unterschieden von Lead und Title (sonst doppelt)

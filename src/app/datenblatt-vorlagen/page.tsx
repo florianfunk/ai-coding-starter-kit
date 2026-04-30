@@ -69,7 +69,7 @@ export default async function TemplatesPage() {
                         {t.name}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11.5px]">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11.5px]">
                       {t.is_system ? (
                         <span className="pill pill-accent">System</span>
                       ) : (
@@ -83,6 +83,32 @@ export default async function TemplatesPage() {
                           Custom
                         </span>
                       )}
+                      {/* PROJ-38: Layout-Status */}
+                      {t.latex_template_key ? (
+                        <span
+                          className="pill"
+                          style={{ background: "hsl(142 71% 45% / 0.14)", color: "hsl(142 71% 35%)" }}
+                          title={`LaTeX-Layout: ${t.latex_template_key}`}
+                        >
+                          Aktiviert
+                        </span>
+                      ) : (
+                        <span
+                          className="pill"
+                          style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}
+                          title="Keine LaTeX-Layout-Verknüpfung — wird im PDF-Export nicht verwendet"
+                        >
+                          Skeleton
+                        </span>
+                      )}
+                      {t.is_default && (
+                        <span
+                          className="pill pill-accent"
+                          title="Default-Vorlage — wird verwendet, wenn ein Produkt keine eigene Vorlage hat"
+                        >
+                          Default
+                        </span>
+                      )}
                       <span className="text-muted-foreground">{(t.slots as Slot[]).length} Slots</span>
                       <span className="text-muted-foreground">
                         · {t.page_width_cm}×{t.page_height_cm} cm
@@ -94,12 +120,27 @@ export default async function TemplatesPage() {
                     href={`/datenblatt-vorlagen/${t.id}`}
                     className="mx-auto block transition-transform hover:scale-[1.02]"
                   >
-                    <TemplatePreview
-                      pageWidth={Number(t.page_width_cm)}
-                      pageHeight={Number(t.page_height_cm)}
-                      slots={t.slots as Slot[]}
-                      targetWidthPx={260}
-                    />
+                    {t.preview_image_path ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={t.preview_image_path}
+                        alt={`Vorschau ${t.name}`}
+                        width={260}
+                        className="rounded border border-border/60 shadow-sm"
+                        style={{
+                          aspectRatio: `${t.page_width_cm} / ${t.page_height_cm}`,
+                          objectFit: "cover",
+                          background: "white",
+                        }}
+                      />
+                    ) : (
+                      <TemplatePreview
+                        pageWidth={Number(t.page_width_cm)}
+                        pageHeight={Number(t.page_height_cm)}
+                        slots={t.slots as Slot[]}
+                        targetWidthPx={260}
+                      />
+                    )}
                   </Link>
 
                   <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-2">

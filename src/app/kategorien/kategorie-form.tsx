@@ -1,21 +1,48 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useState, useTransition, useActionState } from "react";
 import { toast } from "sonner";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Image as ImageIcon, Table as TableIcon, Upload, X } from "lucide-react";
+import {
+  Image as ImageIcon,
+  Table as TableIcon,
+  Upload,
+  X,
+  Crop,
+  Maximize2,
+  GripVertical,
+  RotateCcw,
+} from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { EnhanceBildButton } from "@/components/enhance-bild-button";
+import { ImageZoomModal } from "@/components/image-zoom-modal";
+import { CropSuggestionModal, type CropAspect } from "@/components/crop-suggestion-modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
-import { uploadKategorieBild, replaceKategorieBildPath, type KategorieFormState } from "./actions";
+import {
+  uploadKategorieBild,
+  replaceKategorieBildPath,
+  cropKategorieBild,
+  type KategorieFormState,
+} from "./actions";
 import { getSlotBildSignedUrl } from "../produkte/datenblatt-actions";
 
 const initial: KategorieFormState = { error: null };
@@ -23,7 +50,23 @@ const initial: KategorieFormState = { error: null };
 export type IconOption = { id: string; label: string; gruppe: string | null; url: string | null };
 
 type BildSlot = 1 | 2 | 3 | 4;
-type BildState = { path: string | null; previewUrl: string | null };
+type BildState = {
+  path: string | null;
+  previewUrl: string | null;
+  /** Vorheriger Pfad — für „Original wiederherstellen" nach Crop. Null wenn kein Crop oder bereits zurückgewechselt. */
+  originalPath?: string | null;
+  /** Vorherige Preview-URL passend zu originalPath. */
+  originalPreviewUrl?: string | null;
+};
+
+const SLOT_ASPECT: Record<BildSlot, CropAspect> = {
+  1: "wide",
+  2: "wide",
+  3: "tall",
+  4: "tall",
+};
+
+const SLOT_GROUP: Record<BildSlot, "wide" | "tall"> = SLOT_ASPECT;
 
 type Props = {
   bereiche: { id: string; name: string }[];
@@ -78,6 +121,113 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
     const init = defaultValues?.spalten ?? [];
     return Array.from({ length: 9 }, (_, i) => init[i] ?? null);
   });
+
+  // Zoom-Modal
+  const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+
+  // Crop-Modal
+  const [cropSlot, setCropSlot] = useState<BildSlot | null>(null);
+  const [cropSuggestionPath, setCropSuggestionPath] = useState<string | null>(null);
+  const [cropSuggestionUrl, setCropSuggestionUrl] = useState<string | null>(null);
+  const [cropLoading, setCropLoading] = useState(false);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  function handleSlotDragEnd(event: DragEndEvent) {
+    const fromSlot = Number(event.active.id) as BildSlot;
+    const toSlot = event.over ? (Number(event.over.id) as BildSlot) : null;
+    if (!toSlot || fromSlot === toSlot) return;
+    if (SLOT_GROUP[fromSlot] !== SLOT_GROUP[toSlot]) {
+      toast.error(
+        `Tausch nicht möglich — Bild ${fromSlot} ist ${SLOT_META[fromSlot].size}, Bild ${toSlot} ist ${SLOT_META[toSlot].size}.`,
+      );
+      return;
+    }
+    setBilder((prev) => ({
+      ...prev,
+      [fromSlot]: prev[toSlot],
+      [toSlot]: prev[fromSlot],
+    }));
+    toast.success(`Bild ${fromSlot} ↔ Bild ${toSlot} getauscht`);
+  }
+
+  async function generateCropSuggestion(slot: BildSlot) {
+    const bild = bilder[slot];
+    if (!bild.path) return;
+    setCropLoading(true);
+    try {
+      const r = await cropKategorieBild({ path: bild.path, aspect: SLOT_ASPECT[slot] });
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setCropSuggestionPath(r.path);
+      const { url } = await getSlotBildSignedUrl(r.path);
+      setCropSuggestionUrl(url);
+    } finally {
+      setCropLoading(false);
+    }
+  }
+
+  async function acceptCrop() {
+    if (cropSlot == null || !cropSuggestionPath || !cropSuggestionUrl) return;
+    const slot = cropSlot;
+    const newPath = cropSuggestionPath;
+    const newUrl = cropSuggestionUrl;
+    const prev = bilder[slot];
+
+    if (kategorieId) {
+      const r = await replaceKategorieBildPath(kategorieId, `bild${slot}_path`, newPath);
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
+    }
+
+    setBilder((p) => ({
+      ...p,
+      [slot]: {
+        path: newPath,
+        previewUrl: newUrl,
+        originalPath: prev.path,
+        originalPreviewUrl: prev.previewUrl,
+      },
+    }));
+    toast.success(`${SLOT_META[slot].label}: Zuschnitt übernommen`);
+    closeCropModal();
+  }
+
+  function closeCropModal() {
+    setCropSlot(null);
+    setCropSuggestionPath(null);
+    setCropSuggestionUrl(null);
+    setCropLoading(false);
+  }
+
+  async function restoreOriginal(slot: BildSlot) {
+    const bild = bilder[slot];
+    if (!bild.originalPath) return;
+    const restored = bild.originalPath;
+    const restoredUrl = bild.originalPreviewUrl ?? null;
+
+    if (kategorieId) {
+      const r = await replaceKategorieBildPath(kategorieId, `bild${slot}_path`, restored);
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
+    }
+
+    setBilder((p) => ({
+      ...p,
+      [slot]: { path: restored, previewUrl: restoredUrl, originalPath: null, originalPreviewUrl: null },
+    }));
+    toast.success(`${SLOT_META[slot].label}: Original wiederhergestellt`);
+  }
 
   function setSpalte(i: number, value: string | null) {
     setSpalten((prev) => prev.map((v, idx) => (idx === i ? value : v)));
@@ -257,75 +407,69 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
               <Label>Bilder für Katalog-Seite</Label>
               <p className="text-xs text-muted-foreground mt-1">
                 Pro Kategorie werden bis zu 4 Bilder auf der Katalog-Seite angeordnet — breite Felder links (Bild 1 + 2), schmale Felder rechts (Bild 3 + 4).
-                Fehlende Bilder lassen den Platz im Katalog leer.
+                Fehlende Bilder lassen den Platz im Katalog leer. Bilder mit gleichem Format können per Drag &amp; Drop getauscht werden.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {([1, 2, 3, 4] as BildSlot[]).map((slot) => {
-                const meta = SLOT_META[slot];
-                const bild = bilder[slot];
-                const isUploading = uploadingSlot === slot;
-                const isWide = slot === 1 || slot === 2;
-                return (
-                  <div key={slot} className="rounded-lg border bg-muted/20 p-3 space-y-2">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-sm font-medium">{meta.label}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{meta.size}</span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
-                    <div
-                      className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${
-                        isWide ? "aspect-[5/1]" : "aspect-[1/2]"
-                      }`}
-                    >
-                      {bild.previewUrl ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={bild.previewUrl} alt="" className="h-full w-full object-cover" />
-                          <div className="absolute top-1 right-1 flex items-center gap-1">
-                            {bild.path && (
-                              <EnhanceBildButton
-                                bucket="produktbilder"
-                                path={bild.path}
-                                deleteOriginal={!!kategorieId}
-                                onReplaced={(newPath) => handleEnhanced(slot, newPath)}
-                                size="icon"
-                                className="border shadow-sm"
-                              />
-                            )}
-                            <button
-                              type="button"
-                              aria-label="Bild entfernen"
-                              onClick={() => clearSlot(slot)}
-                              className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-                      )}
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-primary hover:underline cursor-pointer">
-                      <Upload className="h-3.5 w-3.5" />
-                      <span>{isUploading ? "Lädt…" : bild.path ? "Ersetzen" : "Datei auswählen"}</span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="hidden"
-                        disabled={isUploading}
-                        onChange={(e) => handleFile(slot, e.target.files?.[0] ?? null)}
-                      />
-                    </label>
-                  </div>
-                );
-              })}
-            </div>
+            <DndContext
+              sensors={dndSensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleSlotDragEnd}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {([1, 2, 3, 4] as BildSlot[]).map((slot) => (
+                  <BildSlotCard
+                    key={slot}
+                    slot={slot}
+                    bild={bilder[slot]}
+                    meta={SLOT_META[slot]}
+                    isUploading={uploadingSlot === slot}
+                    onFile={(file) => handleFile(slot, file)}
+                    onClear={() => clearSlot(slot)}
+                    onZoom={() => bilder[slot].previewUrl && setZoomUrl(bilder[slot].previewUrl)}
+                    onCrop={() => {
+                      setCropSlot(slot);
+                      // Direkt generieren beim Öffnen — User sieht sofort das Ergebnis
+                      void generateCropSuggestion(slot);
+                    }}
+                    onRestoreOriginal={() => restoreOriginal(slot)}
+                    enhanceProps={
+                      bilder[slot].path
+                        ? {
+                            bucket: "produktbilder",
+                            path: bilder[slot].path!,
+                            deleteOriginal: !!kategorieId,
+                            onReplaced: (newPath) => handleEnhanced(slot, newPath),
+                          }
+                        : null
+                    }
+                  />
+                ))}
+              </div>
+            </DndContext>
 
             <CategoryLayoutPreview bilder={bilder} />
           </div>
+
+          <ImageZoomModal
+            open={zoomUrl !== null}
+            onOpenChange={(o) => !o && setZoomUrl(null)}
+            src={zoomUrl ?? ""}
+          />
+
+          <CropSuggestionModal
+            open={cropSlot !== null}
+            onOpenChange={(o) => !o && closeCropModal()}
+            originalUrl={cropSlot ? bilder[cropSlot].previewUrl ?? "" : ""}
+            suggestionUrl={cropSuggestionUrl}
+            loading={cropLoading}
+            aspect={cropSlot ? SLOT_ASPECT[cropSlot] : "wide"}
+            slotLabel={cropSlot ? `${SLOT_META[cropSlot].label} (${SLOT_META[cropSlot].size})` : undefined}
+            onGenerate={() => {
+              if (cropSlot) void generateCropSuggestion(cropSlot);
+            }}
+            onAccept={acceptCrop}
+          />
 
           {formState.error && <Alert variant="destructive"><AlertDescription>{formState.error}</AlertDescription></Alert>}
 
@@ -344,6 +488,165 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
  * 4-Spalten × 2-Zeilen-Grid: Bild1 und Bild2 sind breite Felder (3 Spalten),
  * Bild3 überspannt rechts oben zwei Zeilen hochkant, Bild4 liegt rechts unten.
  */
+interface BildSlotCardProps {
+  slot: BildSlot;
+  bild: BildState;
+  meta: { label: string; size: string; hint: string };
+  isUploading: boolean;
+  onFile: (file: File | null) => void;
+  onClear: () => void;
+  onZoom: () => void;
+  onCrop: () => void;
+  onRestoreOriginal: () => void;
+  enhanceProps: {
+    bucket: "produktbilder";
+    path: string;
+    deleteOriginal: boolean;
+    onReplaced: (newPath: string) => void;
+  } | null;
+}
+
+function BildSlotCard({
+  slot,
+  bild,
+  meta,
+  isUploading,
+  onFile,
+  onClear,
+  onZoom,
+  onCrop,
+  onRestoreOriginal,
+  enhanceProps,
+}: BildSlotCardProps) {
+  const isWide = slot === 1 || slot === 2;
+  const hasImage = !!bild.previewUrl;
+
+  // Drag-Source: nur wenn ein Bild da ist
+  const draggable = useDraggable({
+    id: String(slot),
+    disabled: !hasImage,
+  });
+
+  // Drop-Target: immer aktiv (auch leere Slots können Drop empfangen)
+  const droppable = useDroppable({
+    id: String(slot),
+  });
+
+  return (
+    <div
+      ref={droppable.setNodeRef}
+      className={`rounded-lg border bg-muted/20 p-3 space-y-2 transition-colors ${
+        droppable.isOver ? "border-primary bg-primary/5" : ""
+      } ${draggable.isDragging ? "opacity-40" : ""}`}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          {hasImage && (
+            <button
+              type="button"
+              ref={draggable.setNodeRef}
+              {...draggable.listeners}
+              {...draggable.attributes}
+              className="cursor-grab touch-none text-muted-foreground/60 hover:text-foreground active:cursor-grabbing"
+              aria-label={`${meta.label} verschieben`}
+              title="Tauschen mit gleichem Format (Drag & Drop)"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <span className="text-sm font-medium">{meta.label}</span>
+        </div>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{meta.size}</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
+
+      <div
+        className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${
+          isWide ? "aspect-[5/1]" : "aspect-[1/2]"
+        }`}
+      >
+        {bild.previewUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={bild.previewUrl}
+              alt=""
+              className="h-full w-full object-cover cursor-zoom-in"
+              onClick={onZoom}
+            />
+            <div className="absolute top-1 right-1 flex items-center gap-1">
+              {bild.path && (
+                <button
+                  type="button"
+                  onClick={onCrop}
+                  aria-label="Auf Slot-Format zuschneiden"
+                  title="Auf Slot-Format zuschneiden"
+                  className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+                >
+                  <Crop className="h-3 w-3" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onZoom}
+                aria-label="Bild groß ansehen"
+                title="Bild groß ansehen"
+                className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+              >
+                <Maximize2 className="h-3 w-3" />
+              </button>
+              {enhanceProps && (
+                <EnhanceBildButton
+                  bucket={enhanceProps.bucket}
+                  path={enhanceProps.path}
+                  deleteOriginal={enhanceProps.deleteOriginal}
+                  onReplaced={enhanceProps.onReplaced}
+                  size="icon"
+                  className="border shadow-sm"
+                />
+              )}
+              <button
+                type="button"
+                aria-label="Bild entfernen"
+                onClick={onClear}
+                className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          </>
+        ) : (
+          <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+        )}
+      </div>
+
+      {bild.originalPath && (
+        <button
+          type="button"
+          onClick={onRestoreOriginal}
+          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border/60 bg-background/60 px-2 py-1 text-[11px] text-muted-foreground hover:border-foreground hover:text-foreground"
+          title="Zugeschnittenes Bild verwerfen — Original wiederherstellen"
+        >
+          <RotateCcw className="h-3 w-3" />
+          Original wiederherstellen
+        </button>
+      )}
+
+      <label className="flex items-center gap-2 text-xs text-primary hover:underline cursor-pointer">
+        <Upload className="h-3.5 w-3.5" />
+        <span>{isUploading ? "Lädt…" : bild.path ? "Ersetzen" : "Datei auswählen"}</span>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          disabled={isUploading}
+          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+        />
+      </label>
+    </div>
+  );
+}
+
 function CategoryLayoutPreview({ bilder }: { bilder: Record<BildSlot, BildState> }) {
   return (
     <div className="rounded-lg border bg-muted/20 p-4">

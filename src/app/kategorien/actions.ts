@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
@@ -176,4 +177,81 @@ export async function uploadKategorieBild(formData: FormData) {
   const { error } = await supabase.storage.from("produktbilder").upload(path, buffer, { contentType });
   if (error) return { path: null, error: error.message };
   return { path, error: null };
+}
+
+// ----------------------------------------------------------------------------
+// Smart-Crop für Kategorie-Bilder (PROJ-40)
+// ----------------------------------------------------------------------------
+// Schneidet ein bestehendes Bild auf das Ziel-Aspect-Ratio des Slots zu —
+// "wide" (5:1, breit) oder "tall" (1:2, hochkant). Nutzt Sharps Attention-
+// Strategie: das Bild wird auf die längere Achse skaliert und dann auf den
+// "interessantesten" Bereich zugeschnitten (kontrastreichste Region). Das
+// Original wird *nicht* gelöscht — der Pfad bleibt erhalten, der Aufrufer
+// kann zwischen Original und Zuschnitt wechseln.
+
+const cropAspectMap = {
+  wide: { width: 1500, height: 300, label: "5:1 (breit)" },
+  tall: { width: 600, height: 1200, label: "1:2 (hochkant)" },
+} as const;
+
+const cropSchema = z.object({
+  path: z.string().min(1),
+  aspect: z.enum(["wide", "tall"]),
+});
+
+export type KategorieCropResult =
+  | { ok: true; path: string }
+  | { ok: false; error: string };
+
+export async function cropKategorieBild(input: unknown): Promise<KategorieCropResult> {
+  const parsed = cropSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Ungültige Eingabe." };
+  const { path, aspect } = parsed.data;
+
+  const supabase = await createClient();
+
+  const { data: download, error: dlErr } = await supabase.storage
+    .from("produktbilder")
+    .download(path);
+  if (dlErr || !download) {
+    return { ok: false, error: dlErr?.message ?? "Bild nicht gefunden." };
+  }
+
+  const inputBuffer = Buffer.from(await download.arrayBuffer());
+  const { width, height } = cropAspectMap[aspect];
+
+  let croppedBuffer: Buffer;
+  let contentType = "image/jpeg";
+  let extension = "jpg";
+  try {
+    const pipeline = sharp(inputBuffer, { failOn: "none" })
+      .rotate()
+      .resize(width, height, {
+        fit: "cover",
+        position: sharp.strategy.attention,
+      });
+
+    // PNG → PNG (für Transparenz), sonst JPEG
+    const meta = await sharp(inputBuffer).metadata();
+    if (meta.format === "png" && meta.hasAlpha) {
+      croppedBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+      contentType = "image/png";
+      extension = "png";
+    } else {
+      croppedBuffer = await pipeline.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Sharp-Fehler" };
+  }
+
+  const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+  const rand = Math.random().toString(36).slice(2, 8);
+  const newPath = `${dir ? dir + "/" : ""}crop-${aspect}-${Date.now()}-${rand}.${extension}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("produktbilder")
+    .upload(newPath, croppedBuffer, { contentType });
+  if (upErr) return { ok: false, error: `Upload fehlgeschlagen: ${upErr.message}` };
+
+  return { ok: true, path: newPath };
 }

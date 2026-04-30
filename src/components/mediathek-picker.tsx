@@ -251,10 +251,12 @@ export function MediathekPicker({
                     }`}
                     title={item.smartTitle || item.name}
                   >
-                    {/* Vorschaubild mit fester Mindesthöhe — robuster als
-                        aspect-ratio in flex-col-Buttons (das kollabiert
-                        manchmal in Browsern). 180px ≈ 4:3 bei 240px Tile-Breite. */}
-                    <div className="relative h-[180px] w-full shrink-0 bg-muted/40">
+                    {/* Inline-style erzwingt 220px Höhe — nichts kann das
+                        überschreiben (kein flex-shrink, keine grid-row-Bremse). */}
+                    <div
+                      className="relative w-full bg-muted/40"
+                      style={{ height: "220px", minHeight: "220px", flexShrink: 0 }}
+                    >
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

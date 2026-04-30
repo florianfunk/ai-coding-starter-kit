@@ -568,7 +568,10 @@ function MediathekTile({
         className="block w-full"
         aria-label={`Details für ${item.name}`}
       >
-        <div className="relative h-[180px] w-full shrink-0 overflow-hidden bg-muted/30">
+        <div
+          className="relative w-full overflow-hidden bg-muted/30"
+          style={{ height: "220px", minHeight: "220px", flexShrink: 0 }}
+        >
           {url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img

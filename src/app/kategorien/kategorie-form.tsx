@@ -99,10 +99,10 @@ type Props = {
 };
 
 const SLOT_META: Record<BildSlot, { label: string; size: string; hint: string }> = {
-  1: { label: "Bild 1", size: "15 × 3 cm", hint: "Breit, mittig links" },
+  1: { label: "Bild 1", size: "15 × 3 cm", hint: "Breit, oben links" },
   2: { label: "Bild 2", size: "15 × 3 cm", hint: "Breit, unten links" },
-  3: { label: "Bild 3", size: "5 × 3 cm",  hint: "Hochkant, oben rechts" },
-  4: { label: "Bild 4", size: "5 × 3 cm",  hint: "Rechts unten" },
+  3: { label: "Bild 3", size: "5 × 3 cm",  hint: "Klein, rechts oben" },
+  4: { label: "Bild 4", size: "5 × 3 cm",  hint: "Klein, rechts unten" },
 };
 
 export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, action, submitLabel }: Props) {
@@ -528,6 +528,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
               onToggle={toggleIcon}
               onReorder={setSelected}
               showRemoveButtons
+              compact
             />
           </div>
 
@@ -546,47 +547,147 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
               collisionDetection={closestCenter}
               onDragEnd={handleSlotDragEnd}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {([1, 2, 3, 4] as BildSlot[]).map((slot) => (
+              {/*
+                Echtes Katalog-Layout: linke Spalte 3× breiter (15 cm vs. 5 cm).
+                - Linke Spalte: Bild 1 oben, Bild 2 darunter (jeweils 5:1 quer)
+                - Rechte Spalte: Bild 3 + Bild 4 nebeneinander (jeweils 1:2 hochkant)
+                Auf Mobile (sm:) untereinander gestapelt.
+              */}
+              <div className="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-3 items-stretch">
+                <div className="flex flex-col gap-3">
                   <BildSlotCard
-                    key={slot}
-                    slot={slot}
-                    bild={bilder[slot]}
-                    meta={SLOT_META[slot]}
-                    isUploading={uploadingSlot === slot}
-                    onFile={(file) => handleFile(slot, file)}
-                    onClear={() => clearSlot(slot)}
-                    onZoom={() => bilder[slot].previewUrl && setZoomUrl(bilder[slot].previewUrl)}
+                    slot={1}
+                    bild={bilder[1]}
+                    meta={SLOT_META[1]}
+                    isUploading={uploadingSlot === 1}
+                    onFile={(file) => handleFile(1, file)}
+                    onClear={() => clearSlot(1)}
+                    onZoom={() => bilder[1].previewUrl && setZoomUrl(bilder[1].previewUrl)}
                     onCrop={() => {
-                      setCropSlot(slot);
-                      // Direkt generieren beim Öffnen — User sieht sofort das Ergebnis
-                      void generateCropSuggestion(slot);
+                      setCropSlot(1);
+                      void generateCropSuggestion(1);
                     }}
-                    onRestoreOriginal={() => restoreOriginal(slot)}
+                    onRestoreOriginal={() => restoreOriginal(1)}
                     enhanceProps={
-                      bilder[slot].path
+                      bilder[1].path
                         ? {
                             bucket: "produktbilder",
-                            path: bilder[slot].path!,
+                            path: bilder[1].path!,
                             deleteOriginal: !!kategorieId,
-                            onReplaced: (newPath) => handleEnhanced(slot, newPath),
+                            onReplaced: (newPath) => handleEnhanced(1, newPath),
                           }
                         : null
                     }
                     aiImage={{
-                      aspect: SLOT_ASPECT[slot],
-                      previewUrl: aiPreviewBySlot[slot].url,
-                      loading: aiLoadingSlot === slot,
-                      onGenerate: (userPrompt) => handleAiImageGenerate(slot, userPrompt),
-                      onAccept: () => handleAiImageAccept(slot),
-                      onClose: () => handleAiImageClose(slot),
+                      aspect: SLOT_ASPECT[1],
+                      previewUrl: aiPreviewBySlot[1].url,
+                      loading: aiLoadingSlot === 1,
+                      onGenerate: (userPrompt) => handleAiImageGenerate(1, userPrompt),
+                      onAccept: () => handleAiImageAccept(1),
+                      onClose: () => handleAiImageClose(1),
                     }}
                   />
-                ))}
+                  <BildSlotCard
+                    slot={2}
+                    bild={bilder[2]}
+                    meta={SLOT_META[2]}
+                    isUploading={uploadingSlot === 2}
+                    onFile={(file) => handleFile(2, file)}
+                    onClear={() => clearSlot(2)}
+                    onZoom={() => bilder[2].previewUrl && setZoomUrl(bilder[2].previewUrl)}
+                    onCrop={() => {
+                      setCropSlot(2);
+                      void generateCropSuggestion(2);
+                    }}
+                    onRestoreOriginal={() => restoreOriginal(2)}
+                    enhanceProps={
+                      bilder[2].path
+                        ? {
+                            bucket: "produktbilder",
+                            path: bilder[2].path!,
+                            deleteOriginal: !!kategorieId,
+                            onReplaced: (newPath) => handleEnhanced(2, newPath),
+                          }
+                        : null
+                    }
+                    aiImage={{
+                      aspect: SLOT_ASPECT[2],
+                      previewUrl: aiPreviewBySlot[2].url,
+                      loading: aiLoadingSlot === 2,
+                      onGenerate: (userPrompt) => handleAiImageGenerate(2, userPrompt),
+                      onAccept: () => handleAiImageAccept(2),
+                      onClose: () => handleAiImageClose(2),
+                    }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <BildSlotCard
+                    slot={3}
+                    bild={bilder[3]}
+                    meta={SLOT_META[3]}
+                    isUploading={uploadingSlot === 3}
+                    onFile={(file) => handleFile(3, file)}
+                    onClear={() => clearSlot(3)}
+                    onZoom={() => bilder[3].previewUrl && setZoomUrl(bilder[3].previewUrl)}
+                    onCrop={() => {
+                      setCropSlot(3);
+                      void generateCropSuggestion(3);
+                    }}
+                    onRestoreOriginal={() => restoreOriginal(3)}
+                    enhanceProps={
+                      bilder[3].path
+                        ? {
+                            bucket: "produktbilder",
+                            path: bilder[3].path!,
+                            deleteOriginal: !!kategorieId,
+                            onReplaced: (newPath) => handleEnhanced(3, newPath),
+                          }
+                        : null
+                    }
+                    aiImage={{
+                      aspect: SLOT_ASPECT[3],
+                      previewUrl: aiPreviewBySlot[3].url,
+                      loading: aiLoadingSlot === 3,
+                      onGenerate: (userPrompt) => handleAiImageGenerate(3, userPrompt),
+                      onAccept: () => handleAiImageAccept(3),
+                      onClose: () => handleAiImageClose(3),
+                    }}
+                  />
+                  <BildSlotCard
+                    slot={4}
+                    bild={bilder[4]}
+                    meta={SLOT_META[4]}
+                    isUploading={uploadingSlot === 4}
+                    onFile={(file) => handleFile(4, file)}
+                    onClear={() => clearSlot(4)}
+                    onZoom={() => bilder[4].previewUrl && setZoomUrl(bilder[4].previewUrl)}
+                    onCrop={() => {
+                      setCropSlot(4);
+                      void generateCropSuggestion(4);
+                    }}
+                    onRestoreOriginal={() => restoreOriginal(4)}
+                    enhanceProps={
+                      bilder[4].path
+                        ? {
+                            bucket: "produktbilder",
+                            path: bilder[4].path!,
+                            deleteOriginal: !!kategorieId,
+                            onReplaced: (newPath) => handleEnhanced(4, newPath),
+                          }
+                        : null
+                    }
+                    aiImage={{
+                      aspect: SLOT_ASPECT[4],
+                      previewUrl: aiPreviewBySlot[4].url,
+                      loading: aiLoadingSlot === 4,
+                      onGenerate: (userPrompt) => handleAiImageGenerate(4, userPrompt),
+                      onAccept: () => handleAiImageAccept(4),
+                      onClose: () => handleAiImageClose(4),
+                    }}
+                  />
+                </div>
               </div>
             </DndContext>
-
-            <CategoryLayoutPreview bilder={bilder} />
           </div>
 
           <ImageZoomModal
@@ -666,7 +767,10 @@ function BildSlotCard({
   enhanceProps,
   aiImage,
 }: BildSlotCardProps) {
-  const isWide = slot === 1 || slot === 2;
+  // Echte Slot-Aspects entsprechen den physischen Katalog-Maßen:
+  //  - Bild 1, 2: 15×3 cm → 5:1 (breit, quer)
+  //  - Bild 3, 4: 5×3 cm  → 5:3 (klein, leicht quer)
+  const slotAspectClass = slot === 1 || slot === 2 ? "aspect-[5/1]" : "aspect-[5/3]";
   const hasImage = !!bild.previewUrl;
 
   // Drag-Source: nur wenn ein Bild da ist
@@ -709,9 +813,7 @@ function BildSlotCard({
       <p className="text-[11px] text-muted-foreground">{meta.hint}</p>
 
       <div
-        className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${
-          isWide ? "aspect-[5/1]" : "aspect-[1/2]"
-        }`}
+        className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${slotAspectClass}`}
       >
         {bild.previewUrl ? (
           <>
@@ -823,20 +925,6 @@ function BildSlotCard({
   );
 }
 
-function CategoryLayoutPreview({ bilder }: { bilder: Record<BildSlot, BildState> }) {
-  return (
-    <div className="rounded-lg border bg-muted/20 p-4">
-      <p className="text-xs font-medium text-muted-foreground mb-2">Anordnung auf der Katalog-Seite</p>
-      <div className="aspect-[4/2] w-full max-w-md grid grid-cols-4 grid-rows-2 gap-1 bg-background rounded border p-1">
-        <PreviewSlot bild={bilder[1]} label="Bild 1" size="15×3 cm" className="col-span-3 row-span-1" />
-        <PreviewSlot bild={bilder[3]} label="Bild 3" size="5×3 cm"  className="col-span-1 row-span-2" />
-        <PreviewSlot bild={bilder[2]} label="Bild 2" size="15×3 cm" className="col-span-3 row-span-1" />
-        <PreviewSlot bild={bilder[4]} label="Bild 4" size="5×3 cm"  className="col-start-4 row-start-2" />
-      </div>
-    </div>
-  );
-}
-
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -844,34 +932,4 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function PreviewSlot({
-  bild,
-  label,
-  size,
-  className,
-}: {
-  bild: BildState;
-  label: string;
-  size: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`relative overflow-hidden rounded-sm border border-dashed ${
-        bild.previewUrl ? "border-primary/40" : "border-muted-foreground/30 bg-muted/40"
-      } ${className ?? ""}`}
-    >
-      {bild.previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={bild.previewUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <div className="h-full w-full flex flex-col items-center justify-center text-[9px] text-muted-foreground/70 px-1 text-center">
-          <span className="font-medium">{label}</span>
-          <span className="opacity-70">{size}</span>
-        </div>
-      )}
-    </div>
-  );
 }

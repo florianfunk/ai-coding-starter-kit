@@ -270,7 +270,7 @@ Stabilität: Tests passieren einzeln zuverlässig, in der vollen Suite gelegentl
 
 **0 Critical · 0 High · 1 Medium · 1 Low**
 
-- **Medium**: EXIF-Orientation wird nicht zwischen Browser-Anzeige und Server-Crop-Logik abgeglichen. Fotos vom iPhone (oder Kamera mit EXIF Orientation ≠ 1) werden im Browser EXIF-rotiert dargestellt, in Sharp `metadata()` aber als rohe Pixel-Matrix gelesen. Ergebnis: Crop-Koordinaten vom Client beziehen sich auf das rotierte Bild, Sharp arbeitet mit dem unrotierten Buffer → falscher Bildausschnitt. **Steps to repro:** Foto mit EXIF Orientation 6 (90° rotiert) hochladen, manuell zuschneiden → Server schneidet falschen Bereich aus. **Fix-Skizze:** EXIF-Orientation aus Metadata lesen und Crop-Koordinaten serverseitig rotieren, oder Original vor `metadata()` mit `.rotate().toBuffer()` materialisieren. **Workaround:** Bilder mit Orientation 1 (Standard von Profi-Kameras) nicht betroffen.
+- ~~**Medium**: EXIF-Orientation-Mismatch beim manuellen Crop~~ → **Behoben in Commit `27705c4` (Hotfix-Deploy)**: Original wird via `sharp().rotate().toBuffer()` einmalig rotiert materialisiert; Metadata + Extract laufen auf dem rotierten Buffer. iPhone-Fotos mit Orientation 6 schneiden jetzt korrekt.
 - **Low**: AC „Smart-Crop-Position als Startwert" wurde nicht erfüllt. Der Editor startet zentriert, weil der Smart-Crop-Vorschlag als bereits gecropptes Bild zurückkommt und keine Koordinaten relativ zum Original mitliefert. **Empfehlung:** Entweder Server-Action `cropKategorieBild` erweitern, dass sie auch die Crop-Box mitliefert, oder Spec auf „startet zentriert" anpassen.
 
 ### Production-Ready Decision

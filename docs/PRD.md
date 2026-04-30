@@ -28,6 +28,7 @@ Pain Points heute: FileMaker-Lizenzkosten, keine parallele Bearbeitung, schwerer
 | P0 (MVP) | PROJ-10 PDF-Export: Gesamtkatalog | Planned |
 | P1       | PROJ-36 Datenblatt-Felder pflegen (UI) | Planned |
 | P1       | PROJ-38 Datenblatt-Vorlagen mit LaTeX-Layout-Varianten | Planned |
+| P2       | PROJ-41 Manuelles Crop-Rechteck für Kategorie-Bilder | Planned |
 
 ## Success Metrics
 - Alle bestehenden FileMaker-Daten (20 Bereiche, ~70 Kategorien, ~400+ Produkte, Preise, Bilder) erfolgreich migriert

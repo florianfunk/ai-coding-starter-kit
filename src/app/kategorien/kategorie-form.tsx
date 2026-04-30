@@ -535,8 +535,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             <RichTextEditor value={beschreibung} onChange={setBeschreibung} />
           </div>
 
-          {/* Katalog-Spalten */}
-          <div className="order-4 space-y-3">
+          {/* Katalog-Spalten — ganz unten (order-5) */}
+          <div className="order-5 space-y-3">
             <div className="flex items-center gap-2">
               <TableIcon className="h-4 w-4 text-muted-foreground" />
               <Label>Katalog-Spalten</Label>
@@ -589,8 +589,8 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
             />
           </div>
 
-          {/* Bilder-Block: 4 Upload-Slots — am Ende (order-5) */}
-          <div className="order-5 space-y-4">
+          {/* Bilder-Block: 4 Upload-Slots — vor den Katalog-Spalten (order-4) */}
+          <div className="order-4 space-y-4">
             <div>
               <Label>Bilder für Katalog-Seite</Label>
               <p className="text-xs text-muted-foreground mt-1">

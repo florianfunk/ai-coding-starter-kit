@@ -27,11 +27,12 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   GripVertical,
   Pencil,
-  ChevronRight,
-  ImageIcon,
   LayoutGrid as LayoutGridIcon,
   List,
   Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { DeleteBereichButton } from "./delete-button";
 import { reorderBereiche } from "./actions";
@@ -87,14 +88,16 @@ function BereichRow({
   item,
   index,
   isDragOverlay,
+  dragDisabled,
 }: {
   item: BereichItem;
   index: number;
   isDragOverlay?: boolean;
+  dragDisabled?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: isDragOverlay,
+    disabled: isDragOverlay || dragDisabled,
   });
 
   const style = { transform: CSS.Transform.toString(transform), transition };
@@ -115,24 +118,23 @@ function BereichRow({
     >
       <button
         type="button"
-        className="shrink-0 cursor-grab touch-none text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing"
-        aria-label="Reihenfolge ändern"
-        {...(isDragOverlay ? {} : { ...attributes, ...listeners })}
+        disabled={dragDisabled}
+        className="shrink-0 cursor-grab touch-none text-muted-foreground/40 transition-colors hover:text-muted-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:text-muted-foreground/40"
+        aria-label={dragDisabled ? "Drag & Drop nur bei manueller Sortierung verfügbar" : "Reihenfolge ändern"}
+        title={dragDisabled ? "Drag & Drop nur bei manueller Sortierung verfügbar" : "Reihenfolge ändern"}
+        {...(isDragOverlay || dragDisabled ? {} : { ...attributes, ...listeners })}
       >
         <GripVertical className="h-[18px] w-[18px]" />
       </button>
 
       <Link href={`/bereiche/${item.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground/70 tabular-nums">
+        <div className="w-[26px] shrink-0 font-mono text-[11px] font-semibold uppercase tracking-[0.04em] text-muted-foreground/70 tabular-nums">
           {String(index + 1).padStart(2, "0")}
         </div>
         <Thumb item={item} />
         <div className="min-w-0 flex-1">
           <div className="mb-0.5 flex items-center gap-2">
             <span className="truncate text-[14.5px] font-semibold tracking-[-0.01em]">{item.name}</span>
-            {item.startseite && (
-              <span className="pill font-mono text-[10px]">S. {item.startseite}</span>
-            )}
           </div>
           {plain && (
             <div className="line-clamp-1 text-[11.5px] text-muted-foreground">{plain}</div>
@@ -149,6 +151,12 @@ function BereichRow({
           <div className="text-[17px] font-semibold tabular-nums tracking-[-0.012em]">{item.prodCount}</div>
           <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Prod.</div>
         </div>
+        <div className="min-w-[54px] text-center">
+          <div className="text-[17px] font-semibold tabular-nums tracking-[-0.012em]">
+            {item.startseite ?? <span className="text-muted-foreground/40">—</span>}
+          </div>
+          <div className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70">Seite</div>
+        </div>
       </div>
 
       <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -161,7 +169,6 @@ function BereichRow({
         </Link>
         <DeleteBereichButton id={item.id} name={item.name} />
       </div>
-      <ChevronRight className="h-[14px] w-[14px] text-muted-foreground/40" />
     </div>
   );
 }
@@ -218,17 +225,120 @@ function BereichCard({ item }: { item: BereichItem }) {
   );
 }
 
+type SortKey = "manual" | "name" | "katCount" | "prodCount" | "startseite";
+type SortDir = "asc" | "desc";
+
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-40" />;
+  return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
+
+function BereicheHeader({
+  sortKey,
+  sortDir,
+  onSort,
+}: {
+  sortKey: SortKey;
+  sortDir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const headerCellClass =
+    "flex items-center gap-1 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70 transition-colors hover:text-foreground";
+  return (
+    <div className="flex items-center gap-3 border-b border-border/60 bg-muted/30 px-4 py-2.5">
+      <div className="w-[18px] shrink-0" aria-hidden />
+      <button
+        type="button"
+        onClick={() => onSort("manual")}
+        className={`${headerCellClass} w-[26px] shrink-0 justify-start`}
+        title="Manuelle Reihenfolge (Drag & Drop)"
+      >
+        #
+      </button>
+      <div className="w-[64px] shrink-0" aria-hidden />
+      <button
+        type="button"
+        onClick={() => onSort("name")}
+        className={`${headerCellClass} min-w-0 flex-1 justify-start`}
+      >
+        <span>Bereich</span>
+        <SortIcon active={sortKey === "name"} dir={sortDir} />
+      </button>
+      <div className="hidden items-center gap-5 md:flex">
+        <button
+          type="button"
+          onClick={() => onSort("katCount")}
+          className={`${headerCellClass} min-w-[54px] justify-center`}
+        >
+          <span>Kat.</span>
+          <SortIcon active={sortKey === "katCount"} dir={sortDir} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSort("prodCount")}
+          className={`${headerCellClass} min-w-[54px] justify-center`}
+        >
+          <span>Prod.</span>
+          <SortIcon active={sortKey === "prodCount"} dir={sortDir} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSort("startseite")}
+          className={`${headerCellClass} min-w-[54px] justify-center`}
+        >
+          <span>Seite</span>
+          <SortIcon active={sortKey === "startseite"} dir={sortDir} />
+        </button>
+      </div>
+      <div className="w-[64px] shrink-0" aria-hidden />
+    </div>
+  );
+}
+
 export function SortableBereicheList({ initialItems }: { initialItems: BereichItem[] }) {
   const [items, setItems] = useState(initialItems);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "grid">("list");
   const [query, setQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("manual");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((i) => i.name.toLowerCase().includes(q));
-  }, [items, query]);
+    const base = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
+    if (sortKey === "manual") return base;
+
+    const sorted = [...base].sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "name") {
+        cmp = a.name.localeCompare(b.name, "de", { sensitivity: "base" });
+      } else if (sortKey === "katCount") {
+        cmp = a.katCount - b.katCount;
+      } else if (sortKey === "prodCount") {
+        cmp = a.prodCount - b.prodCount;
+      } else if (sortKey === "startseite") {
+        const av = a.startseite ?? Number.POSITIVE_INFINITY;
+        const bv = b.startseite ?? Number.POSITIVE_INFINITY;
+        cmp = av - bv;
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [items, query, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (key === "manual") {
+      setSortKey("manual");
+      setSortDir("asc");
+      return;
+    }
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -302,8 +412,18 @@ export function SortableBereicheList({ initialItems }: { initialItems: BereichIt
         >
           <SortableContext items={filtered.map((i) => i.id)} strategy={verticalListSortingStrategy}>
             <div className="glass-card overflow-hidden">
+              <BereicheHeader
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={toggleSort}
+              />
               {filtered.map((item, i) => (
-                <BereichRow key={item.id} item={item} index={i} />
+                <BereichRow
+                  key={item.id}
+                  item={item}
+                  index={i}
+                  dragDisabled={sortKey !== "manual"}
+                />
               ))}
             </div>
           </SortableContext>
@@ -320,7 +440,10 @@ export function SortableBereicheList({ initialItems }: { initialItems: BereichIt
       )}
 
       <div className="mt-1 text-center text-[11.5px] text-muted-foreground">
-        {filtered.length} Bereiche · Drag &amp; Drop zum Sortieren · Änderungen werden automatisch gespeichert
+        {filtered.length} Bereiche ·{" "}
+        {sortKey === "manual"
+          ? "Drag & Drop zum Sortieren · Änderungen werden automatisch gespeichert"
+          : "Spaltensortierung aktiv — manuelle Sortierung über '#' wiederherstellen"}
       </div>
     </div>
   );

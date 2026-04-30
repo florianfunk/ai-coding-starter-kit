@@ -23,7 +23,11 @@ export default async function EinstellungenPage() {
   const [{ data: filialen }, { data: e }, { data: ai }] = await Promise.all([
     supabase.from("filialen").select("*").order("marke").order("sortierung"),
     supabase.from("katalog_einstellungen").select("*").eq("id", 1).single(),
-    supabase.from("ai_einstellungen").select("replicate_token").eq("id", 1).single(),
+    supabase
+      .from("ai_einstellungen")
+      .select("replicate_token, openai_api_key, anthropic_api_key, ai_provider, ai_model")
+      .eq("id", 1)
+      .single(),
   ]);
 
   const assetUrls: Record<string, string | null> = {};

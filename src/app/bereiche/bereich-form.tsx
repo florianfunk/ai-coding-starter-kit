@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import type { Editor } from "@tiptap/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Image as ImageIcon } from "lucide-react";
 import { ColorPalettePicker } from "@/components/color-palette-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { AITeaserButton } from "@/components/ai-teaser-button";
+import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { uploadBereichBild, type BereichFormState } from "./actions";
 
 const initial: BereichFormState = { error: null };
@@ -35,7 +38,27 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
   const [bildPath, setBildPath] = useState(defaultValues?.bild_path ?? null);
   const [bildPreview, setBildPreview] = useState(defaultValues?.bild_url ?? null);
   const [farbe, setFarbe] = useState(defaultValues?.farbe ?? "");
+  const [name, setName] = useState(defaultValues?.name ?? "");
+  const editorRef = useRef<Editor | null>(null);
+  const beschreibungContextRef = useRef<string | null>(defaultValues?.beschreibung ?? null);
   const [uploading, startUpload] = useTransition();
+
+  const handleEditorReady = useCallback((editor: Editor) => {
+    editorRef.current = editor;
+  }, []);
+
+  function handleTeaserAccept(text: string) {
+    const html = `<p>${escapeHtml(text)}</p>`;
+    editorRef.current?.commands.setContent(html, { emitUpdate: true });
+    beschreibungContextRef.current = text;
+    toast.success("Teaser übernommen");
+  }
+
+  const teaserContext = (() => {
+    const v = beschreibungContextRef.current;
+    if (!v) return null;
+    return isHtmlContent(v) ? htmlToPlainText(v) : v;
+  })();
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
@@ -70,7 +93,8 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
                 id="name"
                 name="name"
                 required
-                defaultValue={defaultValues?.name ?? ""}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
               {state.fieldErrors?.name && <p className="text-sm text-destructive">{state.fieldErrors.name}</p>}
             </div>
@@ -117,10 +141,19 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="beschreibung">Beschreibung</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="beschreibung">Beschreibung</Label>
+                  <AITeaserButton
+                    entityType="bereich"
+                    entityName={name}
+                    entityContext={teaserContext}
+                    onAccept={handleTeaserAccept}
+                  />
+                </div>
                 <RichTextEditor
                   name="beschreibung"
                   defaultValue={defaultValues?.beschreibung ?? ""}
+                  onEditorReady={handleEditorReady}
                   minHeight={120}
                 />
               </div>
@@ -158,4 +191,13 @@ export function BereichForm({ defaultValues, action, submitLabel }: Props) {
       </div>
     </form>
   );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

@@ -2,7 +2,6 @@
 
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import { TextStyle, Color } from "@tiptap/extension-text-style";
 import Placeholder from "@tiptap/extension-placeholder";
 import { useEffect, useState } from "react";
@@ -31,6 +30,7 @@ type Props = {
   defaultValue?: string | null;
   value?: string | null;
   onChange?: (html: string) => void;
+  onEditorReady?: (editor: Editor) => void;
   placeholder?: string;
   minHeight?: number;
   className?: string;
@@ -41,6 +41,7 @@ export function RichTextEditor({
   defaultValue,
   value,
   onChange,
+  onEditorReady,
   placeholder,
   minHeight = 160,
   className,
@@ -57,7 +58,6 @@ export function RichTextEditor({
         blockquote: false,
         horizontalRule: false,
       }),
-      Underline,
       TextStyle,
       Color,
       Placeholder.configure({
@@ -85,6 +85,10 @@ export function RichTextEditor({
       onChange?.(cleaned);
     },
   });
+
+  useEffect(() => {
+    if (editor && onEditorReady) onEditorReady(editor);
+  }, [editor, onEditorReady]);
 
   useEffect(() => {
     return () => {

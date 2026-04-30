@@ -8,6 +8,7 @@ import {
   removeBackground,
   downloadReplicateOutput,
 } from "@/lib/replicate";
+import { AI_PROVIDERS, AI_MODELS, type AiProvider } from "@/lib/ai/models";
 
 // ----------------------------------------------------------------------------
 // AI-Einstellungen: Replicate-Token speichern
@@ -26,6 +27,50 @@ export async function updateAiEinstellungen(_p: AiFormState, formData: FormData)
   if (!parsed.success) return { error: "Eingabe ungültig." };
   const supabase = await createClient();
   const { error } = await supabase.from("ai_einstellungen").update(parsed.data).eq("id", 1);
+  if (error) return { error: error.message };
+  revalidatePath("/einstellungen");
+  return { error: null };
+}
+
+// ----------------------------------------------------------------------------
+// AI-Einstellungen: Provider + Keys + Modell speichern (Marketing-Teaser)
+// ----------------------------------------------------------------------------
+
+const teaserSchema = z
+  .object({
+    ai_provider: z.enum(AI_PROVIDERS),
+    ai_model: z.string().min(1).max(100),
+    openai_api_key: z.string().max(500).optional().nullable(),
+    anthropic_api_key: z.string().max(500).optional().nullable(),
+  })
+  .refine(
+    (d) => AI_MODELS[d.ai_provider as AiProvider].some((m) => m.id === d.ai_model),
+    { path: ["ai_model"], message: "Modell passt nicht zum Provider." },
+  );
+
+export async function updateTeaserEinstellungen(_p: AiFormState, formData: FormData): Promise<AiFormState> {
+  const parsed = teaserSchema.safeParse({
+    ai_provider: formData.get("ai_provider"),
+    ai_model: formData.get("ai_model"),
+    openai_api_key: (formData.get("openai_api_key") as string) || null,
+    anthropic_api_key: (formData.get("anthropic_api_key") as string) || null,
+  });
+  if (!parsed.success) {
+    const first = parsed.error.issues[0];
+    return { error: first?.message ?? "Eingabe ungültig." };
+  }
+
+  const supabase = await createClient();
+
+  // Leere Keys nicht überschreiben — wenn Feld leer ist, alten Wert behalten
+  const update: Record<string, unknown> = {
+    ai_provider: parsed.data.ai_provider,
+    ai_model: parsed.data.ai_model,
+  };
+  if (parsed.data.openai_api_key !== null) update.openai_api_key = parsed.data.openai_api_key || null;
+  if (parsed.data.anthropic_api_key !== null) update.anthropic_api_key = parsed.data.anthropic_api_key || null;
+
+  const { error } = await supabase.from("ai_einstellungen").update(update).eq("id", 1);
   if (error) return { error: error.message };
   revalidatePath("/einstellungen");
   return { error: null };

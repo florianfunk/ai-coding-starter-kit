@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import type { Editor } from "@tiptap/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,8 @@ import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { AITeaserButton } from "@/components/ai-teaser-button";
+import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { uploadProduktBild, type ProduktFormState } from "./actions";
 import { getSlotBildSignedUrl } from "./datenblatt-actions";
@@ -140,6 +143,23 @@ export function ProduktForm({
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initial);
   const [bereichId, setBereichId] = useState<string>(defaultValues.bereich_id ?? "");
+  const [name, setName] = useState<string>(defaultValues.name ?? "");
+  const [artikelnummer, setArtikelnummer] = useState<string>(defaultValues.artikelnummer ?? "");
+  const datenblattEditorRef = useRef<Editor | null>(null);
+  const datenblattInitial = (defaultValues.datenblatt_text ?? "") as string;
+  const datenblattContextRef = useRef<string>(datenblattInitial);
+
+  const handleDatenblattReady = useCallback((editor: Editor) => {
+    datenblattEditorRef.current = editor;
+  }, []);
+
+  function handleProduktTeaserAccept(text: string) {
+    const html = `<p>${escapeProduktHtml(text)}</p>`;
+    datenblattEditorRef.current?.commands.setContent(html, { emitUpdate: true });
+    datenblattContextRef.current = text;
+    markDirty("datenblatt");
+    toast.success("Teaser übernommen");
+  }
   const [hauptbildPath, setHauptbildPath] = useState<string | null>(defaultValues.hauptbild_path ?? null);
   const [hauptbildPreview, setHauptbildPreview] = useState<string | null>(defaultHauptbildUrl);
   const [hauptbildZoom, setHauptbildZoom] = useState(false);
@@ -272,12 +292,24 @@ export function ProduktForm({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="artikelnummer">Artikelnummer *</Label>
-              <Input id="artikelnummer" name="artikelnummer" required defaultValue={defaultValues.artikelnummer ?? ""} className="font-mono text-base" />
+              <Input
+                id="artikelnummer"
+                name="artikelnummer"
+                required
+                value={artikelnummer}
+                onChange={(e) => setArtikelnummer(e.target.value)}
+                className="font-mono text-base"
+              />
               {state.fieldErrors?.artikelnummer && <p className="text-sm text-destructive">{state.fieldErrors.artikelnummer}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Bezeichnung</Label>
-              <Input id="name" name="name" defaultValue={defaultValues.name ?? ""} />
+              <Input
+                id="name"
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="sortierung">Sortierung</Label>
@@ -425,8 +457,27 @@ export function ProduktForm({
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="datenblatt_text">Text Block 1</Label>
-                  <RichTextEditor name="datenblatt_text" defaultValue={defaultValues.datenblatt_text ?? ""} minHeight={220} />
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="datenblatt_text">Text Block 1</Label>
+                    <AITeaserButton
+                      entityType="produkt"
+                      entityName={name || artikelnummer}
+                      entityContext={
+                        datenblattContextRef.current
+                          ? isHtmlContent(datenblattContextRef.current)
+                            ? htmlToPlainText(datenblattContextRef.current)
+                            : datenblattContextRef.current
+                          : (defaultValues.info_kurz as string | null) ?? null
+                      }
+                      onAccept={handleProduktTeaserAccept}
+                    />
+                  </div>
+                  <RichTextEditor
+                    name="datenblatt_text"
+                    defaultValue={defaultValues.datenblatt_text ?? ""}
+                    onEditorReady={handleDatenblattReady}
+                    minHeight={220}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="datenblatt_text_2">Text Block 2</Label>
@@ -770,4 +821,13 @@ function FieldInput({ field, defaultValue }: { field: { col: string; label: stri
       />
     </div>
   );
+}
+
+function escapeProduktHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

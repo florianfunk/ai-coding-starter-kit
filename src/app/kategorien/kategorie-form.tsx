@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Image as ImageIcon, Table as TableIcon, Upload, X } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
+import { AITeaserButton } from "@/components/ai-teaser-button";
+import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
@@ -66,6 +68,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
   });
   const [uploadingSlot, setUploadingSlot] = useState<BildSlot | null>(null);
   const [beschreibung, setBeschreibung] = useState<string>(defaultValues?.beschreibung ?? "");
+  const [name, setName] = useState<string>(defaultValues?.name ?? "");
   const [selected, setSelected] = useState<string[]>(() => {
     const seen = new Set<string>();
     return (defaultValues?.iconIds ?? []).filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
@@ -161,12 +164,36 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
 
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
-            <Input id="name" name="name" required defaultValue={defaultValues?.name ?? ""} className="text-lg" />
+            <Input
+              id="name"
+              name="name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="text-lg"
+            />
             {formState.fieldErrors?.name && <p className="text-sm text-destructive">{formState.fieldErrors.name}</p>}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="beschreibung">Beschreibung</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="beschreibung">Beschreibung</Label>
+              <AITeaserButton
+                entityType="kategorie"
+                entityName={name}
+                entityContext={
+                  beschreibung
+                    ? isHtmlContent(beschreibung)
+                      ? htmlToPlainText(beschreibung)
+                      : beschreibung
+                    : null
+                }
+                onAccept={(text) => {
+                  setBeschreibung(`<p>${escapeHtml(text)}</p>`);
+                  toast.success("Teaser übernommen");
+                }}
+              />
+            </div>
             <input type="hidden" name="beschreibung" value={beschreibung} />
             <RichTextEditor value={beschreibung} onChange={setBeschreibung} />
           </div>
@@ -329,6 +356,15 @@ function CategoryLayoutPreview({ bilder }: { bilder: Record<BildSlot, BildState>
       </div>
     </div>
   );
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function PreviewSlot({

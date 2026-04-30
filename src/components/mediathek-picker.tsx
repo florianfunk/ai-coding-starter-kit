@@ -251,14 +251,10 @@ export function MediathekPicker({
                     }`}
                     title={item.smartTitle || item.name}
                   >
-                    {/* 4:3-Vorschaubild — passt zur typischen Bildform der meisten
-                        Produktfotos. Aspect-ratio direkt am Container, kein
-                        zusätzliches Padding (das würde das Aspect-Ratio brechen).
-                        object-contain zeigt das ganze Bild ohne Cropping. */}
-                    <div
-                      className="relative w-full bg-muted/40"
-                      style={{ aspectRatio: "4 / 3" }}
-                    >
+                    {/* Vorschaubild mit fester Mindesthöhe — robuster als
+                        aspect-ratio in flex-col-Buttons (das kollabiert
+                        manchmal in Browsern). 180px ≈ 4:3 bei 240px Tile-Breite. */}
+                    <div className="relative h-[180px] w-full shrink-0 bg-muted/40">
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

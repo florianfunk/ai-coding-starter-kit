@@ -52,7 +52,7 @@
 | PROJ-36 | Datenblatt-Felder pflegen (UI) | Deployed | [PROJ-36](PROJ-36-datenblatt-felder-pflegen.md) | 2026-04-22 |
 | PROJ-37 | Katalog-Druck-Wizard mit Inhaltsauswahl | Deployed | [PROJ-37](PROJ-37-katalog-druck-wizard.md) | 2026-04-29 |
 | PROJ-38 | Datenblatt-Vorlagen mit LaTeX-Layout-Varianten | Deployed | [PROJ-38](PROJ-38-datenblatt-vorlagen-latex.md) | 2026-04-30 |
-| PROJ-39 | KI-Teaser-Texte für Beschreibungen | In Progress | [PROJ-39](PROJ-39-ki-teaser-texte.md) | 2026-04-30 |
+| PROJ-39 | KI-Teaser-Texte für Beschreibungen | Deployed | [PROJ-39](PROJ-39-ki-teaser-texte.md) | 2026-04-30 |
 | PROJ-40 | Kategorie-Bilder Tools (DnD, Zoom, Smart-Crop) | In Progress | [PROJ-40](PROJ-40-kategorie-bilder-tools.md) | 2026-04-30 |
 
 <!-- Add features above this line -->

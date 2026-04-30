@@ -87,9 +87,9 @@ export function AIImageButton({
           onClick={() => setOpen(true)}
           aria-label="KI-Bild generieren"
           title={disabledHint ?? "KI-Bild generieren"}
-          className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background/90 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"
         >
-          <Wand2 className="h-3 w-3" />
+          <Wand2 className="h-3.5 w-3.5" />
         </button>
       ) : (
         <Button

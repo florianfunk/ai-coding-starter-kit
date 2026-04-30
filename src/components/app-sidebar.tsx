@@ -14,6 +14,7 @@ import {
   History,
   Home,
   HelpCircle,
+  Library,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -47,6 +48,7 @@ const mainGroups: NavGroup[] = [
   {
     label: "Assets",
     items: [
+      { href: "/mediathek", label: "Mediathek", icon: Library },
       { href: "/icons", label: "Icons", icon: Sparkles },
       { href: "/datenblatt-vorlagen", label: "Datenblatt-Vorlagen", icon: LayoutTemplate },
     ],

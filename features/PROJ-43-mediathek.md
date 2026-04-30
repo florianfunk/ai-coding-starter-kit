@@ -1,8 +1,9 @@
 # PROJ-43: Mediathek (zentrale Bild-Bibliothek)
 
-**Status:** Planned
+**Status:** Approved
 **Priorität:** P1
 **Erstellt:** 2026-04-30
+**Last Updated:** 2026-04-30
 
 ## Vision
 Eine WordPress-ähnliche zentrale Mediathek über alle Bilder im Storage, damit Pfleger:
@@ -97,4 +98,27 @@ Bei ~400 Produkten + Galerien können schnell 1000+ Bilder im Bucket liegen. Sto
 - Storage-Limits & Cleanup-Policy
 
 ## Implementation Notes
-_Wird beim Implementieren ergänzt._
+
+**Implementiert am 2026-04-30 (Phase 1 + Phase 2):**
+
+### Gelieferte Komponenten
+- `src/lib/bild-verwendung.ts` — Verwendungs-Lookup quer durch Bereiche, Kategorien, Produkte, Katalog-Einstellungen; Single-Path und Batch-Variante
+- `src/app/mediathek/actions.ts` — Server-Actions: `listMediathek`, `getMediathekSignedUrl`, `getMediathekUsages`, `deleteMediathekBild`
+- `src/app/mediathek/page.tsx` — Übersichtsseite mit Summary-Strip (Total/Used/Unused/Größe)
+- `src/app/mediathek/mediathek-grid.tsx` — Client-Grid mit Suche/Filter (Verwendung/Ordner/Format), Detail-Sheet (Verwendungs-Liste mit Edit-Links), Lösch-Bestätigung mit Force-Modus
+- `src/components/mediathek-picker.tsx` — Wiederverwendbarer Picker-Dialog für andere Forms; Trigger-Variante "icon" (für Slot-Action-Bars) + "default" (Standalone-Button)
+- Sidebar-Link „Mediathek" in der Assets-Gruppe (Library-Icon)
+- Eingebunden in alle 4 Kategorie-Bildslots: zwischen Upload und Zoom-Button
+
+### Architektur-Entscheidungen
+- **Storage-Listing live, kein DB-Mirror.** Supabase Storage `list()` wird beim Page-Load + Filter-Refresh aufgerufen; Verwendungs-Counts via Batch-Lookup über alle Path-Spalten in einer Query-Runde. Bei ~1000 Bildern noch performant.
+- **Subfolder-Recursion manuell.** Storage `list()` returned Files + Subfolder-Entries als Mix. Wir machen pro Subfolder einen weiteren Listing-Call (parallel) — das deckt unsere übersichtliche Ordner-Struktur (`kategorien/`, `produkte/`, `ai-…`) ab.
+- **Verwendungs-Lookup ohne DB-View.** Wir scannen on-demand alle Path-Spalten direkt; das vermeidet Migrations-Aufwand und hält die Logik in TypeScript pflegbar.
+- **Kein Bild-Metadata-Table in Phase 1.** Tags/Notizen sind Out-of-Scope — würden eine eigene Tabelle erfordern und sind nicht akut wichtig.
+- **Lösch-Schutz mit Force-Override.** `deleteMediathekBild` blockiert standardmäßig, wenn Verwendungen existieren. Der UI-Dialog zeigt die Verwendungen und bietet „Trotzdem löschen" — der Pfleger kann bewusst entscheiden.
+
+### Bekannte Limitierungen
+- Listing auf 100 Items begrenzt (PAGE_SIZE in actions.ts) — bei großen Beständen müsste Pagination/Virtualisierung folgen
+- Beim „Trotzdem löschen" werden referenzierende Records nicht automatisch nullified — sie behalten den toten Pfad in der DB. Folge: `<Image>` zeigt ein „Bild fehlt"-Symbol. Cleanup-Aktion oder Validierung im Catch wäre Phase 2.
+- Picker zeigt aktuell **alle** Bilder unabhängig vom Slot-Aspect; `preferAspect`-Prop ist vorhanden, aber noch nicht zum Sortieren/Filtern genutzt
+- Nur Kategorie-Slots haben den Picker — Bereiche, Produkte (Hauptbild, Galerie, Datenblatt-Bilder) folgen in einer späteren Phase

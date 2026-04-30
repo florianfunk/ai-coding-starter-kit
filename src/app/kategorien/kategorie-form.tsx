@@ -37,6 +37,7 @@ import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { EnhanceBildButton } from "@/components/enhance-bild-button";
 import { ImageZoomModal } from "@/components/image-zoom-modal";
 import { CropSuggestionModal, type CropAspect } from "@/components/crop-suggestion-modal";
+import { MediathekPicker } from "@/components/mediathek-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SPALTEN_OPTIONEN } from "@/lib/katalog-column-map";
 import {
@@ -212,6 +213,31 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
       ...prev,
       [slot]: { path: null, url: null },
     }));
+  }
+
+  /** Mediathek-Picker: Pfad eines bestehenden Bilds in den Slot übernehmen. */
+  async function handleMediathekSelect(slot: BildSlot, path: string) {
+    const prev = bilder[slot];
+    const { url } = await getSlotBildSignedUrl(path);
+
+    if (kategorieId) {
+      const r = await replaceKategorieBildPath(kategorieId, `bild${slot}_path`, path);
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
+    }
+
+    setBilder((p) => ({
+      ...p,
+      [slot]: {
+        path,
+        previewUrl: url,
+        originalPath: prev.path,
+        originalPreviewUrl: prev.previewUrl,
+      },
+    }));
+    toast.success(`${SLOT_META[slot].label}: Bild aus Mediathek übernommen`);
   }
 
   const dndSensors = useSensors(
@@ -570,6 +596,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                       void generateCropSuggestion(1);
                     }}
                     onRestoreOriginal={() => restoreOriginal(1)}
+                    onMediathekSelect={(path) => handleMediathekSelect(1, path)}
                     enhanceProps={
                       bilder[1].path
                         ? {
@@ -602,6 +629,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                       void generateCropSuggestion(2);
                     }}
                     onRestoreOriginal={() => restoreOriginal(2)}
+                    onMediathekSelect={(path) => handleMediathekSelect(2, path)}
                     enhanceProps={
                       bilder[2].path
                         ? {
@@ -636,6 +664,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                       void generateCropSuggestion(3);
                     }}
                     onRestoreOriginal={() => restoreOriginal(3)}
+                    onMediathekSelect={(path) => handleMediathekSelect(3, path)}
                     enhanceProps={
                       bilder[3].path
                         ? {
@@ -668,6 +697,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                       void generateCropSuggestion(4);
                     }}
                     onRestoreOriginal={() => restoreOriginal(4)}
+                    onMediathekSelect={(path) => handleMediathekSelect(4, path)}
                     enhanceProps={
                       bilder[4].path
                         ? {
@@ -740,6 +770,7 @@ interface BildSlotCardProps {
   onZoom: () => void;
   onCrop: () => void;
   onRestoreOriginal: () => void;
+  onMediathekSelect: (path: string) => void | Promise<void>;
   enhanceProps: {
     bucket: "produktbilder";
     path: string;
@@ -766,6 +797,7 @@ function BildSlotCard({
   onZoom,
   onCrop,
   onRestoreOriginal,
+  onMediathekSelect,
   enhanceProps,
   aiImage,
 }: BildSlotCardProps) {
@@ -818,97 +850,102 @@ function BildSlotCard({
         className={`relative flex items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40 ${slotAspectClass}`}
       >
         {bild.previewUrl ? (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={bild.previewUrl}
-              alt=""
-              className="h-full w-full object-cover cursor-zoom-in"
-              onClick={onZoom}
-            />
-            <div className="absolute top-1 right-1 flex items-center gap-1">
-              {bild.path && (
-                <button
-                  type="button"
-                  onClick={onCrop}
-                  aria-label="Auf Slot-Format zuschneiden"
-                  title="Auf Slot-Format zuschneiden"
-                  className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-                >
-                  <Crop className="h-3 w-3" />
-                </button>
-              )}
-              <AIImageButton
-                triggerSize="icon"
-                aspect={aiImage.aspect}
-                slotLabel={`${meta.label} (${meta.size})`}
-                onGenerate={aiImage.onGenerate}
-                previewUrl={aiImage.previewUrl}
-                loading={aiImage.loading}
-                onAccept={() => {
-                  void aiImage.onAccept();
-                }}
-                onClose={aiImage.onClose}
-                hasReferenceImage
-                referenceImageUrl={bild.previewUrl}
-              />
-              <button
-                type="button"
-                onClick={onZoom}
-                aria-label="Bild groß ansehen"
-                title="Bild groß ansehen"
-                className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-              >
-                <Maximize2 className="h-3 w-3" />
-              </button>
-              {bild.path && (
-                <a
-                  href={bildProxyUrl("produktbilder", bild.path) ?? "#"}
-                  download={bild.path.split("/").pop() ?? "bild"}
-                  aria-label="Bild herunterladen"
-                  title="Bild herunterladen"
-                  className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Download className="h-3 w-3" />
-                </a>
-              )}
-              {enhanceProps && (
-                <EnhanceBildButton
-                  bucket={enhanceProps.bucket}
-                  path={enhanceProps.path}
-                  deleteOriginal={enhanceProps.deleteOriginal}
-                  onReplaced={enhanceProps.onReplaced}
-                  size="icon"
-                  className="border shadow-sm"
-                />
-              )}
-              <button
-                type="button"
-                aria-label="Bild entfernen"
-                onClick={onClear}
-                className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          </>
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={bild.previewUrl}
+            alt=""
+            className="h-full w-full object-cover cursor-zoom-in"
+            onClick={onZoom}
+          />
         ) : (
-          <div className="flex flex-col items-center gap-2">
-            <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-            <AIImageButton
-              triggerSize="default"
-              aspect={aiImage.aspect}
-              slotLabel={`${meta.label} (${meta.size})`}
-              onGenerate={aiImage.onGenerate}
-              previewUrl={aiImage.previewUrl}
-              loading={aiImage.loading}
-              onAccept={() => {
-                void aiImage.onAccept();
-              }}
-              onClose={aiImage.onClose}
-            />
-          </div>
+          <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+        )}
+      </div>
+
+      {/* Action-Bar UNTER dem Bild — alle Icon-Buttons gleich gestylt */}
+      <div className="flex flex-wrap items-center gap-1">
+        <SlotIconButton
+          asLabel
+          title={isUploading ? "Lädt…" : bild.path ? "Bild ersetzen" : "Datei auswählen"}
+          aria-label={isUploading ? "Lädt…" : bild.path ? "Bild ersetzen" : "Datei auswählen"}
+          disabled={isUploading}
+        >
+          <Upload className="h-3.5 w-3.5" />
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            disabled={isUploading}
+            onChange={(e) => onFile(e.target.files?.[0] ?? null)}
+          />
+        </SlotIconButton>
+
+        <MediathekPicker
+          triggerSize="icon"
+          preferAspect={slot === 1 || slot === 2 ? "wide" : null}
+          onSelect={(path) => void onMediathekSelect(path)}
+        />
+
+        {bild.previewUrl && (
+          <SlotIconButton onClick={onZoom} title="Bild groß ansehen" aria-label="Bild groß ansehen">
+            <Maximize2 className="h-3.5 w-3.5" />
+          </SlotIconButton>
+        )}
+
+        {bild.path && (
+          <SlotIconButton onClick={onCrop} title="Auf Slot-Format zuschneiden" aria-label="Zuschneiden">
+            <Crop className="h-3.5 w-3.5" />
+          </SlotIconButton>
+        )}
+
+        {/* KI-Bild — eigene Komponente, eigener Trigger-Look (Icon-Variante) */}
+        <AIImageButton
+          triggerSize="icon"
+          aspect={aiImage.aspect}
+          slotLabel={`${meta.label} (${meta.size})`}
+          onGenerate={aiImage.onGenerate}
+          previewUrl={aiImage.previewUrl}
+          loading={aiImage.loading}
+          onAccept={() => {
+            void aiImage.onAccept();
+          }}
+          onClose={aiImage.onClose}
+          hasReferenceImage={!!bild.previewUrl}
+          referenceImageUrl={bild.previewUrl}
+        />
+
+        {bild.path && (
+          <SlotIconButton
+            asLink
+            href={bildProxyUrl("produktbilder", bild.path) ?? "#"}
+            download={bild.path.split("/").pop() ?? "bild"}
+            title="Bild herunterladen"
+            aria-label="Bild herunterladen"
+          >
+            <Download className="h-3.5 w-3.5" />
+          </SlotIconButton>
+        )}
+
+        {enhanceProps && (
+          <EnhanceBildButton
+            bucket={enhanceProps.bucket}
+            path={enhanceProps.path}
+            deleteOriginal={enhanceProps.deleteOriginal}
+            onReplaced={enhanceProps.onReplaced}
+            size="icon"
+            className="border shadow-sm"
+          />
+        )}
+
+        {bild.previewUrl && (
+          <SlotIconButton
+            onClick={onClear}
+            title="Bild entfernen"
+            aria-label="Bild entfernen"
+            variant="destructive"
+          >
+            <X className="h-3.5 w-3.5" />
+          </SlotIconButton>
         )}
       </div>
 
@@ -923,19 +960,75 @@ function BildSlotCard({
           Original wiederherstellen
         </button>
       )}
-
-      <label className="flex items-center gap-2 text-xs text-primary hover:underline cursor-pointer">
-        <Upload className="h-3.5 w-3.5" />
-        <span>{isUploading ? "Lädt…" : bild.path ? "Ersetzen" : "Datei auswählen"}</span>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className="hidden"
-          disabled={isUploading}
-          onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-        />
-      </label>
     </div>
+  );
+}
+
+/**
+ * Einheitlicher Icon-Button für die Slot-Action-Bar.
+ * Drei Modi: normaler Button, <a>-Link (Download) oder <label>-Wrapper (File-Picker).
+ * Alle gleich groß (28×28), gleiche Hover-State, Tooltip via title.
+ */
+type SlotIconButtonProps = {
+  children: React.ReactNode;
+  title: string;
+  "aria-label": string;
+  onClick?: () => void;
+  disabled?: boolean;
+  variant?: "default" | "destructive";
+} & (
+  | { asLink: true; href: string; download?: string; asLabel?: never }
+  | { asLabel: true; asLink?: never; href?: never; download?: never }
+  | { asLink?: false; asLabel?: false; href?: never; download?: never }
+);
+
+function SlotIconButton(props: SlotIconButtonProps) {
+  const { children, title, variant = "default", disabled } = props;
+  const ariaLabel = props["aria-label"];
+  const baseClass = `inline-flex h-7 w-7 items-center justify-center rounded-md border bg-background/90 shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+    variant === "destructive"
+      ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40"
+      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+  }`;
+
+  if ("asLink" in props && props.asLink) {
+    return (
+      <a
+        href={props.href}
+        download={props.download}
+        title={title}
+        aria-label={ariaLabel}
+        onClick={(e) => e.stopPropagation()}
+        className={`${baseClass} cursor-pointer`}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  if ("asLabel" in props && props.asLabel) {
+    return (
+      <label
+        title={title}
+        aria-label={ariaLabel}
+        className={`${baseClass} cursor-pointer ${disabled ? "pointer-events-none opacity-40" : ""}`}
+      >
+        {children}
+      </label>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={props.onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={ariaLabel}
+      className={baseClass}
+    >
+      {children}
+    </button>
   );
 }
 

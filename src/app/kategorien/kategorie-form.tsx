@@ -41,8 +41,12 @@ import {
   uploadKategorieBild,
   replaceKategorieBildPath,
   cropKategorieBild,
+  cropKategorieBildManuell,
+  generateKategorieBildKi,
   type KategorieFormState,
 } from "./actions";
+import type { ManualCropResult } from "@/components/manual-crop-editor";
+import { AIImageButton } from "@/components/ai-image-button";
 import { getSlotBildSignedUrl } from "../produkte/datenblatt-actions";
 
 const initial: KategorieFormState = { error: null };
@@ -131,6 +135,81 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
   const [cropSuggestionUrl, setCropSuggestionUrl] = useState<string | null>(null);
   const [cropLoading, setCropLoading] = useState(false);
 
+  // KI-Bild (PROJ-42) — pro Slot eigener Preview-State, damit zwei Buttons
+  // unabhängig laufen können (z.B. paralleles Generieren wäre theoretisch möglich)
+  const [aiPreviewBySlot, setAiPreviewBySlot] = useState<
+    Record<BildSlot, { path: string | null; url: string | null }>
+  >({
+    1: { path: null, url: null },
+    2: { path: null, url: null },
+    3: { path: null, url: null },
+    4: { path: null, url: null },
+  });
+  const [aiLoadingSlot, setAiLoadingSlot] = useState<BildSlot | null>(null);
+
+  async function handleAiImageGenerate(slot: BildSlot, userPrompt: string) {
+    setAiLoadingSlot(slot);
+    try {
+      const r = await generateKategorieBildKi({
+        aspect: SLOT_ASPECT[slot],
+        userPrompt,
+      });
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      const { url } = await getSlotBildSignedUrl(r.path);
+      setAiPreviewBySlot((prev) => ({
+        ...prev,
+        [slot]: { path: r.path, url },
+      }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Fehler bei KI-Generierung");
+    } finally {
+      setAiLoadingSlot(null);
+    }
+  }
+
+  async function handleAiImageAccept(slot: BildSlot) {
+    const generated = aiPreviewBySlot[slot];
+    if (!generated.path || !generated.url) return;
+    const prev = bilder[slot];
+
+    if (kategorieId) {
+      const r = await replaceKategorieBildPath(
+        kategorieId,
+        `bild${slot}_path`,
+        generated.path,
+      );
+      if (r.error) {
+        toast.error(r.error);
+        return;
+      }
+    }
+
+    setBilder((p) => ({
+      ...p,
+      [slot]: {
+        path: generated.path,
+        previewUrl: generated.url,
+        originalPath: prev.path,
+        originalPreviewUrl: prev.previewUrl,
+      },
+    }));
+    setAiPreviewBySlot((prev) => ({
+      ...prev,
+      [slot]: { path: null, url: null },
+    }));
+    toast.success(`${SLOT_META[slot].label}: KI-Bild übernommen`);
+  }
+
+  function handleAiImageClose(slot: BildSlot) {
+    setAiPreviewBySlot((prev) => ({
+      ...prev,
+      [slot]: { path: null, url: null },
+    }));
+  }
+
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
@@ -206,6 +285,55 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
     setCropSuggestionPath(null);
     setCropSuggestionUrl(null);
     setCropLoading(false);
+  }
+
+  // PROJ-41: Manuelles Crop entgegennehmen — Server-Action mit Pfleger-Koordinaten,
+  // dann Bild-State aktualisieren analog zu acceptCrop.
+  async function acceptManualCrop(result: ManualCropResult) {
+    if (cropSlot == null) return;
+    const slot = cropSlot;
+    const bild = bilder[slot];
+    if (!bild.path) return;
+
+    const r = await cropKategorieBildManuell({
+      path: bild.path,
+      aspect: SLOT_ASPECT[slot],
+      x: result.x,
+      y: result.y,
+      width: result.width,
+      height: result.height,
+    });
+    if (!r.ok) {
+      toast.error(r.error);
+      return;
+    }
+    const newPath = r.path;
+    const { url: newUrl } = await getSlotBildSignedUrl(newPath);
+    if (!newUrl) {
+      toast.error("Vorschau-URL konnte nicht erzeugt werden.");
+      return;
+    }
+
+    if (kategorieId) {
+      const dbResult = await replaceKategorieBildPath(kategorieId, `bild${slot}_path`, newPath);
+      if (dbResult.error) {
+        toast.error(dbResult.error);
+        return;
+      }
+    }
+
+    const prev = bilder[slot];
+    setBilder((p) => ({
+      ...p,
+      [slot]: {
+        path: newPath,
+        previewUrl: newUrl,
+        originalPath: prev.originalPath ?? prev.path,
+        originalPreviewUrl: prev.originalPreviewUrl ?? prev.previewUrl,
+      },
+    }));
+    toast.success(`${SLOT_META[slot].label}: Manueller Zuschnitt übernommen`);
+    closeCropModal();
   }
 
   async function restoreOriginal(slot: BildSlot) {
@@ -443,6 +571,14 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                           }
                         : null
                     }
+                    aiImage={{
+                      aspect: SLOT_ASPECT[slot],
+                      previewUrl: aiPreviewBySlot[slot].url,
+                      loading: aiLoadingSlot === slot,
+                      onGenerate: (userPrompt) => handleAiImageGenerate(slot, userPrompt),
+                      onAccept: () => handleAiImageAccept(slot),
+                      onClose: () => handleAiImageClose(slot),
+                    }}
                   />
                 ))}
               </div>
@@ -469,6 +605,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
               if (cropSlot) void generateCropSuggestion(cropSlot);
             }}
             onAccept={acceptCrop}
+            onAcceptManual={acceptManualCrop}
           />
 
           {formState.error && <Alert variant="destructive"><AlertDescription>{formState.error}</AlertDescription></Alert>}
@@ -504,6 +641,14 @@ interface BildSlotCardProps {
     deleteOriginal: boolean;
     onReplaced: (newPath: string) => void;
   } | null;
+  aiImage: {
+    aspect: CropAspect;
+    previewUrl: string | null;
+    loading: boolean;
+    onGenerate: (userPrompt: string) => Promise<void>;
+    onAccept: () => Promise<void>;
+    onClose: () => void;
+  };
 }
 
 function BildSlotCard({
@@ -517,6 +662,7 @@ function BildSlotCard({
   onCrop,
   onRestoreOriginal,
   enhanceProps,
+  aiImage,
 }: BildSlotCardProps) {
   const isWide = slot === 1 || slot === 2;
   const hasImage = !!bild.previewUrl;
@@ -586,6 +732,18 @@ function BildSlotCard({
                   <Crop className="h-3 w-3" />
                 </button>
               )}
+              <AIImageButton
+                triggerSize="icon"
+                aspect={aiImage.aspect}
+                slotLabel={`${meta.label} (${meta.size})`}
+                onGenerate={aiImage.onGenerate}
+                previewUrl={aiImage.previewUrl}
+                loading={aiImage.loading}
+                onAccept={() => {
+                  void aiImage.onAccept();
+                }}
+                onClose={aiImage.onClose}
+              />
               <button
                 type="button"
                 onClick={onZoom}
@@ -616,7 +774,21 @@ function BildSlotCard({
             </div>
           </>
         ) : (
-          <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+          <div className="flex flex-col items-center gap-2">
+            <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+            <AIImageButton
+              triggerSize="default"
+              aspect={aiImage.aspect}
+              slotLabel={`${meta.label} (${meta.size})`}
+              onGenerate={aiImage.onGenerate}
+              previewUrl={aiImage.previewUrl}
+              loading={aiImage.loading}
+              onAccept={() => {
+                void aiImage.onAccept();
+              }}
+              onClose={aiImage.onClose}
+            />
+          </div>
         )}
       </div>
 

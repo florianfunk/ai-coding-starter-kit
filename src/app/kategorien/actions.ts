@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { compressImage } from "@/lib/image-compress";
+import {
+  generateImage,
+  ImageGenerationError,
+  type ImageSize,
+} from "@/lib/ai/image";
 
 const schema = z.object({
   bereich_id: z.string().uuid("Bereich ist Pflicht"),
@@ -251,6 +256,213 @@ export async function cropKategorieBild(input: unknown): Promise<KategorieCropRe
   const { error: upErr } = await supabase.storage
     .from("produktbilder")
     .upload(newPath, croppedBuffer, { contentType });
+  if (upErr) return { ok: false, error: `Upload fehlgeschlagen: ${upErr.message}` };
+
+  return { ok: true, path: newPath };
+}
+
+// PROJ-41: Manuelles Crop mit Pfleger-definierten Koordinaten -------------
+//
+// Schneidet exakt das uebergebene Pixel-Rechteck aus dem Original aus und
+// skaliert es auf die Slot-Zielaufloesung. Original bleibt erhalten.
+// Aspect-Toleranz schuetzt vor Client-Manipulation: das gelieferte Crop
+// muss innerhalb +/- 2% des Slot-Aspect liegen.
+
+const MANUAL_ASPECT_TOLERANCE = 0.02;
+
+const cropManuellSchema = z.object({
+  path: z.string().min(1),
+  aspect: z.enum(["wide", "tall"]),
+  x: z.number().int().min(0),
+  y: z.number().int().min(0),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+export async function cropKategorieBildManuell(input: unknown): Promise<KategorieCropResult> {
+  const parsed = cropManuellSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Ungültige Eingabe." };
+  const { path, aspect, x, y, width, height } = parsed.data;
+
+  // Aspect-Toleranz pruefen
+  const targetAspect = aspect === "wide" ? 5 / 1 : 1 / 2;
+  const actualAspect = width / height;
+  const aspectDelta = Math.abs(actualAspect - targetAspect) / targetAspect;
+  if (aspectDelta > MANUAL_ASPECT_TOLERANCE) {
+    return {
+      ok: false,
+      error: `Crop-Verhältnis ${actualAspect.toFixed(2)} weicht vom Soll-Verhältnis ${targetAspect.toFixed(2)} ab.`,
+    };
+  }
+
+  const supabase = await createClient();
+
+  const { data: download, error: dlErr } = await supabase.storage
+    .from("produktbilder")
+    .download(path);
+  if (dlErr || !download) {
+    return { ok: false, error: dlErr?.message ?? "Bild nicht gefunden." };
+  }
+  const inputBuffer = Buffer.from(await download.arrayBuffer());
+
+  // Original-Dims pruefen — Crop darf nicht ausserhalb liegen
+  const meta = await sharp(inputBuffer, { failOn: "none" }).rotate().metadata();
+  const origWidth = meta.width ?? 0;
+  const origHeight = meta.height ?? 0;
+  if (origWidth === 0 || origHeight === 0) {
+    return { ok: false, error: "Original-Bild konnte nicht gelesen werden." };
+  }
+  if (x + width > origWidth || y + height > origHeight) {
+    return {
+      ok: false,
+      error: `Crop ausserhalb des Bilds (${x + width}×${y + height} > ${origWidth}×${origHeight}).`,
+    };
+  }
+
+  const { width: targetWidth, height: targetHeight } = cropAspectMap[aspect];
+
+  let croppedBuffer: Buffer;
+  let contentType = "image/jpeg";
+  let extension = "jpg";
+  try {
+    // EXIF-Auto-Rotation muss VOR dem extract passieren, sonst stimmen die Koordinaten nicht.
+    const pipeline = sharp(inputBuffer, { failOn: "none" })
+      .rotate()
+      .extract({ left: x, top: y, width, height })
+      .resize(targetWidth, targetHeight, {
+        fit: "cover",
+        withoutEnlargement: false,
+      });
+
+    if (meta.format === "png" && meta.hasAlpha) {
+      croppedBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+      contentType = "image/png";
+      extension = "png";
+    } else {
+      croppedBuffer = await pipeline.jpeg({ quality: 85, mozjpeg: true }).toBuffer();
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Sharp-Fehler" };
+  }
+
+  const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+  const rand = Math.random().toString(36).slice(2, 8);
+  const newPath = `${dir ? dir + "/" : ""}crop-${aspect}-manual-${Date.now()}-${rand}.${extension}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("produktbilder")
+    .upload(newPath, croppedBuffer, { contentType });
+  if (upErr) return { ok: false, error: `Upload fehlgeschlagen: ${upErr.message}` };
+
+  return { ok: true, path: newPath };
+}
+
+// ----------------------------------------------------------------------------
+// PROJ-42: KI-Bild-Generierung via gpt-image-2
+// ----------------------------------------------------------------------------
+// gpt-image-2 unterstützt nur Aspect-Ratios bis max. 3:1. Für unsere extremen
+// Slot-Formate (5:1 wide / 1:2 tall) generieren wir das nächst-passende
+// Format (1536×1024 / 1024×1536) und schneiden danach mit Sharp/attention
+// auf die finale Slot-Größe (1500×300 / 600×1200) zu.
+
+const aiImageGenSchema = z.object({
+  aspect: z.enum(["wide", "tall"]),
+  userPrompt: z.string().min(3, "Prompt zu kurz").max(500, "Prompt zu lang"),
+});
+
+const AI_GEN_SOURCE_SIZE: Record<"wide" | "tall", ImageSize> = {
+  wide: "1536x1024",
+  tall: "1024x1536",
+};
+
+const aiRateLimit = new Map<string, { count: number; resetAt: number }>();
+const AI_LIMIT_PER_HOUR = 10;
+const HOUR_MS = 60 * 60 * 1000;
+
+function checkAiRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = aiRateLimit.get(key);
+  if (!entry || entry.resetAt < now) {
+    aiRateLimit.set(key, { count: 1, resetAt: now + HOUR_MS });
+    return true;
+  }
+  if (entry.count >= AI_LIMIT_PER_HOUR) return false;
+  entry.count++;
+  return true;
+}
+
+export async function generateKategorieBildKi(
+  input: unknown,
+): Promise<KategorieCropResult> {
+  const parsed = aiImageGenSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Ungültige Eingabe." };
+  }
+  const { aspect, userPrompt } = parsed.data;
+
+  // Rate-Limit (KI-Bilder sind teuer ~$0.17/Stück bei high quality)
+  if (!checkAiRateLimit("global")) {
+    return {
+      ok: false,
+      error: "Limit erreicht (10 Bilder/Stunde). Bitte später erneut versuchen.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // OpenAI-Key aus den AI-Einstellungen ziehen (PROJ-39)
+  const { data: settings } = await supabase
+    .from("ai_einstellungen")
+    .select("openai_api_key")
+    .eq("id", 1)
+    .single();
+
+  if (!settings?.openai_api_key) {
+    return {
+      ok: false,
+      error: "Kein OpenAI-Key hinterlegt. Bitte in den Einstellungen → KI eintragen.",
+    };
+  }
+
+  // 1) Bild generieren (gpt-image-2 liefert PNG-Buffer)
+  let generated: { buffer: Buffer; contentType: string };
+  try {
+    generated = await generateImage({
+      userPrompt,
+      size: AI_GEN_SOURCE_SIZE[aspect],
+      quality: "high",
+      apiKey: settings.openai_api_key,
+    });
+  } catch (e) {
+    if (e instanceof ImageGenerationError) {
+      return { ok: false, error: e.message };
+    }
+    return { ok: false, error: e instanceof Error ? e.message : "Generation fehlgeschlagen" };
+  }
+
+  // 2) Auf Slot-Aspect zuschneiden (1500×300 / 600×1200) via attention
+  const { width: targetWidth, height: targetHeight } = cropAspectMap[aspect];
+
+  let croppedBuffer: Buffer;
+  try {
+    croppedBuffer = await sharp(generated.buffer, { failOn: "none" })
+      .resize(targetWidth, targetHeight, {
+        fit: "cover",
+        position: sharp.strategy.attention,
+      })
+      .jpeg({ quality: 88, mozjpeg: true })
+      .toBuffer();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Crop-Fehler" };
+  }
+
+  // 3) In Storage hochladen
+  const rand = Math.random().toString(36).slice(2, 8);
+  const newPath = `kategorien/ai-${aspect}-${Date.now()}-${rand}.jpg`;
+
+  const { error: upErr } = await supabase.storage
+    .from("produktbilder")
+    .upload(newPath, croppedBuffer, { contentType: "image/jpeg" });
   if (upErr) return { ok: false, error: `Upload fehlgeschlagen: ${upErr.message}` };
 
   return { ok: true, path: newPath };

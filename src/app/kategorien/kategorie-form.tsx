@@ -27,7 +27,9 @@ import {
   Maximize2,
   GripVertical,
   RotateCcw,
+  Download,
 } from "lucide-react";
+import { bildProxyUrl } from "@/lib/bild-url";
 import { IconPicker } from "@/components/icon-picker";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
@@ -553,7 +555,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                 - Rechte Spalte: Bild 3 + Bild 4 nebeneinander (jeweils 1:2 hochkant)
                 Auf Mobile (sm:) untereinander gestapelt.
               */}
-              <div className="grid grid-cols-1 sm:grid-cols-[3fr_1fr] gap-3 items-stretch">
+              <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-3 items-stretch">
                 <div className="flex flex-col gap-3">
                   <BildSlotCard
                     slot={1}
@@ -620,7 +622,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
                     }}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-3">
                   <BildSlotCard
                     slot={3}
                     bild={bilder[3]}
@@ -859,6 +861,18 @@ function BildSlotCard({
               >
                 <Maximize2 className="h-3 w-3" />
               </button>
+              {bild.path && (
+                <a
+                  href={bildProxyUrl("produktbilder", bild.path) ?? "#"}
+                  download={bild.path.split("/").pop() ?? "bild"}
+                  aria-label="Bild herunterladen"
+                  title="Bild herunterladen"
+                  className="rounded-full bg-background/90 hover:bg-background p-1 border shadow-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download className="h-3 w-3" />
+                </a>
+              )}
               {enhanceProps && (
                 <EnhanceBildButton
                   bucket={enhanceProps.bucket}

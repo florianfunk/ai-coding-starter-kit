@@ -56,7 +56,8 @@
 | PROJ-40 | Kategorie-Bilder Tools (DnD, Zoom, Smart-Crop) | Deployed | [PROJ-40](PROJ-40-kategorie-bilder-tools.md) | 2026-04-30 |
 | PROJ-41 | Manuelles Crop-Rechteck für Kategorie-Bilder | Deployed | [PROJ-41](PROJ-41-manuelles-crop-rechteck.md) | 2026-04-30 |
 | PROJ-42 | KI-Bild-Generierung für Kategorie-Slots (gpt-image-2) | Deployed | [PROJ-42](PROJ-42-ki-bild-generierung.md) | 2026-04-30 |
+| PROJ-43 | Mediathek (zentrale Bild-Bibliothek mit Wiederverwendung) | Planned | [PROJ-43](PROJ-43-mediathek.md) | 2026-04-30 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-43
+## Next Available ID: PROJ-44

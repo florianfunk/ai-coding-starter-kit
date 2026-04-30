@@ -306,8 +306,18 @@ export async function cropKategorieBildManuell(input: unknown): Promise<Kategori
   }
   const inputBuffer = Buffer.from(await download.arrayBuffer());
 
-  // Original-Dims pruefen — Crop darf nicht ausserhalb liegen
-  const meta = await sharp(inputBuffer, { failOn: "none" }).rotate().metadata();
+  // PROJ-41 Hotfix: EXIF-Auto-Rotation einmalig materialisieren, BEVOR
+  // wir Metadata oder Extract aufrufen. sharp.metadata() liest die rohen
+  // (vor-EXIF-Rotation) Pixel-Dimensionen — wenn der Browser jedoch das
+  // EXIF-rotierte Bild zeigt, beziehen sich die Client-Coords darauf.
+  // Lösung: Original rotiert in einen Zwischen-Buffer schreiben und auf
+  // diesem die Dims + Extract berechnen. Format/Alpha kommen aus dem
+  // Original-Buffer (rotation entfernt EXIF-Hint nicht aus dem Format).
+  const origMeta = await sharp(inputBuffer, { failOn: "none" }).metadata();
+  const rotatedBuffer = await sharp(inputBuffer, { failOn: "none" })
+    .rotate()
+    .toBuffer();
+  const meta = await sharp(rotatedBuffer, { failOn: "none" }).metadata();
   const origWidth = meta.width ?? 0;
   const origHeight = meta.height ?? 0;
   if (origWidth === 0 || origHeight === 0) {
@@ -326,16 +336,15 @@ export async function cropKategorieBildManuell(input: unknown): Promise<Kategori
   let contentType = "image/jpeg";
   let extension = "jpg";
   try {
-    // EXIF-Auto-Rotation muss VOR dem extract passieren, sonst stimmen die Koordinaten nicht.
-    const pipeline = sharp(inputBuffer, { failOn: "none" })
-      .rotate()
+    // Auf dem bereits rotierten Buffer arbeiten — keine erneute .rotate() nötig.
+    const pipeline = sharp(rotatedBuffer, { failOn: "none" })
       .extract({ left: x, top: y, width, height })
       .resize(targetWidth, targetHeight, {
         fit: "cover",
         withoutEnlargement: false,
       });
 
-    if (meta.format === "png" && meta.hasAlpha) {
+    if (origMeta.format === "png" && origMeta.hasAlpha) {
       croppedBuffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
       contentType = "image/png";
       extension = "png";

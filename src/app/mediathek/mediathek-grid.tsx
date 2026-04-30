@@ -43,11 +43,16 @@ import { bildProxyUrl } from "@/lib/bild-url";
 import {
   listMediathek,
   getMediathekUsages,
+  getMediathekFilterOptions,
+  getMediathekDimensions,
+  renameMediathekBild,
   deleteMediathekBild,
   type MediathekItem,
   type UsageFilter,
+  type MediathekFilterOptions,
 } from "./actions";
 import type { BildVerwendung } from "@/lib/bild-verwendung";
+import type { ImageDimensions } from "@/lib/image-dimensions";
 
 interface Props {
   initialItems: MediathekItem[];
@@ -59,24 +64,47 @@ export function MediathekGrid({ initialItems }: Props) {
   const [usage, setUsage] = useState<UsageFilter>("all");
   const [prefix, setPrefix] = useState<string>("all");
   const [extension, setExtension] = useState<string>("all");
+  const [bereichId, setBereichId] = useState<string>("all");
+  const [kategorieId, setKategorieId] = useState<string>("all");
   const [pending, startTransition] = useTransition();
+
+  // Filter-Optionen (Bereiche/Kategorien) — einmalig laden
+  const [filterOptions, setFilterOptions] = useState<MediathekFilterOptions | null>(null);
+  useEffect(() => {
+    void getMediathekFilterOptions().then(setFilterOptions);
+  }, []);
 
   // Detail-Sheet
   const [activeItem, setActiveItem] = useState<MediathekItem | null>(null);
   const [activeUsages, setActiveUsages] = useState<BildVerwendung[] | null>(null);
   const [usagesLoading, setUsagesLoading] = useState(false);
+  const [activeDimensions, setActiveDimensions] = useState<ImageDimensions | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
 
   // Delete-Confirm
   const [confirmDelete, setConfirmDelete] = useState<MediathekItem | null>(null);
   const [deleteUsages, setDeleteUsages] = useState<BildVerwendung[]>([]);
   const [deleting, setDeleting] = useState(false);
 
+  // Wenn Bereich wechselt, Kategorie zurücksetzen
+  useEffect(() => {
+    setKategorieId("all");
+  }, [bereichId]);
+
   // Reload when filter changes (debounced for search)
   useEffect(() => {
     const handle = setTimeout(() => {
       startTransition(async () => {
         try {
-          const next = await listMediathek({ search, usage, prefix, extension });
+          const next = await listMediathek({
+            search,
+            usage,
+            prefix,
+            extension,
+            bereichId,
+            kategorieId,
+          });
           setItems(next);
         } catch (e) {
           toast.error(e instanceof Error ? e.message : "Listing fehlgeschlagen");
@@ -84,7 +112,7 @@ export function MediathekGrid({ initialItems }: Props) {
       });
     }, 250);
     return () => clearTimeout(handle);
-  }, [search, usage, prefix, extension]);
+  }, [search, usage, prefix, extension, bereichId, kategorieId]);
 
   // Distinct prefixes/extensions aus den initial geladenen Items
   const distinctPrefixes = useMemo(() => {
@@ -97,13 +125,25 @@ export function MediathekGrid({ initialItems }: Props) {
     return Array.from(s).sort();
   }, [initialItems]);
 
+  const filteredKategorien = useMemo(() => {
+    if (!filterOptions) return [];
+    if (bereichId === "all") return filterOptions.kategorien;
+    return filterOptions.kategorien.filter((k) => k.bereichId === bereichId);
+  }, [filterOptions, bereichId]);
+
   async function openDetail(item: MediathekItem) {
     setActiveItem(item);
     setActiveUsages(null);
+    setActiveDimensions(null);
+    setRenameValue(item.name);
     setUsagesLoading(true);
     try {
-      const usages = await getMediathekUsages(item.path);
+      const [usages, dimResult] = await Promise.all([
+        getMediathekUsages(item.path),
+        getMediathekDimensions(item.path),
+      ]);
       setActiveUsages(usages);
+      if (dimResult.ok) setActiveDimensions(dimResult.dim);
     } finally {
       setUsagesLoading(false);
     }
@@ -112,6 +152,36 @@ export function MediathekGrid({ initialItems }: Props) {
   function closeDetail() {
     setActiveItem(null);
     setActiveUsages(null);
+    setActiveDimensions(null);
+    setRenameValue("");
+  }
+
+  async function handleRename() {
+    if (!activeItem) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed || trimmed === activeItem.name) return;
+    setRenaming(true);
+    try {
+      const r = await renameMediathekBild({ oldPath: activeItem.path, newName: trimmed });
+      if (!r.ok) {
+        toast.error(r.error ?? "Umbenennen fehlgeschlagen");
+        return;
+      }
+      toast.success("Umbenannt");
+      // Liste neu laden + Detail-Sheet schließen (Pfad hat sich geändert)
+      const next = await listMediathek({
+        search,
+        usage,
+        prefix,
+        extension,
+        bereichId,
+        kategorieId,
+      });
+      setItems(next);
+      closeDetail();
+    } finally {
+      setRenaming(false);
+    }
   }
 
   async function requestDelete(item: MediathekItem) {
@@ -139,28 +209,27 @@ export function MediathekGrid({ initialItems }: Props) {
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Datei oder Pfad suchen…"
-            className="pl-9 pr-9"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Suche zurücksetzen"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
+      <div className="space-y-2 rounded-xl border bg-card p-3">
         <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[220px] flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Suche in Pfad / Produkt / Kategorie…"
+              className="pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Suche zurücksetzen"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={usage} onValueChange={(v) => setUsage(v as UsageFilter)}>
             <SelectTrigger className="w-[150px]">
@@ -172,7 +241,6 @@ export function MediathekGrid({ initialItems }: Props) {
               <SelectItem value="unused">Unbenutzt</SelectItem>
             </SelectContent>
           </Select>
-
           <Select value={prefix} onValueChange={setPrefix}>
             <SelectTrigger className="w-[160px]">
               <SelectValue />
@@ -186,7 +254,6 @@ export function MediathekGrid({ initialItems }: Props) {
               ))}
             </SelectContent>
           </Select>
-
           <Select value={extension} onValueChange={setExtension}>
             <SelectTrigger className="w-[120px]">
               <SelectValue />
@@ -200,8 +267,59 @@ export function MediathekGrid({ initialItems }: Props) {
               ))}
             </SelectContent>
           </Select>
-
           {pending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={bereichId} onValueChange={setBereichId}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Alle Bereiche" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Bereiche</SelectItem>
+              {filterOptions?.bereiche.map((b) => (
+                <SelectItem key={b.id} value={b.id}>
+                  {b.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={kategorieId} onValueChange={setKategorieId}>
+            <SelectTrigger className="w-[260px]">
+              <SelectValue placeholder="Alle Kategorien" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Kategorien</SelectItem>
+              {filteredKategorien.map((k) => (
+                <SelectItem key={k.id} value={k.id}>
+                  {k.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {(bereichId !== "all" ||
+            kategorieId !== "all" ||
+            usage !== "all" ||
+            prefix !== "all" ||
+            extension !== "all" ||
+            search) && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch("");
+                setUsage("all");
+                setPrefix("all");
+                setExtension("all");
+                setBereichId("all");
+                setKategorieId("all");
+              }}
+              className="text-xs"
+            >
+              Filter zurücksetzen
+            </Button>
+          )}
         </div>
       </div>
 
@@ -232,7 +350,9 @@ export function MediathekGrid({ initialItems }: Props) {
           {activeItem && (
             <>
               <SheetHeader>
-                <SheetTitle className="truncate text-base">{activeItem.name}</SheetTitle>
+                <SheetTitle className="text-base">
+                  {activeItem.smartTitle || activeItem.name}
+                </SheetTitle>
                 <SheetDescription className="break-all text-[11px] font-mono">
                   {activeItem.path}
                 </SheetDescription>
@@ -251,8 +371,60 @@ export function MediathekGrid({ initialItems }: Props) {
                 <div className="grid grid-cols-2 gap-2 text-[12px]">
                   <Meta label="Größe" value={formatBytes(activeItem.size ?? 0)} />
                   <Meta label="Format" value={`.${activeItem.extension}`} />
+                  {activeDimensions ? (
+                    <>
+                      <Meta
+                        label="Pixel"
+                        value={`${activeDimensions.widthPx} × ${activeDimensions.heightPx}`}
+                      />
+                      <Meta
+                        label={`cm @ ${activeDimensions.dpi} dpi`}
+                        value={`${activeDimensions.widthCm} × ${activeDimensions.heightCm}`}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Meta label="Pixel" value="—" />
+                      <Meta label="cm" value="—" />
+                    </>
+                  )}
                   <Meta label="Ordner" value={activeItem.prefix} />
                   <Meta label="Hochgeladen" value={formatDate(activeItem.createdAt)} />
+                </div>
+
+                {/* Umbenennen */}
+                <div className="space-y-1.5 rounded-md border bg-muted/20 p-2.5">
+                  <label
+                    htmlFor="rename-input"
+                    className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                  >
+                    Datei umbenennen
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="rename-input"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      placeholder={activeItem.name}
+                      className="h-8 text-[12px]"
+                      disabled={renaming}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handleRename()}
+                      disabled={
+                        renaming ||
+                        !renameValue.trim() ||
+                        renameValue.trim() === activeItem.name
+                      }
+                    >
+                      {renaming ? "Speichere…" : "Umbenennen"}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Alle Verweise (Bereich/Kategorie/Produkt) werden automatisch aktualisiert.
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -409,7 +581,13 @@ function MediathekTile({
       </button>
 
       <div className="space-y-1 p-2">
-        <div className="truncate text-[11px] font-medium" title={item.name}>
+        <div
+          className="line-clamp-2 text-[11.5px] font-medium leading-snug"
+          title={item.smartTitle || item.name}
+        >
+          {item.smartTitle || item.name}
+        </div>
+        <div className="truncate text-[10px] text-muted-foreground" title={item.name}>
           {item.name}
         </div>
         <div className="flex items-center justify-between">

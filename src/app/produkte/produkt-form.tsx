@@ -308,6 +308,49 @@ export function ProduktForm({
     }
   }, [state, pending]);
 
+  /** Sidebar-Link auf eine zugeklappte Section: erst Accordion öffnen,
+   *  dann sauber zum Header scrollen (das CSS scroll-margin-top greift). */
+  useEffect(() => {
+    function ensureSectionOpen(hash: string) {
+      const m = hash.match(/^#section-(.+)$/);
+      if (!m) return;
+      const id = m[1];
+      if (!SECTION_IDS.includes(id as SectionId)) return; // base etc. nicht collapsible
+      setOpenSections((prev) => {
+        if (prev.includes(id)) return prev;
+        const next = [...prev, id];
+        saveOpenSections(next);
+        return next;
+      });
+      // Nach dem Re-Render erneut scrollen — der initiale Browser-Scroll
+      // landet sonst auf dem zugeklappten Header.
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`section-${id}`);
+        el?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    function onClick(e: MouseEvent) {
+      const target = e.target as HTMLElement | null;
+      const link = target?.closest('a[href^="#section-"]') as HTMLAnchorElement | null;
+      if (!link) return;
+      ensureSectionOpen(link.getAttribute("href") ?? "");
+    }
+
+    function onHashChange() {
+      ensureSectionOpen(window.location.hash);
+    }
+
+    document.addEventListener("click", onClick);
+    window.addEventListener("hashchange", onHashChange);
+    // Initial: falls die Seite mit Hash geladen wurde
+    if (window.location.hash) ensureSectionOpen(window.location.hash);
+    return () => {
+      document.removeEventListener("click", onClick);
+      window.removeEventListener("hashchange", onHashChange);
+    };
+  }, []);
+
   function toggleIcon(id: string) {
     setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     // Abwahl: zugehörigen Wert verwerfen

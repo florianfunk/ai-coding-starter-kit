@@ -302,7 +302,11 @@ export function IconPicker({
       ))}
 
       {searchInput}
-      {selectedBlock}
+      {selectedBlock ?? (
+        <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+          Noch keine Icons gewählt — wähle unten im Auswahl-Bereich Icons aus.
+        </div>
+      )}
       <div className="rounded-xl border bg-card">{selectionGrid}</div>
     </div>
   );

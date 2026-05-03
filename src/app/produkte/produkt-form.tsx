@@ -511,6 +511,8 @@ export function ProduktForm({
               label="Datenblatt"
               required
               progress={sectionProgress("datenblatt", defaultValues, iconIds.length, manualComplete)}
+              rawDone={rawProgress("datenblatt").done}
+              manuallyComplete={manualComplete.has("datenblatt")}
             />
           </AccordionTrigger>
           <SectionCompleteToggle
@@ -610,6 +612,8 @@ export function ProduktForm({
               Icon={Images}
               label="Datenblatt-Bilder"
               progress={sectionProgress("datenblatt-bilder", defaultValues, iconIds.length, manualComplete)}
+              rawDone={rawProgress("datenblatt-bilder").done}
+              manuallyComplete={manualComplete.has("datenblatt-bilder")}
             />
           </AccordionTrigger>
           <SectionCompleteToggle
@@ -744,7 +748,14 @@ export function ProduktForm({
               onChange={() => markDirty(group.tab)}
             >
               <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
-                <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
+                <SectionHeader
+                  colorVar={meta.colorVar}
+                  Icon={meta.icon}
+                  label={meta.label}
+                  progress={progress}
+                  rawDone={rawProgress(group.tab as SectionId).done}
+                  manuallyComplete={manualComplete.has(group.tab as SectionId)}
+                />
               </AccordionTrigger>
               <SectionCompleteToggle
                 active={manualComplete.has(group.tab as SectionId)}
@@ -783,6 +794,8 @@ export function ProduktForm({
               Icon={Thermometer}
               label="Thermisch & Sonstiges"
               progress={sectionProgress("thermisch", defaultValues, iconIds.length, manualComplete)}
+              rawDone={rawProgress("thermisch").done}
+              manuallyComplete={manualComplete.has("thermisch")}
             />
           </AccordionTrigger>
           <SectionCompleteToggle
@@ -818,6 +831,8 @@ export function ProduktForm({
               Icon={Palette}
               label="Icons & Tags"
               progress={sectionProgress("icons", defaultValues, iconIds.length, manualComplete)}
+              rawDone={rawProgress("icons").done}
+              manuallyComplete={manualComplete.has("icons")}
               countBadge={iconIds.length}
             />
           </AccordionTrigger>
@@ -940,19 +955,25 @@ function SectionHeader({
   Icon,
   label,
   progress,
+  rawDone,
   required,
   countBadge,
+  manuallyComplete,
 }: {
   colorVar?: string;
   Icon: LucideIcon;
   label: string;
   progress: { done: number; total: number };
+  /** Tatsächlich gefüllte Felder (vor Manual-Complete-Override). */
+  rawDone?: number;
   required?: boolean;
   countBadge?: number;
+  manuallyComplete?: boolean;
 }) {
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
   const stateColor = pct >= 100 ? "#193073" : pct >= 50 ? "#FFC10D" : "#D90416";
-  const isEmpty = progress.done === 0;
+  const realDone = rawDone ?? progress.done;
+  const isEmpty = realDone === 0 && !manuallyComplete;
   return (
     <div className="flex flex-1 items-center gap-3">
       <div className="card-head-icon"><Icon /></div>
@@ -961,12 +982,19 @@ function SectionHeader({
           <span className="card-head-title">{label}</span>
           {required && <span className="pill">Pflicht</span>}
           {isEmpty && <span className="pill pill-warn">Leer</span>}
+          {manuallyComplete && (
+            <span className="pill pill-warn" title="Als vollständig markiert, obwohl Felder leer sind">
+              markiert
+            </span>
+          )}
           {countBadge != null && countBadge > 0 && (
             <span className="pill">{countBadge}</span>
           )}
         </div>
         <div className="card-head-sub font-mono">
-          {progress.done} / {progress.total} Felder · {pct}%
+          {manuallyComplete && rawDone !== undefined && rawDone < progress.total
+            ? `${rawDone} / ${progress.total} Felder · markiert`
+            : `${progress.done} / ${progress.total} Felder · ${pct}%`}
         </div>
       </div>
       <div className="hidden w-[100px] shrink-0 sm:block">

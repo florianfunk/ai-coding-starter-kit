@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 
 interface Props {
   id?: string;
@@ -17,7 +18,8 @@ interface Props {
 
 /** Input + Dropdown-Liste, die IMMER alle Optionen zeigt — keine
  *  Filterung beim Tippen (im Gegensatz zu nativem <datalist>). Custom-Werte
- *  sind weiterhin per Tipp-Eingabe erlaubt. */
+ *  sind weiterhin per Tipp-Eingabe erlaubt. Popover wird via Portal außerhalb
+ *  des Form-Containers gerendert, damit es nicht von overflow:hidden geclipt wird. */
 export function OptionsCombo({
   id,
   name,
@@ -30,20 +32,16 @@ export function OptionsCombo({
 }: Props) {
   const [value, setValue] = useState(defaultValue);
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [triggerWidth, setTriggerWidth] = useState<number | undefined>(undefined);
 
-  // Klick außerhalb schließt das Popover
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current) return;
-      if (!wrapRef.current.contains(e.target as Node)) setOpen(false);
+    if (open && anchorRef.current) {
+      setTriggerWidth(anchorRef.current.offsetWidth);
     }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  }, [open]);
 
   function selectOption(opt: string) {
     setValue(opt);
@@ -68,58 +66,67 @@ export function OptionsCombo({
   }
 
   return (
-    <div ref={wrapRef} className={`relative ${className ?? ""}`}>
-      <Input
-        ref={inputRef}
-        id={id}
-        name={name}
-        type={type}
-        step={step}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onFocus={() => setOpen(true)}
-        onKeyDown={onKeyDown}
-        placeholder={placeholder}
-        className="pr-9"
-        autoComplete="off"
-      />
-      <button
-        type="button"
-        tabIndex={-1}
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setOpen((o) => !o);
-          inputRef.current?.focus();
-        }}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
-        aria-label="Optionen anzeigen"
-      >
-        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && options.length > 0 && (
-        <div
-          ref={listRef}
-          className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md"
-        >
-          {options.map((opt, i) => (
-            <button
-              key={opt}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                selectOption(opt);
-              }}
-              onMouseEnter={() => setActiveIndex(i)}
-              className={`block w-full rounded px-2 py-1.5 text-left text-sm ${
-                i === activeIndex ? "bg-accent" : "hover:bg-accent/60"
-              } ${opt === value ? "font-medium" : ""}`}
-            >
-              {opt}
-            </button>
-          ))}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div ref={anchorRef} className={`relative ${className ?? ""}`}>
+          <Input
+            ref={inputRef}
+            id={id}
+            name={name}
+            type={type}
+            step={step}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onFocus={() => setOpen(true)}
+            onKeyDown={onKeyDown}
+            placeholder={placeholder}
+            className="pr-9"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setOpen((o) => !o);
+              inputRef.current?.focus();
+            }}
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+            aria-label="Optionen anzeigen"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
         </div>
-      )}
-    </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        // Fokus bleibt im Input, sodass weiter getippt werden kann
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        // Klick im Anchor (Input) soll Popover nicht schließen
+        onInteractOutside={(e) => {
+          if (anchorRef.current?.contains(e.target as Node)) e.preventDefault();
+        }}
+        style={{ width: triggerWidth, maxHeight: "min(70vh, 520px)" }}
+        className="overflow-auto p-1"
+      >
+        {options.map((opt, i) => (
+          <button
+            key={opt}
+            type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              selectOption(opt);
+            }}
+            onMouseEnter={() => setActiveIndex(i)}
+            className={`block w-full rounded px-2 py-2 text-left text-sm ${
+              i === activeIndex ? "bg-accent" : "hover:bg-accent/60"
+            } ${opt === value ? "font-medium" : ""}`}
+          >
+            {opt}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }

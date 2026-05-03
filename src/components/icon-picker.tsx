@@ -354,7 +354,7 @@ function SortableSelectedIcon({
           title={icon.label}
         >
           <div
-            className={`relative h-8 w-8 rounded-md bg-background border border-border/60 flex items-center justify-center overflow-hidden ${
+            className={`relative h-16 w-16 rounded-md bg-background border border-border/60 flex items-center justify-center overflow-hidden ${
               isDragging ? "shadow-md ring-1 ring-primary" : ""
             }`}
           >
@@ -363,10 +363,10 @@ function SortableSelectedIcon({
               <img
                 src={icon.url}
                 alt={icon.label}
-                className="max-h-full max-w-full object-contain p-0.5 pointer-events-none"
+                className="max-h-full max-w-full object-contain p-1 pointer-events-none"
               />
             ) : (
-              <span className="text-[8px] font-bold pointer-events-none text-center px-0.5 leading-tight">
+              <span className="text-xs font-bold pointer-events-none text-center px-1 leading-tight">
                 {icon.label.slice(0, 4)}
               </span>
             )}
@@ -381,7 +381,7 @@ function SortableSelectedIcon({
             maxLength={120}
             aria-label={`Wert für ${icon.label}`}
             placeholder="—"
-            className="h-5 w-8 rounded border border-input bg-background px-0.5 text-[10px] text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/40"
+            className="h-7 w-16 rounded border border-input bg-background px-1 text-xs text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/40"
           />
         )}
         {onRemove && (

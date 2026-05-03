@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Zap, Sun, Wrench, Thermometer, FileText, Palette, ChevronsUpDown, Images } from "lucide-react";
+import { Zap, Sun, Wrench, Thermometer, FileText, Palette, ChevronsUpDown, Images, CheckCircle2, Circle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
@@ -88,30 +88,40 @@ function saveOpenSections(sections: string[]) {
   } catch { /* ignore */ }
 }
 
-/** Count filled vs total fields per section, for the header progress bar */
-function sectionProgress(sectionId: SectionId, defaultValues: Record<string, any>, iconCount: number) {
+/** Count filled vs total fields per section, for the header progress bar.
+ *  Wenn die Section in `manualComplete` steht, gilt sie als 100 % (done = total). */
+function sectionProgress(
+  sectionId: SectionId,
+  defaultValues: Record<string, any>,
+  iconCount: number,
+  manualComplete: ReadonlySet<string>,
+) {
   const check = (v: unknown) => v != null && v !== "" && v !== false;
-  if (sectionId === "icons") return { done: Math.min(iconCount, 10), total: 10 };
-  if (sectionId === "datenblatt") {
-    const keys = ["datenblatt_titel", "info_kurz", "treiber", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
-    return { done: keys.filter((k) => check(defaultValues[k])).length, total: keys.length };
-  }
-  if (sectionId === "datenblatt-bilder") {
-    return {
-      done: DATENBLATT_BILDER_KEYS.filter((k) => check(defaultValues[k])).length,
-      total: DATENBLATT_BILDER_KEYS.length,
-    };
-  }
-  const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
-  let done = 0;
   let total = 0;
-  for (const tab of groupTabs) {
-    const group = PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab);
-    if (group) {
-      total += group.fields.length;
-      for (const f of group.fields) if (check(defaultValues[f.col])) done += 1;
+  let done = 0;
+
+  if (sectionId === "icons") {
+    total = 10;
+    done = Math.min(iconCount, 10);
+  } else if (sectionId === "datenblatt") {
+    const keys = ["datenblatt_titel", "info_kurz", "treiber", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
+    total = keys.length;
+    done = keys.filter((k) => check(defaultValues[k])).length;
+  } else if (sectionId === "datenblatt-bilder") {
+    total = DATENBLATT_BILDER_KEYS.length;
+    done = DATENBLATT_BILDER_KEYS.filter((k) => check(defaultValues[k])).length;
+  } else {
+    const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
+    for (const tab of groupTabs) {
+      const group = PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab);
+      if (group) {
+        total += group.fields.length;
+        for (const f of group.fields) if (check(defaultValues[f.col])) done += 1;
+      }
     }
   }
+
+  if (manualComplete.has(sectionId)) return { done: total, total };
   return { done, total };
 }
 
@@ -178,6 +188,35 @@ export function ProduktForm({
   const [uploading] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
   const [dirtySections, setDirtySections] = useState<Set<string>>(new Set());
+
+  // Manuell als „alle Daten eingegeben" markierte Sections.
+  // Wirken in der UI sofort als 100 %; werden beim Submit als
+  // formData.getAll("vollstaendig_sections") in die DB geschrieben.
+  const [manualComplete, setManualComplete] = useState<Set<SectionId>>(() => {
+    const raw = defaultValues.vollstaendig_sections;
+    if (!Array.isArray(raw)) return new Set();
+    return new Set(
+      raw.filter((id): id is SectionId =>
+        SECTION_IDS.includes(id as SectionId),
+      ),
+    );
+  });
+
+  const toggleManualComplete = useCallback((id: SectionId) => {
+    setManualComplete((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    // Markierung ändert den DB-Wert → Section ist dirty
+    setDirtySections((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
 
   const isDirty = useCallback(
     (id: string) => dirtySections.has(id),
@@ -414,15 +453,19 @@ export function ProduktForm({
           onInput={() => markDirty("datenblatt")}
           onChange={() => markDirty("datenblatt")}
         >
-          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+          <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
             <SectionHeader
               colorVar={SECTION_META.datenblatt.colorVar}
               Icon={FileText}
               label="Datenblatt"
               required
-              progress={sectionProgress("datenblatt", defaultValues, iconIds.length)}
+              progress={sectionProgress("datenblatt", defaultValues, iconIds.length, manualComplete)}
             />
           </AccordionTrigger>
+          <SectionCompleteToggle
+            active={manualComplete.has("datenblatt")}
+            onToggle={() => toggleManualComplete("datenblatt")}
+          />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-4">
@@ -508,14 +551,18 @@ export function ProduktForm({
           onInput={() => markDirty("datenblatt-bilder")}
           onChange={() => markDirty("datenblatt-bilder")}
         >
-          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+          <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
             <SectionHeader
               colorVar={SECTION_META["datenblatt-bilder"].colorVar}
               Icon={Images}
               label="Datenblatt-Bilder"
-              progress={sectionProgress("datenblatt-bilder", defaultValues, iconIds.length)}
+              progress={sectionProgress("datenblatt-bilder", defaultValues, iconIds.length, manualComplete)}
             />
           </AccordionTrigger>
+          <SectionCompleteToggle
+            active={manualComplete.has("datenblatt-bilder")}
+            onToggle={() => toggleManualComplete("datenblatt-bilder")}
+          />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt-bilder")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="space-y-5">
@@ -631,7 +678,7 @@ export function ProduktForm({
         {PRODUKT_FIELD_GROUPS.filter((g) => g.tab !== "thermisch" && g.tab !== "sonstiges").map((group) => {
           const meta = SECTION_META[group.tab as SectionId];
           if (!meta) return null;
-          const progress = sectionProgress(group.tab as SectionId, defaultValues, iconIds.length);
+          const progress = sectionProgress(group.tab as SectionId, defaultValues, iconIds.length, manualComplete);
           return (
             <AccordionItem
               key={group.tab}
@@ -641,9 +688,13 @@ export function ProduktForm({
               onInput={() => markDirty(group.tab)}
               onChange={() => markDirty(group.tab)}
             >
-              <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+              <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
                 <SectionHeader colorVar={meta.colorVar} Icon={meta.icon} label={meta.label} progress={progress} />
               </AccordionTrigger>
+              <SectionCompleteToggle
+                active={manualComplete.has(group.tab as SectionId)}
+                onToggle={() => toggleManualComplete(group.tab as SectionId)}
+              />
               <SectionSaveButton pending={pending || uploading} dirty={isDirty(group.tab)} floating />
               <AccordionContent className="px-4 pb-4">
                 {group.tab === "elektrisch" && (
@@ -669,14 +720,18 @@ export function ProduktForm({
           onInput={() => markDirty("thermisch")}
           onChange={() => markDirty("thermisch")}
         >
-          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+          <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
             <SectionHeader
               colorVar={SECTION_META.thermisch.colorVar}
               Icon={Thermometer}
               label="Thermisch & Sonstiges"
-              progress={sectionProgress("thermisch", defaultValues, iconIds.length)}
+              progress={sectionProgress("thermisch", defaultValues, iconIds.length, manualComplete)}
             />
           </AccordionTrigger>
+          <SectionCompleteToggle
+            active={manualComplete.has("thermisch")}
+            onToggle={() => toggleManualComplete("thermisch")}
+          />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("thermisch")} floating />
           <AccordionContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -698,15 +753,19 @@ export function ProduktForm({
           onInput={() => markDirty("icons")}
           onChange={() => markDirty("icons")}
         >
-          <AccordionTrigger className="card-head hover:no-underline pr-[112px]">
+          <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
             <SectionHeader
               colorVar={SECTION_META.icons.colorVar}
               Icon={Palette}
               label="Icons & Tags"
-              progress={sectionProgress("icons", defaultValues, iconIds.length)}
+              progress={sectionProgress("icons", defaultValues, iconIds.length, manualComplete)}
               countBadge={iconIds.length}
             />
           </AccordionTrigger>
+          <SectionCompleteToggle
+            active={manualComplete.has("icons")}
+            onToggle={() => toggleManualComplete("icons")}
+          />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("icons")} floating />
           <AccordionContent className="px-4 pb-4">
             <IconPicker
@@ -732,6 +791,11 @@ export function ProduktForm({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* Manuell als „vollständig" markierte Sections — wird via getAll() gelesen */}
+      {Array.from(manualComplete).map((id) => (
+        <input key={id} type="hidden" name="vollstaendig_sections" value={id} />
+      ))}
     </form>
   );
 }
@@ -741,6 +805,40 @@ export function ProduktForm({
  *  `floating` (absolute, pinned to the top of the header bar) so it sits
  *  on the dark trigger strip without nesting a <button> inside another
  *  <button>. Only renders when the form has unsaved changes. */
+/**
+ * Toggle-Button im Section-Header: markiert die Section als „alle Daten
+ * eingegeben". Wirkt sich sofort auf den Section-Progress (100 %) und nach
+ * dem Speichern auf die globale Completeness aus.
+ */
+function SectionCompleteToggle({
+  active,
+  onToggle,
+}: {
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onToggle();
+      }}
+      title={active ? "Markierung 'Alle Daten eingegeben' entfernen" : "Als 'alle Daten eingegeben' markieren"}
+      aria-pressed={active}
+      className={`absolute right-[124px] top-2 z-10 inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-semibold tracking-[-0.003em] transition-all ${
+        active
+          ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25"
+          : "border-white/15 bg-white/[0.04] text-white/70 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      {active ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+      <span className="hidden sm:inline">{active ? "Vollständig" : "Als vollständig"}</span>
+    </button>
+  );
+}
+
 function SectionSaveButton({
   pending,
   dirty,

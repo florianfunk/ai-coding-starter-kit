@@ -26,7 +26,17 @@ type ProduktLike = {
   laenge_mm?: number | null;
   breite_mm?: number | null;
   hoehe_mm?: number | null;
+  /**
+   * Sections, die der Pfleger manuell als „alle Daten eingegeben" markiert hat.
+   * Eine Markierung wirkt als „Bucket erfüllt" für die zugeordneten Pauschal-Felder
+   * (siehe Mapping in 0025_produkt_vollstaendig_sections.sql).
+   */
+  vollstaendig_sections?: string[] | null;
 };
+
+function hasSection(p: ProduktLike, id: string): boolean {
+  return Array.isArray(p.vollstaendig_sections) && p.vollstaendig_sections.includes(id);
+}
 
 /* ------------------------------------------------------------------ */
 /*  Field definitions                                                  */
@@ -52,10 +62,23 @@ const FIELDS: FieldCheck[] = [
   { label: "Hauptbild", weight: 10, check: (p) => p.hauptbild_path != null },
   { label: "Aktiver Preis", weight: 10, check: (_p, ctx) => ctx.hasActivePrice },
 
-  // Optionale Felder (zusammen 50 %)
-  { label: "Datenblatttitel", weight: 7, check: (p) => Boolean(p.datenblatt_titel?.trim()) },
-  { label: "Datenblatttext", weight: 7, check: (p) => Boolean(p.datenblatt_text?.trim()) },
-  { label: "Datenblatt-Vorlage", weight: 6, check: (p) => p.datenblatt_template_id != null },
+  // Optionale Felder (zusammen 50 %) — jedes Feld kann durch eine Section-
+  // Markierung als „erfüllt" gelten. Mapping siehe Migration 0025.
+  {
+    label: "Datenblatttitel",
+    weight: 7,
+    check: (p) => Boolean(p.datenblatt_titel?.trim()) || hasSection(p, "datenblatt"),
+  },
+  {
+    label: "Datenblatttext",
+    weight: 7,
+    check: (p) => Boolean(p.datenblatt_text?.trim()) || hasSection(p, "datenblatt"),
+  },
+  {
+    label: "Datenblatt-Vorlage",
+    weight: 6,
+    check: (p) => p.datenblatt_template_id != null || hasSection(p, "datenblatt"),
+  },
   {
     label: "Technische Daten",
     weight: 8,
@@ -63,7 +86,10 @@ const FIELDS: FieldCheck[] = [
       p.leistung_w != null ||
       p.lichtstrom_lm != null ||
       p.farbtemperatur_k != null ||
-      (p.schutzart_ip != null && p.schutzart_ip.trim() !== ""),
+      (p.schutzart_ip != null && p.schutzart_ip.trim() !== "") ||
+      hasSection(p, "elektrisch") ||
+      hasSection(p, "lichttechnisch") ||
+      hasSection(p, "thermisch"),
   },
   {
     label: "Abmessungen",
@@ -72,10 +98,19 @@ const FIELDS: FieldCheck[] = [
       Boolean(p.masse_text?.trim()) ||
       p.laenge_mm != null ||
       p.breite_mm != null ||
-      p.hoehe_mm != null,
+      p.hoehe_mm != null ||
+      hasSection(p, "mechanisch"),
   },
-  { label: "Galerie-Bild", weight: 3, check: (_p, ctx) => ctx.galerieCount > 0 },
-  { label: "Icon zugeordnet", weight: 3, check: (_p, ctx) => ctx.iconCount > 0 },
+  {
+    label: "Galerie-Bild",
+    weight: 3,
+    check: (p, ctx) => ctx.galerieCount > 0 || hasSection(p, "datenblatt-bilder"),
+  },
+  {
+    label: "Icon zugeordnet",
+    weight: 3,
+    check: (p, ctx) => ctx.iconCount > 0 || hasSection(p, "icons"),
+  },
 ];
 
 // Sanity: weights must add up to 100

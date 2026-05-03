@@ -36,6 +36,7 @@ const baseSchema = z.object({
   bild_zeichnung_2_path: z.string().optional().nullable(),
   bild_zeichnung_3_path: z.string().optional().nullable(),
   bild_energielabel_path: z.string().optional().nullable(),
+  vollstaendig_sections: z.array(z.string().max(50)).max(20).default([]),
 });
 
 export type ProduktFormState = { error: string | null; fieldErrors?: Record<string, string> };
@@ -66,6 +67,10 @@ function parseTechFields(formData: FormData): Record<string, any> {
 
 function parseBase(formData: FormData) {
   const marken = formData.getAll("marken").map(String).filter(Boolean);
+  const vollstaendigSections = formData
+    .getAll("vollstaendig_sections")
+    .map(String)
+    .filter(Boolean);
   return baseSchema.safeParse({
     artikelnummer: formData.get("artikelnummer"),
     bereich_id: formData.get("bereich_id"),
@@ -90,6 +95,7 @@ function parseBase(formData: FormData) {
     bild_zeichnung_2_path: (formData.get("bild_zeichnung_2_path") as string) || null,
     bild_zeichnung_3_path: (formData.get("bild_zeichnung_3_path") as string) || null,
     bild_energielabel_path: (formData.get("bild_energielabel_path") as string) || null,
+    vollstaendig_sections: vollstaendigSections,
   });
 }
 

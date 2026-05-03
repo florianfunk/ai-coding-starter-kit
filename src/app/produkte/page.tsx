@@ -55,35 +55,30 @@ export default async function ProdukteListPage({
   if (sp.vollstaendigkeit === "vollstaendig")   query = query.gt("completeness_percent", 80);
 
   // Sortierung:
-  // - Hierarchie: nach Produkt-Sortierung innerhalb der Gruppen (Gruppen werden client-side
-  //   nach Bereich/Kategorie-Sortierung geordnet).
-  // - Liste (Default ohne ?sort=): gleiche Reihenfolge wie Hierarchie, aber flach — also
-  //   nach Bereich-Sortierung → Kategorie-Sortierung → Produkt-Sortierung → Artikelnummer.
-  //   Da die View nur Produkt-eigene Felder kennt, sortieren wir nach dem Laden in-memory
-  //   mit den Bereich-/Kategorie-Indizes aus dem Cache.
-  // - Liste mit explizitem ?sort=…: User-Wahl gewinnt.
+  // - User-Sort via ?sort=…: serverseitig, mit Pagination (für große Listen effizient).
+  // - Default (kein ?sort=): nach Bereich/Kategorie/Produkt-Sortierung — gleiche Reihenfolge
+  //   wie Hierarchie. Da die View die Bereich/Kategorie-Sortierung nicht kennt, müssen wir
+  //   ALLE gefilterten Produkte laden, in JS sortieren und dann erst die Page slicen.
+  //   Bei ~400 Produkten kein Performance-Thema; bei wachsender DB ggf. View erweitern.
   const userSort = sp.sort;
   if (userSort) {
     const [col, dir] = userSort.startsWith("-") ? [userSort.slice(1), "desc"] : [userSort, "asc"];
     query = query.order(col, { ascending: dir === "asc" });
+    if (ansicht === "liste") {
+      query = query.range(from, to);
+    }
   } else {
-    // Sinnvoller Default: nach Produkt-Sortierung, dann Artikelnummer (innerhalb Kategorie).
-    query = query.order("sortierung", { ascending: true }).order("artikelnummer", { ascending: true });
-  }
-  // In der Hierarchie-Ansicht alle Produkte laden (gruppiert dargestellt, keine Pagination).
-  if (ansicht === "liste") {
-    query = query.range(from, to);
+    // Stabile Reihenfolge auf Server-Seite (vermeidet zufälliges Mischen bei Re-Fetches).
+    // JS-Sortierung danach übernimmt die echte Reihenfolge nach Bereich/Kategorie.
+    query = query.order("artikelnummer", { ascending: true });
   }
 
   const { data: produkte, count } = await query;
   let listing = (produkte ?? []) as ProduktListing[];
 
-  // Default-Sortierung in der Liste-Ansicht: erst Bereich-Sortierung, dann Kategorie-
-  // Sortierung — wie in der Hierarchie. Nur wenn der User nicht explizit per ?sort= sortiert.
-  if (ansicht === "liste" && !userSort) {
-    // Bereich-Sortierung global (Cache ist bereits nach sortierung ASC).
-    // Kategorie-Sortierung pro Bereich (sortierung ist nur INNERHALB des Bereichs eindeutig
-    // — daher kategorie.sortierung direkt nutzen, NICHT global indexieren).
+  // Default-Sortierung (kein ?sort=): serverseitig kommen ALLE Produkte (oder alle gefilterten),
+  // hier sortieren nach Bereich → Kategorie → Produkt → Artikelnummer und erst dann slicen.
+  if (!userSort) {
     const bereichOrder = new Map(bereiche.map((b, i) => [b.id, i]));
     const kategorieById = new Map(kategorien.map((k) => [k.id, k]));
     listing = [...listing].sort((a, b) => {
@@ -93,14 +88,16 @@ export default async function ProdukteListPage({
       const kSortA = kategorieById.get(a.kategorie_id)?.sortierung ?? 9999;
       const kSortB = kategorieById.get(b.kategorie_id)?.sortierung ?? 9999;
       if (kSortA !== kSortB) return kSortA - kSortB;
-      // Bei gleicher Kategorie-Sortierung (Duplikate gibt's z. B. „160 SMD/MT" und „30Mt"
-      // beide mit sortierung=3): nach Kategorie-Name als Stabilisator.
       const kNameA = kategorieById.get(a.kategorie_id)?.name ?? "";
       const kNameB = kategorieById.get(b.kategorie_id)?.name ?? "";
       if (kNameA !== kNameB) return kNameA.localeCompare(kNameB);
       if (a.sortierung !== b.sortierung) return a.sortierung - b.sortierung;
       return (a.artikelnummer ?? "").localeCompare(b.artikelnummer ?? "");
     });
+    // Page-Slice für die Liste (Hierarchie zeigt eh alles).
+    if (ansicht === "liste") {
+      listing = listing.slice(from, from + PAGE_SIZE);
+    }
   }
 
   // Completeness-Objekt pro Row aus den View-Feldern rekonstruieren (keine Extra-Queries).

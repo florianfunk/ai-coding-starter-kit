@@ -21,6 +21,7 @@ import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { type ProduktFormState } from "./actions";
 import { ALL_PRODUKT_FIELDS, PRODUKT_FIELD_GROUPS } from "./fields";
 import { ProduktBildSlot } from "./produkt-bild-slot";
+import { ElektrischCalcButton } from "./elektrisch-calc-button";
 
 type Marke = "lichtengros" | "eisenkeil";
 
@@ -645,6 +646,11 @@ export function ProduktForm({
               </AccordionTrigger>
               <SectionSaveButton pending={pending || uploading} dirty={isDirty(group.tab)} floating />
               <AccordionContent className="px-4 pb-4">
+                {group.tab === "elektrisch" && (
+                  <div className="mb-3 flex justify-end">
+                    <ElektrischCalcButton />
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
                   {group.fields.map((f) => (
                     <FieldInput key={f.col} field={f} defaultValue={defaultValues[f.col]} />

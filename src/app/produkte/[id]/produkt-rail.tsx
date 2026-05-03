@@ -1,6 +1,11 @@
 import { Check, AlertTriangle, FileText, Edit3, Sparkles, Cpu, Zap, Tag, Bolt, Images, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { CompletenessResult } from "@/lib/completeness";
+import { PRODUKT_FIELD_GROUPS } from "../fields";
+
+function fieldsForTab(tab: string): string[] {
+  return PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab)?.fields.map((f) => f.col) ?? [];
+}
 
 type SectionStat = {
   id: string;
@@ -67,41 +72,18 @@ export function buildSectionStats(
   ];
   const datenblattBilderDone = datenblattBilder.filter((k) => val(k)).length;
 
-  const elektrisch = [
-    "leistung_w",
-    "nennstrom_a",
-    "nennspannung_v",
-    "schutzklasse",
-    "spannungsart",
-    "gesamteffizienz_lm_w",
-  ];
+  // Feldlisten direkt aus fields.ts spiegeln, damit Form & Sidebar nie auseinanderlaufen.
+  const elektrisch = fieldsForTab("elektrisch");
   const elektrischDone = elektrisch.filter((k) => val(k)).length;
 
-  const lichttechnisch = [
-    "lichtstrom_lm",
-    "abstrahlwinkel_grad",
-    "energieeffizienzklasse",
-    "farbtemperatur_k",
-    "farbkonsistenz_sdcm",
-    "farbwiedergabeindex_cri",
-    "lebensdauer_h",
-    "lichtausbeute_lm_pro_w",
-  ];
+  const lichttechnisch = fieldsForTab("lichttechnisch");
   const lichttechnischDone = lichttechnisch.filter((k) => val(k)).length;
 
-  const mechanisch = [
-    "laenge_mm",
-    "breite_mm",
-    "hoehe_mm",
-    "gewicht_g",
-    "material",
-    "farbe",
-    "montageart",
-    "schutzart_ip",
-  ];
+  const mechanisch = fieldsForTab("mechanisch");
   const mechanischDone = mechanisch.filter((k) => val(k)).length;
 
-  const thermisch = ["betriebstemperatur_min_c", "betriebstemperatur_max_c", "lagertemperatur_text", "waermeentwicklung"];
+  // Form merged „thermisch" + „sonstiges" in eine UI-Section (siehe produkt-form.tsx).
+  const thermisch = [...fieldsForTab("thermisch"), ...fieldsForTab("sonstiges")];
   const thermischDone = thermisch.filter((k) => val(k)).length;
 
   return [

@@ -216,6 +216,11 @@ export function ProduktForm({
     [defaultValues, iconIds.length],
   );
 
+  // Die folgenden useCallbacks setzen wir bewusst — React Compiler meldet
+  // "Compilation Skipped: Existing memoization could not be preserved", weil
+  // er die Memoisierung selbst übernehmen möchte. Wir behalten useCallback,
+  // weil der manuelle Vertrag mit Konsumenten (stable identity) klarer ist.
+  /* eslint-disable react-hooks/preserve-manual-memoization */
   const toggleManualComplete = useCallback((id: SectionId) => {
     setManualComplete((prev) => {
       const next = new Set(prev);
@@ -293,6 +298,14 @@ export function ProduktForm({
     markDirty("datenblatt");
   }, [markDirty]);
 
+  // Lazy-Provider für AITeaserButton — wird erst beim Klick aufgerufen,
+  // damit datenblattContextRef.current jeweils aktuell ist.
+  const getDatenblattTeaserContext = useCallback((): string | null => {
+    const cur = datenblattContextRef.current;
+    if (!cur) return (defaultValues.info_kurz as string | null) ?? null;
+    return isHtmlContent(cur) ? htmlToPlainText(cur) : cur;
+  }, [defaultValues.info_kurz]);
+
   const allOpen = openSections.length === SECTION_IDS.length;
 
   const handleSectionsChange = useCallback((value: string[]) => {
@@ -305,11 +318,13 @@ export function ProduktForm({
     setOpenSections(next);
     saveOpenSections(next);
   }, [allOpen]);
+  /* eslint-enable react-hooks/preserve-manual-memoization */
 
   useEffect(() => {
     if (state.error) toast.error(state.error);
     if (state.error === null && state !== initial && !pending) {
       toast.success("Gespeichert");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset nach Save
       setDirtySections(new Set());
     }
   }, [state, pending]);
@@ -578,13 +593,7 @@ export function ProduktForm({
                     <AITeaserButton
                       entityType="produkt"
                       entityName={name || artikelnummer}
-                      entityContext={
-                        datenblattContextRef.current
-                          ? isHtmlContent(datenblattContextRef.current)
-                            ? htmlToPlainText(datenblattContextRef.current)
-                            : datenblattContextRef.current
-                          : (defaultValues.info_kurz as string | null) ?? null
-                      }
+                      entityContext={getDatenblattTeaserContext}
                       onAccept={handleProduktTeaserAccept}
                     />
                   </div>

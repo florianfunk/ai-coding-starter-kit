@@ -977,7 +977,7 @@ function FieldInput({
   field,
   defaultValue,
 }: {
-  field: { col: string; label: string; type: string; unit?: string; options?: string[]; colSpan?: "full" };
+  field: { col: string; label: string; type: string; unit?: string; options?: string[]; colSpan?: "full"; rows?: number };
   defaultValue: any;
 }) {
   const tooltip = FIELD_TOOLTIPS[field.col];
@@ -1000,6 +1000,7 @@ function FieldInput({
     );
   }
   const hasOptions = field.options && field.options.length > 0;
+  const isMultiline = field.rows && field.rows > 1;
   return (
     <div className={wrapperClass}>
       <Label htmlFor={field.col} className="text-xs inline-flex items-center gap-1.5">
@@ -1007,7 +1008,15 @@ function FieldInput({
         {field.unit && <span className="text-muted-foreground">({field.unit})</span>}
         {tooltip && <FieldInfo text={tooltip} />}
       </Label>
-      {hasOptions ? (
+      {isMultiline ? (
+        <Textarea
+          id={field.col}
+          name={field.col}
+          rows={field.rows}
+          defaultValue={defaultValue ?? ""}
+          className="text-sm"
+        />
+      ) : hasOptions ? (
         <OptionsCombo
           id={field.col}
           name={field.col}

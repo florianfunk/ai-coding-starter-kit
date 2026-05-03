@@ -10,6 +10,8 @@ export type FieldDef = {
   options?: string[];
   /** Optional: Breite im Grid. "full" = volle Zeile. */
   colSpan?: "full";
+  /** Optional: rendert eine Textarea statt eines Inputs. Wert = Zeilenanzahl. */
+  rows?: number;
 };
 
 export const PRODUKT_FIELD_GROUPS: { tab: string; title: string; fields: FieldDef[] }[] = [
@@ -215,7 +217,7 @@ export const PRODUKT_FIELD_GROUPS: { tab: string; title: string; fields: FieldDe
     title: "Sonstiges",
     fields: [
       { col: "mit_betriebsgeraet", label: "Mit Betriebsgerät", type: "bool" },
-      { col: "optional_text", label: "Optional", type: "text", colSpan: "full" },
+      { col: "optional_text", label: "Optional", type: "text", colSpan: "full", rows: 4 },
       // Hinweis: „zertifikate" wurde aus der UI entfernt — die Pflege läuft
       // jetzt über die Icons-Section (Gruppe „Zertifikate"). DB-Spalte bleibt
       // bestehen für Migrations-/Altdaten.

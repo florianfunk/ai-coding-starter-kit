@@ -72,8 +72,9 @@ export function MediathekPicker({
     void getMediathekFilterOptions().then(setFilterOptions);
   }, [open, filterOptions]);
 
-  // Wenn Bereich wechselt, Kategorie zurücksetzen (sonst kann sie inkonsistent sein)
+  // Wenn Bereich wechselt, Kategorie zurücksetzen (sonst kann sie inkonsistent sein).
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Cross-Filter-Reset
     setKategorieId("all");
   }, [bereichId]);
 

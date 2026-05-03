@@ -22,6 +22,9 @@ export function useWizardDefaults() {
   const [parameter, setParameterState] = useState<WizardParameter>(DEFAULT_PARAMETER);
   const [hydrated, setHydrated] = useState(false);
 
+  // Hydration aus localStorage — unvermeidbar setState-im-Effect, weil
+  // localStorage nur clientseitig verfügbar ist.
+  /* eslint-disable react-hooks/set-state-in-effect -- localStorage-Hydration */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -34,6 +37,7 @@ export function useWizardDefaults() {
     }
     setHydrated(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const setParameter = useCallback((next: WizardParameter) => {
     setParameterState(next);

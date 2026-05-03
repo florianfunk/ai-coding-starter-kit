@@ -24,9 +24,10 @@ export function CreateUserDialog() {
   const [open, setOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Close dialog on success (redirect handles this, but as safety)
+  // Close dialog on success (redirect handles this, but as safety).
   useEffect(() => {
     if (state.success) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- One-Shot success
       setOpen(false);
       formRef.current?.reset();
     }

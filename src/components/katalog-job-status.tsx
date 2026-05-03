@@ -72,7 +72,9 @@ export function KatalogJobStatus({
       }
       // Bei bereits abgeschlossenen Jobs (done/error) trotzdem einmal die
       // Server-Daten laden — sonst fehlt die PDF-URL bzw. der Fehlertext
-      // beim ersten Render der Seite (LOW-2 Fix).
+      // beim ersten Render der Seite (LOW-2 Fix). fetchStatus löst intern
+      // einen setState aus, das ist hier bewusst.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- One-Shot-Refresh
       if (status === "done" && !pdfUrl) fetchStatus();
       else if (status === "error" && !errorText) fetchStatus();
       return;

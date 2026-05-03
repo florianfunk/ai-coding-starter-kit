@@ -735,4 +735,10 @@
   .accent-underline {
     @apply border-b-4 border-primary pb-1;
   }
+
+  /* Anchor-Sprünge (Sidebar-Links auf Produkt-Form) müssen unter den
+     sticky Topnav (56px) springen — sonst ist der Section-Header verdeckt. */
+  [id^="section-"] {
+    scroll-margin-top: 120px;
+  }
 }

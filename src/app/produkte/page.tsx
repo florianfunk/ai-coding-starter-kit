@@ -54,16 +54,50 @@ export default async function ProdukteListPage({
   if (sp.vollstaendigkeit === "unvollstaendig") query = query.lte("completeness_percent", 80);
   if (sp.vollstaendigkeit === "vollstaendig")   query = query.gt("completeness_percent", 80);
 
-  const sort = sp.sort ?? "artikelnummer";
-  const [col, dir] = sort.startsWith("-") ? [sort.slice(1), "desc"] : [sort, "asc"];
-  query = query.order(col, { ascending: dir === "asc" });
+  // Sortierung:
+  // - Hierarchie: nach Produkt-Sortierung innerhalb der Gruppen (Gruppen werden client-side
+  //   nach Bereich/Kategorie-Sortierung geordnet).
+  // - Liste (Default ohne ?sort=): gleiche Reihenfolge wie Hierarchie, aber flach — also
+  //   nach Bereich-Sortierung → Kategorie-Sortierung → Produkt-Sortierung → Artikelnummer.
+  //   Da die View nur Produkt-eigene Felder kennt, sortieren wir nach dem Laden in-memory
+  //   mit den Bereich-/Kategorie-Indizes aus dem Cache.
+  // - Liste mit explizitem ?sort=…: User-Wahl gewinnt.
+  const userSort = sp.sort;
+  if (userSort) {
+    const [col, dir] = userSort.startsWith("-") ? [userSort.slice(1), "desc"] : [userSort, "asc"];
+    query = query.order(col, { ascending: dir === "asc" });
+  } else {
+    // Sinnvoller Default: nach Produkt-Sortierung, dann Artikelnummer (innerhalb Kategorie).
+    query = query.order("sortierung", { ascending: true }).order("artikelnummer", { ascending: true });
+  }
   // In der Hierarchie-Ansicht alle Produkte laden (gruppiert dargestellt, keine Pagination).
   if (ansicht === "liste") {
     query = query.range(from, to);
   }
 
   const { data: produkte, count } = await query;
-  const listing = (produkte ?? []) as ProduktListing[];
+  let listing = (produkte ?? []) as ProduktListing[];
+
+  // Default-Sortierung in der Liste-Ansicht: erst Bereich-Sortierung, dann Kategorie-
+  // Sortierung — wie in der Hierarchie. Nur wenn der User nicht explizit per ?sort= sortiert.
+  if (ansicht === "liste" && !userSort) {
+    // Bereiche-Cache ist bereits nach sortierung ASC; Kategorien-Cache ist nach Name sortiert,
+    // daher hier explizit nach sortierung ordnen.
+    const bereichOrder = new Map(bereiche.map((b, i) => [b.id, i]));
+    const kategorieOrder = new Map(
+      [...kategorien].sort((a, b) => a.sortierung - b.sortierung).map((k, i) => [k.id, i]),
+    );
+    listing = [...listing].sort((a, b) => {
+      const bA = bereichOrder.get(a.bereich_id) ?? 9999;
+      const bB = bereichOrder.get(b.bereich_id) ?? 9999;
+      if (bA !== bB) return bA - bB;
+      const kA = kategorieOrder.get(a.kategorie_id) ?? 9999;
+      const kB = kategorieOrder.get(b.kategorie_id) ?? 9999;
+      if (kA !== kB) return kA - kB;
+      if (a.sortierung !== b.sortierung) return a.sortierung - b.sortierung;
+      return (a.artikelnummer ?? "").localeCompare(b.artikelnummer ?? "");
+    });
+  }
 
   // Completeness-Objekt pro Row aus den View-Feldern rekonstruieren (keine Extra-Queries).
   // Die MV liefert nur percent/is_complete; für den Tooltip brauchen wir aber die Liste
@@ -245,8 +279,8 @@ export default async function ProdukteListPage({
                 hauptbild_path: p.hauptbild_path,
                 artikel_bearbeitet: p.artikel_bearbeitet,
               }))}
-              bereiche={bereiche.map((b) => ({ id: b.id, name: b.name }))}
-              kategorien={kategorien.map((k) => ({ id: k.id, name: k.name, bereich_id: k.bereich_id }))}
+              bereiche={bereiche.map((b) => ({ id: b.id, name: b.name, sortierung: b.sortierung }))}
+              kategorien={kategorien.map((k) => ({ id: k.id, name: k.name, bereich_id: k.bereich_id, sortierung: k.sortierung }))}
               completenessMap={completenessMap}
               hasFilter={hasFilter}
             />

@@ -18,8 +18,8 @@ type ProduktItem = {
   artikel_bearbeitet: boolean;
 };
 
-type Bereich = { id: string; name: string };
-type Kategorie = { id: string; name: string; bereich_id: string };
+type Bereich = { id: string; name: string; sortierung?: number };
+type Kategorie = { id: string; name: string; bereich_id: string; sortierung?: number };
 
 type Props = {
   produkte: ProduktItem[];
@@ -49,7 +49,9 @@ export function ProdukteHierarchie({ produkte, bereiche, kategorien, completenes
     return byBereich;
   }, [produkte]);
 
-  const sichtbareBereiche = bereiche.filter((b) => grouped.has(b.id));
+  const sortierteBereiche = [...bereiche].sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0));
+  const sortierteKategorien = [...kategorien].sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0));
+  const sichtbareBereiche = sortierteBereiche.filter((b) => grouped.has(b.id));
 
   if (sichtbareBereiche.length === 0) {
     return (
@@ -69,7 +71,7 @@ export function ProdukteHierarchie({ produkte, bereiche, kategorien, completenes
         const bereichMap = grouped.get(b.id)!;
         const totalProdukte = Array.from(bereichMap.values()).reduce((sum, l) => sum + l.length, 0);
         const totalKategorien = bereichMap.size;
-        const sichtbareKategorien = kategorien.filter((k) => k.bereich_id === b.id && bereichMap.has(k.id));
+        const sichtbareKategorien = sortierteKategorien.filter((k) => k.bereich_id === b.id && bereichMap.has(k.id));
 
         return (
           <AccordionItem key={b.id} value={b.id} className="border-0">

@@ -8,6 +8,8 @@ type SectionStat = {
   icon: LucideIcon;
   done: number;
   total: number;
+  /** True wenn die Section vom Pfleger als „alle Daten eingegeben" markiert wurde. */
+  manualComplete?: boolean;
 };
 
 type Check = { ok: boolean; text: string; sub?: string };
@@ -20,11 +22,17 @@ function sectionColorVar(pct: number) {
   return "--destructive";
 }
 
-/** Compute section stats from the actual Produkt row + related counts */
+/** Compute section stats from the actual Produkt row + related counts.
+ *  Sections, die in `produkt.vollstaendig_sections` stehen, werden als
+ *  100 % gewertet (done = total), unabhängig von den tatsächlichen Werten. */
 export function buildSectionStats(
   produkt: Record<string, unknown>,
   ctx: { hasActivePrice: boolean; iconCount: number; galerieCount: number; hasTemplate: boolean },
 ): SectionStat[] {
+  const manualSections = new Set<string>(
+    Array.isArray(produkt.vollstaendig_sections) ? (produkt.vollstaendig_sections as string[]) : [],
+  );
+  const isManual = (id: string) => manualSections.has(id);
   const val = (k: string) => {
     const v = produkt[k];
     return v != null && v !== "" && v !== false;
@@ -76,13 +84,53 @@ export function buildSectionStats(
   const thermisch = ["betriebstemperatur_min_c", "betriebstemperatur_max_c", "lagertemperatur_text", "waermeentwicklung"];
   const thermischDone = thermisch.filter((k) => val(k)).length;
 
+  // „Lichttechnik" in der Sidebar fasst die Form-Sections elektrisch +
+  // lichttechnisch zusammen (in der Form sind das 2 Sections, die beide
+  // den Pauschal-Bucket „Technische Daten" füllen).
+  const lichttechnikManual = isManual("lichttechnisch") || isManual("elektrisch");
+
   return [
     { id: "base", label: "Grunddaten", icon: FileText, done: baseDone, total: base.length },
-    { id: "datenblatt", label: "Datenblatt", icon: Edit3, done: datenblattDone, total: datenblatt.length },
-    { id: "lichttechnisch", label: "Lichttechnik", icon: Sparkles, done: lichttechnischDone, total: lichttechnisch.length },
-    { id: "mechanisch", label: "Mechanisch", icon: Cpu, done: mechanischDone, total: mechanisch.length },
-    { id: "thermisch", label: "Thermisch & Sonstiges", icon: Zap, done: thermischDone, total: thermisch.length },
-    { id: "icons", label: "Icons & Tags", icon: Tag, done: Math.min(ctx.iconCount, 10), total: 10 },
+    {
+      id: "datenblatt",
+      label: "Datenblatt",
+      icon: Edit3,
+      done: isManual("datenblatt") ? datenblatt.length : datenblattDone,
+      total: datenblatt.length,
+      manualComplete: isManual("datenblatt"),
+    },
+    {
+      id: "lichttechnisch",
+      label: "Lichttechnik",
+      icon: Sparkles,
+      done: lichttechnikManual ? lichttechnisch.length : lichttechnischDone,
+      total: lichttechnisch.length,
+      manualComplete: lichttechnikManual,
+    },
+    {
+      id: "mechanisch",
+      label: "Mechanisch",
+      icon: Cpu,
+      done: isManual("mechanisch") ? mechanisch.length : mechanischDone,
+      total: mechanisch.length,
+      manualComplete: isManual("mechanisch"),
+    },
+    {
+      id: "thermisch",
+      label: "Thermisch & Sonstiges",
+      icon: Zap,
+      done: isManual("thermisch") ? thermisch.length : thermischDone,
+      total: thermisch.length,
+      manualComplete: isManual("thermisch"),
+    },
+    {
+      id: "icons",
+      label: "Icons & Tags",
+      icon: Tag,
+      done: isManual("icons") ? 10 : Math.min(ctx.iconCount, 10),
+      total: 10,
+      manualComplete: isManual("icons"),
+    },
   ];
 }
 
@@ -195,9 +243,19 @@ export async function ProduktRail({
                   <Icon className="h-3 w-3" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[12.5px] font-medium leading-tight">{s.label}</div>
+                  <div className="flex items-center gap-1 text-[12.5px] font-medium leading-tight">
+                    <span className="truncate">{s.label}</span>
+                    {s.manualComplete && (
+                      <Check
+                        className="h-3 w-3 shrink-0"
+                        style={{ color: "hsl(var(--green))" }}
+                        aria-label="Als vollständig markiert"
+                      />
+                    )}
+                  </div>
                   <div className="font-mono text-[10.5px] tabular-nums text-muted-foreground/80">
                     {s.done}/{s.total}
+                    {s.manualComplete && " · markiert"}
                   </div>
                 </div>
                 <div className="w-8">

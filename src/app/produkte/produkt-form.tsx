@@ -47,6 +47,8 @@ const FIELD_TOOLTIPS: Record<string, string> = {
 
 const initial: ProduktFormState = { error: null };
 
+const EMPTY_SET: ReadonlySet<string> = new Set();
+
 const STORAGE_KEY = "produkt-form-sections";
 
 const SECTION_IDS = ["datenblatt", "datenblatt-bilder", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
@@ -201,6 +203,12 @@ export function ProduktForm({
       ),
     );
   });
+
+  /** Roher Section-Progress ohne Markierungs-Effekt — für den Toggle. */
+  const rawProgress = useCallback(
+    (id: SectionId) => sectionProgress(id, defaultValues, iconIds.length, EMPTY_SET),
+    [defaultValues, iconIds.length],
+  );
 
   const toggleManualComplete = useCallback((id: SectionId) => {
     setManualComplete((prev) => {
@@ -465,6 +473,8 @@ export function ProduktForm({
           <SectionCompleteToggle
             active={manualComplete.has("datenblatt")}
             onToggle={() => toggleManualComplete("datenblatt")}
+            fieldsFilled={rawProgress("datenblatt").done}
+            fieldsTotal={rawProgress("datenblatt").total}
           />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt")} floating />
           <AccordionContent className="px-4 pb-4">
@@ -562,6 +572,8 @@ export function ProduktForm({
           <SectionCompleteToggle
             active={manualComplete.has("datenblatt-bilder")}
             onToggle={() => toggleManualComplete("datenblatt-bilder")}
+            fieldsFilled={rawProgress("datenblatt-bilder").done}
+            fieldsTotal={rawProgress("datenblatt-bilder").total}
           />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt-bilder")} floating />
           <AccordionContent className="px-4 pb-4">
@@ -694,6 +706,8 @@ export function ProduktForm({
               <SectionCompleteToggle
                 active={manualComplete.has(group.tab as SectionId)}
                 onToggle={() => toggleManualComplete(group.tab as SectionId)}
+                fieldsFilled={rawProgress(group.tab as SectionId).done}
+                fieldsTotal={rawProgress(group.tab as SectionId).total}
               />
               <SectionSaveButton pending={pending || uploading} dirty={isDirty(group.tab)} floating />
               <AccordionContent className="px-4 pb-4">
@@ -731,6 +745,8 @@ export function ProduktForm({
           <SectionCompleteToggle
             active={manualComplete.has("thermisch")}
             onToggle={() => toggleManualComplete("thermisch")}
+            fieldsFilled={rawProgress("thermisch").done}
+            fieldsTotal={rawProgress("thermisch").total}
           />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("thermisch")} floating />
           <AccordionContent className="px-4 pb-4">
@@ -765,6 +781,8 @@ export function ProduktForm({
           <SectionCompleteToggle
             active={manualComplete.has("icons")}
             onToggle={() => toggleManualComplete("icons")}
+            fieldsFilled={rawProgress("icons").done}
+            fieldsTotal={rawProgress("icons").total}
           />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("icons")} floating />
           <AccordionContent className="px-4 pb-4">
@@ -809,14 +827,25 @@ export function ProduktForm({
  * Toggle-Button im Section-Header: markiert die Section als „alle Daten
  * eingegeben". Wirkt sich sofort auf den Section-Progress (100 %) und nach
  * dem Speichern auf die globale Completeness aus.
+ *
+ * Wird ausgeblendet, wenn die Section ohne Markierung schon zu 100 % gefüllt
+ * ist — dann ist nichts zu markieren. Ist die Markierung aktiv, bleibt der
+ * Button immer sichtbar, damit man sie auch wieder entfernen kann.
  */
 function SectionCompleteToggle({
   active,
   onToggle,
+  fieldsFilled,
+  fieldsTotal,
 }: {
   active: boolean;
   onToggle: () => void;
+  /** Anzahl tatsächlich gefüllter Felder (ohne Markierung gerechnet). */
+  fieldsFilled: number;
+  /** Gesamtzahl der Felder dieser Section. */
+  fieldsTotal: number;
 }) {
+  if (!active && fieldsFilled >= fieldsTotal && fieldsTotal > 0) return null;
   return (
     <button
       type="button"

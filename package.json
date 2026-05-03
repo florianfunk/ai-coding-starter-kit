@@ -1,6 +1,6 @@
 {
   "name": "ai-coding-starter-kit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI Coding Starter Kit with AI Agent Team System for Claude Code",
   "private": true,
   "scripts": {

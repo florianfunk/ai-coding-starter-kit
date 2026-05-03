@@ -8,6 +8,8 @@ export type FieldDef = {
   unit?: string;
   /** Optional: Vorschlagswerte für Datalist-Dropdown. Custom-Werte bleiben erlaubt. */
   options?: string[];
+  /** Optional: Breite im Grid. "full" = volle Zeile. */
+  colSpan?: "full";
 };
 
 export const PRODUKT_FIELD_GROUPS: { tab: string; title: string; fields: FieldDef[] }[] = [
@@ -213,7 +215,7 @@ export const PRODUKT_FIELD_GROUPS: { tab: string; title: string; fields: FieldDe
     title: "Sonstiges",
     fields: [
       { col: "mit_betriebsgeraet", label: "Mit Betriebsgerät", type: "bool" },
-      { col: "optional_text", label: "Optional", type: "text" },
+      { col: "optional_text", label: "Optional", type: "text", colSpan: "full" },
       // Hinweis: „zertifikate" wurde aus der UI entfernt — die Pflege läuft
       // jetzt über die Icons-Section (Gruppe „Zertifikate"). DB-Spalte bleibt
       // bestehen für Migrations-/Altdaten.

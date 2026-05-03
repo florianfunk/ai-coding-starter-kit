@@ -96,8 +96,6 @@ const TECH_SONSTIGE: ColumnDef[] = [
 const DATENBLATT: ColumnDef[] = [
   { key: "datenblatt_titel", label: "Datenblatt-Titel" },
   { key: "datenblatt_text", label: "Datenblatt-Text" },
-  { key: "datenblatt_text_2", label: "Datenblatt-Text 2" },
-  { key: "datenblatt_text_3", label: "Datenblatt-Text 3" },
 ];
 
 type ColumnGroup = {

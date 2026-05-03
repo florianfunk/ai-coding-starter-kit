@@ -35,8 +35,6 @@ const COLUMN_LABELS: Record<string, string> = {
   gueltig_ab: "Preis gueltig ab",
   datenblatt_titel: "Datenblatt-Titel",
   datenblatt_text: "Datenblatt-Text",
-  datenblatt_text_2: "Datenblatt-Text 2",
-  datenblatt_text_3: "Datenblatt-Text 3",
   leistung_w: "Leistung (W)",
   nennstrom_a: "Nennstrom (A)",
   nennspannung_v: "Nennspannung (V)",

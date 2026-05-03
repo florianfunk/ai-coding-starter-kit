@@ -32,7 +32,7 @@ function sectionColorVar(pct: number) {
  *  100 % gewertet (done = total), unabhängig von den tatsächlichen Werten. */
 export function buildSectionStats(
   produkt: Record<string, unknown>,
-  ctx: { hasActivePrice: boolean; iconCount: number; galerieCount: number; hasTemplate: boolean },
+  ctx: { hasActivePrice: boolean; iconCount: number; hasTemplate: boolean },
 ): SectionStat[] {
   const manualSections = new Set<string>(
     Array.isArray(produkt.vollstaendig_sections) ? (produkt.vollstaendig_sections as string[]) : [],
@@ -63,8 +63,6 @@ export function buildSectionStats(
   const datenblatt: Array<[string, boolean]> = [
     ["datenblatt_titel", val("datenblatt_titel")],
     ["datenblatt_text", val("datenblatt_text")],
-    ["datenblatt_text_2", val("datenblatt_text_2")],
-    ["datenblatt_text_3", val("datenblatt_text_3")],
     ["template", ctx.hasTemplate],
   ];
   const datenblattDone = datenblatt.filter(([, v]) => v).length;
@@ -157,7 +155,7 @@ export function buildSectionStats(
 export function buildChecks(
   completeness: CompletenessResult,
   sections: SectionStat[],
-  ctx: { galerieCount: number; hasTemplate: boolean },
+  ctx: { hasTemplate: boolean },
 ): Check[] {
   const checks: Check[] = [];
   const missing = new Set(completeness.missing);
@@ -180,12 +178,6 @@ export function buildChecks(
     checks.push({ ok: false, text: "Datenblatt-Vorlage fehlt", sub: "Keine Vorlage zugeordnet" });
   } else {
     checks.push({ ok: true, text: "Datenblatt-Vorlage gesetzt" });
-  }
-
-  if (ctx.galerieCount === 0) {
-    checks.push({ ok: false, text: "Galerie leer", sub: "Mindestens 1 Bild empfohlen" });
-  } else {
-    checks.push({ ok: true, text: `Galerie · ${ctx.galerieCount} Bilder` });
   }
 
   return checks;

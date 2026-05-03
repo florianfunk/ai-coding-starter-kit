@@ -171,7 +171,7 @@ export function PreiseSection({ produktId, preise }: Props) {
         </Dialog>
       </div>
 
-      <div className="grid gap-3 p-4 md:grid-cols-3">
+      <div className="grid gap-2 p-3 sm:grid-cols-3">
         {SPUR_ORDER.map((spur) => {
           const aktuellId = aktuellerPreisIdProSpur[spur];
           const aktuellPreis = aktuellId
@@ -180,117 +180,122 @@ export function PreiseSection({ produktId, preise }: Props) {
           return (
             <div
               key={spur}
-              className="rounded-[14px] border border-border/60 bg-card/40 p-4"
+              className="flex items-center justify-between gap-3 rounded-[10px] border border-border/60 bg-card/40 px-3 py-2"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                {SPUR_LABELS[spur]}
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {SPUR_LABELS[spur]}
+                </div>
+                {aktuellPreis ? (
+                  <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                    ab {aktuellPreis.gueltig_ab}
+                  </div>
+                ) : (
+                  <div className="mt-0.5 font-mono text-[11px] text-muted-foreground/60">
+                    kein Preis
+                  </div>
+                )}
               </div>
               {aktuellPreis ? (
-                <>
-                  <div className="mt-1 font-mono text-2xl font-semibold tabular-nums">
-                    {formatPreis(Number(aktuellPreis.preis))}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                    gültig ab {aktuellPreis.gueltig_ab}
-                  </div>
-                </>
+                <div className="font-mono text-base font-semibold tabular-nums">
+                  {formatPreis(Number(aktuellPreis.preis))}
+                </div>
               ) : (
-                <>
-                  <div className="mt-1 font-mono text-2xl font-semibold tabular-nums text-muted-foreground/60">
-                    —
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 h-7"
-                    onClick={() => openAddDialog(spur)}
-                  >
-                    <Plus className="h-3 w-3" /> Preis anlegen
-                  </Button>
-                </>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-7 w-7"
+                  onClick={() => openAddDialog(spur)}
+                  aria-label={`Preis für ${SPUR_LABELS[spur]} anlegen`}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               )}
             </div>
           );
         })}
       </div>
 
-      <div className="space-y-4 px-4 pb-4">
-        {SPUR_ORDER.map((spur) => {
-          const zeilen = grouped[spur];
-          const aktuellId = aktuellerPreisIdProSpur[spur];
-          return (
-            <div key={spur} className="overflow-hidden rounded-[10px] border border-border/60">
-              <div className="flex items-center justify-between border-b border-border/60 bg-muted/30 px-4 py-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.08em]">
-                  {SPUR_LABELS[spur]}
-                </div>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {zeilen.length} {zeilen.length === 1 ? "Eintrag" : "Einträge"}
-                </span>
-              </div>
-              {zeilen.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  Noch kein Preis hinterlegt.
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="pl-4 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                        Gültig ab
-                      </TableHead>
-                      <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                        Preis
-                      </TableHead>
-                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                        Status
-                      </TableHead>
-                      <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                        Quelle
-                      </TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {zeilen.map((p) => {
-                      const status = getStatus(p.gueltig_ab, p.id === aktuellId, today);
-                      return (
-                        <TableRow
-                          key={p.id}
-                          className={status === "aktuell" ? "bg-[hsl(var(--green))]/10" : undefined}
+      <div className="px-3 pb-3">
+        <div className="overflow-hidden rounded-[10px] border border-border/60">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="pl-3 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                  Spur
+                </TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                  Gültig ab
+                </TableHead>
+                <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                  Preis
+                </TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                  Status
+                </TableHead>
+                <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+                  Quelle
+                </TableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {SPUR_ORDER.flatMap((spur) => {
+                const zeilen = grouped[spur];
+                const aktuellId = aktuellerPreisIdProSpur[spur];
+                if (zeilen.length === 0) {
+                  return [
+                    <TableRow key={`empty-${spur}`} className="hover:bg-transparent">
+                      <TableCell className="pl-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        {SPUR_LABELS[spur]}
+                      </TableCell>
+                      <TableCell colSpan={5} className="text-sm text-muted-foreground">
+                        Noch kein Preis hinterlegt.
+                      </TableCell>
+                    </TableRow>,
+                  ];
+                }
+                return zeilen.map((p, idx) => {
+                  const status = getStatus(p.gueltig_ab, p.id === aktuellId, today);
+                  return (
+                    <TableRow
+                      key={p.id}
+                      className={status === "aktuell" ? "bg-[hsl(var(--green))]/10" : undefined}
+                    >
+                      <TableCell className="pl-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        {idx === 0 ? SPUR_LABELS[spur] : ""}
+                      </TableCell>
+                      <TableCell className="font-mono text-[12px] tabular-nums">
+                        {p.gueltig_ab}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-[13px] font-semibold tabular-nums">
+                        {formatPreis(Number(p.preis))}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={status} />
+                      </TableCell>
+                      <TableCell className="font-mono text-[11px] text-muted-foreground">
+                        {p.quelle}
+                      </TableCell>
+                      <TableCell className="pr-1 text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setDeleteTarget(p)}
+                          disabled={pending}
+                          aria-label="Preis löschen"
                         >
-                          <TableCell className="pl-4 font-mono text-[13px] tabular-nums">
-                            {p.gueltig_ab}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-semibold tabular-nums">
-                            {formatPreis(Number(p.preis))}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={status} />
-                          </TableCell>
-                          <TableCell className="font-mono text-[11px] text-muted-foreground">
-                            {p.quelle}
-                          </TableCell>
-                          <TableCell className="pr-2 text-right">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteTarget(p)}
-                              disabled={pending}
-                              aria-label="Preis löschen"
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          );
-        })}
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                });
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <AlertDialog

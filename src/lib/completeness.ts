@@ -51,7 +51,6 @@ type FieldCheck = {
 type CompletenessContext = {
   hasActivePrice: boolean;
   iconCount: number;
-  galerieCount: number;
 };
 
 const FIELDS: FieldCheck[] = [
@@ -100,11 +99,6 @@ const FIELDS: FieldCheck[] = [
       p.breite_mm != null ||
       p.hoehe_mm != null ||
       hasSection(p, "mechanisch"),
-  },
-  {
-    label: "Galerie-Bild",
-    weight: 3,
-    check: (p, ctx) => ctx.galerieCount > 0 || hasSection(p, "datenblatt-bilder"),
   },
   {
     label: "Icon zugeordnet",

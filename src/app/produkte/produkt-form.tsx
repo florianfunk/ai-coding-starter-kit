@@ -110,7 +110,7 @@ function sectionProgress(
     total = 10;
     done = Math.min(iconCount, 10);
   } else if (sectionId === "datenblatt") {
-    const keys = ["datenblatt_titel", "info_kurz", "treiber", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
+    const keys = ["datenblatt_titel", "info_kurz", "datenblatt_text"];
     total = keys.length;
     done = keys.filter((k) => checkText(defaultValues[k])).length;
   } else if (sectionId === "datenblatt-bilder") {
@@ -576,43 +576,22 @@ export function ProduktForm({
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="treiber">Treiber</Label>
-                <Textarea
-                  id="treiber"
-                  name="treiber"
-                  defaultValue={defaultValues.treiber ?? ""}
-                  placeholder="z. B. inkl. Treiber 24V DC, 30W, dimmbar"
-                  rows={2}
-                  maxLength={1000}
-                />
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label htmlFor="datenblatt_text">Text Block 1</Label>
-                    <AITeaserButton
-                      entityType="produkt"
-                      entityName={name || artikelnummer}
-                      entityContext={getDatenblattTeaserContext}
-                      onAccept={handleProduktTeaserAccept}
-                    />
-                  </div>
-                  <RichTextEditor
-                    name="datenblatt_text"
-                    defaultValue={defaultValues.datenblatt_text ?? ""}
-                    onEditorReady={handleDatenblattReady}
-                    minHeight={220}
+              <div className="space-y-2 w-full">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="datenblatt_text">Text Block</Label>
+                  <AITeaserButton
+                    entityType="produkt"
+                    entityName={name || artikelnummer}
+                    entityContext={getDatenblattTeaserContext}
+                    onAccept={handleProduktTeaserAccept}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="datenblatt_text_2">Text Block 2</Label>
-                  <RichTextEditor name="datenblatt_text_2" defaultValue={defaultValues.datenblatt_text_2 ?? ""} minHeight={220} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="datenblatt_text_3">Text Block 3</Label>
-                  <RichTextEditor name="datenblatt_text_3" defaultValue={defaultValues.datenblatt_text_3 ?? ""} minHeight={220} />
-                </div>
+                <RichTextEditor
+                  name="datenblatt_text"
+                  defaultValue={defaultValues.datenblatt_text ?? ""}
+                  onEditorReady={handleDatenblattReady}
+                  minHeight={320}
+                />
               </div>
             </div>
           </AccordionContent>
@@ -656,17 +635,6 @@ export function ProduktForm({
                     defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
                     onDirty={() => markDirty("datenblatt-bilder")}
                   />
-                  <div className="space-y-1.5">
-                    <Label htmlFor="bild_detail_1_text" className="text-xs">Detail-Text 1</Label>
-                    <Textarea
-                      id="bild_detail_1_text"
-                      name="bild_detail_1_text"
-                      defaultValue={defaultValues.bild_detail_1_text ?? ""}
-                      rows={2}
-                      maxLength={500}
-                      className="text-sm"
-                    />
-                  </div>
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-border/60 p-3">
@@ -679,33 +647,7 @@ export function ProduktForm({
                     defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
                     onDirty={() => markDirty("datenblatt-bilder")}
                   />
-                  <div className="space-y-1.5">
-                    <Label htmlFor="bild_detail_2_text" className="text-xs">Detail-Text 2</Label>
-                    <Textarea
-                      id="bild_detail_2_text"
-                      name="bild_detail_2_text"
-                      defaultValue={defaultValues.bild_detail_2_text ?? ""}
-                      rows={2}
-                      maxLength={500}
-                      className="text-sm"
-                    />
-                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="bild_detail_3_text" className="text-xs">
-                  Detail-Text 3
-                  <span className="ml-1 text-muted-foreground">(erscheint neben Zeichnung 1 im PDF)</span>
-                </Label>
-                <Textarea
-                  id="bild_detail_3_text"
-                  name="bild_detail_3_text"
-                  defaultValue={defaultValues.bild_detail_3_text ?? ""}
-                  rows={2}
-                  maxLength={500}
-                  className="text-sm"
-                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -1035,13 +977,16 @@ function FieldInput({
   field,
   defaultValue,
 }: {
-  field: { col: string; label: string; type: string; unit?: string; options?: string[] };
+  field: { col: string; label: string; type: string; unit?: string; options?: string[]; colSpan?: "full" };
   defaultValue: any;
 }) {
   const tooltip = FIELD_TOOLTIPS[field.col];
+  const wrapperClass = field.colSpan === "full"
+    ? "space-y-2 col-span-2 md:col-span-3 lg:col-span-4"
+    : "space-y-2";
   if (field.type === "bool") {
     return (
-      <div className="space-y-2">
+      <div className={wrapperClass}>
         <Label htmlFor={field.col} className="inline-flex items-center gap-1.5">
           {field.label}
           {tooltip && <FieldInfo text={tooltip} />}
@@ -1056,7 +1001,7 @@ function FieldInput({
   }
   const hasOptions = field.options && field.options.length > 0;
   return (
-    <div className="space-y-2">
+    <div className={wrapperClass}>
       <Label htmlFor={field.col} className="text-xs inline-flex items-center gap-1.5">
         {field.label}
         {field.unit && <span className="text-muted-foreground">({field.unit})</span>}

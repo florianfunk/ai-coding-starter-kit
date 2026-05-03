@@ -31,7 +31,6 @@ const FIELD_ANCHORS: Record<string, string> = {
   "Datenblatt-Vorlage": "section-datenblatt",
   "Technische Daten": "section-technisch",
   Abmessungen: "section-mechanisch",
-  "Galerie-Bild": "section-galerie",
   "Icon zugeordnet": "field-icons",
 };
 
@@ -46,7 +45,6 @@ const ALL_FIELDS = [
   "Datenblatt-Vorlage",
   "Technische Daten",
   "Abmessungen",
-  "Galerie-Bild",
   "Icon zugeordnet",
 ];
 

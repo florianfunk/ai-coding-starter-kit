@@ -61,14 +61,12 @@ export default async function ProdukteListPage({
 
   // Completeness-Objekt pro Row aus den View-Feldern rekonstruieren (keine Extra-Queries).
   // Die MV liefert nur percent/is_complete; für den Tooltip brauchen wir aber die Liste
-  // der fehlenden Felder. Die bauen wir rein in-memory mit calculateCompleteness, wobei
-  // Kontext (hasActivePrice, iconCount, galerieCount) aus der View kommt.
+  // der fehlenden Felder. Die bauen wir rein in-memory mit calculateCompleteness.
   const completenessMap: Record<string, CompletenessResult> = {};
   for (const p of listing) {
     completenessMap[p.id] = calculateCompleteness(p as any, {
       hasActivePrice: Boolean(p.hat_preis),
       iconCount: p.icon_count ?? 0,
-      galerieCount: p.galerie_count ?? 0,
     });
   }
 

@@ -62,7 +62,6 @@ export const SPALTEN_OPTIONEN: SpaltenDefinition[] = [
   { label: "Infofeld", field: "infofeld", align: "left" },
   { label: "Zertifikate", field: "zertifikate", align: "left" },
   { label: "Optional", field: "optional_text", align: "left" },
-  { label: "Treiber", field: "treiber", align: "left" },
   { label: "Leuchtmittel", field: "leuchtmittel", align: "center" },
 
   // --- Spezial ---

@@ -384,7 +384,6 @@ const ARTIKEL_MAP: Record<string, Col> = {
 
   Infofeld: { col: "infofeld", type: "text" },
   t__Info: { col: "info_kurz", type: "text" },
-  w_Treiber: { col: "treiber", type: "text" },
   Datenblatt_art: { col: "datenblatt_art", type: "text" },
   Da_Titel: { col: "datenblatt_titel", type: "text" },
   Da_Beschreibung_1: { col: "datenblatt_text", type: "text" },
@@ -396,10 +395,6 @@ const ARTIKEL_MAP: Record<string, Col> = {
   marker_erledigt: { col: "artikel_bearbeitet", type: "bool" },
   marker_Preis_Status_aktiv: { col: "marker_preis_status", type: "bool" },
   nicht_leer: { col: "nicht_leer", type: "bool" },
-
-  Bild_Detail_1_Text: { col: "bild_detail_1_text", type: "text" },
-  Bild_Detail_2_Text: { col: "bild_detail_2_text", type: "text" },
-  Bild_Detail_3_Text: { col: "bild_detail_3_text", type: "text" },
 
   // Elektrotechnisch
   t_e_Systemleistung: { col: "leistung_w", type: "num" },

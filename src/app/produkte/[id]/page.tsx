@@ -8,7 +8,6 @@ import { ProduktForm } from "../produkt-form";
 import { updateProdukt, type ProduktFormState } from "../actions";
 import { ProduktTopActions } from "./top-actions";
 import { PreiseSection } from "./preise-section";
-import { GalerieSection } from "./galerie-section";
 import { DatenblattSection } from "./datenblatt-section";
 import { ChevronLeft, ChevronRight, FileText, Sparkles } from "lucide-react";
 import type { DatenblattTemplate } from "@/lib/datenblatt";
@@ -36,12 +35,10 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   const [
     { data: produkt },
     { data: produktIcons },
-    { data: galerie },
     { data: preise },
   ] = await Promise.all([
     supabase.from("produkte").select("*").eq("id", id).single(),
     supabase.from("produkt_icons").select("icon_id, wert").eq("produkt_id", id).order("sortierung"),
-    supabase.from("produkt_bilder").select("*").eq("produkt_id", id).order("sortierung"),
     supabase
       .from("preise")
       .select("id, produkt_id, spur, gueltig_ab, preis, quelle, created_at")
@@ -67,10 +64,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   const kategorieRow = kategorien.find((k) => k.id === produkt.kategorie_id) ?? null;
 
   const hauptbildUrl = bildProxyUrl("produktbilder", produkt.hauptbild_path);
-  const galerieMit = (galerie ?? []).map((g) => ({
-    ...g,
-    url: bildProxyUrl("produktbilder", g.storage_path),
-  }));
 
   // PROJ-36: URLs für Datenblatt-Bilder (Detail, Zeichnung, Energielabel)
   const defaultDatenblattBildUrls = {
@@ -110,12 +103,11 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   const todayIso = new Date().toISOString().slice(0, 10);
   const hasActivePrice = (preise ?? []).some((p) => p.gueltig_ab <= todayIso);
   const iconCount = (produktIcons ?? []).length;
-  const galerieCount = (galerie ?? []).length;
   const hasTemplate = Boolean(produkt.datenblatt_template_id);
-  const completeness = calculateCompleteness(produkt, { hasActivePrice, iconCount, galerieCount });
+  const completeness = calculateCompleteness(produkt, { hasActivePrice, iconCount });
 
-  const sectionStats = buildSectionStats(produkt, { hasActivePrice, iconCount, galerieCount, hasTemplate });
-  const checks = buildChecks(completeness, sectionStats, { galerieCount, hasTemplate });
+  const sectionStats = buildSectionStats(produkt, { hasActivePrice, iconCount, hasTemplate });
+  const checks = buildChecks(completeness, sectionStats, { hasTemplate });
 
   const completenessColor =
     completeness.color === "green"
@@ -131,7 +123,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
 
   const tabs = [
     { id: "base", label: "Details", badge: null },
-    { id: "images", label: "Bilder & Galerie", badge: galerieCount },
     { id: "prices", label: "Preise", badge: (preise ?? []).length },
     { id: "datasheet", label: "Datenblatt-Vorlage", badge: null },
     { id: "history", label: "Historie", badge: null },
@@ -271,7 +262,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             />
 
             <PreiseSection produktId={id} preise={preise ?? []} />
-            <GalerieSection produktId={id} bilder={galerieMit} hauptbildPath={produkt.hauptbild_path} />
             <AuditSection produktId={id} />
 
             <div className="mt-2 flex justify-center pt-2">

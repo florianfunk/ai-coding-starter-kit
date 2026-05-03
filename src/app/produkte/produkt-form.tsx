@@ -17,6 +17,7 @@ import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
 import { AiNamenButton, type AiNamenContext } from "@/components/ai-namen-button";
+import { OptionsCombo } from "@/components/options-combo";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { type ProduktFormState } from "./actions";
 import { ALL_PRODUKT_FIELDS, PRODUKT_FIELD_GROUPS } from "./fields";
@@ -1052,7 +1053,7 @@ function FieldInput({
       </div>
     );
   }
-  const datalistId = field.options && field.options.length > 0 ? `dl-${field.col}` : undefined;
+  const hasOptions = field.options && field.options.length > 0;
   return (
     <div className="space-y-2">
       <Label htmlFor={field.col} className="text-xs inline-flex items-center gap-1.5">
@@ -1060,21 +1061,25 @@ function FieldInput({
         {field.unit && <span className="text-muted-foreground">({field.unit})</span>}
         {tooltip && <FieldInfo text={tooltip} />}
       </Label>
-      <Input
-        id={field.col}
-        name={field.col}
-        type={field.type === "number" ? "number" : "text"}
-        step={field.type === "number" ? "any" : undefined}
-        defaultValue={defaultValue ?? ""}
-        list={datalistId}
-        className="text-sm"
-      />
-      {datalistId && (
-        <datalist id={datalistId}>
-          {field.options!.map((opt) => (
-            <option key={opt} value={opt} />
-          ))}
-        </datalist>
+      {hasOptions ? (
+        <OptionsCombo
+          id={field.col}
+          name={field.col}
+          type={field.type === "number" ? "number" : "text"}
+          step={field.type === "number" ? "any" : undefined}
+          defaultValue={defaultValue == null ? "" : String(defaultValue)}
+          options={field.options!}
+          className="text-sm"
+        />
+      ) : (
+        <Input
+          id={field.col}
+          name={field.col}
+          type={field.type === "number" ? "number" : "text"}
+          step={field.type === "number" ? "any" : undefined}
+          defaultValue={defaultValue ?? ""}
+          className="text-sm"
+        />
       )}
     </div>
   );

@@ -393,7 +393,9 @@ export function ProduktForm({
         <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="artikelnummer">Artikelnummer *</Label>
+              <div className="flex h-7 items-center">
+                <Label htmlFor="artikelnummer">Artikelnummer *</Label>
+              </div>
               <Input
                 id="artikelnummer"
                 name="artikelnummer"
@@ -405,7 +407,7 @@ export function ProduktForm({
               {state.fieldErrors?.artikelnummer && <p className="text-sm text-destructive">{state.fieldErrors.artikelnummer}</p>}
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex h-7 items-center justify-between gap-2">
                 <Label htmlFor="name">Bezeichnung</Label>
                 <AiNamenButton
                   getContext={getNamenContext}
@@ -421,7 +423,9 @@ export function ProduktForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sortierung">Sortierung</Label>
+              <div className="flex h-7 items-center">
+                <Label htmlFor="sortierung">Sortierung</Label>
+              </div>
               <Input id="sortierung" name="sortierung" type="number" defaultValue={String(defaultValues.sortierung ?? 0)} />
             </div>
           </div>

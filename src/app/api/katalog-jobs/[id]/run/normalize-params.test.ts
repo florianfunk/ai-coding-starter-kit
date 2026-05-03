@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeParams } from "./route";
+import { normalizeParams } from "./params";
 
 describe("normalizeParams", () => {
   it("akzeptiert vollständige Wizard-Parameter", () => {

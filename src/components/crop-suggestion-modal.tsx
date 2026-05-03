@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Crop, RotateCcw, SlidersHorizontal, ArrowLeft } from "lucide-react";
 import { ManualCropEditor, type ManualCropResult } from "./manual-crop-editor";
 
-export type CropAspect = "wide" | "tall" | "a4";
+export type CropAspect = "wide" | "tall" | "a4" | "square";
 
 interface Props {
   open: boolean;
@@ -58,13 +58,21 @@ export function CropSuggestionModal({
   const [manualSaving, setManualSaving] = useState(false);
 
   const aspectLabel =
-    aspect === "wide" ? "5 : 1 (breit)" : aspect === "tall" ? "1 : 2 (hochkant)" : "DIN A4 (hochkant)";
+    aspect === "wide"
+      ? "5 : 1 (breit)"
+      : aspect === "tall"
+      ? "1 : 2 (hochkant)"
+      : aspect === "a4"
+      ? "DIN A4 (hochkant)"
+      : "1 : 1 (quadratisch)";
   const previewClass =
     aspect === "wide"
       ? "aspect-[5/1]"
       : aspect === "tall"
       ? "aspect-[1/2] max-w-[180px] mx-auto"
-      : "aspect-[210/297] max-w-[260px] mx-auto";
+      : aspect === "a4"
+      ? "aspect-[210/297] max-w-[260px] mx-auto"
+      : "aspect-square max-w-[280px] mx-auto";
 
   // Beim Öffnen: zurück in Compare-Modus + Reset
   useEffect(() => {

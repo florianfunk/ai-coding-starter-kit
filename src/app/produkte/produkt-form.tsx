@@ -10,19 +10,16 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Zap, Sun, Wrench, Thermometer, Image as ImageIcon, FileText, Palette, ChevronsUpDown, Images } from "lucide-react";
+import { Zap, Sun, Wrench, Thermometer, FileText, Palette, ChevronsUpDown, Images } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
-import { EnhanceBildButton } from "@/components/enhance-bild-button";
-import { uploadProduktBild, type ProduktFormState } from "./actions";
-import { getSlotBildSignedUrl } from "./datenblatt-actions";
+import { type ProduktFormState } from "./actions";
 import { PRODUKT_FIELD_GROUPS } from "./fields";
-import { DatenblattBildUpload } from "./datenblatt-bild-upload";
+import { ProduktBildSlot } from "./produkt-bild-slot";
 
 type Marke = "lichtengros" | "eisenkeil";
 
@@ -160,9 +157,6 @@ export function ProduktForm({
     markDirty("datenblatt");
     toast.success("Teaser übernommen");
   }
-  const [hauptbildPath, setHauptbildPath] = useState<string | null>(defaultValues.hauptbild_path ?? null);
-  const [hauptbildPreview, setHauptbildPreview] = useState<string | null>(defaultHauptbildUrl);
-  const [hauptbildZoom, setHauptbildZoom] = useState(false);
   const [iconIds, setIconIds] = useState<string[]>(() => {
     const seen = new Set<string>();
     return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
@@ -176,7 +170,7 @@ export function ProduktForm({
     }
     return ["lichtengros"];
   }, [defaultValues.marken]);
-  const [uploading, startUpload] = useTransition();
+  const [uploading] = useTransition();
   const [openSections, setOpenSections] = useState<string[]>(loadOpenSections);
   const [dirtySections, setDirtySections] = useState<Set<string>>(new Set());
 
@@ -231,22 +225,6 @@ export function ProduktForm({
     }
   }, [state, pending]);
 
-  function handleHauptbild(file: File | null) {
-    if (!file) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("produkt_id", produktId ?? "neu");
-    startUpload(async () => {
-      const r = await uploadProduktBild(fd);
-      if (r.error) toast.error(r.error);
-      else {
-        setHauptbildPath(r.path);
-        setHauptbildPreview(URL.createObjectURL(file));
-        markDirty("base");
-      }
-    });
-  }
-
   function toggleIcon(id: string) {
     setIconIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
     // Abwahl: zugehörigen Wert verwerfen
@@ -264,8 +242,6 @@ export function ProduktForm({
 
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="hauptbild_path" value={hauptbildPath ?? ""} />
-
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
       {/* Grunddaten -- always visible, not collapsible */}
@@ -342,58 +318,20 @@ export function ProduktForm({
           {/* Marken werden intern als "lichtengros" gesetzt; keine UI-Auswahl */}
           {marken.map((m) => <input key={m} type="hidden" name="marken" value={m} />)}
 
-          <div className="mt-4 space-y-2">
-            <Label>Hauptbild</Label>
-            <div className="flex items-start gap-4">
-              {hauptbildPreview ? (
-                <button
-                  type="button"
-                  onClick={() => setHauptbildZoom(true)}
-                  className="group relative flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40 cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-primary"
-                  aria-label="Hauptbild vergrößern"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={hauptbildPreview} alt="" className="h-full w-full object-contain transition-transform group-hover:scale-[1.03]" />
-                </button>
-              ) : (
-                <div className="flex h-32 w-40 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-dashed border-border bg-muted/40">
-                  <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploading}
-                  onChange={(e) => handleHauptbild(e.target.files?.[0] ?? null)} />
-                {uploading && <p className="text-sm text-muted-foreground">Lade hoch...</p>}
-                {hauptbildPath && !uploading && (
-                  <EnhanceBildButton
-                    bucket="produktbilder"
-                    path={hauptbildPath}
-                    onReplaced={async (newPath) => {
-                      const r = await getSlotBildSignedUrl(newPath);
-                      setHauptbildPath(newPath);
-                      setHauptbildPreview(r.url ?? null);
-                    }}
-                  />
-                )}
-              </div>
-            </div>
+          <div className="mt-4">
+            <ProduktBildSlot
+              name="hauptbild_path"
+              label="Hauptbild"
+              column="hauptbild_path"
+              produktId={produktId}
+              defaultPath={defaultValues.hauptbild_path ?? null}
+              defaultUrl={defaultHauptbildUrl}
+              size="lg"
+              onDirty={() => markDirty("base")}
+            />
           </div>
         </div>
       </section>
-
-      <Dialog open={hauptbildZoom} onOpenChange={setHauptbildZoom}>
-        <DialogContent className="max-w-[90vw] p-2 sm:max-w-4xl">
-          <DialogTitle className="sr-only">Hauptbild Vorschau</DialogTitle>
-          {hauptbildPreview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={hauptbildPreview}
-              alt="Hauptbild"
-              className="max-h-[85vh] w-full object-contain"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Toggle all button */}
       <div className="flex justify-end">
@@ -513,12 +451,14 @@ export function ProduktForm({
             <div className="space-y-5">
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-3 rounded-lg border border-border/60 p-3">
-                  <DatenblattBildUpload
+                  <ProduktBildSlot
                     name="bild_detail_1_path"
                     label="Detail-Bild 1"
+                    column="bild_detail_1_path"
                     produktId={produktId}
                     defaultPath={defaultValues.bild_detail_1_path ?? null}
                     defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
+                    onDirty={() => markDirty("datenblatt-bilder")}
                   />
                   <div className="space-y-1.5">
                     <Label htmlFor="bild_detail_1_text" className="text-xs">Detail-Text 1</Label>
@@ -534,12 +474,14 @@ export function ProduktForm({
                 </div>
 
                 <div className="space-y-3 rounded-lg border border-border/60 p-3">
-                  <DatenblattBildUpload
+                  <ProduktBildSlot
                     name="bild_detail_2_path"
                     label="Detail-Bild 2"
+                    column="bild_detail_2_path"
                     produktId={produktId}
                     defaultPath={defaultValues.bild_detail_2_path ?? null}
                     defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
+                    onDirty={() => markDirty("datenblatt-bilder")}
                   />
                   <div className="space-y-1.5">
                     <Label htmlFor="bild_detail_2_text" className="text-xs">Detail-Text 2</Label>
@@ -571,36 +513,44 @@ export function ProduktForm({
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <DatenblattBildUpload
+                <ProduktBildSlot
                   name="bild_zeichnung_1_path"
                   label="Zeichnung 1"
+                  column="bild_zeichnung_1_path"
                   produktId={produktId}
                   defaultPath={defaultValues.bild_zeichnung_1_path ?? null}
                   defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_1_path ?? null}
+                  onDirty={() => markDirty("datenblatt-bilder")}
                 />
-                <DatenblattBildUpload
+                <ProduktBildSlot
                   name="bild_zeichnung_2_path"
                   label="Zeichnung 2"
+                  column="bild_zeichnung_2_path"
                   produktId={produktId}
                   defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
                   defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
+                  onDirty={() => markDirty("datenblatt-bilder")}
                 />
-                <DatenblattBildUpload
+                <ProduktBildSlot
                   name="bild_zeichnung_3_path"
                   label="Zeichnung 3"
+                  column="bild_zeichnung_3_path"
                   produktId={produktId}
                   defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
                   defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
+                  onDirty={() => markDirty("datenblatt-bilder")}
                 />
               </div>
 
               <div className="border-t pt-4">
-                <DatenblattBildUpload
+                <ProduktBildSlot
                   name="bild_energielabel_path"
                   label="Energielabel-Bild"
+                  column="bild_energielabel_path"
                   produktId={produktId}
                   defaultPath={defaultValues.bild_energielabel_path ?? null}
                   defaultUrl={defaultDatenblattBildUrls.bild_energielabel_path ?? null}
+                  onDirty={() => markDirty("datenblatt-bilder")}
                 />
               </div>
             </div>

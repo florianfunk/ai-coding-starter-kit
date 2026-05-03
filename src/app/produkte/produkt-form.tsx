@@ -74,7 +74,6 @@ const BILDER_KEYS = [
   "bild_zeichnung_1_path",
   "bild_zeichnung_2_path",
   "bild_zeichnung_3_path",
-  "bild_energielabel_path",
 ] as const;
 
 function loadOpenSections(): string[] {
@@ -611,11 +610,11 @@ export function ProduktForm({
           />
           <SectionSaveButton pending={pending || uploading} dirty={isDirty("bilder")} floating />
           <AccordionContent className="px-4 pb-4">
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr]">
-              {/* Hauptbild — links groß */}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,440px)_1fr]">
+              {/* Hauptbild — links, echtes 11×9-Querformat */}
               <div className="space-y-2">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Hauptbild
+                  Hauptbild · 11 × 9 cm
                 </div>
                 <ProduktBildSlot
                   name="hauptbild_path"
@@ -624,18 +623,19 @@ export function ProduktForm({
                   produktId={produktId}
                   defaultPath={defaultValues.hauptbild_path ?? null}
                   defaultUrl={defaultHauptbildUrl}
-                  size="lg"
+                  aspectRatio="11 / 9"
+                  previewWidth="w-full max-w-[440px]"
                   onDirty={() => markDirty("bilder")}
                 />
               </div>
 
-              {/* Sekundärbilder — rechts gruppiert */}
+              {/* Sekundärbilder — rechts: Details (3er-Reihe) + Zeichnungen (gestapelte Streifen) */}
               <div className="space-y-5 min-w-0">
                 <div className="space-y-2">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Detail-Bilder
+                    Details · 6 × 4 cm
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <ProduktBildSlot
                       name="bild_detail_1_path"
                       label="Detail 1"
@@ -643,6 +643,8 @@ export function ProduktForm({
                       produktId={produktId}
                       defaultPath={defaultValues.bild_detail_1_path ?? null}
                       defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
+                      aspectRatio="6 / 4"
+                      previewWidth="w-full"
                       onDirty={() => markDirty("bilder")}
                     />
                     <ProduktBildSlot
@@ -652,41 +654,19 @@ export function ProduktForm({
                       produktId={produktId}
                       defaultPath={defaultValues.bild_detail_2_path ?? null}
                       defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
+                      aspectRatio="6 / 4"
+                      previewWidth="w-full"
                       onDirty={() => markDirty("bilder")}
                     />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Zeichnungen
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <ProduktBildSlot
                       name="bild_zeichnung_1_path"
-                      label="Zeichnung 1"
+                      label="Detail 3"
                       column="bild_zeichnung_1_path"
                       produktId={produktId}
                       defaultPath={defaultValues.bild_zeichnung_1_path ?? null}
                       defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_1_path ?? null}
-                      onDirty={() => markDirty("bilder")}
-                    />
-                    <ProduktBildSlot
-                      name="bild_zeichnung_2_path"
-                      label="Zeichnung 2"
-                      column="bild_zeichnung_2_path"
-                      produktId={produktId}
-                      defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
-                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
-                      onDirty={() => markDirty("bilder")}
-                    />
-                    <ProduktBildSlot
-                      name="bild_zeichnung_3_path"
-                      label="Zeichnung 3"
-                      column="bild_zeichnung_3_path"
-                      produktId={produktId}
-                      defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
-                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
+                      aspectRatio="6 / 4"
+                      previewWidth="w-full"
                       onDirty={() => markDirty("bilder")}
                     />
                   </div>
@@ -694,17 +674,32 @@ export function ProduktForm({
 
                 <div className="space-y-2">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Energielabel
+                    Zeichnungen · 10 × 3 cm
                   </div>
-                  <ProduktBildSlot
-                    name="bild_energielabel_path"
-                    label="Energielabel"
-                    column="bild_energielabel_path"
-                    produktId={produktId}
-                    defaultPath={defaultValues.bild_energielabel_path ?? null}
-                    defaultUrl={defaultDatenblattBildUrls.bild_energielabel_path ?? null}
-                    onDirty={() => markDirty("bilder")}
-                  />
+                  <div className="space-y-3">
+                    <ProduktBildSlot
+                      name="bild_zeichnung_2_path"
+                      label="Zeichnung 1"
+                      column="bild_zeichnung_2_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
+                      aspectRatio="10 / 3"
+                      previewWidth="w-full"
+                      onDirty={() => markDirty("bilder")}
+                    />
+                    <ProduktBildSlot
+                      name="bild_zeichnung_3_path"
+                      label="Zeichnung 2"
+                      column="bild_zeichnung_3_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
+                      aspectRatio="10 / 3"
+                      previewWidth="w-full"
+                      onDirty={() => markDirty("bilder")}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

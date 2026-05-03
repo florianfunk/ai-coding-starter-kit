@@ -67,6 +67,10 @@ type Props = {
   defaultUrl: string | null;
   /** Größe der Bild-Vorschau. "lg" für Hauptbild, "md" für Datenblatt-Bilder (default md) */
   size?: "md" | "lg";
+  /** Optional: aspect-ratio der Vorschau im CSS-Format ("11/9", "6/4", "10/3"). Default: 1/1. */
+  aspectRatio?: string;
+  /** Optional: Breiten-Cap der Vorschau (Tailwind-Wert wie "w-72", "w-full"). Default: feste Quadrat-Größe. */
+  previewWidth?: string;
   /** Wird beim Form-State-Update aufgerufen (z. B. um die Section als "dirty" zu markieren). */
   onDirty?: () => void;
 };
@@ -79,6 +83,8 @@ export function ProduktBildSlot({
   defaultPath,
   defaultUrl,
   size = "md",
+  aspectRatio,
+  previewWidth,
   onDirty,
 }: Props) {
   const [bild, setBild] = useState<BildState>({
@@ -100,10 +106,12 @@ export function ProduktBildSlot({
   const [aiLoading, setAiLoading] = useState(false);
 
   const canPersist = !!produktId && !!column;
-  // Bild-Vorschau quadratisch, mind. so breit wie die Action-Bar darunter
-  // (7 Icons × 28px + 6 × 4px Gap ≈ 220px).
-  const previewSize =
-    size === "lg" ? "h-60 w-60" : "h-56 w-56";
+  // Vorschau-Größe: bei aspectRatio/previewWidth dynamisch (echtes Bildverhältnis),
+  // sonst fixes Quadrat (mind. so breit wie die Action-Bar: 7 × 28 + 6 × 4 ≈ 220 px).
+  const previewSize = aspectRatio
+    ? `${previewWidth ?? "w-full"}`
+    : size === "lg" ? "h-60 w-60" : "h-56 w-56";
+  const previewStyle = aspectRatio ? { aspectRatio } : undefined;
 
   function markDirty() {
     onDirty?.();
@@ -331,7 +339,7 @@ export function ProduktBildSlot({
       <Label htmlFor={name}>{label}</Label>
       <input type="hidden" name={name} value={bild.path ?? ""} />
 
-      <div className={`relative flex ${previewSize} shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40`}>
+      <div className={`relative flex ${previewSize} shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-dashed border-border bg-muted/40`} style={previewStyle}>
         {bild.previewUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img

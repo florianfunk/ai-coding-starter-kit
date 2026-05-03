@@ -73,7 +73,6 @@ export function buildSectionStats(
     "bild_zeichnung_1_path",
     "bild_zeichnung_2_path",
     "bild_zeichnung_3_path",
-    "bild_energielabel_path",
   ];
   const bilderDone = bilder.filter((k) => val(k)).length;
 

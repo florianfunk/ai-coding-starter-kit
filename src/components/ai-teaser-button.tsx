@@ -28,7 +28,11 @@ export type TeaserLaenge = "kurz" | "mittel" | "lang";
 interface Props {
   entityType: TeaserEntityType;
   entityName: string;
-  entityContext?: string | null;
+  // Kann ein statischer Wert sein, oder eine Funktion (lazy) — die Funktion
+  // wird erst beim Klick aufgerufen, damit Caller mit useRef etc. einen
+  // aktuellen Wert liefern können, ohne dass dieser bei jedem Render gelesen
+  // wird (siehe react-hooks/refs).
+  entityContext?: string | null | (() => string | null);
   onAccept: (text: string) => void;
   size?: "sm" | "default";
   className?: string;
@@ -61,13 +65,15 @@ export function AITeaserButton({
     }
     setLoading(true);
     try {
+      const ctx =
+        typeof entityContext === "function" ? entityContext() : entityContext ?? null;
       const res = await fetch("/api/ai/teaser", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           entityType,
           entityName,
-          entityContext: entityContext ?? null,
+          entityContext: ctx,
           zusatzHinweis: zusatz.trim() || null,
           laenge,
         }),
@@ -164,7 +170,7 @@ export function AITeaserButton({
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{teaser}</p>
               ) : (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Klick auf „Generieren", um einen Teaser zu erstellen.
+                  Klick auf „Generieren“, um einen Teaser zu erstellen.
                 </p>
               )}
             </div>

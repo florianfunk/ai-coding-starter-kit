@@ -22,7 +22,7 @@ export function DeleteIconButton({ id, name }: { id: string; name: string }) {
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Icon „{name}" löschen?</AlertDialogTitle>
+          <AlertDialogTitle>Icon „{name}“ löschen?</AlertDialogTitle>
           <AlertDialogDescription>Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

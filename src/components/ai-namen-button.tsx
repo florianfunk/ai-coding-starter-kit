@@ -218,7 +218,7 @@ export function AiNamenButton({
                 </div>
               ) : (
                 <p className="py-10 text-center text-sm text-muted-foreground">
-                  Klick auf „Generieren", um Vorschläge zu erstellen.
+                  Klick auf „Generieren“, um Vorschläge zu erstellen.
                 </p>
               )}
             </div>

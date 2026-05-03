@@ -59,8 +59,10 @@ export function ProduktTree({ tree, selection, search }: Props) {
   // Bereiche default zu, beim Suchen automatisch alle auf
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  // Auto-Expand bei Suche; danach kann der User wieder manuell togglen.
   useEffect(() => {
     if (search.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Auto-Expand-Pattern
       setExpanded(
         new Set([
           ...visibleTree.map((b) => b.id),
@@ -82,7 +84,7 @@ export function ProduktTree({ tree, selection, search }: Props) {
   if (visibleTree.length === 0) {
     return (
       <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-        Keine Produkte gefunden für „{search}".
+        Keine Produkte gefunden für „{search}“.
       </div>
     );
   }

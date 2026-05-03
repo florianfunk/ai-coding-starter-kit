@@ -144,7 +144,7 @@ export function CropSuggestionModal({
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={suggestionUrl} alt="Vorschlag" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-sm text-muted-foreground">Klick „Vorschlag generieren"</span>
+                    <span className="text-sm text-muted-foreground">Klick „Vorschlag generieren“</span>
                   )}
                 </div>
               </div>

@@ -22,7 +22,7 @@ export function DeleteKategorieButton({ id, name }: { id: string; name: string }
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Kategorie „{name}" löschen?</AlertDialogTitle>
+          <AlertDialogTitle>Kategorie „{name}“ löschen?</AlertDialogTitle>
           <AlertDialogDescription>Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

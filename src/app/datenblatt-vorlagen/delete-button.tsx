@@ -45,7 +45,7 @@ export function DeleteTemplateButton({ id, name, redirectOnSuccess, variant = "i
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Vorlage „{name}" löschen?</AlertDialogTitle>
+          <AlertDialogTitle>Vorlage „{name}“ löschen?</AlertDialogTitle>
           <AlertDialogDescription>Diese Aktion kann nicht rückgängig gemacht werden.</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

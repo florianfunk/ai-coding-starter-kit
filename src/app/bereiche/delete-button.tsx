@@ -24,7 +24,7 @@ export function DeleteBereichButton({ id, name }: { id: string; name: string }) 
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Bereich „{name}" löschen?</AlertDialogTitle>
+          <AlertDialogTitle>Bereich „{name}“ löschen?</AlertDialogTitle>
           <AlertDialogDescription>
             Diese Aktion kann nicht rückgängig gemacht werden.
           </AlertDialogDescription>

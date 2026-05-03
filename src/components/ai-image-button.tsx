@@ -138,7 +138,7 @@ export function AIImageButton({
                   <div className="font-medium">Referenzbild aktiv</div>
                   <div className="text-muted-foreground">
                     Beschreibe, was an Motiv/Stil/Komposition geändert werden soll —
-                    z. B. „gleiches Produkt, aber heller Hintergrund". Bei leerem Prompt: ähnliches Bild in Studio-Qualität.
+                    z. B. „gleiches Produkt, aber heller Hintergrund“. Bei leerem Prompt: ähnliches Bild in Studio-Qualität.
                   </div>
                 </div>
               </div>

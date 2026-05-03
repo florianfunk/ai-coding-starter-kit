@@ -510,7 +510,7 @@ export function MediathekGrid({ initialItems }: Props) {
                     Achtung: Wird von {deleteUsages.length} Eintrag/-trägen verwendet.
                   </span>
                   <br />
-                  Bei „Trotzdem löschen" werden die betroffenen Einträge ein Bild verlieren.
+                  Bei „Trotzdem löschen“ werden die betroffenen Einträge ein Bild verlieren.
                 </>
               )}
             </AlertDialogDescription>

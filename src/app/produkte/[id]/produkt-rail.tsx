@@ -55,7 +55,6 @@ export function buildSectionStats(
     ["name", val("name")],
     ["bereich_id", val("bereich_id")],
     ["kategorie_id", val("kategorie_id")],
-    ["hauptbild_path", val("hauptbild_path")],
     ["active_price", ctx.hasActivePrice],
   ];
   const baseDone = base.filter(([, v]) => v).length;
@@ -67,7 +66,8 @@ export function buildSectionStats(
   ];
   const datenblattDone = datenblatt.filter(([, v]) => v).length;
 
-  const datenblattBilder = [
+  const bilder = [
+    "hauptbild_path",
     "bild_detail_1_path",
     "bild_detail_2_path",
     "bild_zeichnung_1_path",
@@ -75,7 +75,7 @@ export function buildSectionStats(
     "bild_zeichnung_3_path",
     "bild_energielabel_path",
   ];
-  const datenblattBilderDone = datenblattBilder.filter((k) => val(k)).length;
+  const bilderDone = bilder.filter((k) => val(k)).length;
 
   // Feldlisten direkt aus fields.ts spiegeln, damit Form & Sidebar nie auseinanderlaufen.
   const elektrisch = fieldsForTab("elektrisch");
@@ -102,12 +102,12 @@ export function buildSectionStats(
       manualComplete: isManual("datenblatt"),
     },
     {
-      id: "datenblatt-bilder",
-      label: "Datenblatt-Bilder",
+      id: "bilder",
+      label: "Bilder",
       icon: Images,
-      done: isManual("datenblatt-bilder") ? datenblattBilder.length : datenblattBilderDone,
-      total: datenblattBilder.length,
-      manualComplete: isManual("datenblatt-bilder"),
+      done: isManual("bilder") ? bilder.length : bilderDone,
+      total: bilder.length,
+      manualComplete: isManual("bilder"),
     },
     {
       id: "elektrisch",

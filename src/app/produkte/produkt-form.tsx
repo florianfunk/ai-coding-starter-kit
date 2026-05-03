@@ -52,14 +52,14 @@ const EMPTY_SET: ReadonlySet<string> = new Set();
 
 const STORAGE_KEY = "produkt-form-sections";
 
-const SECTION_IDS = ["datenblatt", "datenblatt-bilder", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
+const SECTION_IDS = ["datenblatt", "bilder", "elektrisch", "lichttechnisch", "mechanisch", "thermisch", "icons"] as const;
 type SectionId = (typeof SECTION_IDS)[number];
 
 const DEFAULT_OPEN: SectionId[] = ["datenblatt"];
 
 const SECTION_META: Record<SectionId, { label: string; icon: LucideIcon; colorVar: string }> = {
   datenblatt: { label: "Datenblatt", icon: FileText, colorVar: "--violet" },
-  "datenblatt-bilder": { label: "Datenblatt-Bilder", icon: Images, colorVar: "--violet" },
+  bilder: { label: "Bilder", icon: Images, colorVar: "--violet" },
   elektrisch: { label: "Elektrotechnisch", icon: Zap, colorVar: "--warning" },
   lichttechnisch: { label: "Lichttechnisch", icon: Sun, colorVar: "--warning" },
   mechanisch: { label: "Mechanisch", icon: Wrench, colorVar: "--green" },
@@ -67,7 +67,8 @@ const SECTION_META: Record<SectionId, { label: string; icon: LucideIcon; colorVa
   icons: { label: "Icons", icon: Palette, colorVar: "--primary" },
 };
 
-const DATENBLATT_BILDER_KEYS = [
+const BILDER_KEYS = [
+  "hauptbild_path",
   "bild_detail_1_path",
   "bild_detail_2_path",
   "bild_zeichnung_1_path",
@@ -113,9 +114,9 @@ function sectionProgress(
     const keys = ["datenblatt_titel", "info_kurz", "datenblatt_text"];
     total = keys.length;
     done = keys.filter((k) => checkText(defaultValues[k])).length;
-  } else if (sectionId === "datenblatt-bilder") {
-    total = DATENBLATT_BILDER_KEYS.length;
-    done = DATENBLATT_BILDER_KEYS.filter((k) => checkText(defaultValues[k])).length;
+  } else if (sectionId === "bilder") {
+    total = BILDER_KEYS.length;
+    done = BILDER_KEYS.filter((k) => checkText(defaultValues[k])).length;
   } else {
     const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
     for (const tab of groupTabs) {
@@ -496,19 +497,6 @@ export function ProduktForm({
 
           {/* Marken werden intern als "lichtengros" gesetzt; keine UI-Auswahl */}
           {marken.map((m) => <input key={m} type="hidden" name="marken" value={m} />)}
-
-          <div className="mt-4">
-            <ProduktBildSlot
-              name="hauptbild_path"
-              label="Hauptbild"
-              column="hauptbild_path"
-              produktId={produktId}
-              defaultPath={defaultValues.hauptbild_path ?? null}
-              defaultUrl={defaultHauptbildUrl}
-              size="lg"
-              onDirty={() => markDirty("base")}
-            />
-          </div>
         </div>
       </section>
 
@@ -597,99 +585,127 @@ export function ProduktForm({
           </AccordionContent>
         </AccordionItem>
 
-        {/* Datenblatt-Bilder (PROJ-36) */}
+        {/* Bilder: Hauptbild + Datenblatt-Bilder (PROJ-36) */}
         <AccordionItem
-          id="section-datenblatt-bilder"
-          value="datenblatt-bilder"
+          id="section-bilder"
+          value="bilder"
           className="glass-card overflow-hidden border-0 relative"
-          onInput={() => markDirty("datenblatt-bilder")}
-          onChange={() => markDirty("datenblatt-bilder")}
+          onInput={() => markDirty("bilder")}
+          onChange={() => markDirty("bilder")}
         >
           <AccordionTrigger className="card-head hover:no-underline pr-[260px]">
             <SectionHeader
-              colorVar={SECTION_META["datenblatt-bilder"].colorVar}
+              colorVar={SECTION_META.bilder.colorVar}
               Icon={Images}
-              label="Datenblatt-Bilder"
-              progress={sectionProgress("datenblatt-bilder", defaultValues, iconIds.length, manualComplete)}
-              rawDone={rawProgress("datenblatt-bilder").done}
-              manuallyComplete={manualComplete.has("datenblatt-bilder")}
+              label="Bilder"
+              progress={sectionProgress("bilder", defaultValues, iconIds.length, manualComplete)}
+              rawDone={rawProgress("bilder").done}
+              manuallyComplete={manualComplete.has("bilder")}
             />
           </AccordionTrigger>
           <SectionCompleteToggle
-            active={manualComplete.has("datenblatt-bilder")}
-            onToggle={() => toggleManualComplete("datenblatt-bilder")}
-            fieldsFilled={rawProgress("datenblatt-bilder").done}
-            fieldsTotal={rawProgress("datenblatt-bilder").total}
+            active={manualComplete.has("bilder")}
+            onToggle={() => toggleManualComplete("bilder")}
+            fieldsFilled={rawProgress("bilder").done}
+            fieldsTotal={rawProgress("bilder").total}
           />
-          <SectionSaveButton pending={pending || uploading} dirty={isDirty("datenblatt-bilder")} floating />
+          <SectionSaveButton pending={pending || uploading} dirty={isDirty("bilder")} floating />
           <AccordionContent className="px-4 pb-4">
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-3 rounded-lg border border-border/60 p-3">
-                  <ProduktBildSlot
-                    name="bild_detail_1_path"
-                    label="Detail-Bild 1"
-                    column="bild_detail_1_path"
-                    produktId={produktId}
-                    defaultPath={defaultValues.bild_detail_1_path ?? null}
-                    defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
-                    onDirty={() => markDirty("datenblatt-bilder")}
-                  />
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_1fr]">
+              {/* Hauptbild — links groß */}
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Hauptbild
                 </div>
-
-                <div className="space-y-3 rounded-lg border border-border/60 p-3">
-                  <ProduktBildSlot
-                    name="bild_detail_2_path"
-                    label="Detail-Bild 2"
-                    column="bild_detail_2_path"
-                    produktId={produktId}
-                    defaultPath={defaultValues.bild_detail_2_path ?? null}
-                    defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
-                    onDirty={() => markDirty("datenblatt-bilder")}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <ProduktBildSlot
-                  name="bild_zeichnung_1_path"
-                  label="Zeichnung 1"
-                  column="bild_zeichnung_1_path"
+                  name="hauptbild_path"
+                  label=""
+                  column="hauptbild_path"
                   produktId={produktId}
-                  defaultPath={defaultValues.bild_zeichnung_1_path ?? null}
-                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_1_path ?? null}
-                  onDirty={() => markDirty("datenblatt-bilder")}
-                />
-                <ProduktBildSlot
-                  name="bild_zeichnung_2_path"
-                  label="Zeichnung 2"
-                  column="bild_zeichnung_2_path"
-                  produktId={produktId}
-                  defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
-                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
-                  onDirty={() => markDirty("datenblatt-bilder")}
-                />
-                <ProduktBildSlot
-                  name="bild_zeichnung_3_path"
-                  label="Zeichnung 3"
-                  column="bild_zeichnung_3_path"
-                  produktId={produktId}
-                  defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
-                  defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
-                  onDirty={() => markDirty("datenblatt-bilder")}
+                  defaultPath={defaultValues.hauptbild_path ?? null}
+                  defaultUrl={defaultHauptbildUrl}
+                  size="lg"
+                  onDirty={() => markDirty("bilder")}
                 />
               </div>
 
-              <div className="border-t pt-4">
-                <ProduktBildSlot
-                  name="bild_energielabel_path"
-                  label="Energielabel-Bild"
-                  column="bild_energielabel_path"
-                  produktId={produktId}
-                  defaultPath={defaultValues.bild_energielabel_path ?? null}
-                  defaultUrl={defaultDatenblattBildUrls.bild_energielabel_path ?? null}
-                  onDirty={() => markDirty("datenblatt-bilder")}
-                />
+              {/* Sekundärbilder — rechts gruppiert */}
+              <div className="space-y-5 min-w-0">
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Detail-Bilder
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <ProduktBildSlot
+                      name="bild_detail_1_path"
+                      label="Detail 1"
+                      column="bild_detail_1_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_detail_1_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_detail_1_path ?? null}
+                      onDirty={() => markDirty("bilder")}
+                    />
+                    <ProduktBildSlot
+                      name="bild_detail_2_path"
+                      label="Detail 2"
+                      column="bild_detail_2_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_detail_2_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_detail_2_path ?? null}
+                      onDirty={() => markDirty("bilder")}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Zeichnungen
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <ProduktBildSlot
+                      name="bild_zeichnung_1_path"
+                      label="Zeichnung 1"
+                      column="bild_zeichnung_1_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_zeichnung_1_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_1_path ?? null}
+                      onDirty={() => markDirty("bilder")}
+                    />
+                    <ProduktBildSlot
+                      name="bild_zeichnung_2_path"
+                      label="Zeichnung 2"
+                      column="bild_zeichnung_2_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_zeichnung_2_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_2_path ?? null}
+                      onDirty={() => markDirty("bilder")}
+                    />
+                    <ProduktBildSlot
+                      name="bild_zeichnung_3_path"
+                      label="Zeichnung 3"
+                      column="bild_zeichnung_3_path"
+                      produktId={produktId}
+                      defaultPath={defaultValues.bild_zeichnung_3_path ?? null}
+                      defaultUrl={defaultDatenblattBildUrls.bild_zeichnung_3_path ?? null}
+                      onDirty={() => markDirty("bilder")}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Energielabel
+                  </div>
+                  <ProduktBildSlot
+                    name="bild_energielabel_path"
+                    label="Energielabel"
+                    column="bild_energielabel_path"
+                    produktId={produktId}
+                    defaultPath={defaultValues.bild_energielabel_path ?? null}
+                    defaultUrl={defaultDatenblattBildUrls.bild_energielabel_path ?? null}
+                    onDirty={() => markDirty("bilder")}
+                  />
+                </div>
               </div>
             </div>
           </AccordionContent>

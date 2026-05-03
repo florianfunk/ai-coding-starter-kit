@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/tooltip";
 import { InlineEdit } from "@/components/inline-edit";
 import {
-  ChevronRight,
   Box,
   Loader2,
   CheckCircle,
@@ -218,13 +217,12 @@ export function ProdukteTable({
               Vollständigkeit
             </TableHead>
             <TableHead className="w-10" />
-            <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
         {produkte.length === 0 ? (
           <TableBody>
             <TableRow>
-              <TableCell colSpan={11} className="py-16 text-center text-muted-foreground">
+              <TableCell colSpan={10} className="py-16 text-center text-muted-foreground">
                 <Box className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
                 <p className="text-lg font-semibold text-foreground mb-1">
                   {hasFilter ? "Keine Treffer" : "Keine Produkte"}
@@ -646,10 +644,6 @@ function ProduktRow({
         </TooltipProvider>
       </TableCell>
 
-      {/* Arrow */}
-      <TableCell className="relative z-20">
-        <ChevronRight className="h-5 w-5 text-muted-foreground/40 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-      </TableCell>
     </TableRow>
   );
 }

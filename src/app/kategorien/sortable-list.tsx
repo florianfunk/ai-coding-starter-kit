@@ -27,7 +27,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   GripVertical,
   Pencil,
-  ChevronRight,
   ImageIcon,
   Search,
   List,
@@ -169,7 +168,6 @@ function KategorieRow({
         </Link>
         <DeleteKategorieButton id={item.id} name={item.name} />
       </div>
-      <ChevronRight className="h-[14px] w-[14px] text-muted-foreground/40" />
     </div>
   );
 }

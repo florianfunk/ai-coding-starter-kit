@@ -3,8 +3,9 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, Filter, X, Upload, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, X, Upload, ChevronRight, LayoutList, ListTree } from "lucide-react";
 import { ProdukteTable } from "./produkte-table-body";
+import { ProdukteHierarchie } from "./produkte-hierarchie";
 import { ExportDialog } from "./export-dialog";
 import { KatalogDruckenDialog } from "@/components/katalog-drucken/katalog-drucken-dialog";
 import { calculateCompleteness, type CompletenessResult } from "@/lib/completeness";
@@ -16,10 +17,11 @@ const PAGE_SIZE = 50;
 export default async function ProdukteListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; bereich?: string; kategorie?: string; status?: string; sort?: string; page?: string; vollstaendigkeit?: string }>;
+  searchParams: Promise<{ q?: string; bereich?: string; kategorie?: string; status?: string; sort?: string; page?: string; vollstaendigkeit?: string; ansicht?: string }>;
 }) {
   const sp = await searchParams;
   const supabase = await createClient();
+  const ansicht: "hierarchie" | "liste" = sp.ansicht === "liste" ? "liste" : "hierarchie";
 
   // Bereiche & Kategorien aus dem Cache — slowly-changing, per Tag invalidiert.
   // KatalogTree + Wechselkurs nur für den Druck-Wizard (PROJ-37).
@@ -54,7 +56,11 @@ export default async function ProdukteListPage({
 
   const sort = sp.sort ?? "artikelnummer";
   const [col, dir] = sort.startsWith("-") ? [sort.slice(1), "desc"] : [sort, "asc"];
-  query = query.order(col, { ascending: dir === "asc" }).range(from, to);
+  query = query.order(col, { ascending: dir === "asc" });
+  // In der Hierarchie-Ansicht alle Produkte laden (gruppiert dargestellt, keine Pagination).
+  if (ansicht === "liste") {
+    query = query.range(from, to);
+  }
 
   const { data: produkte, count } = await query;
   const listing = (produkte ?? []) as ProduktListing[];
@@ -98,7 +104,27 @@ export default async function ProdukteListPage({
                 {displayCount} Produkte{hasFilter ? " gefunden · Filter aktiv" : ""}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-[9px] border border-border/70 bg-card p-0.5">
+                <Link
+                  href={`?${new URLSearchParams({ ...(sp as Record<string, string>), ansicht: "hierarchie" }).toString()}`}
+                  className={`inline-flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                    ansicht === "hierarchie" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={ansicht === "hierarchie"}
+                >
+                  <ListTree className="h-3.5 w-3.5" /> Hierarchie
+                </Link>
+                <Link
+                  href={`?${new URLSearchParams({ ...(sp as Record<string, string>), ansicht: "liste" }).toString()}`}
+                  className={`inline-flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                    ansicht === "liste" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-pressed={ansicht === "liste"}
+                >
+                  <LayoutList className="h-3.5 w-3.5" /> Liste
+                </Link>
+              </div>
               <KatalogDruckenDialog tree={katalogTree} wechselkurs={wechselkurs} />
               <ExportDialog
                 produktCount={displayCount}
@@ -208,26 +234,44 @@ export default async function ProdukteListPage({
         </form>
 
         <div className="glass-card overflow-hidden">
-          <ProdukteTable
-            produkte={listing.map((p) => ({
-              id: p.id,
-              artikelnummer: p.artikelnummer,
-              name: p.name,
-              bereich_id: p.bereich_id,
-              kategorie_id: p.kategorie_id,
-              sortierung: p.sortierung,
-              artikel_bearbeitet: p.artikel_bearbeitet,
-              hauptbild_path: p.hauptbild_path,
-            }))}
-            bereichName={bereichNameMap}
-            kategorieName={kategorieNameMap}
-            kategorien={kategorien.map((k) => ({ id: k.id, name: k.name }))}
-            hasFilter={hasFilter}
-            completenessMap={completenessMap}
-          />
+          {ansicht === "hierarchie" ? (
+            <ProdukteHierarchie
+              produkte={listing.map((p) => ({
+                id: p.id,
+                artikelnummer: p.artikelnummer,
+                name: p.name,
+                bereich_id: p.bereich_id,
+                kategorie_id: p.kategorie_id,
+                hauptbild_path: p.hauptbild_path,
+                artikel_bearbeitet: p.artikel_bearbeitet,
+              }))}
+              bereiche={bereiche.map((b) => ({ id: b.id, name: b.name }))}
+              kategorien={kategorien.map((k) => ({ id: k.id, name: k.name, bereich_id: k.bereich_id }))}
+              completenessMap={completenessMap}
+              hasFilter={hasFilter}
+            />
+          ) : (
+            <ProdukteTable
+              produkte={listing.map((p) => ({
+                id: p.id,
+                artikelnummer: p.artikelnummer,
+                name: p.name,
+                bereich_id: p.bereich_id,
+                kategorie_id: p.kategorie_id,
+                sortierung: p.sortierung,
+                artikel_bearbeitet: p.artikel_bearbeitet,
+                hauptbild_path: p.hauptbild_path,
+              }))}
+              bereichName={bereichNameMap}
+              kategorieName={kategorieNameMap}
+              kategorien={kategorien.map((k) => ({ id: k.id, name: k.name }))}
+              hasFilter={hasFilter}
+              completenessMap={completenessMap}
+            />
+          )}
         </div>
 
-        {totalPages > 1 && (
+        {ansicht === "liste" && totalPages > 1 && (
           <div className="mt-2 flex justify-end gap-2 text-sm">
             {page > 1 && (
               <Button asChild variant="outline" size="sm">

@@ -1014,7 +1014,13 @@ function SectionHeader({
 }
 
 
-function FieldInput({ field, defaultValue }: { field: { col: string; label: string; type: string; unit?: string }; defaultValue: any }) {
+function FieldInput({
+  field,
+  defaultValue,
+}: {
+  field: { col: string; label: string; type: string; unit?: string; options?: string[] };
+  defaultValue: any;
+}) {
   const tooltip = FIELD_TOOLTIPS[field.col];
   if (field.type === "bool") {
     return (
@@ -1031,6 +1037,7 @@ function FieldInput({ field, defaultValue }: { field: { col: string; label: stri
       </div>
     );
   }
+  const datalistId = field.options && field.options.length > 0 ? `dl-${field.col}` : undefined;
   return (
     <div className="space-y-2">
       <Label htmlFor={field.col} className="text-xs inline-flex items-center gap-1.5">
@@ -1044,8 +1051,16 @@ function FieldInput({ field, defaultValue }: { field: { col: string; label: stri
         type={field.type === "number" ? "number" : "text"}
         step={field.type === "number" ? "any" : undefined}
         defaultValue={defaultValue ?? ""}
+        list={datalistId}
         className="text-sm"
       />
+      {datalistId && (
+        <datalist id={datalistId}>
+          {field.options!.map((opt) => (
+            <option key={opt} value={opt} />
+          ))}
+        </datalist>
+      )}
     </div>
   );
 }

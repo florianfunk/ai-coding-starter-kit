@@ -63,3 +63,8 @@
 <!-- Add features above this line -->
 
 ## Next Available ID: PROJ-46
+
+## Backlog (Ideen ohne PROJ-Nummer)
+
+Brainstorming-Ideen mit Wert/Komplexitäts-Einschätzung — siehe [BACKLOG-IDEEN.md](BACKLOG-IDEEN.md).
+Wenn eine umgesetzt werden soll: `/requirements <Idee>` ausführen, dann bekommt sie eine PROJ-Nummer.

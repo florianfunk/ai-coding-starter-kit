@@ -33,10 +33,11 @@ export function ProduktTopActions({ id, artikelnummer }: ProduktTopActionsProps)
         <AlertDialogTrigger asChild>
           <Button
             variant="outline"
+            size="sm"
             className="hover:bg-primary hover:text-primary-foreground transition-colors"
             disabled={pending}
           >
-            <Copy className="h-4 w-4 mr-1" /> Duplizieren
+            <Copy className="h-3.5 w-3.5 mr-1" /> Duplizieren
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>
@@ -80,8 +81,8 @@ export function ProduktTopActions({ id, artikelnummer }: ProduktTopActionsProps)
       {/* L&ouml;schen */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogTrigger asChild>
-          <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground transition-colors" disabled={pending}>
-            <Trash2 className="h-4 w-4 mr-1" /> L&ouml;schen
+          <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground transition-colors" disabled={pending}>
+            <Trash2 className="h-3.5 w-3.5 mr-1" /> L&ouml;schen
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>

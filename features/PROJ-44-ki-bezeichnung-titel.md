@@ -1,9 +1,10 @@
 # PROJ-44: KI-Vorschläge für Bezeichnung & Datenblatt-Titel
 
-**Status:** In Progress
+**Status:** Deployed
 **Priorität:** P1
 **Erstellt:** 2026-05-03
 **Last Updated:** 2026-05-03
+**Deployed:** 2026-05-03 (dpl_BD9qRweMqy7AQcxBteBwvbjVzc7f, commit 04924d0)
 
 ## Vision
 

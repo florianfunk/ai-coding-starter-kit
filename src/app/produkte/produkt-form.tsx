@@ -16,9 +16,10 @@ import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
+import { AiNamenButton, type AiNamenContext } from "@/components/ai-namen-button";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
 import { type ProduktFormState } from "./actions";
-import { PRODUKT_FIELD_GROUPS } from "./fields";
+import { ALL_PRODUKT_FIELDS, PRODUKT_FIELD_GROUPS } from "./fields";
 import { ProduktBildSlot } from "./produkt-bild-slot";
 
 type Marke = "lichtengros" | "eisenkeil";
@@ -140,8 +141,11 @@ export function ProduktForm({
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initial);
   const [bereichId, setBereichId] = useState<string>(defaultValues.bereich_id ?? "");
+  const [kategorieId, setKategorieId] = useState<string>(defaultValues.kategorie_id ?? "");
   const [name, setName] = useState<string>(defaultValues.name ?? "");
   const [artikelnummer, setArtikelnummer] = useState<string>(defaultValues.artikelnummer ?? "");
+  const [datenblattTitel, setDatenblattTitel] = useState<string>(defaultValues.datenblatt_titel ?? "");
+  const [infoKurz, setInfoKurz] = useState<string>(defaultValues.info_kurz ?? "");
   const datenblattEditorRef = useRef<Editor | null>(null);
   const datenblattInitial = (defaultValues.datenblatt_text ?? "") as string;
   const datenblattContextRef = useRef<string>(datenblattInitial);
@@ -203,6 +207,37 @@ export function ProduktForm({
     () => kategorien.filter((k) => !bereichId || k.bereich_id === bereichId),
     [kategorien, bereichId],
   );
+
+  const getNamenContext = useCallback((): AiNamenContext => {
+    const bereich = bereiche.find((b) => b.id === bereichId);
+    const kategorie = kategorien.find((k) => k.id === kategorieId);
+    const tech: Record<string, string> = {};
+    for (const f of ALL_PRODUKT_FIELDS) {
+      const v = defaultValues[f.col];
+      if (v == null) continue;
+      const s = String(v).trim();
+      if (!s || s === "false") continue;
+      const label = f.unit ? `${f.label} (${f.unit})` : f.label;
+      tech[label] = s;
+    }
+    return {
+      artikelnummer,
+      bereichName: bereich?.name ?? null,
+      kategorieName: kategorie?.name ?? null,
+      infoKurz: infoKurz || null,
+      technischeDaten: Object.keys(tech).length > 0 ? tech : null,
+    };
+  }, [artikelnummer, bereichId, kategorieId, infoKurz, bereiche, kategorien, defaultValues]);
+
+  const handleAcceptBezeichnung = useCallback((value: string) => {
+    setName(value);
+    markDirty("base");
+  }, [markDirty]);
+
+  const handleAcceptTitel = useCallback((value: string) => {
+    setDatenblattTitel(value);
+    markDirty("datenblatt");
+  }, [markDirty]);
 
   const allOpen = openSections.length === SECTION_IDS.length;
 
@@ -279,7 +314,14 @@ export function ProduktForm({
               {state.fieldErrors?.artikelnummer && <p className="text-sm text-destructive">{state.fieldErrors.artikelnummer}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="name">Bezeichnung</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="name">Bezeichnung</Label>
+                <AiNamenButton
+                  getContext={getNamenContext}
+                  onAcceptBezeichnung={handleAcceptBezeichnung}
+                  onAcceptTitel={handleAcceptTitel}
+                />
+              </div>
               <Input
                 id="name"
                 name="name"
@@ -296,14 +338,34 @@ export function ProduktForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div className="space-y-2">
               <Label htmlFor="bereich_id">Bereich *</Label>
-              <select id="bereich_id" name="bereich_id" required value={bereichId} onChange={(e) => setBereichId(e.target.value)} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
+              <select
+                id="bereich_id"
+                name="bereich_id"
+                required
+                value={bereichId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setBereichId(next);
+                  if (kategorieId && !kategorien.some((k) => k.id === kategorieId && k.bereich_id === next)) {
+                    setKategorieId("");
+                  }
+                }}
+                className="w-full rounded-lg border px-3 py-2 bg-background text-sm"
+              >
                 <option value="" disabled>-- wahlen --</option>
                 {bereiche.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
               </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="kategorie_id">Kategorie *</Label>
-              <select id="kategorie_id" name="kategorie_id" required defaultValue={defaultValues.kategorie_id ?? ""} className="w-full rounded-lg border px-3 py-2 bg-background text-sm">
+              <select
+                id="kategorie_id"
+                name="kategorie_id"
+                required
+                value={kategorieId}
+                onChange={(e) => setKategorieId(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 bg-background text-sm"
+              >
                 <option value="" disabled>-- wahlen --</option>
                 {filteredKategorien.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
               </select>
@@ -366,7 +428,13 @@ export function ProduktForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="datenblatt_titel">Titel</Label>
-                  <Input id="datenblatt_titel" name="datenblatt_titel" defaultValue={defaultValues.datenblatt_titel ?? ""} className="text-base" />
+                  <Input
+                    id="datenblatt_titel"
+                    name="datenblatt_titel"
+                    value={datenblattTitel}
+                    onChange={(e) => setDatenblattTitel(e.target.value)}
+                    className="text-base"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="info_kurz">
@@ -376,7 +444,8 @@ export function ProduktForm({
                   <Input
                     id="info_kurz"
                     name="info_kurz"
-                    defaultValue={defaultValues.info_kurz ?? ""}
+                    value={infoKurz}
+                    onChange={(e) => setInfoKurz(e.target.value)}
                     placeholder="z. B. STEPLIGHT 3W 2700K 124lm CRI90 IP65 inkl. TRAFO N.DIM.-WEISS"
                     maxLength={500}
                   />

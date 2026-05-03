@@ -57,7 +57,8 @@
 | PROJ-41 | Manuelles Crop-Rechteck für Kategorie-Bilder | Deployed | [PROJ-41](PROJ-41-manuelles-crop-rechteck.md) | 2026-04-30 |
 | PROJ-42 | KI-Bild-Generierung für Kategorie-Slots (gpt-image-2) | Deployed | [PROJ-42](PROJ-42-ki-bild-generierung.md) | 2026-04-30 |
 | PROJ-43 | Mediathek (zentrale Bild-Bibliothek mit Wiederverwendung) | Approved | [PROJ-43](PROJ-43-mediathek.md) | 2026-04-30 |
+| PROJ-44 | KI-Vorschläge für Bezeichnung & Datenblatt-Titel | In Progress | [PROJ-44](PROJ-44-ki-bezeichnung-titel.md) | 2026-05-03 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-44
+## Next Available ID: PROJ-45

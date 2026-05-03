@@ -100,8 +100,10 @@ export function ProduktBildSlot({
   const [aiLoading, setAiLoading] = useState(false);
 
   const canPersist = !!produktId && !!column;
+  // Bild-Vorschau quadratisch, mind. so breit wie die Action-Bar darunter
+  // (7 Icons × 28px + 6 × 4px Gap ≈ 220px).
   const previewSize =
-    size === "lg" ? "h-32 w-40" : "h-24 w-32";
+    size === "lg" ? "h-60 w-60" : "h-56 w-56";
 
   function markDirty() {
     onDirty?.();

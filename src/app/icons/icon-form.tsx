@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -163,7 +164,7 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
 
       <div className="mt-4 flex justify-end gap-2">
         <Button asChild variant="outline" type="button">
-          <a href="/icons">Abbrechen</a>
+          <Link href="/icons">Abbrechen</Link>
         </Button>
         <Button type="submit" disabled={pending || uploading}>
           {pending ? "Speichere…" : submitLabel}

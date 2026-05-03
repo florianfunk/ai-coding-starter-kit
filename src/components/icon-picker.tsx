@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -103,9 +104,9 @@ export function IconPicker({
       {icons.length === 0 && (
         <p className="p-6 text-sm text-muted-foreground text-center">
           Noch keine Icons angelegt.{" "}
-          <a href="/icons/neu" className="text-primary hover:underline">
+          <Link href="/icons/neu" className="text-primary hover:underline">
             Jetzt welche anlegen &rarr;
-          </a>
+          </Link>
         </p>
       )}
 

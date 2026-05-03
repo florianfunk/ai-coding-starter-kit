@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useRef } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Edit3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -89,12 +90,12 @@ export function DatenblattSection({ produktId, templates, activeTemplateId, slot
           <div className="card-head-title">Datenblatt-Vorlage</div>
           <div className="card-head-sub">Bilder-Slots für den PDF-Export</div>
         </div>
-        <a
+        <Link
           href="/datenblatt-vorlagen"
           className="text-[12px] font-medium text-white/80 hover:text-white"
         >
           Vorlagen verwalten →
-        </a>
+        </Link>
       </div>
       <div className="space-y-4 p-5">
         {/* Template chooser — PROJ-38: Vorschaubild + Slot-Anzahl */}

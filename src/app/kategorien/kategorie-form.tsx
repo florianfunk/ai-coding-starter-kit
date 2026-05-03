@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useActionState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -575,9 +576,9 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
           <div className="order-2 space-y-3">
             <div className="flex items-center justify-between">
               <Label>Icons</Label>
-              <a href="/icons" className="text-xs text-muted-foreground hover:text-primary hover:underline">
+              <Link href="/icons" className="text-xs text-muted-foreground hover:text-primary hover:underline">
                 Icons verwalten &rarr;
-              </a>
+              </Link>
             </div>
             <IconPicker
               icons={icons}
@@ -782,7 +783,7 @@ export function KategorieForm({ bereiche, icons, kategorieId, defaultValues, act
 
           <div className="order-7 flex gap-2">
             <Button type="submit" disabled={pending || uploadingSlot !== null}>{pending ? "Speichere…" : "Speichern"}</Button>
-            <Button asChild variant="outline" type="button"><a href="/kategorien">Abbrechen</a></Button>
+            <Button asChild variant="outline" type="button"><Link href="/kategorien">Abbrechen</Link></Button>
           </div>
         </form>
       </CardContent>
@@ -822,6 +823,11 @@ interface BildSlotCardProps {
   };
 }
 
+// dnd-kit gibt setNodeRef/listeners/attributes via Hook zurück und erwartet
+// sie als Ref/Spread auf das DOM-Element. Das ist by-design — die neue
+// react-hooks/refs-Regel (React 19) kennt das Pattern nicht und meldet hier
+// systematisch False Positives.
+/* eslint-disable react-hooks/refs */
 function BildSlotCard({
   slot,
   bild,
@@ -1005,6 +1011,7 @@ function BildSlotCard({
     </div>
   );
 }
+/* eslint-enable react-hooks/refs */
 
 /**
  * Einheitlicher Icon-Button für die Slot-Action-Bar.

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,8 +77,9 @@ export function TemplateEditor(props: Props) {
       if (!interaction) return;
       const dx = e.clientX - interaction.startX;
       const dy = e.clientY - interaction.startY;
-      const dxCm = toCm(dx);
-      const dyCm = toCm(dy);
+      // Inline (statt toCm), damit der Effect-Dep-Array nicht wachsen muss.
+      const dxCm = dx / scale;
+      const dyCm = dy / scale;
 
       setSlots((prev) => prev.map((s) => {
         if (s.id !== interaction.slotId) return s;
@@ -381,7 +383,7 @@ export function TemplateEditor(props: Props) {
         )}
 
         <div className="flex gap-2 sticky bottom-2">
-          <Button asChild variant="outline" className="flex-1"><a href="/datenblatt-vorlagen">Zurück</a></Button>
+          <Button asChild variant="outline" className="flex-1"><Link href="/datenblatt-vorlagen">Zurück</Link></Button>
           {!locked && (
             <Button className="flex-1" onClick={save} disabled={saving}>
               {saving ? "Speichere…" : (props.mode === "create" ? "Anlegen" : "Speichern")}

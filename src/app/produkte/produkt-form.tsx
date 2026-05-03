@@ -872,6 +872,7 @@ export function ProduktForm({
               showRemoveButtons
               values={iconWerte}
               onValueChange={setIconWert}
+              compact
             />
             {/* Hidden inputs für Icon-Werte (Key: icon_wert__<iconId>) */}
             {iconIds.map((id) =>

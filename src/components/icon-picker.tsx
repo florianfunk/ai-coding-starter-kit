@@ -345,7 +345,7 @@ function SortableSelectedIcon({
       <div
         ref={setNodeRef}
         style={style}
-        className="relative group flex items-center select-none"
+        className="relative group flex flex-col items-center gap-0.5 select-none"
       >
         <div
           className={`flex items-center touch-none ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
@@ -372,6 +372,18 @@ function SortableSelectedIcon({
             )}
           </div>
         </div>
+        {hasWert && (
+          <input
+            type="text"
+            value={value ?? ""}
+            onChange={(e) => onValueChange!(e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            maxLength={120}
+            aria-label={`Wert für ${icon.label}`}
+            placeholder="—"
+            className="h-5 w-8 rounded border border-input bg-background px-0.5 text-[10px] text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-primary/40"
+          />
+        )}
         {onRemove && (
           <button
             type="button"

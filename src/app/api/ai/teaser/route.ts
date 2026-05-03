@@ -40,14 +40,14 @@ function checkRateLimit(key: string): { ok: boolean; remaining: number } {
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
-  // Auth ist im Projekt aktuell deaktiviert (server uses service role).
-  // Schutz vor Misuse: simples Rate-Limit pro IP.
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
 
-  const rl = checkRateLimit(ip);
+  const rl = checkRateLimit(user.id);
   if (!rl.ok) {
     return NextResponse.json(
       { error: "Limit erreicht (60 Anfragen / Stunde). Bitte später erneut versuchen." },

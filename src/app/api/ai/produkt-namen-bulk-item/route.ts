@@ -32,14 +32,16 @@ function checkRateLimit(key: string): { ok: boolean } {
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
-  const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
 
-  if (!checkRateLimit(ip).ok) {
+  if (!checkRateLimit(user.id).ok) {
     return NextResponse.json(
-      { error: "Limit erreicht (60 Anfragen / Stunde). Bitte später erneut versuchen." },
+      { error: "Limit erreicht (500 Anfragen / Stunde). Bitte später erneut versuchen." },
       { status: 429 },
     );
   }

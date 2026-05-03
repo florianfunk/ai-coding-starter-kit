@@ -198,7 +198,6 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                   <TableHead className="w-28 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
                     Status
                   </TableHead>
-                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -255,14 +254,6 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                       ) : (
                         <span className="pill pill-bad">unbearbeitet</span>
                       )}
-                    </TableCell>
-                    <TableCell className="relative z-20">
-                      <Link
-                        href={`/produkte/${p.id}`}
-                        className="inline-flex items-center p-1 text-muted-foreground/50 transition-colors hover:text-primary"
-                      >
-                        <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

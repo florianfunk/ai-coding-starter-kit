@@ -111,10 +111,11 @@ export async function updateKategorie(id: string, _p: KategorieFormState, formDa
   await logAudit(supabase, { tableName: "kategorien", recordId: id, action: "update", recordLabel: parsed.data.name });
 
   revalidatePath("/kategorien");
+  revalidatePath(`/kategorien/${id}`);
   revalidatePath(`/kategorien/${id}/bearbeiten`);
   revalidateTag("kategorien", "max");
   revalidateTag("dashboard", "max");
-  redirect("/kategorien?toast=success&message=Kategorie+gespeichert");
+  redirect(`/kategorien/${id}?toast=success&message=Kategorie+gespeichert`);
 }
 
 export async function deleteKategorie(id: string): Promise<{ error: string | null }> {

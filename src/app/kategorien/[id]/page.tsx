@@ -78,11 +78,6 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
                 <Pencil className="h-3.5 w-3.5" /> Bearbeiten
               </Link>
             </Button>
-            <Button asChild size="sm">
-              <Link href={`/produkte/neu?kategorie=${id}`}>
-                <Plus className="h-3.5 w-3.5" /> Neues Produkt
-              </Link>
-            </Button>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">

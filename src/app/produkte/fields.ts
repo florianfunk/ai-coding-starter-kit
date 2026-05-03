@@ -190,12 +190,9 @@ export const PRODUKT_FIELD_GROUPS: { tab: string; title: string; fields: FieldDe
     fields: [
       { col: "mit_betriebsgeraet", label: "Mit Betriebsgerät", type: "bool" },
       { col: "optional_text", label: "Optional", type: "text" },
-      {
-        col: "zertifikate",
-        label: "Zertifikate",
-        type: "text",
-        options: ["CE", "RoHS", "CE, RoHS", "CE, RoHS, ENEC", "CE, RoHS, VDE", "CE, RoHS, TÜV", "CE, RoHS, ENEC, VDE"],
-      },
+      // Hinweis: „zertifikate" wurde aus der UI entfernt — die Pflege läuft
+      // jetzt über die Icons-Section (Gruppe „Zertifikate"). DB-Spalte bleibt
+      // bestehen für Migrations-/Altdaten.
     ],
   },
 ];

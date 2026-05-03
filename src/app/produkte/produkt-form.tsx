@@ -98,7 +98,10 @@ function sectionProgress(
   iconCount: number,
   manualComplete: ReadonlySet<string>,
 ) {
-  const check = (v: unknown) => v != null && v !== "" && v !== false;
+  const check = (v: unknown) => v != null && v !== "";
+  // Für reine Text/Number-Felder gilt zusätzlich: `false` = nicht gesetzt.
+  // Bei Bool-Feldern ist `false` (Nein) ein bewusst gepflegter Wert.
+  const checkText = (v: unknown) => check(v) && v !== false;
   let total = 0;
   let done = 0;
 
@@ -108,17 +111,20 @@ function sectionProgress(
   } else if (sectionId === "datenblatt") {
     const keys = ["datenblatt_titel", "info_kurz", "treiber", "datenblatt_text", "datenblatt_text_2", "datenblatt_text_3"];
     total = keys.length;
-    done = keys.filter((k) => check(defaultValues[k])).length;
+    done = keys.filter((k) => checkText(defaultValues[k])).length;
   } else if (sectionId === "datenblatt-bilder") {
     total = DATENBLATT_BILDER_KEYS.length;
-    done = DATENBLATT_BILDER_KEYS.filter((k) => check(defaultValues[k])).length;
+    done = DATENBLATT_BILDER_KEYS.filter((k) => checkText(defaultValues[k])).length;
   } else {
     const groupTabs = sectionId === "thermisch" ? ["thermisch", "sonstiges"] : [sectionId];
     for (const tab of groupTabs) {
       const group = PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab);
       if (group) {
         total += group.fields.length;
-        for (const f of group.fields) if (check(defaultValues[f.col])) done += 1;
+        for (const f of group.fields) {
+          const isFilled = f.type === "bool" ? check(defaultValues[f.col]) : checkText(defaultValues[f.col]);
+          if (isFilled) done += 1;
+        }
       }
     }
   }

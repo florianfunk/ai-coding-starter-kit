@@ -3,8 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { CompletenessResult } from "@/lib/completeness";
 import { PRODUKT_FIELD_GROUPS } from "../fields";
 
-function fieldsForTab(tab: string): string[] {
-  return PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab)?.fields.map((f) => f.col) ?? [];
+function fieldsForTab(tab: string): { col: string; type: string }[] {
+  return PRODUKT_FIELD_GROUPS.find((g) => g.tab === tab)?.fields.map((f) => ({ col: f.col, type: f.type })) ?? [];
 }
 
 type SectionStat = {
@@ -42,6 +42,13 @@ export function buildSectionStats(
     const v = produkt[k];
     return v != null && v !== "" && v !== false;
   };
+  // Für Bool-Felder zählt auch `false` (Nein) als gepflegt.
+  const valTyped = (k: string, type: string) => {
+    const v = produkt[k];
+    if (v == null || v === "") return false;
+    if (type === "bool") return true;
+    return v !== false;
+  };
 
   const base: Array<[string, boolean]> = [
     ["artikelnummer", val("artikelnummer")],
@@ -74,17 +81,17 @@ export function buildSectionStats(
 
   // Feldlisten direkt aus fields.ts spiegeln, damit Form & Sidebar nie auseinanderlaufen.
   const elektrisch = fieldsForTab("elektrisch");
-  const elektrischDone = elektrisch.filter((k) => val(k)).length;
+  const elektrischDone = elektrisch.filter((f) => valTyped(f.col, f.type)).length;
 
   const lichttechnisch = fieldsForTab("lichttechnisch");
-  const lichttechnischDone = lichttechnisch.filter((k) => val(k)).length;
+  const lichttechnischDone = lichttechnisch.filter((f) => valTyped(f.col, f.type)).length;
 
   const mechanisch = fieldsForTab("mechanisch");
-  const mechanischDone = mechanisch.filter((k) => val(k)).length;
+  const mechanischDone = mechanisch.filter((f) => valTyped(f.col, f.type)).length;
 
   // Form merged „thermisch" + „sonstiges" in eine UI-Section (siehe produkt-form.tsx).
   const thermisch = [...fieldsForTab("thermisch"), ...fieldsForTab("sonstiges")];
-  const thermischDone = thermisch.filter((k) => val(k)).length;
+  const thermischDone = thermisch.filter((f) => valTyped(f.col, f.type)).length;
 
   return [
     { id: "base", label: "Grunddaten", icon: FileText, done: baseDone, total: base.length },

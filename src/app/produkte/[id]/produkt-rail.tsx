@@ -1,4 +1,4 @@
-import { Check, AlertTriangle, FileText, Edit3, Sparkles, Cpu, Zap, Tag, type LucideIcon } from "lucide-react";
+import { Check, AlertTriangle, FileText, Edit3, Sparkles, Cpu, Zap, Tag, Bolt, Images, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import type { CompletenessResult } from "@/lib/completeness";
 
@@ -57,15 +57,35 @@ export function buildSectionStats(
   ];
   const datenblattDone = datenblatt.filter(([, v]) => v).length;
 
-  const lichttechnisch = [
+  const datenblattBilder = [
+    "bild_detail_1_path",
+    "bild_detail_2_path",
+    "bild_zeichnung_1_path",
+    "bild_zeichnung_2_path",
+    "bild_zeichnung_3_path",
+    "bild_energielabel_path",
+  ];
+  const datenblattBilderDone = datenblattBilder.filter((k) => val(k)).length;
+
+  const elektrisch = [
     "leistung_w",
+    "nennstrom_a",
+    "nennspannung_v",
+    "schutzklasse",
+    "spannungsart",
+    "gesamteffizienz_lm_w",
+  ];
+  const elektrischDone = elektrisch.filter((k) => val(k)).length;
+
+  const lichttechnisch = [
     "lichtstrom_lm",
-    "farbtemperatur_k",
-    "lichtausbeute_lm_pro_w",
-    "farbwiedergabeindex_cri",
-    "farbkonsistenz_sdcm",
-    "lebensdauer_h",
     "abstrahlwinkel_grad",
+    "energieeffizienzklasse",
+    "farbtemperatur_k",
+    "farbkonsistenz_sdcm",
+    "farbwiedergabeindex_cri",
+    "lebensdauer_h",
+    "lichtausbeute_lm_pro_w",
   ];
   const lichttechnischDone = lichttechnisch.filter((k) => val(k)).length;
 
@@ -84,11 +104,6 @@ export function buildSectionStats(
   const thermisch = ["betriebstemperatur_min_c", "betriebstemperatur_max_c", "lagertemperatur_text", "waermeentwicklung"];
   const thermischDone = thermisch.filter((k) => val(k)).length;
 
-  // „Lichttechnik" in der Sidebar fasst die Form-Sections elektrisch +
-  // lichttechnisch zusammen (in der Form sind das 2 Sections, die beide
-  // den Pauschal-Bucket „Technische Daten" füllen).
-  const lichttechnikManual = isManual("lichttechnisch") || isManual("elektrisch");
-
   return [
     { id: "base", label: "Grunddaten", icon: FileText, done: baseDone, total: base.length },
     {
@@ -100,12 +115,28 @@ export function buildSectionStats(
       manualComplete: isManual("datenblatt"),
     },
     {
+      id: "datenblatt-bilder",
+      label: "Datenblatt-Bilder",
+      icon: Images,
+      done: isManual("datenblatt-bilder") ? datenblattBilder.length : datenblattBilderDone,
+      total: datenblattBilder.length,
+      manualComplete: isManual("datenblatt-bilder"),
+    },
+    {
+      id: "elektrisch",
+      label: "Elektrotechnik",
+      icon: Bolt,
+      done: isManual("elektrisch") ? elektrisch.length : elektrischDone,
+      total: elektrisch.length,
+      manualComplete: isManual("elektrisch"),
+    },
+    {
       id: "lichttechnisch",
       label: "Lichttechnik",
       icon: Sparkles,
-      done: lichttechnikManual ? lichttechnisch.length : lichttechnischDone,
+      done: isManual("lichttechnisch") ? lichttechnisch.length : lichttechnischDone,
       total: lichttechnisch.length,
-      manualComplete: lichttechnikManual,
+      manualComplete: isManual("lichttechnisch"),
     },
     {
       id: "mechanisch",

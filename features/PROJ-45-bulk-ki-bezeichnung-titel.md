@@ -1,9 +1,10 @@
 # PROJ-45: Bulk-KI-Vorschläge für Bezeichnung & Titel
 
-**Status:** In Progress
+**Status:** Deployed
 **Priorität:** P1
 **Erstellt:** 2026-05-03
 **Last Updated:** 2026-05-03
+**Deployed:** 2026-05-03 (dpl_64Jyk8g7LjddZoHufJhkzgzN7aUS, commit 83cd33b)
 
 ## Vision
 

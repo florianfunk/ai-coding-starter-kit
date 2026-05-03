@@ -50,11 +50,13 @@ import {
   FolderOpen,
   Scale,
   ImageIcon,
+  Sparkles,
 } from "lucide-react";
 import { quickUpdateProdukt, bulkUpdateProdukte } from "./actions";
 import { toast } from "sonner";
 import { CompletenessBar } from "@/components/completeness-bar";
 import type { CompletenessResult } from "@/lib/completeness";
+import { BulkNamenWizard } from "./bulk-namen-wizard";
 
 interface Produkt {
   id: string;
@@ -95,6 +97,7 @@ export function ProdukteTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showNamenWizard, setShowNamenWizard] = useState(false);
   const [isBulkPending, startBulkTransition] = useTransition();
 
   function toggleCompare(id: string) {
@@ -310,6 +313,16 @@ export function ProdukteTable({
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowNamenWizard(true)}
+                disabled={isBulkPending}
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                KI-Vorschläge
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleBulkDelete}
                 disabled={isBulkPending}
                 className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
@@ -404,6 +417,18 @@ export function ProdukteTable({
 
       {/* Spacer so table content is not hidden by bottom bars */}
       {(selectedCount > 0 || compareIds.length > 0) && <div className="h-20" />}
+
+      <BulkNamenWizard
+        open={showNamenWizard}
+        onOpenChange={setShowNamenWizard}
+        produkte={produkte
+          .filter((p) => selected.has(p.id))
+          .map((p) => ({ id: p.id, artikelnummer: p.artikelnummer, name: p.name }))}
+        onApplied={() => {
+          clearSelection();
+          router.refresh();
+        }}
+      />
     </>
   );
 }

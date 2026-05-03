@@ -606,3 +606,48 @@ export async function matchArtikelnummern(
 
   return { matches, error: null };
 }
+
+const bulkNamenSchema = z.array(
+  z.object({
+    id: z.string().uuid(),
+    name: z.string().max(300).optional(),
+    datenblatt_titel: z.string().max(300).optional(),
+  }).refine((u) => u.name !== undefined || u.datenblatt_titel !== undefined, {
+    message: "Mindestens ein Feld muss übergeben werden",
+  }),
+).min(1).max(500);
+
+export async function applyBulkProduktNamen(
+  updates: { id: string; name?: string; datenblatt_titel?: string }[],
+): Promise<{ error: string | null; count: number }> {
+  const parsed = bulkNamenSchema.safeParse(updates);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Eingabe ungültig.", count: 0 };
+  }
+
+  const supabase = await createClient();
+  let count = 0;
+
+  for (const u of parsed.data) {
+    const patch: Record<string, string> = {};
+    if (u.name !== undefined) patch.name = u.name;
+    if (u.datenblatt_titel !== undefined) patch.datenblatt_titel = u.datenblatt_titel;
+    if (Object.keys(patch).length === 0) continue;
+
+    const { error } = await supabase.from("produkte").update(patch).eq("id", u.id);
+    if (error) {
+      return { error: `Update für ${u.id}: ${error.message}`, count };
+    }
+    count += 1;
+    await logAudit(supabase, {
+      tableName: "produkte",
+      recordId: u.id,
+      action: "update",
+      changes: { ki_namen: { old: null, new: patch } },
+    });
+  }
+
+  revalidatePath("/produkte");
+  revalidateTag("dashboard", "max");
+  return { error: null, count };
+}

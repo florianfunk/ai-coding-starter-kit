@@ -135,9 +135,9 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
               </div>
               {hatBilder ? (
                 <div className="grid aspect-[4/2] w-full grid-cols-4 grid-rows-2 gap-2 rounded-[14px] border border-border/60 bg-muted/40 p-2">
-                  <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 row-span-1" />
-                  <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-span-1 row-span-2" />
-                  <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 row-span-1" />
+                  <BildKachel url={bildUrls.bild1} label="Bild 1" size="15 × 3 cm" className="col-span-3 col-start-1 row-start-1" />
+                  <BildKachel url={bildUrls.bild2} label="Bild 2" size="15 × 3 cm" className="col-span-3 col-start-1 row-start-2" />
+                  <BildKachel url={bildUrls.bild3} label="Bild 3" size="5 × 3 cm" className="col-start-4 row-start-1" />
                   <BildKachel url={bildUrls.bild4} label="Bild 4" size="5 × 3 cm" className="col-start-4 row-start-2" />
                 </div>
               ) : (

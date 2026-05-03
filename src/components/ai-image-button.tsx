@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, Wand2, RotateCcw } from "lucide-react";
 
-export type AspectPreview = "wide" | "tall";
+export type AspectPreview = "wide" | "tall" | "a4";
 
 interface Props {
   /** Größe des Button-Triggers — passt zu den Mini-Action-Buttons in den Bildslots */
@@ -67,7 +67,12 @@ export function AIImageButton({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const previewClass = aspect === "wide" ? "aspect-[5/1]" : "aspect-[1/2] max-w-[200px] mx-auto";
+  const previewClass =
+    aspect === "wide"
+      ? "aspect-[5/1]"
+      : aspect === "tall"
+      ? "aspect-[1/2] max-w-[200px] mx-auto"
+      : "aspect-[210/297] max-w-[260px] mx-auto";
 
   function handleGenerate() {
     if (!prompt.trim()) return;

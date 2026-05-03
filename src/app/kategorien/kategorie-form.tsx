@@ -66,12 +66,12 @@ type BildState = {
   originalPreviewUrl?: string | null;
 };
 
-const SLOT_ASPECT: Record<BildSlot, CropAspect> = {
+const SLOT_ASPECT = {
   1: "wide",
   2: "wide",
   3: "tall",
   4: "tall",
-};
+} as const satisfies Record<BildSlot, CropAspect>;
 
 const SLOT_GROUP: Record<BildSlot, "wide" | "tall"> = SLOT_ASPECT;
 

@@ -46,6 +46,7 @@ interface Props {
 const ASPECT_RATIO: Record<CropAspect, number> = {
   wide: 5 / 1,
   tall: 1 / 2,
+  a4: 210 / 297,
 };
 
 const MIN_CROP_PX = 50;
@@ -126,7 +127,11 @@ export function ManualCropEditor({ originalUrl, aspect, initialCrop, onChange }:
   }, [completedCrop, imgDims, onChange]);
 
   const previewWrapperClass =
-    aspect === "wide" ? "aspect-[5/1] w-full" : "aspect-[1/2] mx-auto max-w-[140px]";
+    aspect === "wide"
+      ? "aspect-[5/1] w-full"
+      : aspect === "tall"
+      ? "aspect-[1/2] mx-auto max-w-[140px]"
+      : "aspect-[210/297] mx-auto max-w-[180px]";
 
   // Live-Preview via CSS: Original-Bild positioniert + skaliert hinter einem Crop-Fenster
   const previewStyle: React.CSSProperties = (() => {

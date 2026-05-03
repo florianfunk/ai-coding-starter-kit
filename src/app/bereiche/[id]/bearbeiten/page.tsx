@@ -32,6 +32,7 @@ export default async function EditBereichPage({ params }: { params: Promise<{ id
         ]}
       />
       <BereichForm
+        bereichId={id}
         defaultValues={{
           name: bereich.name,
           beschreibung: bereich.beschreibung,

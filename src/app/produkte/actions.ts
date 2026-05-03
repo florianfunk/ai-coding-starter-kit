@@ -4,7 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { logAudit } from "@/lib/audit";
+import { logAudit, logAuditMany } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { compressImage } from "@/lib/image-compress";
 import { ALL_PRODUKT_FIELDS } from "./fields";
@@ -270,9 +270,16 @@ export async function bulkUpdateProdukte(
     return { error: `Unbekannte Aktion: ${action}`, count: 0 };
   }
 
-  for (const pid of ids) {
-    await logAudit(supabase, { tableName: "produkte", recordId: pid, action: action === "delete" ? "delete" : "update", changes: action !== "delete" ? { bulk_action: { old: null, new: action } } : undefined });
-  }
+  await logAuditMany(
+    supabase,
+    ids.map((pid) => ({
+      tableName: "produkte",
+      recordId: pid,
+      action: action === "delete" ? "delete" : "update",
+      changes:
+        action !== "delete" ? { bulk_action: { old: null, new: action } } : undefined,
+    })),
+  );
 
   revalidatePath("/produkte");
   revalidateTag("dashboard", "max");

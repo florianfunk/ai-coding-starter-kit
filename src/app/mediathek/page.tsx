@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { ChevronRight, Image as ImageIcon } from "lucide-react";
+import { ChevronRight, Image as ImageIcon, FileSearch } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { listMediathek } from "./actions";
 import { MediathekGrid } from "./mediathek-grid";
 
@@ -30,6 +31,11 @@ export default async function MediathekPage() {
                 übertragen oder ungenutzte Bilder löschen.
               </p>
             </div>
+            <Button asChild variant="outline" size="sm" className="gap-2">
+              <Link href="/mediathek/dubletten">
+                <FileSearch className="h-4 w-4" /> Dubletten finden
+              </Link>
+            </Button>
           </div>
         </div>
 

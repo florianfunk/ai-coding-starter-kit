@@ -18,12 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Search,
   X,
   Loader2,
   ImageIcon,
   Library,
+  Eye,
 } from "lucide-react";
 import { bildProxyUrl } from "@/lib/bild-url";
 import {
@@ -62,6 +64,7 @@ export function MediathekPicker({
   const [kategorieId, setKategorieId] = useState<string>("all");
   const [pending, startTransition] = useTransition();
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<MediathekItem | null>(null);
 
   // Beim Öffnen: Filter-Optionen einmal laden
   useEffect(() => {
@@ -235,7 +238,11 @@ export function MediathekPicker({
               </p>
             </div>
           ) : (
-            <div className="grid max-h-[55vh] grid-cols-2 gap-3 overflow-y-auto sm:grid-cols-3 md:grid-cols-4">
+            <ScrollArea className="h-[55vh] pr-3">
+              <div
+                className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
+                style={{ gridAutoRows: "minmax(220px, auto)" }}
+              >
               {items.map((item) => {
                 const url = bildProxyUrl("produktbilder", item.path);
                 const isSelected = selectedPath === item.path;
@@ -244,19 +251,16 @@ export function MediathekPicker({
                     key={item.path}
                     type="button"
                     onClick={() => setSelectedPath(item.path)}
-                    className={`group relative flex flex-col overflow-hidden rounded-lg border-2 bg-card text-left transition-all ${
+                    className={`group relative flex h-full flex-col overflow-hidden rounded-lg border-2 bg-card text-left transition-all ${
                       isSelected
                         ? "border-primary ring-2 ring-primary/30"
                         : "border-transparent hover:border-primary/40"
                     }`}
                     title={item.smartTitle || item.name}
                   >
-                    {/* Inline-style erzwingt 220px Höhe — nichts kann das
-                        überschreiben (kein flex-shrink, keine grid-row-Bremse). */}
-                    <div
-                      className="relative w-full bg-muted/40"
-                      style={{ height: "220px", minHeight: "220px", flexShrink: 0 }}
-                    >
+                    {/* Bild-Bereich nimmt allen verfügbaren Platz in der
+                        Tile (Grid-Row ist mind. 220 px hoch). */}
+                    <div className="relative min-h-0 flex-1 bg-muted/40">
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -271,8 +275,30 @@ export function MediathekPicker({
                         </div>
                       )}
                       {item.usageCount > 0 && (
-                        <span className="absolute top-1.5 right-1.5 rounded-full bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-primary/90 px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
                           {item.usageCount}×
+                        </span>
+                      )}
+                      {url && (
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Vorschau in groß"
+                          title="Vorschau in groß"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewItem(item);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPreviewItem(item);
+                            }
+                          }}
+                          className="absolute top-1.5 right-1.5 inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border bg-background/90 text-muted-foreground opacity-0 shadow-sm transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
                         </span>
                       )}
                     </div>
@@ -287,7 +313,8 @@ export function MediathekPicker({
                   </button>
                 );
               })}
-            </div>
+              </div>
+            </ScrollArea>
           )}
 
           <div className="flex items-center justify-between gap-2 border-t pt-3">
@@ -302,6 +329,53 @@ export function MediathekPicker({
                 Übernehmen
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lightbox-Vorschau in groß */}
+      <Dialog
+        open={previewItem !== null}
+        onOpenChange={(o) => !o && setPreviewItem(null)}
+      >
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium">
+              {previewItem?.smartTitle || previewItem?.name}
+            </DialogTitle>
+            <DialogDescription className="text-[11px]">
+              {previewItem?.path}
+            </DialogDescription>
+          </DialogHeader>
+          {previewItem && (
+            <div className="relative flex max-h-[75vh] items-center justify-center bg-muted/30 p-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bildProxyUrl("produktbilder", previewItem.path) ?? ""}
+                alt={previewItem.smartTitle || previewItem.name}
+                className="max-h-[70vh] max-w-full object-contain"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2 border-t pt-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPreviewItem(null)}
+            >
+              Schließen
+            </Button>
+            {previewItem && (
+              <Button
+                type="button"
+                onClick={() => {
+                  setSelectedPath(previewItem.path);
+                  setPreviewItem(null);
+                }}
+              >
+                Dieses Bild auswählen
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>

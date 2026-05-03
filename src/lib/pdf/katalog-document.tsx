@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/alt-text -- Image hier ist @react-pdf/renderer (PDF), nicht <img>. alt-Attribut existiert nicht. */
 import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer";
 import { getSpaltenDefinition, formatSpaltenWert } from "@/lib/katalog-column-map";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";

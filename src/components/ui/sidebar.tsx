@@ -660,8 +660,10 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
+  // Random width between 50 to 90%. Shadcn-Default-Code; wir lassen Math.random
+  // im useMemo (mountet einmal pro Skeleton-Instance), darum hier ok.
   const width = React.useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- shadcn skeleton-loader
     return `${Math.floor(Math.random() * 40) + 50}%`
   }, [])
 

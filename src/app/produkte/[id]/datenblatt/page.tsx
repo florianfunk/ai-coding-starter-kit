@@ -39,8 +39,14 @@ export default async function DatenblattPreviewPage({
             </Button>
           </div>
         </div>
+        {/* Server Component — Date.now() läuft serverseitig pro Request,
+            kein React-Render-Purity-Problem. Cache-Buster verhindert, dass
+            das iframe ein altes PDF anzeigt nach Datenblatt-Edits. */}
         <iframe
-          src={`/produkte/${id}/datenblatt/raw${qs}&_=${Date.now()}`}
+          src={
+            // eslint-disable-next-line react-hooks/purity -- Server Component
+            `/produkte/${id}/datenblatt/raw${qs}&_=${Date.now()}`
+          }
           className="w-full h-[80vh] border rounded"
         />
       </div>

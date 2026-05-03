@@ -17,7 +17,7 @@
  *  4. Style "klassisch" umgeht das System und nutzt das FileMaker-Replikat direkt.
  */
 import { NextResponse } from "next/server";
-import { createServiceRoleClient } from "@/lib/supabase/server";
+import { createClient, createServiceRoleClient } from "@/lib/supabase/server";
 import {
   buildDatenblattPayload,
   renderDatenblattPdf,
@@ -37,6 +37,13 @@ export async function GET(
   const layout: Brand = url.searchParams.get("layout") === "eisenkeil" ? "eisenkeil" : "lichtengros";
   const forceClassic = url.searchParams.get("style") === "klassisch";
   const download = url.searchParams.get("download") === "1";
+
+  // Defense-in-Depth: nicht nur auf Middleware vertrauen — auch hier prüfen.
+  const auth = await createClient();
+  const {
+    data: { user },
+  } = await auth.auth.getUser();
+  if (!user) return new NextResponse("Unauthorized", { status: 401 });
 
   const supabase = await createServiceRoleClient();
 

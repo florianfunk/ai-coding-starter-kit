@@ -6,7 +6,6 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit, logAuditMany } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
-import { compressImage } from "@/lib/image-compress";
 import { ALL_PRODUKT_FIELDS } from "./fields";
 
 const MARKE_VALUES = ["lichtengros", "eisenkeil"] as const;
@@ -224,16 +223,16 @@ export async function bulkUpdateProdukte(
   if (!ids.length) return { error: "Keine Produkte ausgewählt.", count: 0 };
   if (ids.length > 500) return { error: "Maximal 500 Produkte gleichzeitig.", count: 0 };
 
-  // Validate all IDs are UUIDs
-  const validIds = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
-  if (validIds.length !== ids.length) return { error: "Ungueltige Produkt-IDs.", count: 0 };
+  const idSchema = z.string().uuid();
+  const idsCheck = z.array(idSchema).safeParse(ids);
+  if (!idsCheck.success) return { error: "Ungueltige Produkt-IDs.", count: 0 };
 
-  // Validate value as UUID for kategorie change
-  if (action === "change_kategorie" && value && !/^[0-9a-f-]{36}$/i.test(value)) {
+  if (action === "change_kategorie" && value && !idSchema.safeParse(value).success) {
     return { error: "Ungueltige Kategorie-ID.", count: 0 };
   }
 
   const supabase = await createClient();
+  const userEmail = (await supabase.auth.getUser()).data.user?.email ?? null;
   let error: string | null = null;
   let count = 0;
 
@@ -273,6 +272,7 @@ export async function bulkUpdateProdukte(
   await logAuditMany(
     supabase,
     ids.map((pid) => ({
+      userEmail,
       tableName: "produkte",
       recordId: pid,
       action: action === "delete" ? "delete" : "update",
@@ -349,108 +349,6 @@ export async function duplicateProdukt(id: string): Promise<{ id?: string; error
   revalidateTag("bereich-counts", "max");
   revalidateTag("kategorie-counts", "max");
   return { id: data.id, error: null };
-}
-
-const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
-export async function uploadProduktBild(formData: FormData) {
-  const file = formData.get("file") as File | null;
-  const produktId = String(formData.get("produkt_id") ?? "main");
-  if (!file || file.size === 0) return { path: null, error: "Keine Datei." };
-  if (!ALLOWED.includes(file.type)) return { path: null, error: "Format nicht unterstützt." };
-  if (file.size > 10 * 1024 * 1024) return { path: null, error: "Datei zu groß." };
-  const supabase = await createClient();
-  const { buffer, contentType, extension } = await compressImage(file);
-  const path = `produkte/${produktId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-  const { error } = await supabase.storage.from("produktbilder").upload(path, buffer, { contentType });
-  if (error) return { path: null, error: error.message };
-  return { path, error: null };
-}
-
-export async function addGalerieBild(produktId: string, storagePath: string, altText: string | null) {
-  const supabase = await createClient();
-  const { count } = await supabase.from("produkt_bilder").select("*", { count: "exact", head: true }).eq("produkt_id", produktId);
-  const { error } = await supabase.from("produkt_bilder")
-    .insert({ produkt_id: produktId, storage_path: storagePath, sortierung: count ?? 0, alt_text: altText });
-  if (error) return { error: error.message };
-  revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
-}
-
-export async function deleteGalerieBild(bildId: string, produktId: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("produkt_bilder").delete().eq("id", bildId);
-  if (error) return { error: error.message };
-  revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
-}
-
-export async function reorderGalerieBilder(
-  produktId: string,
-  orderedImageIds: string[],
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-
-  // Update sortierung for each image in the new order
-  const updates = orderedImageIds.map((id, index) =>
-    supabase
-      .from("produkt_bilder")
-      .update({ sortierung: index })
-      .eq("id", id)
-      .eq("produkt_id", produktId),
-  );
-
-  const results = await Promise.all(updates);
-  const failed = results.find((r) => r.error);
-  if (failed?.error) return { error: failed.error.message };
-
-  revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
-}
-
-export async function setHauptbild(
-  produktId: string,
-  storagePath: string,
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("produkte")
-    .update({ hauptbild_path: storagePath })
-    .eq("id", produktId);
-
-  if (error) return { error: error.message };
-
-  revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
-}
-
-/**
- * Ersetzt den Storage-Pfad eines Galeriebildes (nach Upscale/BG-Remove).
- * Aktualisiert auch hauptbild_path, falls das Galeriebild als Hauptbild
- * markiert war.
- */
-export async function replaceGalerieBildPath(
-  bildId: string,
-  produktId: string,
-  oldPath: string,
-  newPath: string,
-): Promise<{ error: string | null }> {
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("produkt_bilder")
-    .update({ storage_path: newPath })
-    .eq("id", bildId);
-  if (error) return { error: error.message };
-
-  // Hauptbild-Referenz ggf. mitziehen
-  await supabase
-    .from("produkte")
-    .update({ hauptbild_path: newPath })
-    .eq("id", produktId)
-    .eq("hauptbild_path", oldPath);
-
-  revalidatePath(`/produkte/${produktId}`);
-  return { error: null };
 }
 
 // ---------------------------------------------------------------------------

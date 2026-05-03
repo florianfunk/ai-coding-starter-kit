@@ -413,15 +413,21 @@ export async function generateKategorieBildKi(
   }
   const { aspect, userPrompt, referencePath } = parsed.data;
 
-  // Rate-Limit (KI-Bilder sind teuer ~$0.17/Stück bei high quality)
-  if (!checkAiRateLimit("global")) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Nicht angemeldet." };
+  }
+
+  // Rate-Limit (KI-Bilder sind teuer ~$0.17/Stück bei high quality) — per User.
+  if (!checkAiRateLimit(user.id)) {
     return {
       ok: false,
       error: "Limit erreicht (10 Bilder/Stunde). Bitte später erneut versuchen.",
     };
   }
-
-  const supabase = await createClient();
 
   // OpenAI-Key aus den AI-Einstellungen ziehen (PROJ-39)
   const { data: settings } = await supabase

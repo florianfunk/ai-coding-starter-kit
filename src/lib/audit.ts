@@ -4,7 +4,7 @@
  */
 
 type AuditParams = {
-  userEmail?: string;
+  userEmail?: string | null;
   tableName: string;
   recordId: string;
   action: "create" | "update" | "delete";

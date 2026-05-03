@@ -344,14 +344,20 @@ export async function generateBereichBildKi(
   }
   const { userPrompt, referencePath } = parsed.data;
 
-  if (!checkBereichAiRateLimit("global")) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Nicht angemeldet." };
+  }
+
+  if (!checkBereichAiRateLimit(user.id)) {
     return {
       ok: false,
       error: "Limit erreicht (10 Bilder/Stunde). Bitte später erneut versuchen.",
     };
   }
-
-  const supabase = await createClient();
 
   const { data: settings } = await supabase
     .from("ai_einstellungen")

@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -93,6 +94,9 @@ export function ProdukteTable({
   completenessMap,
 }: ProdukteTableProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const currentSort = searchParams.get("sort") ?? "";
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -195,27 +199,27 @@ export function ProdukteTable({
             <TableHead className="w-[72px] text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
               Bild
             </TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            <SortableHeader column="artikelnummer" current={currentSort} pathname={pathname} searchParams={searchParams}>
               Artikelnummer
-            </TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="name" current={currentSort} pathname={pathname} searchParams={searchParams}>
               Name
-            </TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="bereich_name" current={currentSort} pathname={pathname} searchParams={searchParams}>
               Bereich
-            </TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="kategorie_name" current={currentSort} pathname={pathname} searchParams={searchParams}>
               Kategorie
-            </TableHead>
-            <TableHead className="text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="sortierung" current={currentSort} pathname={pathname} searchParams={searchParams} align="right">
               Sort
-            </TableHead>
-            <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="artikel_bearbeitet" current={currentSort} pathname={pathname} searchParams={searchParams}>
               Status
-            </TableHead>
-            <TableHead className="min-w-[140px] text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
+            </SortableHeader>
+            <SortableHeader column="completeness_percent" current={currentSort} pathname={pathname} searchParams={searchParams} className="min-w-[140px]">
               Vollständigkeit
-            </TableHead>
+            </SortableHeader>
             <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
@@ -645,5 +649,64 @@ function ProduktRow({
       </TableCell>
 
     </TableRow>
+  );
+}
+
+function SortableHeader({
+  column,
+  current,
+  pathname,
+  searchParams,
+  align = "left",
+  className = "",
+  children,
+}: {
+  column: string;
+  current: string;
+  pathname: string;
+  searchParams: URLSearchParams;
+  align?: "left" | "right";
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const isActiveAsc = current === column;
+  const isActiveDesc = current === `-${column}`;
+  const isActive = isActiveAsc || isActiveDesc;
+
+  // Klick-Logik: kein Sort → ASC; ASC → DESC; DESC → kein Sort (Default).
+  let nextSort: string | null;
+  if (!isActive) nextSort = column;
+  else if (isActiveAsc) nextSort = `-${column}`;
+  else nextSort = null;
+
+  const params = new URLSearchParams(searchParams.toString());
+  if (nextSort) params.set("sort", nextSort);
+  else params.delete("sort");
+  params.delete("page");
+  const href = `${pathname}?${params.toString()}`;
+
+  const Icon = isActiveAsc ? ArrowUp : isActiveDesc ? ArrowDown : ArrowUpDown;
+
+  return (
+    <TableHead
+      className={`text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70 ${
+        align === "right" ? "text-right" : ""
+      } ${className}`}
+    >
+      <Link
+        href={href}
+        className={`group inline-flex items-center gap-1 transition-colors hover:text-foreground ${
+          isActive ? "text-foreground" : ""
+        } ${align === "right" ? "flex-row-reverse" : ""}`}
+        scroll={false}
+      >
+        {children}
+        <Icon
+          className={`h-3 w-3 transition-opacity ${
+            isActive ? "opacity-100" : "opacity-30 group-hover:opacity-70"
+          }`}
+        />
+      </Link>
+    </TableHead>
   );
 }

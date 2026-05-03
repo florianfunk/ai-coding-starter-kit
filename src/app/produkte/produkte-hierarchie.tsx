@@ -50,7 +50,16 @@ export function ProdukteHierarchie({ produkte, bereiche, kategorien, completenes
   }, [produkte]);
 
   const sortierteBereiche = [...bereiche].sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0));
-  const sortierteKategorien = [...kategorien].sort((a, b) => (a.sortierung ?? 0) - (b.sortierung ?? 0));
+  // Kategorien-sortierung ist nur innerhalb eines Bereichs eindeutig — pro Bereich
+  // sortieren, dann nach Name als Tie-Break (es gibt Duplikate wie „sortierung=3"
+  // mehrfach im selben Bereich).
+  const sortierteKategorien = [...kategorien].sort((a, b) => {
+    if (a.bereich_id !== b.bereich_id) return 0;
+    const sA = a.sortierung ?? 9999;
+    const sB = b.sortierung ?? 9999;
+    if (sA !== sB) return sA - sB;
+    return a.name.localeCompare(b.name);
+  });
   const sichtbareBereiche = sortierteBereiche.filter((b) => grouped.has(b.id));
 
   if (sichtbareBereiche.length === 0) {

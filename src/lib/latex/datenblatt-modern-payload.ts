@@ -172,16 +172,11 @@ function splitBeschreibung(raw: string | null | undefined): {
   return { body, warnung };
 }
 
-/** Beschreibungstext in 1–4 Absaetze splitten (Briefing Lead + 4 Paras). */
+/** Beschreibungstext in beliebig viele Absaetze splitten — keine Kuerzung. */
 function splitParagraphs(body: string): string[] {
   if (!body) return [];
-  // Erster Absatz wird Lead. Wenn der Body sehr lang ist, kuerzen wir ihn
-  // auf max 2 Absaetze damit das Datenblatt auf eine Seite passt.
   const byBlank = body.split(/\n\s*\n+/).map((p) => p.replace(/\n/g, " ").trim()).filter(Boolean);
-  if (byBlank.length >= 2) return byBlank.slice(0, 2);
-  // Single block: kuerzer trimmen
-  const truncated = body.trim().length > 600 ? body.trim().slice(0, 580).replace(/\s\S*$/, " …") : body.trim();
-  return [truncated];
+  return byBlank.length ? byBlank : [body.trim()];
 }
 
 /** Format helper for DB values with units (skip empty). */

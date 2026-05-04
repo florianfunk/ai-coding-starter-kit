@@ -100,18 +100,6 @@
   \par\vspace{5mm}
   \noindent\includegraphics[width=\linewidth,height=32mm,keepaspectratio]{(((figF_filename | e)))}
   ((* endif *))
-
-  % Beschreibung direkt unter den Detail-Bildern — nutzt linke Spalte,
-  % damit die Hoehe der Tech-Daten rechts ausbalanciert wird.
-  % Ueberschrift nur, wenn auch Beschreibungstext vorhanden ist.
-  ((* if paragraphs *))
-  \par\vspace{5mm}
-  \sectionhead{Anwendung \& Hinweise}{}
-  ((* for para in paragraphs *))
-  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
-  \par\vspace{2mm}
-  ((* endfor *))
-  ((* endif *))
 \end{minipage}\hspace{7mm}%
 \begin{minipage}[t]{\dimexpr 0.45\linewidth-3.15mm\relax}
   \vspace{0pt}
@@ -165,5 +153,18 @@
   \end{tcolorbox}
   ((* endif *))
 \end{minipage}
+
+% ═════ ANWENDUNG & HINWEISE — eigener Block ueber volle Breite ═════
+% Steht ausserhalb der Hero-Minipages, damit langer Text nicht das ganze
+% 2-Spalten-Layout auf Seite 2 schiebt. Bei sehr langem Text bricht hier
+% sauber auf Seite 2 um.
+((* if paragraphs *))
+\par\vspace{6mm}\noindent
+\sectionhead{Anwendung \& Hinweise}{}
+((* for para in paragraphs *))
+{\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
+\par\vspace{2mm}
+((* endfor *))
+((* endif *))
 
 \end{document}

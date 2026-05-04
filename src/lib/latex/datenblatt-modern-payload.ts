@@ -421,7 +421,13 @@ function buildQuickfacts(
     final.splice(2, 0, cctTile);
     if (final.length > 9) final.length = 9;
   }
-  return final;
+  // Optionale Felder normalisieren, damit das Jinja-Template
+  // (((quickfacts[i].bg_hex))) nie auf undefined zugreift.
+  return final.map((q) => ({
+    ...q,
+    icon_image: q.icon_image ?? null,
+    bg_hex: q.bg_hex ?? null,
+  }));
 }
 
 /** Spec-Gruppen exakt nach Briefing 6.5.2. */

@@ -182,7 +182,6 @@
     \ifthenelse{\equal{\activeE}{1}}{\node[fill=ecE, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xe,5.5pt) + (7pt,0)$) {E};}{}
     \ifthenelse{\equal{\activeF}{1}}{\node[fill=ecF, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xf,5.5pt) + (7pt,0)$) {F};}{}
     \ifthenelse{\equal{\activeG}{1}}{\node[fill=ecG, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xg,5.5pt) + (7pt,0)$) {G};}{}
-    \draw[hairstrong, line width=0.4pt] (\xa,0) rectangle (\dimexpr\xg+14pt\relax,11pt);
   \end{tikzpicture}%
 }
 

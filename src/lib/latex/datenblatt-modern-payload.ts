@@ -60,6 +60,7 @@ async function downloadAndCompress(
   bucket: string,
   storagePath: string | null | undefined,
   preset: "hero" | "detail" | "logo",
+  options: { trimEdges?: boolean } = {},
 ): Promise<{ base64: string; ext: Ext } | null> {
   if (!storagePath) return null;
   const { data, error } = await supabase.storage.from(bucket).download(storagePath);
@@ -73,7 +74,15 @@ async function downloadAndCompress(
       ? { maxWidth: 800, quality: 80, png: false }
       : { maxWidth: 600, quality: 90, png: true };
 
-  let pipeline = sharp(input).rotate().resize({
+  let pipeline = sharp(input).rotate();
+  if (options.trimEdges) {
+    // Schneidet einfarbige Raender (z.B. eingebrannte schwarze Box) ab.
+    // Threshold etwas hoeher gesetzt, damit auch leichte Anti-Aliasing-Pixel
+    // mitgenommen werden. Trim VOR resize, damit der eigentliche Inhalt
+    // skaliert wird, nicht die Box.
+    pipeline = pipeline.trim({ threshold: 30 });
+  }
+  pipeline = pipeline.resize({
     width: cfg.maxWidth,
     withoutEnlargement: true,
   });
@@ -328,7 +337,9 @@ async function loadQuickfactIcons(
   for (const qf of quickfacts) {
     const path = qf.icon_image;
     if (!path || pathToFilename.has(path)) continue;
-    const dl = await downloadAndCompress(supabase, "produktbilder", path, "logo");
+    const dl = await downloadAndCompress(supabase, "produktbilder", path, "logo", {
+      trimEdges: true,
+    });
     if (!dl) continue;
     const fname = `qfico${counter++}.${dl.ext}`;
     pathToFilename.set(path, fname);

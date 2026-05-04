@@ -222,8 +222,9 @@
 %  (b) sonst kleines Mono-Label oben + grosser Display-Wert + kleine Unit.
 \newcommand{\quickfact}[4]{%
   % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename (optional)
-  \parbox[t][14mm][t]{\linewidth}{%
-    \ifthenelse{\equal{#4}{}}{%
+  \ifthenelse{\equal{#4}{}}{%
+    % Text-Variante: oben verankert
+    \parbox[t][14mm][t]{\linewidth}{%
       \raggedright
       {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par
       \vspace{1.6mm}%
@@ -231,11 +232,12 @@
       \ifthenelse{\equal{#3}{}}{}{%
         \,{\fontsize{8pt}{10pt}\selectfont\color{muted}#3}%
       }%
-    }{%
-      % Icon-Bild zentriert in der Kachel, max 11mm hoch, behaelt Aspect.
-      \centering\vspace*{\fill}%
+    }%
+  }{%
+    % Icon-Variante: vertikal UND horizontal zentriert in der ganzen Kachel.
+    \parbox[c][14mm][c]{\linewidth}{%
+      \centering
       \includegraphics[height=11mm,width=\linewidth,keepaspectratio]{#4}%
-      \vspace*{\fill}%
     }%
   }%
 }

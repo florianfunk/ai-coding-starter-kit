@@ -652,10 +652,10 @@ export async function buildModernDatenblattPayload(
     return collapsed.length ? collapsed : null;
   })();
 
-  // Titel = "Bezeichnung" (produkt.name) aus dem Formular. Faellt auf
-  // datenblatt_titel zurueck, falls keine Bezeichnung gepflegt wurde.
-  // Kein Akzent als zweite Zeile — die Bezeichnung enthaelt bereits CCT/Watt/IP.
-  const title = (produkt.name?.trim() || produkt.datenblatt_titel?.trim() || "") as string;
+  // Titel = "Datenblatt-Titel" (produkt.datenblatt_titel) aus dem Formular.
+  // Faellt auf "Bezeichnung" (produkt.name) zurueck, falls kein Titel gepflegt
+  // wurde. Kein Akzent als zweite Zeile.
+  const title = (produkt.datenblatt_titel?.trim() || produkt.name?.trim() || "") as string;
   const titleAccent = "";
 
   // Zwei-Spalten-Split: linke Spalte (unter Zeichnung) zuerst auffüllen,

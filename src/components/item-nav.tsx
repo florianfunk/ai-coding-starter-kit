@@ -5,13 +5,17 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-interface ProduktNavProps {
+interface ItemNavProps {
+  /** Pfad-Prefix, an den die ID angehängt wird (z. B. "/produkte"). */
+  basePath: string;
   prevId: string | null;
   nextId: string | null;
   position: number;
   total: number;
   prevLabel?: string | null;
   nextLabel?: string | null;
+  /** Substantiv für Tooltips, z. B. "Produkt", "Bereich", "Kategorie". */
+  itemNoun?: string;
 }
 
 function isEditableTarget(el: EventTarget | null): boolean {
@@ -22,7 +26,16 @@ function isEditableTarget(el: EventTarget | null): boolean {
   return false;
 }
 
-export function ProduktNav({ prevId, nextId, position, total, prevLabel, nextLabel }: ProduktNavProps) {
+export function ItemNav({
+  basePath,
+  prevId,
+  nextId,
+  position,
+  total,
+  prevLabel,
+  nextLabel,
+  itemNoun = "Eintrag",
+}: ItemNavProps) {
   const router = useRouter();
 
   useEffect(() => {
@@ -31,15 +44,15 @@ export function ProduktNav({ prevId, nextId, position, total, prevLabel, nextLab
       if (isEditableTarget(e.target)) return;
       if (e.key === "ArrowLeft" && prevId) {
         e.preventDefault();
-        router.push(`/produkte/${prevId}`);
+        router.push(`${basePath}/${prevId}`);
       } else if (e.key === "ArrowRight" && nextId) {
         e.preventDefault();
-        router.push(`/produkte/${nextId}`);
+        router.push(`${basePath}/${nextId}`);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [prevId, nextId, router]);
+  }, [prevId, nextId, router, basePath]);
 
   return (
     <div className="flex items-center gap-1.5">
@@ -47,9 +60,9 @@ export function ProduktNav({ prevId, nextId, position, total, prevLabel, nextLab
         variant="outline"
         size="sm"
         disabled={!prevId}
-        onClick={() => prevId && router.push(`/produkte/${prevId}`)}
-        title={prevLabel ? `Vorheriges: ${prevLabel} (←)` : "Kein vorheriges Produkt"}
-        aria-label="Vorheriges Produkt"
+        onClick={() => prevId && router.push(`${basePath}/${prevId}`)}
+        title={prevLabel ? `Vorherige(r/s) ${itemNoun}: ${prevLabel} (←)` : `Kein(e) vorherige(r/s) ${itemNoun}`}
+        aria-label={`Vorherige(r/s) ${itemNoun}`}
       >
         <ChevronLeft className="h-3.5 w-3.5" />
       </Button>
@@ -60,9 +73,9 @@ export function ProduktNav({ prevId, nextId, position, total, prevLabel, nextLab
         variant="outline"
         size="sm"
         disabled={!nextId}
-        onClick={() => nextId && router.push(`/produkte/${nextId}`)}
-        title={nextLabel ? `Nächstes: ${nextLabel} (→)` : "Kein nächstes Produkt"}
-        aria-label="Nächstes Produkt"
+        onClick={() => nextId && router.push(`${basePath}/${nextId}`)}
+        title={nextLabel ? `Nächste(r/s) ${itemNoun}: ${nextLabel} (→)` : `Kein(e) nächste(r/s) ${itemNoun}`}
+        aria-label={`Nächste(r/s) ${itemNoun}`}
       >
         <ChevronRight className="h-3.5 w-3.5" />
       </Button>

@@ -7,6 +7,7 @@ import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, Pencil, ChevronRight, ImageIcon, Layers } from "lucide-react";
 import { RichTextDisplay } from "@/components/rich-text-display";
+import { ItemNav } from "@/components/item-nav";
 import { ProdukteTabelle } from "./produkte-tabelle";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +19,18 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   const { data: kategorie } = await supabase.from("kategorien").select("*").eq("id", id).single();
   if (!kategorie) notFound();
 
-  const [{ data: bereich }, { data: produkte }, { data: iconLinks }] = await Promise.all([
+  const [{ data: bereich }, { data: produkte }, { data: iconLinks }, { data: katSiblings }] = await Promise.all([
     supabase.from("bereiche").select("id,name,farbe").eq("id", kategorie.bereich_id).single(),
     supabase.from("produkte").select("*").eq("kategorie_id", id).order("sortierung"),
     supabase.from("kategorie_icons").select("icons(label,symbol_path)").eq("kategorie_id", id),
+    // Geschwister-Kategorien fuer Vor/Zurueck-Navigation
+    // (gleiche globale Sortierung wie /kategorien).
+    supabase.from("kategorien").select("id, name").order("sortierung").order("name").limit(1000),
   ]);
+  const kSiblings = katSiblings ?? [];
+  const kIdx = kSiblings.findIndex((k) => k.id === id);
+  const kPrev = kIdx > 0 ? kSiblings[kIdx - 1] : null;
+  const kNext = kIdx >= 0 && kIdx < kSiblings.length - 1 ? kSiblings[kIdx + 1] : null;
 
   const bildUrls = {
     bild1: bildProxyUrl("produktbilder", kategorie.bild1_path),
@@ -62,12 +70,24 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div className="crumbs">
-          <Link href="/">Dashboard</Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/kategorien">Kategorien</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">{kategorie.name}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/kategorien">Kategorien</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground">{kategorie.name}</span>
+          </div>
+          <ItemNav
+            basePath="/kategorien"
+            prevId={kPrev?.id ?? null}
+            nextId={kNext?.id ?? null}
+            position={kIdx >= 0 ? kIdx + 1 : 0}
+            total={kSiblings.length}
+            prevLabel={kPrev?.name ?? null}
+            nextLabel={kNext?.name ?? null}
+            itemNoun="Kategorie"
+          />
         </div>
 
         {/* HEADER */}

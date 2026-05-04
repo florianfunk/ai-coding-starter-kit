@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Layers, Pencil, ChevronRight, ImageIcon } from "lucide-react";
 import { DeleteKategorieButton } from "@/app/kategorien/delete-button";
 import { RichTextDisplay } from "@/components/rich-text-display";
+import { ItemNav } from "@/components/item-nav";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,18 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
   if (!bereich) notFound();
 
   const bereichBildUrl = bildProxyUrl("produktbilder", bereich.bild_path);
+
+  // Geschwister-Bereiche fuer Vor/Zurueck-Navigation
+  // (gleiche Sortierreihenfolge wie /bereiche).
+  const { data: bereichSiblings } = await supabase
+    .from("bereiche")
+    .select("id, name")
+    .order("sortierung")
+    .order("name");
+  const bSiblings = bereichSiblings ?? [];
+  const bIdx = bSiblings.findIndex((b) => b.id === id);
+  const bPrev = bIdx > 0 ? bSiblings[bIdx - 1] : null;
+  const bNext = bIdx >= 0 && bIdx < bSiblings.length - 1 ? bSiblings[bIdx + 1] : null;
 
   const { data: kategorien } = await supabase
     .from("kategorien").select("*").eq("bereich_id", id).order("sortierung");
@@ -33,12 +46,24 @@ export default async function BereichDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div className="crumbs">
-          <Link href="/">Dashboard</Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/bereiche">Bereiche</Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">{bereich.name}</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/bereiche">Bereiche</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground">{bereich.name}</span>
+          </div>
+          <ItemNav
+            basePath="/bereiche"
+            prevId={bPrev?.id ?? null}
+            nextId={bNext?.id ?? null}
+            position={bIdx >= 0 ? bIdx + 1 : 0}
+            total={bSiblings.length}
+            prevLabel={bPrev?.name ?? null}
+            nextLabel={bNext?.name ?? null}
+            itemNoun="Bereich"
+          />
         </div>
 
         {/* BEREICH HEADER */}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProduktForm } from "../produkt-form";
 import { updateProdukt, type ProduktFormState } from "../actions";
 import { ProduktTopActions } from "./top-actions";
-import { ProduktNav } from "./produkt-nav";
+import { ItemNav } from "@/components/item-nav";
 import { PreiseSection } from "./preise-section";
 import { DatenblattSection } from "./datenblatt-section";
 import { ChevronLeft, ChevronRight, FileText, Sparkles } from "lucide-react";
@@ -171,13 +171,15 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
             <ChevronRight className="h-3 w-3" />
             <span className="font-mono text-foreground">{produkt.artikelnummer}</span>
           </div>
-          <ProduktNav
+          <ItemNav
+            basePath="/produkte"
             prevId={prevSibling?.id ?? null}
             nextId={nextSibling?.id ?? null}
             position={currentIdx >= 0 ? currentIdx + 1 : 0}
             total={siblingList.length}
             prevLabel={prevSibling?.artikelnummer ?? null}
             nextLabel={nextSibling?.artikelnummer ?? null}
+            itemNoun="Produkt"
           />
         </div>
 

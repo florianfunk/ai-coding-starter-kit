@@ -234,10 +234,15 @@
       }%
     }%
   }{%
-    % Icon-Variante: vertikal UND horizontal zentriert in der ganzen Kachel.
-    \parbox[c][14mm][c]{\linewidth}{%
-      \centering
-      \includegraphics[height=11mm,width=\linewidth,keepaspectratio]{#4}%
+    % Icon-Variante: vertikal UND horizontal zentriert via TikZ-Node, der
+    % die gesamte 14mm-Kachelhoehe und die volle Spaltenbreite ausfuellt.
+    % parbox[t] mit innerem TikZ haelt Tabellenzellen-Geometrie sauber.
+    \parbox[t][14mm][t]{\linewidth}{%
+      \begin{tikzpicture}[inner sep=0pt, outer sep=0pt]
+        \path (0,0) rectangle (\linewidth,14mm);
+        \node[anchor=center] at (0.5\linewidth,7mm)
+          {\includegraphics[height=11mm,width=\linewidth,keepaspectratio]{#4}};
+      \end{tikzpicture}%
     }%
   }%
 }

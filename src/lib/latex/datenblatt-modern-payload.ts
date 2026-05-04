@@ -397,7 +397,10 @@ function buildQuickfacts(
       const subLabel = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
       const bg = isCct ? cctToPastelHex(iconLabel) : null;
       out.push({ label: subLabel, value: iconLabel, unit: "", icon_image: symbolPath, bg_hex: bg });
+      // Sowohl den kombinierten Schluessel als auch das reine subLabel
+      // markieren — das Stammdaten-Fallback dedupliziert nur per fb.label.
       usedLabels.add(subLabel + ":" + iconLabel);
+      usedLabels.add(subLabel);
     }
     if (out.length >= 9) break;
   }

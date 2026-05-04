@@ -150,25 +150,35 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   return (
     <AppShell>
       <div className="flex flex-col gap-4">
-        {/* Breadcrumb */}
-        <div className="crumbs">
-          <Link href="/">Dashboard</Link>
-          <ChevronRight className="h-3 w-3" />
-          <Link href="/produkte">Produkte</Link>
-          {bereichRow && (
-            <>
-              <ChevronRight className="h-3 w-3" />
-              <Link href={`/bereiche/${bereichRow.id}`}>{bereichRow.name}</Link>
-            </>
-          )}
-          {kategorieRow && (
-            <>
-              <ChevronRight className="h-3 w-3" />
-              <Link href={`/kategorien/${kategorieRow.id}`}>{kategorieRow.name}</Link>
-            </>
-          )}
-          <ChevronRight className="h-3 w-3" />
-          <span className="font-mono text-foreground">{produkt.artikelnummer}</span>
+        {/* Breadcrumb + Vor/Zurueck-Navigation */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="crumbs">
+            <Link href="/">Dashboard</Link>
+            <ChevronRight className="h-3 w-3" />
+            <Link href="/produkte">Produkte</Link>
+            {bereichRow && (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                <Link href={`/bereiche/${bereichRow.id}`}>{bereichRow.name}</Link>
+              </>
+            )}
+            {kategorieRow && (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                <Link href={`/kategorien/${kategorieRow.id}`}>{kategorieRow.name}</Link>
+              </>
+            )}
+            <ChevronRight className="h-3 w-3" />
+            <span className="font-mono text-foreground">{produkt.artikelnummer}</span>
+          </div>
+          <ProduktNav
+            prevId={prevSibling?.id ?? null}
+            nextId={nextSibling?.id ?? null}
+            position={currentIdx >= 0 ? currentIdx + 1 : 0}
+            total={siblingList.length}
+            prevLabel={prevSibling?.artikelnummer ?? null}
+            nextLabel={nextSibling?.artikelnummer ?? null}
+          />
         </div>
 
         {/* Header card with tabs */}
@@ -225,15 +235,7 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <ProduktNav
-                  prevId={prevSibling?.id ?? null}
-                  nextId={nextSibling?.id ?? null}
-                  position={currentIdx >= 0 ? currentIdx + 1 : 0}
-                  total={siblingList.length}
-                  prevLabel={prevSibling?.artikelnummer ?? null}
-                  nextLabel={nextSibling?.artikelnummer ?? null}
-                />
+              <div className="flex flex-wrap gap-2">
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/produkte/${id}/datenblatt`} target="_blank" rel="noopener noreferrer">
                     <FileText className="h-3.5 w-3.5" /> Datenblatt

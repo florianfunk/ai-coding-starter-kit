@@ -5,9 +5,9 @@ import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/server";
 import { bildProxyUrl } from "@/lib/bild-url";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Package, Pencil, ChevronRight, ImageIcon, Layers } from "lucide-react";
 import { RichTextDisplay } from "@/components/rich-text-display";
+import { ProdukteTabelle } from "./produkte-tabelle";
 
 export const dynamic = "force-dynamic";
 
@@ -51,13 +51,13 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
         .in("produkt_id", prodIds)
     : { data: [] };
   type PreisEntry = { listenpreis: number | null; ekLG: number | null; ekEK: number | null };
-  const preisMap = new Map<string, PreisEntry>();
+  const preisMap: Record<string, PreisEntry> = {};
   for (const p of preise ?? [])
-    preisMap.set(p.produkt_id, {
+    preisMap[p.produkt_id] = {
       listenpreis: p.listenpreis != null ? Number(p.listenpreis) : null,
       ekLG: p.ek_lichtengros != null ? Number(p.ek_lichtengros) : null,
       ekEK: p.ek_eisenkeil != null ? Number(p.ek_eisenkeil) : null,
-    });
+    };
 
   return (
     <AppShell>
@@ -171,94 +171,17 @@ export default async function KategorieDetailPage({ params }: { params: Promise<
               Noch keine Produkte in dieser Kategorie
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-16 pl-5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Bild
-                  </TableHead>
-                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Artikelnummer
-                  </TableHead>
-                  <TableHead className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Bezeichnung
-                  </TableHead>
-                  <TableHead className="w-24 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Sort
-                  </TableHead>
-                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Listenpreis
-                  </TableHead>
-                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    EK Lichtengros
-                  </TableHead>
-                  <TableHead className="w-28 text-right text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    EK Eisenkeil
-                  </TableHead>
-                  <TableHead className="w-28 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground/70">
-                    Status
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {produkteMitBild.map((p) => (
-                  <TableRow key={p.id} className="group relative border-border/60">
-                    <TableCell className="pointer-events-none relative z-10 pl-5">
-                      {p.hauptbild_url ? (
-                        <Image
-                          src={p.hauptbild_url}
-                          alt=""
-                          width={40}
-                          height={40}
-                          unoptimized
-                          className="h-10 w-10 rounded-[8px] border border-border/60 object-cover"
-                        />
-                      ) : (
-                        <div className="grid h-10 w-10 place-items-center rounded-[8px] border border-border/60 bg-muted">
-                          <Package className="h-4 w-4 text-muted-foreground/40" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/produkte/${p.id}`} className="absolute inset-0 z-0" />
-                      <span className="pointer-events-none relative z-10 font-mono text-[13px] transition-colors group-hover:text-primary">
-                        {p.artikelnummer}
-                      </span>
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10 max-w-md">
-                      <div className="truncate">{p.name ?? "—"}</div>
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
-                      {p.sortierung}
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10 text-right font-semibold tabular-nums">
-                      {preisMap.get(p.id)?.listenpreis != null ? (
-                        <span className="text-primary">{preisMap.get(p.id)!.listenpreis!.toFixed(2)} €</span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
-                      {preisMap.get(p.id)?.ekLG != null
-                        ? `${preisMap.get(p.id)!.ekLG!.toFixed(2)} €`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10 text-right font-mono tabular-nums text-muted-foreground">
-                      {preisMap.get(p.id)?.ekEK != null
-                        ? `${preisMap.get(p.id)!.ekEK!.toFixed(2)} €`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="pointer-events-none relative z-10">
-                      {p.artikel_bearbeitet ? (
-                        <span className="pill pill-ok">bearbeitet</span>
-                      ) : (
-                        <span className="pill pill-bad">unbearbeitet</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <ProdukteTabelle
+              produkte={produkteMitBild.map((p) => ({
+                id: p.id,
+                artikelnummer: p.artikelnummer,
+                name: p.name,
+                sortierung: p.sortierung,
+                artikel_bearbeitet: p.artikel_bearbeitet,
+                hauptbild_url: p.hauptbild_url,
+              }))}
+              preisMap={preisMap}
+            />
           )}
         </div>
       </div>

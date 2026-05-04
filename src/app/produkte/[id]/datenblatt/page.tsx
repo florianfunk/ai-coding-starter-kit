@@ -7,28 +7,39 @@ export default async function DatenblattPreviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ layout?: string }>;
+  searchParams: Promise<{ layout?: string; lang?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const layout = sp.layout === "eisenkeil" ? "eisenkeil" : "lichtengros";
+  const lang = sp.lang === "it" ? "it" : "de";
   // Stil ist immer "modern" — die klassische Variante wurde entfernt.
-  const qs = `?layout=${layout}&style=modern`;
+  const qs = `?layout=${layout}&style=modern&lang=${lang}`;
+  const downloadName = lang === "it" ? "Datenblatt-IT" : "Datenblatt";
   return (
     <AppShell>
       <div className="space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">Datenblatt-Vorschau</h1>
-          <div className="flex gap-2 items-center">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground mr-1">Marke</span>
             <Button asChild variant={layout === "lichtengros" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=lichtengros`}>Lichtengros</Link>
+              <Link href={`?layout=lichtengros&lang=${lang}`}>Lichtengros</Link>
             </Button>
             <Button asChild variant={layout === "eisenkeil" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=eisenkeil`}>Eisenkeil</Link>
+              <Link href={`?layout=eisenkeil&lang=${lang}`}>Eisenkeil</Link>
+            </Button>
+            <span className="text-xs text-muted-foreground ml-3 mr-1">Sprache</span>
+            <Button asChild variant={lang === "de" ? "default" : "outline"} size="sm">
+              <Link href={`?layout=${layout}&lang=de`}>Deutsch</Link>
+            </Button>
+            <Button asChild variant={lang === "it" ? "default" : "outline"} size="sm">
+              <Link href={`?layout=${layout}&lang=it`}>Italienisch</Link>
             </Button>
             <Button asChild className="ml-2">
-              <a href={`/produkte/${id}/datenblatt/raw${qs}&download=1`}>Download PDF</a>
+              <a href={`/produkte/${id}/datenblatt/raw${qs}&download=1`} download={`${downloadName}.pdf`}>
+                Download PDF
+              </a>
             </Button>
           </div>
         </div>

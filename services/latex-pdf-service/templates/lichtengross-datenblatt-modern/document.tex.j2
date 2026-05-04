@@ -11,6 +11,14 @@
 \setfootercompany{(((meta.filiale | e)))}
 \setfooterdate{(((meta.stand | e)))}
 \setfooterrev{(((meta.revision | e)))}
+((# PROJ-46 — sprachabhaengige Footer-Labels.
+    Defensive Defaults: Wenn der App-Payload kein meta.labels mitliefert
+    (alter App-Stand, neuer Worker — oder umgekehrt), fallen wir auf die
+    deutschen Labels zurueck statt mit StrictUndefined zu crashen.
+    `meta.get('labels')` ist dict-safe und triggert StrictUndefined nicht. #))
+((* set _labels = meta.get('labels') or {} *))
+\setfooterstandlabel{((( _labels.get('stand', 'Stand') | e )))}
+\setfooterdisclaimer{((( _labels.get('fussnote', 'Technische Aenderungen vorbehalten') | e )))}
 
 \begin{document}
 
@@ -104,7 +112,7 @@
   % ═════ ANWENDUNG & HINWEISE — linke Spalte, unter Zeichnung ═════
   ((* if paragraphs_left *))
   \par\vspace{2mm}\noindent
-  \sectionhead{Anwendung \& Hinweise}{}
+  \sectionhead{((( _labels.get('anwendung_hinweise', 'Anwendung & Hinweise') | e )))}{}
   % Anwendungstext in der gleichen Schriftgroesse wie die Tech-Daten rechts
   % (\specrow: 6.8pt/7.0pt). Hier mit etwas mehr Zeilenabstand fuer Fliesstext.
   ((* for para in paragraphs_left *))
@@ -142,7 +150,7 @@
 
   % Tech-Daten direkt unter den Quickfacts — gruppiert, kompakt.
   \par\vspace{10mm}
-  \sectionhead{Technische Daten}{}
+  \sectionhead{((( _labels.get('technische_daten', 'Technische Daten') | e )))}{}
   ((* for group in spec_groups *))
   \specgroup{(((group.title | e)))}
   ((* for row in group.rows *))
@@ -159,7 +167,7 @@
     borderline west={1.5pt}{0pt}{warnfg},
     boxsep=1.4mm, top=1.4mm, bottom=1.4mm, left=2.2mm, right=2.2mm,
   ]
-  {\monofont\bfseries\fontsize{6.4pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{warnfg}\MakeUppercase{Achtung}}\par
+  {\monofont\bfseries\fontsize{6.4pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{warnfg}\MakeUppercase{((( _labels.get('achtung', 'Achtung') | e )))}}\par
   \vspace{0.8mm}
   \begingroup\linespread{1.0}\fontsize{7pt}{9pt}\selectfont\color{ink2}(((warnung | e)))\par\endgroup
   \end{tcolorbox}
@@ -172,7 +180,7 @@
   ((* if paragraphs_right *))
   \par\vspace{6mm}
   ((* if not paragraphs_left *))
-  \sectionhead{Anwendung \& Hinweise}{}
+  \sectionhead{((( _labels.get('anwendung_hinweise', 'Anwendung & Hinweise') | e )))}{}
   ((* endif *))
   ((* for para in paragraphs_right *))
   \begingroup\linespread{1.0}\fontsize{8pt}{12pt}\selectfont\color{ink2}(((para | e)))\par\endgroup

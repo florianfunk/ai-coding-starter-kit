@@ -15,6 +15,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { ALL_PRODUKT_FIELDS } from "@/app/produkte/fields";
 import { isHtmlContent, htmlToPlainText } from "@/lib/rich-text/sanitize";
+import {
+  STATIC_LABELS,
+  formatDateForLang,
+  localizedField,
+  type DatenblattLang,
+} from "./i18n";
 
 /** Die Codebase + DB nutzen "lichtengros" (mit einem s) als Marken-Code.
  *  Der angezeigte Markenname ist "LICHT.ENGROS" (mit Punkt). */
@@ -30,6 +36,10 @@ export type DatenblattPayload = {
     brand_label: string;
     /** Marke (für Template-Konditionalblöcke, falls später nötig) */
     brand: Brand;
+    /** PROJ-46: Sprache des Datenblatts. */
+    lang: DatenblattLang;
+    /** PROJ-46: Statische Beschriftungen pro Sprache. */
+    labels: Record<string, string>;
   };
   produkt: {
     artikelnummer: string;
@@ -152,6 +162,7 @@ export async function buildDatenblattPayload(
   supabase: SupabaseClient,
   produktId: string,
   brand: Brand,
+  lang: DatenblattLang = "de",
 ): Promise<DatenblattPayload> {
   const [{ data: produkt }, { data: iconRows }, { data: einstellungen }, { data: filialen }] =
     await Promise.all([
@@ -262,36 +273,42 @@ export async function buildDatenblattPayload(
   }).filter(Boolean) as { label: string; value: string }[];
 
   // achtung_text ist die neue, eigenständige Quelle für den Warnhinweis.
-  // Falls leer, fällt der Generator auf die Heuristik zurück (Altdaten, bei
-  // denen die Migration den Block nicht extrahieren konnte).
+  // PROJ-46: sprachabhängig laden, mit Fallback auf DE bei leerem _it.
   const explicitAchtung = (() => {
-    const raw = (produkt as any).achtung_text as string | null | undefined;
+    const raw = localizedField(produkt as Record<string, unknown>, "achtung_text", lang);
     if (!raw) return null;
     const plain = isHtmlContent(raw) ? htmlToPlainText(raw) : raw;
     const collapsed = plain.replace(/\s+/g, " ").trim();
     return collapsed.length ? collapsed : null;
   })();
 
+  const localizedDatenblattText =
+    localizedField(produkt as Record<string, unknown>, "datenblatt_text", lang) ?? "";
   const split = explicitAchtung
     ? { body: (() => {
-        const raw = produkt.datenblatt_text ?? "";
+        const raw = localizedDatenblattText;
         if (!raw) return "";
         const plain = isHtmlContent(raw) ? htmlToPlainText(raw) : raw;
         return plain.replace(/\r\n?/g, "\n").trim();
       })(), warnung: explicitAchtung }
-    : splitBeschreibung(produkt.datenblatt_text);
+    : splitBeschreibung(localizedDatenblattText);
   const { body: beschreibungBody, warnung } = split;
 
   return {
     meta: {
       filiale: filialeFooter,
-      stand: new Date().toLocaleDateString("de-DE"),
+      stand: formatDateForLang(new Date(), lang),
       brand_label: cfg.label,
       brand,
+      lang,
+      labels: STATIC_LABELS[lang],
     },
     produkt: {
       artikelnummer: produkt.artikelnummer ?? "",
-      untertitel: produkt.info_kurz || produkt.datenblatt_titel || "",
+      untertitel:
+        localizedField(produkt as Record<string, unknown>, "info_kurz", lang) ||
+        localizedField(produkt as Record<string, unknown>, "datenblatt_titel", lang) ||
+        "",
     },
     tech_rows: techRows,
     icons,

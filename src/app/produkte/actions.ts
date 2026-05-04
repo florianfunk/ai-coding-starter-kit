@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/server";
 import { logAudit, logAuditMany } from "@/lib/audit";
 import { sanitizeRichTextHtml } from "@/lib/rich-text/sanitize";
 import { ALL_PRODUKT_FIELDS } from "./fields";
+import { TRANSLATABLE_FIELDS } from "@/lib/i18n/translatable-fields";
+import { decideAutoTranslateKeys } from "@/lib/i18n/auto-translate-decider";
+import { uebersetzeProdukt } from "@/lib/ai/uebersetzen-produkt";
 
 const MARKE_VALUES = ["lichtengros", "eisenkeil"] as const;
 
@@ -31,6 +34,16 @@ const baseSchema = z.object({
   bild_zeichnung_3_path: z.string().optional().nullable(),
   bild_energielabel_path: z.string().optional().nullable(),
   vollstaendig_sections: z.array(z.string().max(50)).max(20).default([]),
+  // PROJ-46: Italienische Übersetzung — Spiegel-Spalten
+  name_it: z.string().max(300).optional().nullable(),
+  datenblatt_titel_it: z.string().max(300).optional().nullable(),
+  info_kurz_it: z.string().max(500).optional().nullable(),
+  treiber_it: z.string().max(1000).optional().nullable(),
+  datenblatt_text_it: z.string().max(20000).optional().nullable(),
+  achtung_text_it: z.string().max(5000).optional().nullable(),
+  bild_detail_1_text_it: z.string().max(500).optional().nullable(),
+  bild_detail_2_text_it: z.string().max(500).optional().nullable(),
+  bild_detail_3_text_it: z.string().max(500).optional().nullable(),
 });
 
 export type ProduktFormState = { error: string | null; fieldErrors?: Record<string, string> };
@@ -85,6 +98,20 @@ function parseBase(formData: FormData) {
     bild_zeichnung_3_path: (formData.get("bild_zeichnung_3_path") as string) || null,
     bild_energielabel_path: (formData.get("bild_energielabel_path") as string) || null,
     vollstaendig_sections: vollstaendigSections,
+    // PROJ-46: Italienische Spiegel-Felder. RichText-IT-Inhalte werden
+    // genau wie ihre DE-Pendants sanitized. Empty-string → null, damit der
+    // PDF-Renderer für leere IT-Felder auf DE zurückfällt.
+    name_it: (formData.get("name_it") as string) || null,
+    datenblatt_titel_it: (formData.get("datenblatt_titel_it") as string) || null,
+    info_kurz_it: (formData.get("info_kurz_it") as string) || null,
+    treiber_it: (formData.get("treiber_it") as string) || null,
+    datenblatt_text_it:
+      sanitizeRichTextHtml(formData.get("datenblatt_text_it") as string | null) || null,
+    achtung_text_it:
+      sanitizeRichTextHtml(formData.get("achtung_text_it") as string | null) || null,
+    bild_detail_1_text_it: (formData.get("bild_detail_1_text_it") as string) || null,
+    bild_detail_2_text_it: (formData.get("bild_detail_2_text_it") as string) || null,
+    bild_detail_3_text_it: (formData.get("bild_detail_3_text_it") as string) || null,
   });
 }
 
@@ -141,6 +168,18 @@ export async function createProdukt(_p: ProduktFormState, formData: FormData): P
   const iconWerte = readIconWerte(formData, iconIds);
   await setProduktIcons(supabase, data.id, iconIds, iconWerte);
 
+  // PROJ-46: Auto-Trigger auch beim Erstellen. Wir simulieren einen leeren
+  // Vorher-Snapshot — `maybeAutoTranslate` erkennt dann jedes nicht-leere
+  // DE-Feld als „geändert" und übersetzt es, sofern der User das passende
+  // IT-Feld nicht selbst ausgefüllt hat (der „manueller-Wert-gewinnt"-Schutz
+  // greift, weil dann newIt !== oldIt = "" gilt).
+  const emptyVorher: Record<string, unknown> = {};
+  for (const f of TRANSLATABLE_FIELDS) {
+    emptyVorher[f.de] = "";
+    emptyVorher[f.it] = "";
+  }
+  await maybeAutoTranslate(supabase, data.id, parsed.data, emptyVorher);
+
   revalidatePath("/produkte");
   revalidateTag("dashboard", "max");
   revalidateTag("bereich-counts", "max");
@@ -154,6 +193,24 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
 
   const supabase = await createClient();
   const tech = parseTechFields(formData);
+
+  // PROJ-46: Vorher-Werte der DE- UND IT-Spalten lesen, damit wir später
+  // erkennen, welche Felder durch dieses Update geändert wurden. Wir brauchen
+  // beide Seiten:
+  //   - DE-Vorher: um „DE wurde geändert" festzustellen (Auto-Trigger-Bedingung).
+  //   - IT-Vorher: um „User hat IT manuell editiert" zu erkennen — die Form-State-
+  //     Architektur sendet das IT-hidden-Input bei jedem Save mit (auch wenn der
+  //     User das IT-Feld nicht angefasst hat). Ohne Vergleich gegen den vorigen
+  //     IT-DB-Wert würde der Override-Schutz bei jedem schon-übersetzten Produkt
+  //     greifen und die Auto-Übersetzung permanent abwürgen (PROJ-46 QA Bug-1).
+  const deKeys = TRANSLATABLE_FIELDS.map((f) => f.de);
+  const itKeys = TRANSLATABLE_FIELDS.map((f) => f.it);
+  const { data: vorher } = await supabase
+    .from("produkte")
+    .select([...deKeys, ...itKeys].join(", "))
+    .eq("id", id)
+    .single<Record<string, unknown>>();
+
   const { error } = await supabase.from("produkte").update({ ...parsed.data, ...tech }).eq("id", id);
   if (error) {
     if (error.code === "23505") return { error: "Artikelnummer existiert bereits.", fieldErrors: { artikelnummer: "Bereits vergeben" } };
@@ -166,6 +223,12 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
 
   await logAudit(supabase, { tableName: "produkte", recordId: id, action: "update", recordLabel: parsed.data.artikelnummer });
 
+  // PROJ-46: Auto-Trigger für italienische Übersetzung. Findet die geänderten
+  // DE-Felder, prüft ob der User in derselben Speicherung das passende IT-Feld
+  // manuell editiert hat (dann nicht überschreiben), ruft den Übersetzer.
+  // Best-effort: Fehler stoppen das Save nicht, sondern landen nur im Log.
+  await maybeAutoTranslate(supabase, id, parsed.data, vorher);
+
   revalidatePath("/produkte");
   revalidatePath(`/produkte/${id}`);
   revalidateTag("dashboard", "max");
@@ -173,6 +236,39 @@ export async function updateProdukt(id: string, _p: ProduktFormState, formData: 
   revalidateTag("bereich-counts", "max");
   revalidateTag("kategorie-counts", "max");
   return { error: null };
+}
+
+async function maybeAutoTranslate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  produktId: string,
+  parsedData: Record<string, unknown>,
+  vorher: Record<string, unknown> | null,
+) {
+  try {
+    if (!vorher) return; // konnte Vorher-Snapshot nicht lesen — überspringen
+
+    const { data: settings } = await supabase
+      .from("ai_einstellungen")
+      .select("auto_translate_it")
+      .eq("id", 1)
+      .single();
+    if (!settings || settings.auto_translate_it !== true) return;
+
+    const changedDeKeys = decideAutoTranslateKeys({ vorher, parsedData });
+    if (changedDeKeys.length === 0) return;
+
+    // Synchron warten — der Save selbst wartet auf den Übersetzer. Auf Vercel
+    // Functions ist Fire-and-forget nach Response unzuverlässig, deshalb der
+    // bewusst blockierende Aufruf. Toast-UX-Hinweis ist vorhanden.
+    await uebersetzeProdukt(supabase, produktId, {
+      nurLeere: false,
+      felder: changedDeKeys,
+    });
+  } catch (e) {
+    // Auto-Trigger-Fehler stoppen das Speichern nicht — DE-Werte sind sicher
+    // schon in der DB. Wir loggen das nur.
+    console.error("[PROJ-46] Auto-Übersetzung fehlgeschlagen:", e);
+  }
 }
 
 const QUICK_EDIT_FIELDS = ["sortierung", "name", "artikel_bearbeitet"] as const;

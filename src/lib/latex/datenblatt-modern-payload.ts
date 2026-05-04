@@ -13,6 +13,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { isHtmlContent, htmlToPlainText } from "@/lib/rich-text/sanitize";
+import {
+  STATIC_LABELS,
+  formatDateForLang,
+  localizedField,
+  type DatenblattLang,
+} from "./i18n";
 
 export type ModernBrand = "lichtengros" | "eisenkeil";
 
@@ -28,6 +34,10 @@ export type ModernDatenblattPayload = {
     revision: string;
     version: string;
     energy_class: string;
+    /** PROJ-46: Sprache des Datenblatts. Default 'de'. */
+    lang: DatenblattLang;
+    /** PROJ-46: Statische Beschriftungen pro Sprache fürs LaTeX-Template. */
+    labels: Record<string, string>;
   };
   produkt: {
     artikelnummer: string;
@@ -554,6 +564,7 @@ export async function buildModernDatenblattPayload(
   produktId: string,
   brand: ModernBrand,
   template?: ResolvedTemplateForPayload,
+  lang: DatenblattLang = "de",
 ): Promise<ModernDatenblattPayload> {
   const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: slotBilder }, { data: produktIcons }] = await Promise.all([
     supabase
@@ -653,18 +664,18 @@ export async function buildModernDatenblattPayload(
   // Logo: statisches Brand-Asset aus dem Worker (kein Supabase-Download).
   const logo_filename = cfg.logoFilename;
 
-  // Den vollen "Text Block" (datenblatt_text) als Beschreibung anzeigen —
-  // ohne ACHTUNG-Split, ohne Lead-Konsum. Der Inhalt wird 1:1 in Absaetze
-  // gesplittet und unter "Anwendung & Hinweise" gerendert.
-  const rawText = produkt.datenblatt_text ?? "";
+  // PROJ-46: Texte sprachabhängig laden. localizedField liefert IT, wenn
+  // gesetzt, sonst Fallback auf DE.
+  const rawText = localizedField(produkt as Record<string, unknown>, "datenblatt_text", lang) ?? "";
   const plainText = rawText
     ? (isHtmlContent(rawText) ? htmlToPlainText(rawText) : rawText).replace(/\r\n?/g, "\n").trim()
     : "";
   const paragraphs = splitParagraphs(plainText);
-  const lead = (produkt.info_kurz?.trim()) || "";
+  const leadRaw = localizedField(produkt as Record<string, unknown>, "info_kurz", lang) ?? "";
+  const lead = leadRaw.trim();
 
   // ACHTUNG-Block: eigenständige Spalte. Leere Werte → keine Warnbox im PDF.
-  const rawAchtung = (produkt as any).achtung_text as string | null | undefined;
+  const rawAchtung = localizedField(produkt as Record<string, unknown>, "achtung_text", lang);
   const warnung: string | null = (() => {
     if (!rawAchtung) return null;
     const plain = isHtmlContent(rawAchtung) ? htmlToPlainText(rawAchtung) : rawAchtung;
@@ -672,10 +683,14 @@ export async function buildModernDatenblattPayload(
     return collapsed.length ? collapsed : null;
   })();
 
-  // Titel = "Datenblatt-Titel" (produkt.datenblatt_titel) aus dem Formular.
-  // Faellt auf "Bezeichnung" (produkt.name) zurueck, falls kein Titel gepflegt
-  // wurde. Kein Akzent als zweite Zeile.
-  const title = (produkt.datenblatt_titel?.trim() || produkt.name?.trim() || "") as string;
+  // Titel = "Datenblatt-Titel" (sprachabhängig). Fallback-Kette:
+  // 1. datenblatt_titel(_it bei lang=it) — bevorzugt
+  // 2. name(_it bei lang=it) — Bezeichnung
+  // 3. leerer String
+  const title =
+    localizedField(produkt as Record<string, unknown>, "datenblatt_titel", lang) ||
+    localizedField(produkt as Record<string, unknown>, "name", lang) ||
+    "";
   const titleAccent = "";
 
   // Zwei-Spalten-Split: linke Spalte (unter Zeichnung) zuerst auffüllen,
@@ -697,19 +712,22 @@ export async function buildModernDatenblattPayload(
       brand_suffix: cfg.brand_suffix,
       brand_sub: cfg.brand_sub,
       filiale: filialeFooter,
-      stand: new Date().toLocaleDateString("de-DE"),
+      stand: formatDateForLang(new Date(), lang),
       revision: `Rev. ${new Date().toISOString().slice(0, 10)}`,
       version: "v1.0",
       energy_class: produkt.energieeffizienzklasse?.[0]?.toUpperCase() || "F",
+      lang,
+      labels: STATIC_LABELS[lang],
     },
     produkt: {
       artikelnummer: produkt.artikelnummer ?? "",
       eyebrow: [produkt.bereiche?.name, produkt.kategorien?.name].filter(Boolean).join(" · "),
       title: title ?? "",
       title_accent: titleAccent,
-      // Subtitle nur, wenn unterschieden von Lead und Title (sonst doppelt)
+      // Subtitle nur, wenn unterschieden von Lead und Title (sonst doppelt).
+      // PROJ-46: liest info_kurz sprachabhängig.
       subtitle: (() => {
-        const candidate = produkt.info_kurz || "";
+        const candidate = leadRaw || "";
         if (!candidate || candidate.trim().length < 5) return "";
         if (lead && candidate.trim() === lead.trim()) return "";
         return candidate.length > 140 ? candidate.slice(0, 138) + "…" : candidate;

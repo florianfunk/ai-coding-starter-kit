@@ -101,10 +101,10 @@
     {\monofont\bfseries\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{ink}\MakeUppercase{\lgFooterCompany}}%
   \end{minipage}\hfill%
   \begin{minipage}[c]{0.32\textwidth}\centering%
-    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Stand \lgFooterDate \(\cdot\) v1.0}}%
+    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{\lgFooterStandLabel{} \lgFooterDate \(\cdot\) v1.0}}%
   \end{minipage}\hfill%
   \begin{minipage}[c]{0.34\textwidth}\raggedleft%
-    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten}}%
+    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{\lgFooterDisclaimer}}%
   \end{minipage}%
 }
 \fancyfoot[C]{}
@@ -134,11 +134,16 @@
 \newcommand{\lgFooterRev}{}
 \newcommand{\lgFooterEnergy}{F}
 \newcommand{\lgFooterArtnr}{}
+% PROJ-46 — sprachabhaengige Footer-Strings
+\newcommand{\lgFooterStandLabel}{Stand}
+\newcommand{\lgFooterDisclaimer}{Technische Aenderungen vorbehalten}
 \newcommand{\setfootercompany}[1]{\renewcommand{\lgFooterCompany}{#1}}
 \newcommand{\setfooterdate}[1]{\renewcommand{\lgFooterDate}{#1}}
 \newcommand{\setfooterrev}[1]{\renewcommand{\lgFooterRev}{#1}}
 \newcommand{\setfooterenergy}[1]{\renewcommand{\lgFooterEnergy}{#1}}
 \newcommand{\setfooterartnr}[1]{\renewcommand{\lgFooterArtnr}{#1}}
+\newcommand{\setfooterstandlabel}[1]{\renewcommand{\lgFooterStandLabel}{#1}}
+\newcommand{\setfooterdisclaimer}[1]{\renewcommand{\lgFooterDisclaimer}{#1}}
 
 % ─── Energie-Skala (Briefing 6.6) ──────────────────────────────────────────
 % Renderhandwerk: 7 Buchstaben in einer Reihe.

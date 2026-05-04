@@ -25,7 +25,7 @@ export default async function EinstellungenPage() {
     supabase.from("katalog_einstellungen").select("*").eq("id", 1).single(),
     supabase
       .from("ai_einstellungen")
-      .select("replicate_token, openai_api_key, anthropic_api_key, ai_provider, ai_model")
+      .select("replicate_token, openai_api_key, anthropic_api_key, ai_provider, ai_model, auto_translate_it")
       .eq("id", 1)
       .single(),
   ]);

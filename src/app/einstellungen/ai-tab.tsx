@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -14,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, EyeOff, Save, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Languages, Save, Sparkles } from "lucide-react";
 import {
   updateAiEinstellungen,
   updateTeaserEinstellungen,
+  updateUebersetzungEinstellungen,
   type AiFormState,
 } from "./ai-actions";
 import {
@@ -34,12 +36,14 @@ type AiSettings = {
   anthropic_api_key: string | null;
   ai_provider: AiProvider | null;
   ai_model: string | null;
+  auto_translate_it: boolean | null;
 };
 
 export function AiTab({ settings }: { settings: AiSettings | null }) {
   return (
     <div className="space-y-6">
       <TeaserCard settings={settings} />
+      <UebersetzungCard settings={settings} />
       <ReplicateCard settings={settings} />
     </div>
   );
@@ -193,6 +197,77 @@ function TeaserCard({ settings }: { settings: AiSettings | null }) {
               . Leer lassen ändert den gespeicherten Key nicht.
             </p>
           </div>
+
+          {state.error && (
+            <Alert variant="destructive">
+              <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+          )}
+
+          <Button type="submit" disabled={pending} className="gap-2">
+            <Save className="h-4 w-4" />
+            {pending ? "Speichere…" : "Speichern"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UebersetzungCard({ settings }: { settings: AiSettings | null }) {
+  const [autoTranslate, setAutoTranslate] = useState<boolean>(
+    settings?.auto_translate_it ?? true,
+  );
+  const [state, formAction, pending] = useActionState(
+    async (prev: AiFormState, fd: FormData) => {
+      const r = await updateUebersetzungEinstellungen(prev, fd);
+      if (!r.error) toast.success("Gespeichert");
+      return r;
+    },
+    initial,
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Languages className="h-4 w-4" /> Italienische Übersetzung
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form action={formAction} className="space-y-5 max-w-xl">
+          <p className="text-sm text-muted-foreground">
+            PROJ-46 — automatische italienische Übersetzung der Datenblatt-Felder.
+            Provider, Modell und API-Key kommen aus der KI-Marketing-Teaser-Sektion oben.
+          </p>
+
+          <div className="flex items-start gap-3">
+            <Switch
+              id="auto_translate_it"
+              checked={autoTranslate}
+              onCheckedChange={setAutoTranslate}
+            />
+            <div className="flex-1">
+              <Label
+                htmlFor="auto_translate_it"
+                className="cursor-pointer text-sm font-medium"
+              >
+                Auto-Übersetzung beim Speichern
+              </Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Wenn aktiv, wird die italienische Version automatisch neu generiert,
+                sobald ein deutsches Feld geändert wird. Bestehende italienische Texte
+                werden dabei <strong>überschrieben</strong>. Wer manuelle Korrekturen
+                schützen möchte, schaltet diese Option aus und nutzt den
+                „🇮🇹 Übersetzen“-Button im Produkt-Formular.
+              </p>
+            </div>
+          </div>
+          <input
+            type="hidden"
+            name="auto_translate_it"
+            value={autoTranslate ? "1" : "0"}
+          />
 
           {state.error && (
             <Alert variant="destructive">

@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { BulkNamenWizard } from "@/app/produkte/bulk-namen-wizard";
+import { BulkUebersetzenWizard } from "@/app/produkte/bulk-uebersetzen-wizard";
 
 interface Produkt {
   id: string;
@@ -41,6 +42,7 @@ export function ProdukteTabelle({ produkte, preisMap }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showWizard, setShowWizard] = useState(false);
+  const [showUebersetzenWizard, setShowUebersetzenWizard] = useState(false);
 
   const allIds = produkte.map((p) => p.id);
   const allSelected = produkte.length > 0 && allIds.every((id) => selected.has(id));
@@ -197,6 +199,16 @@ export function ProdukteTabelle({ produkte, preisMap }: Props) {
                 <Sparkles className="h-4 w-4 mr-1" />
                 KI-Vorschläge
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUebersetzenWizard(true)}
+              >
+                <span className="mr-1" aria-hidden>
+                  🇮🇹
+                </span>
+                Italienisch übersetzen
+              </Button>
             </div>
           </div>
         </div>
@@ -210,6 +222,18 @@ export function ProdukteTabelle({ produkte, preisMap }: Props) {
         produkte={produkte
           .filter((p) => selected.has(p.id))
           .map((p) => ({ id: p.id, artikelnummer: p.artikelnummer, name: p.name }))}
+        onApplied={() => {
+          clearSelection();
+          router.refresh();
+        }}
+      />
+
+      <BulkUebersetzenWizard
+        open={showUebersetzenWizard}
+        onOpenChange={setShowUebersetzenWizard}
+        produkte={produkte
+          .filter((p) => selected.has(p.id))
+          .map((p) => ({ id: p.id, artikelnummer: p.artikelnummer }))}
         onApplied={() => {
           clearSelection();
           router.refresh();

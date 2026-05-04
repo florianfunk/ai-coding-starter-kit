@@ -24,6 +24,8 @@ import { type ProduktFormState } from "./actions";
 import { ALL_PRODUKT_FIELDS, PRODUKT_FIELD_GROUPS } from "./fields";
 import { ProduktBildSlot } from "./produkt-bild-slot";
 import { ElektrischCalcButton } from "./elektrisch-calc-button";
+import { ItalienischSection } from "./italienisch-section";
+import { TRANSLATABLE_FIELDS } from "@/lib/i18n/translatable-fields";
 
 type Marke = "lichtengros" | "eisenkeil";
 
@@ -352,6 +354,63 @@ export function ProduktForm({
     return isHtmlContent(cur) ? htmlToPlainText(cur) : cur;
   }, [defaultValues.info_kurz]);
 
+  // PROJ-46: Sammelt DE-Werte aller übersetzbaren Felder live aus dem Form.
+  // Wir lesen aus DOM, weil viele Felder uncontrolled sind (defaultValue).
+  // Spezial-Cases: kontrollierte States (name, datenblatt_titel, info_kurz)
+  // werden bevorzugt; RichText (datenblatt_text, achtung_text) liegt als
+  // hidden Input vor, der vom Editor automatisch synchronisiert wird.
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const getDeTranslatableValues = useCallback((): Record<string, string> => {
+    const out: Record<string, string> = {};
+    const form = formRef.current;
+    for (const f of TRANSLATABLE_FIELDS) {
+      // Bevorzugt: kontrollierte React-States für die drei Hauptfelder
+      if (f.de === "name") {
+        out[f.de] = name;
+        continue;
+      }
+      if (f.de === "datenblatt_titel") {
+        out[f.de] = datenblattTitel;
+        continue;
+      }
+      if (f.de === "info_kurz") {
+        out[f.de] = infoKurz;
+        continue;
+      }
+      // Sonst aus dem DOM
+      if (!form) {
+        out[f.de] = (defaultValues[f.de] ?? "") as string;
+        continue;
+      }
+      const els = form.elements.namedItem(f.de);
+      if (els == null) {
+        out[f.de] = (defaultValues[f.de] ?? "") as string;
+      } else if (els instanceof HTMLInputElement || els instanceof HTMLTextAreaElement) {
+        out[f.de] = els.value ?? "";
+      } else if (els instanceof RadioNodeList) {
+        // Mehrere Elemente mit gleichem Namen: nimm den ersten Wert.
+        // RadioNodeList iteriert Node, deshalb erst auf HTMLElement verengen.
+        const first: Node | null = els.item(0);
+        if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement) {
+          out[f.de] = first.value;
+        } else {
+          out[f.de] = "";
+        }
+      } else {
+        out[f.de] = (defaultValues[f.de] ?? "") as string;
+      }
+    }
+    return out;
+  }, [name, datenblattTitel, infoKurz, defaultValues]);
+
+  const defaultItValues = useMemo<Record<string, string | null | undefined>>(() => {
+    const out: Record<string, string | null | undefined> = {};
+    for (const f of TRANSLATABLE_FIELDS) {
+      out[f.it] = defaultValues[f.it] as string | null | undefined;
+    }
+    return out;
+  }, [defaultValues]);
+
   const allOpen = openSections.length === SECTION_IDS.length;
 
   const handleSectionsChange = useCallback((value: string[]) => {
@@ -434,7 +493,7 @@ export function ProduktForm({
   const sonstigesGroup = PRODUKT_FIELD_GROUPS.find((g) => g.tab === "sonstiges");
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form ref={formRef} action={formAction} className="space-y-6">
       {state.error && <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert>}
 
       {/* Grunddaten -- always visible, not collapsible */}
@@ -912,6 +971,15 @@ export function ProduktForm({
           </AccordionContent>
         </AccordionItem>
       </Accordion>
+
+      {/* PROJ-46: Italienische Übersetzung — eigene Sektion unterhalb der
+          Accordion-Gruppe. State + Hidden-Inputs für *_it-Spalten leben in
+          ItalienischSection; werden beim Save automatisch mitgeschickt. */}
+      <ItalienischSection
+        produktId={produktId ?? null}
+        getDeValues={getDeTranslatableValues}
+        defaultItValues={defaultItValues}
+      />
 
       {/* Manuell als „vollständig" markierte Sections — wird via getAll() gelesen */}
       {Array.from(manualComplete).map((id) => (

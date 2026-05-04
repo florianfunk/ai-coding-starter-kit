@@ -77,6 +77,32 @@ export async function updateTeaserEinstellungen(_p: AiFormState, formData: FormD
 }
 
 // ----------------------------------------------------------------------------
+// PROJ-46: Italienische Übersetzung — Auto-Translate-Toggle
+// ----------------------------------------------------------------------------
+
+const uebersetzungSchema = z.object({
+  auto_translate_it: z.enum(["0", "1"]),
+});
+
+export async function updateUebersetzungEinstellungen(
+  _p: AiFormState,
+  formData: FormData,
+): Promise<AiFormState> {
+  const parsed = uebersetzungSchema.safeParse({
+    auto_translate_it: formData.get("auto_translate_it"),
+  });
+  if (!parsed.success) return { error: "Eingabe ungültig." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ai_einstellungen")
+    .update({ auto_translate_it: parsed.data.auto_translate_it === "1" })
+    .eq("id", 1);
+  if (error) return { error: error.message };
+  revalidatePath("/einstellungen");
+  return { error: null };
+}
+
+// ----------------------------------------------------------------------------
 // Bild-Enhance: Upscale oder BG-Removal
 // ----------------------------------------------------------------------------
 

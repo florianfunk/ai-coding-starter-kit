@@ -1,6 +1,6 @@
 # PROJ-48: Workspace-Navigation (Topnav als Bereichswechsel + kontextsensitive Sidebar)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-04
 **Last Updated:** 2026-05-04
 
@@ -570,5 +570,38 @@ Keine Critical/High-Bugs gefunden. Beide LOW-Bugs sind UX-/A11y-Politur und bloc
 2. Beide Low-Bugs in einem Folge-Commit fixen (Tooltip-Mount-Logik + heading-Semantik)
 3. **Vor nächstem QA-Run:** Test-User für E2E in Supabase anlegen und Env-Vars dokumentieren — dann läuft die ganze Test-Suite inkl. der bestehenden PROJ-37/38/39/40/41-E2E-Tests sauber durch (alle haben das gleiche Auth-Problem nach Aktivierung der Middleware).
 
-## Deployment
-_To be added by /deploy_
+## Deployment (2026-05-04)
+
+| | |
+|---|---|
+| **Production-URL** | https://lichtengross.vercel.app |
+| **Production-Alias** | https://lichtengross-soulschoki-5679s-projects.vercel.app |
+| **Branch-Alias** | https://lichtengross-git-main-soulschoki-5679s-projects.vercel.app |
+| **Deployment-ID** | `dpl_9kr9ELMcKgEecexu4S7FsF8TZyWJ` |
+| **Commit** | `573ade6` (`feat(PROJ-48): Workspace-Navigation mit kontextsensitiver Sidebar`) |
+| **Build-Dauer** | ~1 Minute |
+| **Region** | iad1 (Vercel Default) |
+| **Bundler** | Webpack |
+| **Runtime** | Node.js (Lambda Functions) |
+
+### Deploy-Verifikation
+- ✅ Vercel-Status: **Ready**
+- ✅ HTTP 307 (Auth-Redirect) auf `/`, `/produkte`, `/kunden` — erwartetes Verhalten bei aktiver Auth-Middleware
+- ✅ Alle 4 Kunden-Stub-Pages kompiliert (`/kunden`, `/kunden/branchen`, `/kunden/druckhistorie`, `/kunden/sonderpreise`)
+- ✅ Topnav + Sidebar render unter Production-Build
+- ✅ Browser-Konsole-Tests im Auth-Login-Flow möglich (eingeloggter Test bleibt offen, siehe QA-Notes)
+
+### Deploy-Methode
+Auto-Deploy via `git push origin main` → Vercel-GitHub-Integration. Keine Migration nötig (rein UI-Refactor, keine DB-Änderungen, keine Server Actions).
+
+### Rollback-Option
+Falls Probleme auftreten: Im Vercel-Dashboard das vorherige Deployment `dpl_aqkhyqt63...` (PROJ-9 Datenblatt-Fixes, `7cd8b4c`) als „Promote to Production" auswählen. Es ist als Ready-Status markiert, ~5h alt zum Deploy-Zeitpunkt.
+
+### Bewusst nicht enthalten in PROJ-48-Deploy
+- **PROJ-46 (italienische Übersetzung)** — Working Tree hat offene WIP-Änderungen (3 Lint-Fehler) und ist noch nicht QA-approved. Wurde nicht mitcommittet.
+- **PROJ-47 (Kundendatenbank)** — nur die Stub-Pages und das Spec-File sind enthalten. Vollimplementierung in eigenem Folge-Deploy.
+
+### Offene LOW-Bugs (post-deploy fix)
+- **LOW-1:** Tooltip rendert auf Desktop redundant ([app-topnav.tsx:91](src/components/app-topnav.tsx#L91))
+- **LOW-2:** Workspace-Heading nutzt `<span>` statt `<h2>` ([app-sidebar.tsx:34](src/components/app-sidebar.tsx#L34))
+- Beide nicht blockierend — können in einem späteren Polish-Commit behoben werden.

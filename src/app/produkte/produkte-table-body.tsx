@@ -57,6 +57,7 @@ import { toast } from "sonner";
 import { CompletenessBar } from "@/components/completeness-bar";
 import type { CompletenessResult } from "@/lib/completeness";
 import { BulkNamenWizard } from "./bulk-namen-wizard";
+import { BulkUebersetzenWizard } from "./bulk-uebersetzen-wizard";
 
 interface Produkt {
   id: string;
@@ -101,6 +102,7 @@ export function ProdukteTable({
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showNamenWizard, setShowNamenWizard] = useState(false);
+  const [showUebersetzenWizard, setShowUebersetzenWizard] = useState(false);
   const [isBulkPending, startBulkTransition] = useTransition();
 
   function toggleCompare(id: string) {
@@ -325,6 +327,18 @@ export function ProdukteTable({
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowUebersetzenWizard(true)}
+                disabled={isBulkPending}
+              >
+                <span className="mr-1" aria-hidden>
+                  🇮🇹
+                </span>
+                Italienisch übersetzen
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleBulkDelete}
                 disabled={isBulkPending}
                 className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
@@ -426,6 +440,18 @@ export function ProdukteTable({
         produkte={produkte
           .filter((p) => selected.has(p.id))
           .map((p) => ({ id: p.id, artikelnummer: p.artikelnummer, name: p.name }))}
+        onApplied={() => {
+          clearSelection();
+          router.refresh();
+        }}
+      />
+
+      <BulkUebersetzenWizard
+        open={showUebersetzenWizard}
+        onOpenChange={setShowUebersetzenWizard}
+        produkte={produkte
+          .filter((p) => selected.has(p.id))
+          .map((p) => ({ id: p.id, artikelnummer: p.artikelnummer }))}
         onApplied={() => {
           clearSelection();
           router.refresh();

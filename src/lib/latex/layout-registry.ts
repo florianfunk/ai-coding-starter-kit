@@ -19,6 +19,7 @@ import {
   renderModernDatenblattPdf,
   type ModernBrand,
 } from "./datenblatt-modern-payload";
+import type { DatenblattLang } from "./i18n";
 
 /**
  * Resolved-Vorlage mit allem, was der Renderer braucht.
@@ -46,6 +47,7 @@ type LayoutEntry = {
     produktId: string,
     brand: ClassicBrand,
     template: ResolvedTemplate,
+    lang?: DatenblattLang,
   ) => Promise<Buffer>;
 };
 
@@ -58,12 +60,14 @@ async function buildAndRenderModern(
   produktId: string,
   brand: ClassicBrand,
   template: ResolvedTemplate,
+  lang: DatenblattLang = "de",
 ): Promise<Buffer> {
   const payload = await buildModernDatenblattPayload(
     supabase,
     produktId,
     brand as ModernBrand,
     template,
+    lang,
   );
   return renderModernDatenblattPdf(payload);
 }

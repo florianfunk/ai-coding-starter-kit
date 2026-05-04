@@ -5,6 +5,7 @@
  *   ?layout=lichtengros|eisenkeil   (Marke; default: lichtengros)
  *   ?style=klassisch                 (forciert das alte FileMaker-Replikat;
  *                                     ohne Parameter wird die DB-Vorlage genutzt)
+ *   ?lang=de|it                      (PROJ-46 — Sprache; default: de)
  *   ?download=1                      (Content-Disposition: attachment)
  *
  * Rendering laeuft im dedizierten Worker auf pdf.lichtengross.funk.solutions.
@@ -24,6 +25,7 @@ import {
   type Brand,
 } from "@/lib/latex/datenblatt-payload";
 import { getLayoutEntry, type ResolvedTemplate } from "@/lib/latex/layout-registry";
+import type { DatenblattLang } from "@/lib/latex/i18n";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -36,6 +38,7 @@ export async function GET(
   const url = new URL(req.url);
   const layout: Brand = url.searchParams.get("layout") === "eisenkeil" ? "eisenkeil" : "lichtengros";
   const forceClassic = url.searchParams.get("style") === "klassisch";
+  const lang: DatenblattLang = url.searchParams.get("lang") === "it" ? "it" : "de";
   const download = url.searchParams.get("download") === "1";
 
   // Defense-in-Depth: nicht nur auf Middleware vertrauen — auch hier prüfen.
@@ -59,7 +62,7 @@ export async function GET(
 
     if (forceClassic) {
       // Direktzugriff auf das FileMaker-Replikat (kein Vorlagen-Lookup).
-      const payload = await buildDatenblattPayload(supabase, id, layout);
+      const payload = await buildDatenblattPayload(supabase, id, layout, lang);
       pdf = await renderDatenblattPdf(payload);
     } else {
       const template = await resolveTemplate(supabase, produkt.datenblatt_template_id);
@@ -76,14 +79,17 @@ export async function GET(
           { status: 500 },
         );
       }
-      pdf = await entry.build(supabase, id, layout, template);
+      pdf = await entry.build(supabase, id, layout, template, lang);
     }
 
+    // PROJ-46: Sprach-Suffix im Dateinamen — DE bleibt rückwärtskompatibel.
+    const langSuffix = lang === "it" ? "-IT" : "";
+    const filename = `Datenblatt-${produkt.artikelnummer}${langSuffix}.pdf`;
     return new NextResponse(pdf as any, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="Datenblatt-${produkt.artikelnummer}.pdf"`,
+        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
         "Cache-Control": "no-store",
       },
     });

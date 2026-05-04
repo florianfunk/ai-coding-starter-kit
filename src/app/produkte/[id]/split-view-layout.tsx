@@ -132,11 +132,11 @@ function PreviewInner({ produktId }: { produktId: string }) {
   const [layout, setLayout] = useState<"lichtengros" | "eisenkeil">(
     "lichtengros"
   );
-  const [style, setStyle] = useState<"klassisch" | "modern">("modern");
   const [iframeKey, setIframeKey] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const iframeSrc = `/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=${style}&_=${iframeKey}`;
+  // Stil ist immer "modern" — die klassische Variante wurde entfernt.
+  const iframeSrc = `/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=modern&_=${iframeKey}`;
 
   const switchLayout = useCallback(
     (l: "lichtengros" | "eisenkeil") => {
@@ -147,17 +147,6 @@ function PreviewInner({ produktId }: { produktId: string }) {
       }
     },
     [layout]
-  );
-
-  const switchStyle = useCallback(
-    (st: "klassisch" | "modern") => {
-      if (st !== style) {
-        setStyle(st);
-        setLoading(true);
-        setIframeKey((k) => k + 1);
-      }
-    },
-    [style]
   );
 
   const refresh = useCallback(() => {
@@ -188,23 +177,6 @@ function PreviewInner({ produktId }: { produktId: string }) {
         <div className="w-px h-5 bg-border mx-1" />
         <Button
           size="sm"
-          variant={style === "modern" ? "default" : "outline"}
-          onClick={() => switchStyle("modern")}
-          className="h-7 px-2.5 text-xs"
-        >
-          Modern
-        </Button>
-        <Button
-          size="sm"
-          variant={style === "klassisch" ? "default" : "outline"}
-          onClick={() => switchStyle("klassisch")}
-          className="h-7 px-2.5 text-xs"
-        >
-          Klassisch
-        </Button>
-        <div className="w-px h-5 bg-border mx-1" />
-        <Button
-          size="sm"
           variant="ghost"
           onClick={refresh}
           title="Vorschau aktualisieren"
@@ -221,7 +193,7 @@ function PreviewInner({ produktId }: { produktId: string }) {
           className="h-7 w-7 p-0"
         >
           <a
-            href={`/produkte/${produktId}/datenblatt?layout=${layout}&style=${style}`}
+            href={`/produkte/${produktId}/datenblatt?layout=${layout}&style=modern`}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -252,7 +224,7 @@ function PreviewInner({ produktId }: { produktId: string }) {
       {/* Download */}
       <Button variant="outline" asChild className="w-full shrink-0">
         <a
-          href={`/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=${style}&download=1`}
+          href={`/produkte/${produktId}/datenblatt/raw?layout=${layout}&style=modern&download=1`}
         >
           <Download className="h-4 w-4 mr-2" />
           PDF herunterladen

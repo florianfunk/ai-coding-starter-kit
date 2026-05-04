@@ -7,13 +7,13 @@ export default async function DatenblattPreviewPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ layout?: string; style?: string }>;
+  searchParams: Promise<{ layout?: string }>;
 }) {
   const { id } = await params;
   const sp = await searchParams;
   const layout = sp.layout === "eisenkeil" ? "eisenkeil" : "lichtengros";
-  const style = sp.style === "klassisch" ? "klassisch" : "modern";
-  const qs = `?layout=${layout}&style=${style}`;
+  // Stil ist immer "modern" — die klassische Variante wurde entfernt.
+  const qs = `?layout=${layout}&style=modern`;
   return (
     <AppShell>
       <div className="space-y-3">
@@ -22,17 +22,10 @@ export default async function DatenblattPreviewPage({
           <div className="flex gap-2 items-center">
             <span className="text-xs text-muted-foreground mr-1">Marke</span>
             <Button asChild variant={layout === "lichtengros" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=lichtengros&style=${style}`}>Lichtengros</Link>
+              <Link href={`?layout=lichtengros`}>Lichtengros</Link>
             </Button>
             <Button asChild variant={layout === "eisenkeil" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=eisenkeil&style=${style}`}>Eisenkeil</Link>
-            </Button>
-            <span className="text-xs text-muted-foreground ml-3 mr-1">Stil</span>
-            <Button asChild variant={style === "modern" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=${layout}&style=modern`}>Modern</Link>
-            </Button>
-            <Button asChild variant={style === "klassisch" ? "default" : "outline"} size="sm">
-              <Link href={`?layout=${layout}&style=klassisch`}>Klassisch</Link>
+              <Link href={`?layout=eisenkeil`}>Eisenkeil</Link>
             </Button>
             <Button asChild className="ml-2">
               <a href={`/produkte/${id}/datenblatt/raw${qs}&download=1`}>Download PDF</a>

@@ -224,9 +224,15 @@
 % subjektive Lichtfarbe simuliert. Leerer String = kein Hintergrund.
 \newcommand{\quickfact}[5]{%
   % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename, #5 = bg-hex
-  % Inhalt der Kachel — kein Hintergrund hier (der wird ueber \quickfactCell
-  % gesetzt, weil \columncolor saubere zellbreite Faerbung ermoeglicht).
-  \quickfactInner{#1}{#2}{#3}{#4}%
+  % Bei leerem Wert (& leerem Label & leerem Icon) wird die Kachel als
+  % unsichtbarer Platzhalter gerendert: gleiche Hoehe, kein Inhalt, keine
+  % gepunktete Linie. So bleiben die Spalten-Linien der Tabular-Tabelle
+  % erhalten, aber der "—"-Platzhalter verschwindet.
+  \ifthenelse{\equal{#1}{}\AND\equal{#2}{}\AND\equal{#4}{}}{%
+    \parbox[t][14mm][t]{\linewidth}{\strut}%
+  }{%
+    \quickfactInner{#1}{#2}{#3}{#4}%
+  }%
 }
 % Innenkachel ohne Hintergrund — wird vom \quickfact-Wrapper aufgerufen.
 \newcommand{\quickfactInner}[4]{%

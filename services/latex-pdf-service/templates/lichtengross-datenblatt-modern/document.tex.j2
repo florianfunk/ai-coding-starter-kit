@@ -131,7 +131,9 @@
   \newcommand{\qfcellW}{\dimexpr(\linewidth-1.6pt-9mm)/3\relax}
   \noindent\begin{tabular}{|p{\qfcellW}|p{\qfcellW}|p{\qfcellW}|}
   \hline
-  ((* for i in [0,1,2,3,4,5,6,7,8] *))
+  % Dynamisch: nur so viele Reihen rendern, wie der Payload Eintraege liefert.
+  % buildQuickfacts entfernt komplett leere Zeilen am Ende.
+  ((* for i in range(quickfacts | length) *))
   ((* if quickfacts[i].bg_hex *))\multicolumn{1}{((* if i % 3 == 0 *))|((* endif *))>{\columncolor[HTML]{(((quickfacts[i].bg_hex)))}}p{\qfcellW}|}{((* endif *))\quickfact{(((quickfacts[i].label | e)))}{(((quickfacts[i].value | e)))}{(((quickfacts[i].unit | e)))}{(((quickfacts[i].icon_image or "" | e)))}{(((quickfacts[i].bg_hex or "" | e)))}((* if quickfacts[i].bg_hex *))}((* endif *))((* if i % 3 == 2 *)) \\\hline
   ((* else *)) &
   ((* endif *))

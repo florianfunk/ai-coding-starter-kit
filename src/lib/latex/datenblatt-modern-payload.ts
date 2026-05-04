@@ -410,8 +410,12 @@ function buildQuickfacts(
     }
   }
 
-  while (out.length < 9) out.push({ label: "", value: "—", unit: "" });
-  const final = out.slice(0, 9);
+  // Slots auf das naechste volle 3er-Vielfache padden, damit komplette
+  // Zeilen entstehen — dann komplett leere Zeilen abschneiden. So sehen wir
+  // im PDF nur so viele Reihen, wie tatsaechlich Daten vorhanden sind.
+  const targetLen = Math.min(9, Math.max(3, Math.ceil(out.length / 3) * 3));
+  while (out.length < targetLen) out.push({ label: "", value: "", unit: "" });
+  let final = out.slice(0, 9);
 
   // CCT-Kachel (mit Lichtfarben-Hintergrund) auf Position 2 (rechts oben)
   // schieben, damit die Lichtfarbe immer prominent steht.
@@ -421,6 +425,18 @@ function buildQuickfacts(
     final.splice(2, 0, cctTile);
     if (final.length > 9) final.length = 9;
   }
+
+  // Sicherheitshalber komplett leere Zeilen am Ende abschneiden (falls die
+  // CCT-Verschiebung eine leere Reihe nach unten geschoben hat).
+  while (final.length >= 3) {
+    const tailStart = final.length - 3;
+    const tailIsEmpty = final
+      .slice(tailStart)
+      .every((q) => !q.label && !q.value && !q.icon_image);
+    if (!tailIsEmpty) break;
+    final = final.slice(0, tailStart);
+  }
+
   // Optionale Felder normalisieren, damit das Jinja-Template
   // (((quickfacts[i].bg_hex))) nie auf undefined zugreift.
   return final.map((q) => ({

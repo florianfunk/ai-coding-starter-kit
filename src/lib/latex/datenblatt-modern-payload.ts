@@ -82,7 +82,11 @@ async function downloadAndCompress(
     pipeline = pipeline.png({ compressionLevel: 9 });
     ext = "png";
   } else {
-    pipeline = pipeline.jpeg({ quality: cfg.quality, mozjpeg: true });
+    // JPEG kennt keine Transparenz — sharp flacht sonst auf Schwarz.
+    // Wir flatten explizit auf Weiss, damit transparente PNGs sauber wirken.
+    pipeline = pipeline
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: cfg.quality, mozjpeg: true });
     ext = "jpg";
   }
   const out = await pipeline.toBuffer();

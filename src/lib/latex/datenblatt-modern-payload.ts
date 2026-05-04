@@ -76,49 +76,50 @@ async function downloadAndCompress(
       ? { maxWidth: 800, quality: 80, png: false }
       : { maxWidth: 600, quality: 90, png: true };
 
-  let pipeline = sharp(input).rotate();
-  if (options.trimEdges) {
-    // Schneidet einfarbige Raender (z.B. eingebrannte schwarze Box) ab.
-    // Threshold etwas hoeher gesetzt, damit auch leichte Anti-Aliasing-Pixel
-    // mitgenommen werden. Trim VOR resize, damit der eigentliche Inhalt
-    // skaliert wird, nicht die Box.
-    pipeline = pipeline.trim({ threshold: 30 });
-  }
-  if (options.cropBorderPercent && options.cropBorderPercent > 0) {
-    // Schneidet einen prozentualen Rand auf allen vier Seiten ab — fuer Icons
-    // mit eingebrannter Outline-Box, die sharp.trim() nicht erwischt
-    // (weil der Rand Teil des Bildes ist). Wir muessen die Originalmasse
-    // kennen, also pre-flushen.
-    const meta = await sharp(input).rotate().metadata();
-    if (meta.width && meta.height) {
-      const dx = Math.round((meta.width * options.cropBorderPercent) / 100);
-      const dy = Math.round((meta.height * options.cropBorderPercent) / 100);
-      const newW = Math.max(1, meta.width - 2 * dx);
-      const newH = Math.max(1, meta.height - 2 * dy);
-      pipeline = sharp(input)
-        .rotate()
-        .extract({ left: dx, top: dy, width: newW, height: newH });
-      if (options.trimEdges) pipeline = pipeline.trim({ threshold: 30 });
+  // Defekte oder nicht unterstuetzte Bildformate (HEIC, AVIF, korrupt) duerfen
+  // den gesamten Datenblatt-Render nicht abbrechen — der Slot bleibt leer und
+  // das PDF rendert ohne dieses Bild.
+  try {
+    let pipeline = sharp(input).rotate();
+    if (options.trimEdges) {
+      pipeline = pipeline.trim({ threshold: 30 });
     }
+    if (options.cropBorderPercent && options.cropBorderPercent > 0) {
+      const meta = await sharp(input).rotate().metadata();
+      if (meta.width && meta.height) {
+        const dx = Math.round((meta.width * options.cropBorderPercent) / 100);
+        const dy = Math.round((meta.height * options.cropBorderPercent) / 100);
+        const newW = Math.max(1, meta.width - 2 * dx);
+        const newH = Math.max(1, meta.height - 2 * dy);
+        pipeline = sharp(input)
+          .rotate()
+          .extract({ left: dx, top: dy, width: newW, height: newH });
+        if (options.trimEdges) pipeline = pipeline.trim({ threshold: 30 });
+      }
+    }
+    pipeline = pipeline.resize({
+      width: cfg.maxWidth,
+      withoutEnlargement: true,
+    });
+    let ext: Ext;
+    if (cfg.png) {
+      pipeline = pipeline.png({ compressionLevel: 9 });
+      ext = "png";
+    } else {
+      pipeline = pipeline
+        .flatten({ background: "#ffffff" })
+        .jpeg({ quality: cfg.quality, mozjpeg: true });
+      ext = "jpg";
+    }
+    const out = await pipeline.toBuffer();
+    return { base64: out.toString("base64"), ext };
+  } catch (e) {
+    console.warn(
+      `[datenblatt-modern] Bild "${storagePath}" konnte nicht verarbeitet werden — wird im PDF uebersprungen:`,
+      e instanceof Error ? e.message : e,
+    );
+    return null;
   }
-  pipeline = pipeline.resize({
-    width: cfg.maxWidth,
-    withoutEnlargement: true,
-  });
-  let ext: Ext;
-  if (cfg.png) {
-    pipeline = pipeline.png({ compressionLevel: 9 });
-    ext = "png";
-  } else {
-    // JPEG kennt keine Transparenz — sharp flacht sonst auf Schwarz.
-    // Wir flatten explizit auf Weiss, damit transparente PNGs sauber wirken.
-    pipeline = pipeline
-      .flatten({ background: "#ffffff" })
-      .jpeg({ quality: cfg.quality, mozjpeg: true });
-    ext = "jpg";
-  }
-  const out = await pipeline.toBuffer();
-  return { base64: out.toString("base64"), ext };
 }
 
 function brandConfig(brand: ModernBrand, _einstellungen: any) {

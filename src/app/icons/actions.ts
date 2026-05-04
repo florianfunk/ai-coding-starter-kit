@@ -10,6 +10,7 @@ const schema = z.object({
   gruppe: z.string().max(60).optional().nullable().or(z.literal("").transform(() => null)),
   sortierung: z.coerce.number().int().min(0).default(0),
   symbol_path: z.string().optional().nullable(),
+  show_as_symbol: z.coerce.boolean().default(false),
 });
 
 export type IconFormState = { error: string | null; fieldErrors?: Record<string, string> };
@@ -26,6 +27,7 @@ function parse(formData: FormData) {
     gruppe: formData.get("gruppe") || null,
     sortierung: formData.get("sortierung") || 0,
     symbol_path: (formData.get("symbol_path") as string) || null,
+    show_as_symbol: formData.get("show_as_symbol") === "on",
   });
 }
 

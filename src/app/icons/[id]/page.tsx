@@ -45,6 +45,7 @@ export default async function EditIconPage({ params }: { params: Promise<{ id: s
             sortierung: icon.sortierung,
             symbol_path: icon.symbol_path,
             symbol_url: symbolUrl,
+            show_as_symbol: icon.show_as_symbol ?? false,
           }}
           action={action}
           submitLabel="Speichern"

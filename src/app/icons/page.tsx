@@ -99,7 +99,16 @@ export default async function IconsPage() {
                     <TableCell className="pl-5 font-mono text-[11.5px] text-muted-foreground/70 tabular-nums">
                       {String(i + 1).padStart(2, "0")}
                     </TableCell>
-                    <TableCell className="font-medium">{ic.label}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{ic.label}</span>
+                        {ic.show_as_symbol && (
+                          <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-primary">
+                            Symbol
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {ic.gruppe ? (
                         <span className="text-sm text-muted-foreground">{ic.gruppe}</span>

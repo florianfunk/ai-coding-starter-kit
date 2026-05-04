@@ -38,7 +38,7 @@ export type ModernDatenblattPayload = {
     pill: string;
     lead: string;
   };
-  quickfacts: { label: string; value: string; unit: string }[];
+  quickfacts: { label: string; value: string; unit: string; icon_image?: string | null }[];
   icons: string[];
   spec_groups: { title: string; rows: { label: string; value: string }[] }[];
   paragraphs: string[];
@@ -209,7 +209,7 @@ function fallbackQuickfactsFromStammdaten(produkt: any): ModernDatenblattPayload
  */
 function buildQuickfacts(
   produkt: any,
-  produktIcons: Array<{ wert: string | null; icons: { label: string } | null }>,
+  produktIcons: Array<{ wert: string | null; icons: { label: string; symbol_path: string | null; show_as_symbol: boolean | null } | null }>,
 ): ModernDatenblattPayload["quickfacts"] {
   const out: ModernDatenblattPayload["quickfacts"] = [];
   const usedLabels = new Set<string>();
@@ -218,19 +218,23 @@ function buildQuickfacts(
     const iconLabel = pi.icons?.label;
     if (!iconLabel) continue;
     const map = ICON_LABEL_MAP[iconLabel];
+    // Nur als Bild rendern, wenn das Icon explizit dafuer markiert ist UND
+    // ein symbol_path existiert. Sonst Text-Variante (Label + Wert + Unit).
+    const symbolPath =
+      pi.icons?.show_as_symbol && pi.icons?.symbol_path ? pi.icons.symbol_path : null;
     if (pi.wert != null && pi.wert !== "") {
       // Icon mit Wert → "Label" + "Wert" + "Unit"
       const label = (map?.label ?? iconLabel).toString();
       const unit = map?.unit ?? "";
       const value = String(pi.wert).replace(/\.(\d)/, ",$1");
-      out.push({ label, value, unit });
+      out.push({ label, value, unit, icon_image: symbolPath });
       usedLabels.add(label);
     } else {
       // Badge-Icon (kein Wert) → Label gross als Wert, oben kleines "Zertifikat"/"Schutzart"
       const isIp = /^IP\d+/i.test(iconLabel);
       const isCct = /^\d+K$/i.test(iconLabel);
       const subLabel = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
-      out.push({ label: subLabel, value: iconLabel, unit: "" });
+      out.push({ label: subLabel, value: iconLabel, unit: "", icon_image: symbolPath });
       usedLabels.add(subLabel + ":" + iconLabel);
     }
     if (out.length >= 9) break;
@@ -304,6 +308,35 @@ function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
 }
 
 /**
+ * Laedt fuer alle Quickfacts mit `icon_image` (= Storage-Pfad zum Symbol)
+ * das Bild aus dem `produktbilder`-Bucket, komprimiert es als PNG, registriert
+ * es in `images_b64` und ersetzt das `icon_image`-Feld durch den Filename.
+ * Quickfacts ohne Icon-Bild bleiben unveraendert.
+ */
+async function loadQuickfactIcons(
+  supabase: SupabaseClient,
+  quickfacts: ModernDatenblattPayload["quickfacts"],
+  images: Record<string, string>,
+): Promise<ModernDatenblattPayload["quickfacts"]> {
+  // Cache: gleicher Storage-Pfad nur einmal laden + ein Filename pro Pfad
+  const pathToFilename = new Map<string, string>();
+  let counter = 0;
+  for (const qf of quickfacts) {
+    const path = qf.icon_image;
+    if (!path || pathToFilename.has(path)) continue;
+    const dl = await downloadAndCompress(supabase, "produktbilder", path, "logo");
+    if (!dl) continue;
+    const fname = `qfico${counter++}.${dl.ext}`;
+    pathToFilename.set(path, fname);
+    images[fname] = dl.base64;
+  }
+  return quickfacts.map((qf) => ({
+    ...qf,
+    icon_image: qf.icon_image ? (pathToFilename.get(qf.icon_image) ?? null) : null,
+  }));
+}
+
+/**
  * PROJ-38: Resolved-Vorlage mit Slot-Definitionen.
  * Wird vom Layout-Registry-Adapter durchgereicht.
  */
@@ -339,7 +372,7 @@ export async function buildModernDatenblattPayload(
       : Promise.resolve({ data: [] as { slot_id: string; storage_path: string | null }[] }),
     supabase
       .from("produkt_icons")
-      .select("sortierung, wert, icons(label)")
+      .select("sortierung, wert, icons(label, symbol_path, show_as_symbol)")
       .eq("produkt_id", produktId)
       .order("sortierung"),
   ]);
@@ -477,7 +510,11 @@ export async function buildModernDatenblattPayload(
         : produkt.verpackungseinheit || "",
       lead,
     },
-    quickfacts: buildQuickfacts(produkt, (produktIcons ?? []) as any),
+    quickfacts: await loadQuickfactIcons(
+      supabase,
+      buildQuickfacts(produkt, (produktIcons ?? []) as any),
+      images,
+    ),
     icons: [],
     spec_groups: buildSpecGroups(produkt),
     paragraphs,

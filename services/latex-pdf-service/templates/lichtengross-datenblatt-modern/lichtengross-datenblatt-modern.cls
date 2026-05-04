@@ -216,16 +216,26 @@
 }
 
 % ─── Quickfact-Cell ─────────────────────────────────────────────────────────
-% Eine 6er-Grid-Zelle: kleines Mono-Label oben + großer Display-Wert + kleine Unit
-\newcommand{\quickfact}[3]{%
-  % #1 = Label, #2 = Wert, #3 = Unit
+% Eine Grid-Zelle: entweder
+%  (a) wenn #4 (Icon-Image-Dateiname) gesetzt ist → nur das Bild zentriert,
+%      kein Label und kein Text — die volle Kachelflaeche zeigt das Symbol.
+%  (b) sonst kleines Mono-Label oben + grosser Display-Wert + kleine Unit.
+\newcommand{\quickfact}[4]{%
+  % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename (optional)
   \parbox[t][14mm][t]{\linewidth}{%
-    \raggedright
-    {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par
-    \vspace{1.6mm}%
-    {\displayfont\bfseries\fontsize{15pt}{16pt}\selectfont\color{ink}#2}%
-    \ifthenelse{\equal{#3}{}}{}{%
-      \,{\fontsize{8pt}{10pt}\selectfont\color{muted}#3}%
+    \ifthenelse{\equal{#4}{}}{%
+      \raggedright
+      {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par
+      \vspace{1.6mm}%
+      {\displayfont\bfseries\fontsize{15pt}{16pt}\selectfont\color{ink}#2}%
+      \ifthenelse{\equal{#3}{}}{}{%
+        \,{\fontsize{8pt}{10pt}\selectfont\color{muted}#3}%
+      }%
+    }{%
+      % Icon-Bild zentriert in der Kachel, max 11mm hoch, behaelt Aspect.
+      \centering\vspace*{\fill}%
+      \includegraphics[height=11mm,width=\linewidth,keepaspectratio]{#4}%
+      \vspace*{\fill}%
     }%
   }%
 }

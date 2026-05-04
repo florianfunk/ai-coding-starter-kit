@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Image as ImageIcon } from "lucide-react";
 import { uploadIconBild, type IconFormState } from "./actions";
 
@@ -22,6 +23,7 @@ type Props = {
     sortierung?: number;
     symbol_path?: string | null;
     symbol_url?: string | null;
+    show_as_symbol?: boolean;
   };
   action: (prev: IconFormState, formData: FormData) => Promise<IconFormState>;
   submitLabel: string;
@@ -35,6 +37,7 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
   const [symbolPreview, setSymbolPreview] = useState<string | null>(defaultValues?.symbol_url ?? null);
   const [gruppe, setGruppe] = useState(defaultValues?.gruppe ?? "");
   const [useCustomGruppe, setUseCustomGruppe] = useState(false);
+  const [showAsSymbol, setShowAsSymbol] = useState(defaultValues?.show_as_symbol ?? false);
   const [uploading, startUpload] = useTransition();
 
   useEffect(() => {
@@ -154,6 +157,26 @@ export function IconForm({ gruppen, defaultValues, action, submitLabel, redirect
                   Icons sollten ein einheitliches Format haben (240×240 px, quadratisch, transparenter
                   Hintergrund bei PNG/SVG).
                 </span>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-[10px] border border-border/70 bg-card p-3">
+                <Checkbox
+                  id="show_as_symbol"
+                  name="show_as_symbol"
+                  checked={showAsSymbol}
+                  onCheckedChange={(v) => setShowAsSymbol(Boolean(v))}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor="show_as_symbol" className="cursor-pointer text-[13px] font-medium">
+                    Im Datenblatt nur als Symbol anzeigen
+                  </Label>
+                  <p className="text-[11.5px] text-muted-foreground">
+                    Wenn aktiv, zeigt das Datenblatt in der Quickfact-Kachel ausschließlich das
+                    Bild — ohne Label und Wert. Nur sinnvoll bei selbsterklärenden Symbolen
+                    (z.B. CE, RoHS, IP-Schutzart).
+                  </p>
+                </div>
               </div>
             </div>
           </div>

@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const securityHeaders = [
-  { key: "X-Frame-Options", value: "DENY" },
+  // SAMEORIGIN statt DENY: blockiert weiterhin Cross-Origin-Iframes
+  // (Clickjacking-Schutz), erlaubt aber unsere eigene Datenblatt-Vorschau
+  // (iframe in /produkte/[id]/datenblatt zeigt /produkte/[id]/datenblatt/raw).
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "origin-when-cross-origin" },
   {

@@ -22,7 +22,10 @@ import {
 } from "@/lib/i18n/translatable-fields";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Übersetzung mehrerer Felder eines Produkts kann mit Reasoning-Modellen wie
+// gpt-5-mini 60 s deutlich überschreiten — vor allem wenn datenblatt_text
+// (Rich-HTML) lang ist. Vercel Fluid Compute erlaubt bis 300 s.
+export const maxDuration = 300;
 
 // Wir akzeptieren nur DE-Schlüssel aus der zentralen Whitelist — verhindert,
 // dass beliebige Spalten übersetzt werden.

@@ -14,7 +14,9 @@ import {
 } from "@/lib/ai/uebersetzen-produkt";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// Bulk-Item übersetzt alle Felder eines Produkts und schreibt sie in die DB.
+// Mit Reasoning-Modellen (gpt-5-mini) kann das pro Produkt 60 s+ dauern.
+export const maxDuration = 300;
 
 const bodySchema = z.object({
   produktId: z.string().uuid(),

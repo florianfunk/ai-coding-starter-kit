@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ProduktForm } from "../produkt-form";
 import { updateProdukt, type ProduktFormState } from "../actions";
 import { ProduktTopActions } from "./top-actions";
+import { ProduktNav } from "./produkt-nav";
 import { PreiseSection } from "./preise-section";
 import { DatenblattSection } from "./datenblatt-section";
 import { ChevronLeft, ChevronRight, FileText, Sparkles } from "lucide-react";
@@ -49,6 +50,19 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   ]);
 
   if (!produkt) notFound();
+
+  // Geschwister-Produkte derselben Kategorie für Vor/Zurück-Navigation
+  // (gleiche Sortierreihenfolge wie /kategorien/[id]).
+  const { data: siblings } = await supabase
+    .from("produkte")
+    .select("id, artikelnummer")
+    .eq("kategorie_id", produkt.kategorie_id)
+    .order("sortierung")
+    .order("artikelnummer");
+  const siblingList = siblings ?? [];
+  const currentIdx = siblingList.findIndex((p) => p.id === id);
+  const prevSibling = currentIdx > 0 ? siblingList[currentIdx - 1] : null;
+  const nextSibling = currentIdx >= 0 && currentIdx < siblingList.length - 1 ? siblingList[currentIdx + 1] : null;
 
   // Slot-Rows nur abfragen, wenn ein Template gewählt ist (sonst leeres Array).
   const { data: slotRows } = produkt.datenblatt_template_id
@@ -211,7 +225,15 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <ProduktNav
+                  prevId={prevSibling?.id ?? null}
+                  nextId={nextSibling?.id ?? null}
+                  position={currentIdx >= 0 ? currentIdx + 1 : 0}
+                  total={siblingList.length}
+                  prevLabel={prevSibling?.artikelnummer ?? null}
+                  nextLabel={nextSibling?.artikelnummer ?? null}
+                />
                 <Button asChild variant="outline" size="sm">
                   <Link href={`/produkte/${id}/datenblatt`} target="_blank" rel="noopener noreferrer">
                     <FileText className="h-3.5 w-3.5" /> Datenblatt

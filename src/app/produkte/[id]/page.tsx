@@ -9,26 +9,23 @@ import { updateProdukt, type ProduktFormState } from "../actions";
 import { ProduktTopActions } from "./top-actions";
 import { ItemNav } from "@/components/item-nav";
 import { PreiseSection } from "./preise-section";
-import { DatenblattSection } from "./datenblatt-section";
 import { ChevronLeft, ChevronRight, FileText, Sparkles } from "lucide-react";
-import type { DatenblattTemplate } from "@/lib/datenblatt";
 import { calculateCompleteness } from "@/lib/completeness";
 import { AuditSection } from "./audit-section";
 import { ProduktTabs } from "./produkt-tabs";
 import { ProduktRail, buildSectionStats, buildChecks } from "./produkt-rail";
-import { getBereiche, getKategorien, getIcons, getDatenblattTemplates } from "@/lib/cache";
+import { getBereiche, getKategorien, getIcons } from "@/lib/cache";
 
 export default async function ProduktDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
-  // Slowly-changing Lookups (Bereiche, Kategorien, Icons, Templates) aus dem
+  // Slowly-changing Lookups (Bereiche, Kategorien, Icons) aus dem
   // unstable_cache holen — kein DB-Roundtrip, wenn der Cache warm ist.
-  const [bereiche, kategorien, iconsCached, templatesCached] = await Promise.all([
+  const [bereiche, kategorien, iconsCached] = await Promise.all([
     getBereiche(),
     getKategorien(),
     getIcons(),
-    getDatenblattTemplates(),
   ]);
 
   // Produkt + produkt-spezifische Daten parallel — alle anderen Lookups
@@ -64,15 +61,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   const prevSibling = currentIdx > 0 ? siblingList[currentIdx - 1] : null;
   const nextSibling = currentIdx >= 0 && currentIdx < siblingList.length - 1 ? siblingList[currentIdx + 1] : null;
 
-  // Slot-Rows nur abfragen, wenn ein Template gewählt ist (sonst leeres Array).
-  const { data: slotRows } = produkt.datenblatt_template_id
-    ? await supabase
-        .from("produkt_datenblatt_slots")
-        .select("slot_id,storage_path")
-        .eq("produkt_id", id)
-        .eq("template_id", produkt.datenblatt_template_id)
-    : { data: [] as Array<{ slot_id: string; storage_path: string | null }> };
-
   // Bereich + Kategorie aus dem Cache lookup'en — keine extra DB-Queries.
   const bereichRow = bereiche.find((b) => b.id === produkt.bereich_id) ?? null;
   const kategorieRow = kategorien.find((k) => k.id === produkt.kategorie_id) ?? null;
@@ -96,32 +84,13 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
     url: bildProxyUrl("produktbilder", ic.symbol_path),
   }));
 
-  // PROJ-38: Nur Vorlagen mit aktiviertem LaTeX-Layout in der Auswahl anzeigen.
-  // Skeletons (latex_template_key IS NULL) sind unsichtbar fuer den Pfleger.
-  const templatesTyped: DatenblattTemplate[] = templatesCached
-    .filter((t: any) => Boolean(t.latex_template_key))
-    .map((t: any) => ({
-      ...t,
-      page_width_cm: Number(t.page_width_cm),
-      page_height_cm: Number(t.page_height_cm),
-      slots: t.slots ?? [],
-    }));
-
-  const slotImages: Record<string, { path: string; url: string }> = {};
-  for (const row of slotRows ?? []) {
-    if (!row.storage_path) continue;
-    const url = bildProxyUrl("produktbilder", row.storage_path);
-    if (url) slotImages[row.slot_id] = { path: row.storage_path, url };
-  }
-
   const todayIso = new Date().toISOString().slice(0, 10);
   const hasActivePrice = (preise ?? []).some((p) => p.gueltig_ab <= todayIso);
   const iconCount = (produktIcons ?? []).length;
-  const hasTemplate = Boolean(produkt.datenblatt_template_id);
   const completeness = calculateCompleteness(produkt, { hasActivePrice, iconCount });
 
-  const sectionStats = buildSectionStats(produkt, { hasActivePrice, iconCount, hasTemplate });
-  const checks = buildChecks(completeness, sectionStats, { hasTemplate });
+  const sectionStats = buildSectionStats(produkt, { hasActivePrice, iconCount });
+  const checks = buildChecks(completeness, sectionStats);
 
   const completenessColor =
     completeness.color === "green"
@@ -138,7 +107,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
   const tabs = [
     { id: "base", label: "Details", badge: null },
     { id: "prices", label: "Preise", badge: (preise ?? []).length },
-    { id: "datasheet", label: "Datenblatt-Vorlage", badge: null },
     { id: "history", label: "Historie", badge: null },
   ];
 
@@ -278,13 +246,6 @@ export default async function ProduktDetailPage({ params }: { params: Promise<{ 
               produktId={id}
               action={action}
               submitLabel="Speichern"
-            />
-
-            <DatenblattSection
-              produktId={id}
-              templates={templatesTyped}
-              activeTemplateId={produkt.datenblatt_template_id}
-              slotImages={slotImages}
             />
 
             <PreiseSection produktId={id} preise={preise ?? []} />

@@ -546,27 +546,13 @@ async function loadQuickfactIcons(
   }));
 }
 
-/**
- * PROJ-38: Resolved-Vorlage mit Slot-Definitionen.
- * Wird vom Layout-Registry-Adapter durchgereicht.
- */
-export type ResolvedTemplateForPayload = {
-  id: string;
-  slots: Array<{
-    id: string;
-    kind: "image" | "energielabel" | "cutting";
-    position?: string;
-  }>;
-};
-
 export async function buildModernDatenblattPayload(
   supabase: SupabaseClient,
   produktId: string,
   brand: ModernBrand,
-  template?: ResolvedTemplateForPayload,
   lang: DatenblattLang = "de",
 ): Promise<ModernDatenblattPayload> {
-  const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: slotBilder }, { data: produktIcons }] = await Promise.all([
+  const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: produktIcons }] = await Promise.all([
     supabase
       .from("produkte")
       .select("*, bereiche(name), kategorien(name)")
@@ -574,13 +560,6 @@ export async function buildModernDatenblattPayload(
       .single(),
     supabase.from("katalog_einstellungen").select("*").eq("id", 1).single(),
     supabase.from("filialen").select("name").eq("marke", brand).order("sortierung").limit(1),
-    template
-      ? supabase
-          .from("produkt_datenblatt_slots")
-          .select("slot_id, storage_path")
-          .eq("produkt_id", produktId)
-          .eq("template_id", template.id)
-      : Promise.resolve({ data: [] as { slot_id: string; storage_path: string | null }[] }),
     supabase
       .from("produkt_icons")
       .select("sortierung, wert, icons(label, symbol_path, show_as_symbol)")
@@ -595,27 +574,12 @@ export async function buildModernDatenblattPayload(
 
   const images: Record<string, string> = {};
 
-  // PROJ-38: Slot-Bilder pro position aufloesen.
-  // Vorrang: produkt_datenblatt_slots-Eintrag fuer die aktive Vorlage; Fallback: Stammdaten-Pfad.
-  const slotPathByPosition = new Map<string, string>();
-  if (template && Array.isArray(slotBilder)) {
-    const pathBySlotId = new Map<string, string>();
-    for (const sb of slotBilder) {
-      if (sb.storage_path) pathBySlotId.set(sb.slot_id, sb.storage_path);
-    }
-    for (const slot of template.slots) {
-      if (slot.position && pathBySlotId.has(slot.id)) {
-        slotPathByPosition.set(slot.position, pathBySlotId.get(slot.id)!);
-      }
-    }
-  }
-
-  const heroPath      = slotPathByPosition.get("hero")        ?? produkt.hauptbild_path;
-  const detail1Path   = slotPathByPosition.get("detail-1")    ?? produkt.bild_detail_1_path;
-  const detail2Path   = slotPathByPosition.get("detail-2")    ?? produkt.bild_detail_2_path;
-  const detail3Path   = slotPathByPosition.get("detail-3")    ?? produkt.bild_zeichnung_1_path;
-  const zeichnung1Path = slotPathByPosition.get("zeichnung-1") ?? produkt.bild_zeichnung_2_path;
-  const zeichnung2Path = slotPathByPosition.get("zeichnung-2") ?? produkt.bild_zeichnung_3_path;
+  const heroPath       = produkt.hauptbild_path;
+  const detail1Path    = produkt.bild_detail_1_path;
+  const detail2Path    = produkt.bild_detail_2_path;
+  const detail3Path    = produkt.bild_zeichnung_1_path;
+  const zeichnung1Path = produkt.bild_zeichnung_2_path;
+  const zeichnung2Path = produkt.bild_zeichnung_3_path;
 
   // Hauptbild → figA
   const figA = await downloadAndCompress(supabase, "produktbilder", heroPath, "hero");

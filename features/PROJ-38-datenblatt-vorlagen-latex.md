@@ -2,8 +2,21 @@
 
 ## Status: Deployed
 **Created:** 2026-04-30
-**Last Updated:** 2026-04-30
+**Last Updated:** 2026-05-05
 **Deployed:** 2026-04-30
+
+## 2026-05-05 — Rückbau Slot-Override + Vorlagen-Auswahl pro Produkt
+
+Da effektiv nur ein Layout (`lichtengross-datenblatt-modern`) im Einsatz ist und die Slot-Bilder pro Produkt nur ein zweiter Eingang für dieselben Stammdatenbilder waren, wurde die Slot-Override-Sektion auf der Produktseite entfernt:
+
+- **Entfernt:** `DatenblattSection`, Tab „Datenblatt-Vorlage", Server-Actions `setDatenblattTemplate` + `setSlotBild`, Vollständigkeits-Check „Datenblatt-Vorlage gesetzt", `hasTemplate`-Kontext in `buildSectionStats` / `buildChecks`.
+- **PDF-Builder** (`buildModernDatenblattPayload`) liest die Bildpfade jetzt direkt aus den Stammdaten — kein `produkt_datenblatt_slots`-Lookup mehr.
+- **Render-Route** (`/produkte/[id]/datenblatt/raw`) ignoriert `produkt.datenblatt_template_id` und nimmt immer die Default-Vorlage (`is_default=true`).
+- **Energielabel-Override** war im modernen Layout ohnehin nicht aktiv (`bild_energielabel_path` aus den Stammdaten reicht durch).
+
+**Stehen geblieben** (separate Aufräum-Schritte):
+- Tabelle `produkt_datenblatt_slots` und Spalte `produkte.datenblatt_template_id` — ungenutzt, aber nicht via Migration entfernt.
+- `/datenblatt-vorlagen`-Verwaltungsseiten — der Default-Layout-Eintrag bleibt dort sichtbar/editierbar.
 
 ## Implementation Notes (Backend)
 

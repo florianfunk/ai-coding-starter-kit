@@ -17,7 +17,6 @@ type ProduktLike = {
   hauptbild_path?: string | null;
   datenblatt_titel?: string | null;
   datenblatt_text?: string | null;
-  datenblatt_template_id?: string | null;
   leistung_w?: number | null;
   lichtstrom_lm?: number | null;
   farbtemperatur_k?: number | null;
@@ -72,11 +71,6 @@ const FIELDS: FieldCheck[] = [
     label: "Datenblatttext",
     weight: 7,
     check: (p) => Boolean(p.datenblatt_text?.trim()) || hasSection(p, "datenblatt"),
-  },
-  {
-    label: "Datenblatt-Vorlage",
-    weight: 6,
-    check: (p) => p.datenblatt_template_id != null || hasSection(p, "datenblatt"),
   },
   {
     label: "Technische Daten",

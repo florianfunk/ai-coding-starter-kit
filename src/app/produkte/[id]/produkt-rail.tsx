@@ -32,7 +32,7 @@ function sectionColorVar(pct: number) {
  *  100 % gewertet (done = total), unabhängig von den tatsächlichen Werten. */
 export function buildSectionStats(
   produkt: Record<string, unknown>,
-  ctx: { hasActivePrice: boolean; iconCount: number; hasTemplate: boolean },
+  ctx: { hasActivePrice: boolean; iconCount: number },
 ): SectionStat[] {
   const manualSections = new Set<string>(
     Array.isArray(produkt.vollstaendig_sections) ? (produkt.vollstaendig_sections as string[]) : [],
@@ -62,7 +62,6 @@ export function buildSectionStats(
   const datenblatt: Array<[string, boolean]> = [
     ["datenblatt_titel", val("datenblatt_titel")],
     ["datenblatt_text", val("datenblatt_text")],
-    ["template", ctx.hasTemplate],
   ];
   const datenblattDone = datenblatt.filter(([, v]) => v).length;
 
@@ -154,7 +153,6 @@ export function buildSectionStats(
 export function buildChecks(
   completeness: CompletenessResult,
   sections: SectionStat[],
-  ctx: { hasTemplate: boolean },
 ): Check[] {
   const checks: Check[] = [];
   const missing = new Set(completeness.missing);
@@ -171,12 +169,6 @@ export function buildChecks(
     });
   } else {
     checks.push({ ok: true, text: "Thermik-Daten erfasst" });
-  }
-
-  if (!ctx.hasTemplate) {
-    checks.push({ ok: false, text: "Datenblatt-Vorlage fehlt", sub: "Keine Vorlage zugeordnet" });
-  } else {
-    checks.push({ ok: true, text: "Datenblatt-Vorlage gesetzt" });
   }
 
   return checks;

@@ -11,30 +11,29 @@
 \setfootercompany{(((meta.filiale | e)))}
 \setfooterdate{(((meta.stand | e)))}
 \setfooterrev{(((meta.revision | e)))}
-\setfooterenergy{(((meta.energy_class | e)))}
 
 \begin{document}
 
 ((# ═════ MASTHEAD ═════ #))
 \noindent
-\begin{minipage}[c]{0.55\linewidth}
+\begin{minipage}[c]{\dimexpr 0.55\linewidth-3.85mm\relax}
   \vspace{0pt}
   ((* if logo_filename *))
   \includegraphics[height=3.5mm,keepaspectratio]{(((logo_filename)))}%
   ((* else *))
   {\displayfont\bfseries\fontsize{14pt}{16pt}\selectfont\addfontfeature{LetterSpace=4}\color{ink}\MakeUppercase{(((meta.brand_name | e)))}}%
   ((* endif *))
-\end{minipage}\hfill
-\begin{minipage}[c]{0.42\linewidth}\raggedleft
+\end{minipage}\hspace{7mm}%
+\begin{minipage}[c]{\dimexpr 0.45\linewidth-3.15mm\relax}\raggedleft
   {\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Produktdatenblatt}}\\
   {\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Seite 1/1}}
 \end{minipage}
 
 \vspace{1.4mm}{\color{ink}\hrule height 0.4pt}\vspace{4mm}
 
-((# ═════ HERO: Linke Spalte (Eyebrow + Title + Article-Bar) | Rechte Spalte (Quickfacts) ═════ #))
+((# ═════ HERO: Linke Spalte (Eyebrow + Title + Hauptbild + Detail-Bilder) | Rechte Spalte (Artikelnr. + Quickfacts + Tech-Daten) ═════ #))
 \noindent
-\begin{minipage}[t][28mm][s]{0.55\linewidth}
+\begin{minipage}[t]{\dimexpr 0.55\linewidth-3.85mm\relax}
   \vspace{0pt}
   ((* if produkt.eyebrow *))
   \noindent
@@ -48,23 +47,84 @@
   ((* if produkt.title_accent *))
   {\displayfont\bfseries\fontsize{18pt}{20pt}\selectfont\color{accentdeep}(((produkt.title_accent | e)))}
   ((* endif *))
-  \vfill
 
-  % Article-Bar — schwarze Box, ans Bottom der linken Spalte gepinnt.
-  \noindent\colorbox{ink}{%
-    \begin{minipage}{86mm}\vspace{1.6mm}\hspace{0pt}%
-      \begin{tabular*}{86mm}{@{\extracolsep{\fill}}ll}
-        {\monofont\fontsize{8.4pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{accent}\MakeUppercase{Artikelnr.}} &
-        {\monofont\fontsize{10.5pt}{12pt}\selectfont\color{paper}(((produkt.artikelnummer | e)))}
-      \end{tabular*}\vspace{1.6mm}%
-    \end{minipage}%
-  }
-\end{minipage}\hfill
-\begin{minipage}[t]{0.43\linewidth}
+  % Hauptbild direkt unter dem Titel — proportional auf 85% der linken
+  % Spaltenbreite skaliert, Originalseitenverhaeltnis bleibt erhalten,
+  % linksbuendig, kein Rahmen.
+  \par\vspace{5mm}
+  ((* if figA_filename *))
+  \noindent\includegraphics[width=0.85\linewidth,keepaspectratio]{(((figA_filename | e)))}
+  ((* endif *))
+
+  % Detail-Bilder (3 Stueck) unter dem Hauptbild — volle Spaltenbreite,
+  % je 1/3 mit 3mm Spalt zwischen ihnen, randlos zugeschnitten.
+  % Spaltenbreite jeweils: (linewidth - 2*3mm)/3
+  \par\vspace{5mm}
+  \newlength{\thirdw}\setlength{\thirdw}{\dimexpr (\linewidth - 6mm)/3\relax}
+  \newlength{\xPosB}\setlength{\xPosB}{\dimexpr \thirdw + 3mm\relax}
+  \newlength{\xPosC}\setlength{\xPosC}{\dimexpr 2\thirdw + 6mm\relax}
+  \noindent\begin{tikzpicture}
+    \def\hgt{24mm}
+    ((* if figB_filename *))
+    \begin{scope}
+      \clip (0,0) rectangle (\thirdw,\hgt);
+      \node[anchor=north west, inner sep=0pt] at (0,\hgt)
+        {\includegraphics[width=\thirdw,height=\hgt,keepaspectratio=false]{(((figB_filename | e)))}};
+    \end{scope}
+    ((* endif *))
+    ((* if figC_filename *))
+    \begin{scope}
+      \clip (\xPosB,0) rectangle (\dimexpr \xPosB + \thirdw\relax,\hgt);
+      \node[anchor=north west, inner sep=0pt] at (\xPosB,\hgt)
+        {\includegraphics[width=\thirdw,height=\hgt,keepaspectratio=false]{(((figC_filename | e)))}};
+    \end{scope}
+    ((* endif *))
+    ((* if figD_filename *))
+    \begin{scope}
+      \clip (\xPosC,0) rectangle (\linewidth,\hgt);
+      \node[anchor=north west, inner sep=0pt] at (\xPosC,\hgt)
+        {\includegraphics[width=\thirdw,height=\hgt,keepaspectratio=false]{(((figD_filename | e)))}};
+    \end{scope}
+    ((* endif *))
+    % Unsichtbarer Platzhalter sichert die Box-Hoehe auch bei fehlenden Bildern
+    \path (0,0) rectangle (\linewidth,\hgt);
+  \end{tikzpicture}
+
+  % Zeichnung 1 (und optional Zeichnung 2 darunter) — volle Spaltenbreite,
+  % proportional. Wenn beide vorhanden sind, untereinander mit 5mm Abstand.
+  ((* if figE_filename *))
+  \par\vspace{5mm}
+  \noindent\includegraphics[width=\linewidth,height=32mm,keepaspectratio]{(((figE_filename | e)))}
+  ((* endif *))
+  ((* if figF_filename *))
+  \par\vspace{5mm}
+  \noindent\includegraphics[width=\linewidth,height=32mm,keepaspectratio]{(((figF_filename | e)))}
+  ((* endif *))
+
+  % Beschreibung direkt unter den Detail-Bildern — nutzt linke Spalte,
+  % damit die Hoehe der Tech-Daten rechts ausbalanciert wird.
+  \par\vspace{5mm}
+  \sectionhead{Anwendung \& Hinweise}{}
+  ((* for para in paragraphs *))
+  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
+  \par\vspace{2mm}
+  ((* endfor *))
+\end{minipage}\hspace{7mm}%
+\begin{minipage}[t]{\dimexpr 0.45\linewidth-3.15mm\relax}
   \vspace{0pt}
+  % Artikelnummer rechts ausgerichtet, auf Hoehe der linken Eyebrow-Zeile —
+  % gleiche Schriftgroesse wie "PRODUKTDATENBLATT" (8.4pt mono, muted).
+  {\raggedleft\monofont\fontsize{8.4pt}{12pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Artikelnr.\ (((produkt.artikelnummer | e)))}\par}
+  \vspace{1.4mm}
+  % Energielabel direkt unter der Artikelnummer, ebenfalls rechtsbuendig.
+  {\raggedleft\energyscale{(((meta.energy_class | e)))}\par}
+  \vspace{3mm}
+
+  % Quickfact-Grid 3x3 — nimmt die volle Breite der rechten Spalte ein.
   \setlength{\arrayrulewidth}{0.4pt}\arrayrulecolor{hair}
+  \setlength{\tabcolsep}{1.5mm}
   \renewcommand{\arraystretch}{1.0}
-  \noindent\begin{tabular}{|p{0.295\linewidth}|p{0.295\linewidth}|p{0.295\linewidth}|}
+  \noindent\begin{tabular}{|p{\dimexpr(\linewidth-1.6pt-9mm)/3\relax}|p{\dimexpr(\linewidth-1.6pt-9mm)/3\relax}|p{\dimexpr(\linewidth-1.6pt-9mm)/3\relax}|}
   \hline
   \quickfact{(((quickfacts[0].label | e)))}{(((quickfacts[0].value | e)))}{(((quickfacts[0].unit | e)))} &
   \quickfact{(((quickfacts[1].label | e)))}{(((quickfacts[1].value | e)))}{(((quickfacts[1].unit | e)))} &
@@ -72,99 +132,33 @@
   \quickfact{(((quickfacts[3].label | e)))}{(((quickfacts[3].value | e)))}{(((quickfacts[3].unit | e)))} &
   \quickfact{(((quickfacts[4].label | e)))}{(((quickfacts[4].value | e)))}{(((quickfacts[4].unit | e)))} &
   \quickfact{(((quickfacts[5].label | e)))}{(((quickfacts[5].value | e)))}{(((quickfacts[5].unit | e)))} \\\hline
+  \quickfact{(((quickfacts[6].label | e)))}{(((quickfacts[6].value | e)))}{(((quickfacts[6].unit | e)))} &
+  \quickfact{(((quickfacts[7].label | e)))}{(((quickfacts[7].value | e)))}{(((quickfacts[7].unit | e)))} &
+  \quickfact{(((quickfacts[8].label | e)))}{(((quickfacts[8].value | e)))}{(((quickfacts[8].unit | e)))} \\\hline
   \end{tabular}
-\end{minipage}
 
-\vspace{10mm}
-
-((# ═════ IMAGE GALLERY: 3 Bilder, 1.4fr / 1fr / 1fr, feste Hoehe ═════ #))
-\noindent
-\begin{minipage}[t]{0.43\linewidth}
-  \vspace{0pt}
-  ((* if figA_filename *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figA_filename | e)))}%
-    }%
-  }
-  ((* else *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Produktansicht}}\\[0.5mm]
-      {\monofont\fontsize{7pt}{9pt}\selectfont\color{muted}\MakeUppercase{Strip auf Rolle}}
-    }%
-  }
-  ((* endif *))
-\end{minipage}\hfill
-\begin{minipage}[t]{0.275\linewidth}
-  \vspace{0pt}
-  ((* if figB_filename *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figB_filename | e)))}%
-    }%
-  }
-  ((* else *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Detail}}
-    }%
-  }
-  ((* endif *))
-\end{minipage}\hfill
-\begin{minipage}[t]{0.275\linewidth}
-  \vspace{0pt}
-  ((* if figC_filename *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      \includegraphics[width=94mm,height=23mm,keepaspectratio]{(((figC_filename | e)))}%
-    }%
-  }
-  ((* else *))
-  \fcolorbox{hairstrong}{paper}{%
-    \parbox[c][24mm][c]{\linewidth-3pt}{\centering
-      {\monofont\fontsize{9pt}{11pt}\selectfont\color{ink2}\MakeUppercase{Anwendung}}
-    }%
-  }
-  ((* endif *))
-\end{minipage}
-
-\vspace{10mm}
-
-
-((# ═════ CONTENT: 2-Spalten — Specs links, Beschreibung rechts ═════ #))
-\noindent
-\begin{minipage}[t]{0.51\linewidth}
-  \vspace{0pt}
+  % Tech-Daten direkt unter den Quickfacts — gruppiert, kompakt.
+  \par\vspace{10mm}
   \sectionhead{Technische Daten}{}
-
   ((* for group in spec_groups *))
   \specgroup{(((group.title | e)))}
   ((* for row in group.rows *))
   \specrow{(((row.label | e)))}{(((row.value | e)))}%
   ((* endfor *))
   ((* endfor *))
-\end{minipage}\hfill
-\begin{minipage}[t]{0.45\linewidth}
-  \vspace{0pt}
-  \sectionhead{Anwendung \& Hinweise}{}
 
-  ((* for para in paragraphs *))
-  {\fontsize{9.5pt}{14pt}\selectfont\color{ink2}(((para | e)))}
-  \par\vspace{2mm}
-  ((* endfor *))
-
+  % ACHTUNG-Hinweis unter den Tech-Daten — kleine, dezente Box rechts unten.
   ((* if warnung *))
-  \vspace{1mm}
+  \par\vspace{6mm}
   \begin{tcolorbox}[
     enhanced, colback=warnbg, colframe=hair,
-    boxrule=0.4pt, leftrule=2pt, sharp corners,
-    borderline west={2pt}{0pt}{warnfg},
-    boxsep=2mm, top=2mm, bottom=2mm, left=3mm, right=3mm,
+    boxrule=0.3pt, leftrule=1.5pt, sharp corners,
+    borderline west={1.5pt}{0pt}{warnfg},
+    boxsep=1.4mm, top=1.4mm, bottom=1.4mm, left=2.2mm, right=2.2mm,
   ]
-  {\monofont\bfseries\fontsize{8pt}{10pt}\selectfont\addfontfeature{LetterSpace=16}\color{warnfg}\MakeUppercase{Achtung}}\par
-  \vspace{1.5mm}
-  {\fontsize{9pt}{12pt}\selectfont\color{ink2}(((warnung | e)))}
+  {\monofont\bfseries\fontsize{6.4pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{warnfg}\MakeUppercase{Achtung}}\par
+  \vspace{0.8mm}
+  {\fontsize{6.6pt}{8.4pt}\selectfont\color{ink2}(((warnung | e)))}
   \end{tcolorbox}
   ((* endif *))
 \end{minipage}

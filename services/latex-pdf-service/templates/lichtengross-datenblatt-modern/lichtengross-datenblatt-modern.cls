@@ -97,13 +97,14 @@
 
 \newcommand{\rendermyfoot}{%
   {\color{ink}\rule{\textwidth}{0.4pt}}\\[1.6mm]
-  \noindent\begin{minipage}[c]{0.40\textwidth}%
+  \noindent\begin{minipage}[c]{0.34\textwidth}\raggedright%
     {\monofont\bfseries\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{ink}\MakeUppercase{\lgFooterCompany}}%
-    \,{\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{\(\cdot\) Stand \lgFooterDate}}%
   \end{minipage}\hfill%
-  \begin{minipage}[c]{0.22\textwidth}\centering\energyscale{\lgFooterEnergy}\end{minipage}\hfill%
-  \begin{minipage}[c]{0.36\textwidth}\raggedleft%
-    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten \(\cdot\) v1.0}}%
+  \begin{minipage}[c]{0.32\textwidth}\centering%
+    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Stand \lgFooterDate \(\cdot\) v1.0}}%
+  \end{minipage}\hfill%
+  \begin{minipage}[c]{0.34\textwidth}\raggedleft%
+    {\monofont\fontsize{7.4pt}{9pt}\selectfont\addfontfeature{LetterSpace=10}\color{muted}\MakeUppercase{Technische Aenderungen vorbehalten}}%
   \end{minipage}%
 }
 \fancyfoot[C]{}
@@ -132,14 +133,19 @@
 \newcommand{\lgFooterDate}{}
 \newcommand{\lgFooterRev}{}
 \newcommand{\lgFooterEnergy}{F}
+\newcommand{\lgFooterArtnr}{}
 \newcommand{\setfootercompany}[1]{\renewcommand{\lgFooterCompany}{#1}}
 \newcommand{\setfooterdate}[1]{\renewcommand{\lgFooterDate}{#1}}
 \newcommand{\setfooterrev}[1]{\renewcommand{\lgFooterRev}{#1}}
 \newcommand{\setfooterenergy}[1]{\renewcommand{\lgFooterEnergy}{#1}}
+\newcommand{\setfooterartnr}[1]{\renewcommand{\lgFooterArtnr}{#1}}
 
 % ─── Energie-Skala (Briefing 6.6) ──────────────────────────────────────────
-% Renderhandwerk: 7 farbige Buchstaben in einer Reihe, aktiver Buchstabe
-% bekommt einen 1pt-Outline. Briefing-Farben unverändert übernommen.
+% Renderhandwerk: 7 Buchstaben in einer Reihe.
+% Inaktive: Pastell-Hintergrund (Energie-Farbe stark aufgehellt) + Pfeil-Form
+% Aktiver Buchstabe: ueberproportional gross, voll saettigender Hintergrund,
+%   schwarzer Rahmen, weisser Text. Bricht aus der Reihe nach oben/unten aus
+%   und wirkt damit wie ein Stempel auf der Skala.
 \newcommand{\energyscale}[1]{%
   \begin{tikzpicture}[baseline=(current bounding box.center), inner sep=0pt]
     \def\xa{0pt}\def\xb{14pt}\def\xc{28pt}\def\xd{42pt}\def\xe{56pt}\def\xf{70pt}\def\xg{84pt}
@@ -147,23 +153,36 @@
     \definecolor{ecC}{HTML}{BFD630}\definecolor{ecD}{HTML}{FFF200}
     \definecolor{ecE}{HTML}{FBB040}\definecolor{ecF}{HTML}{F37021}
     \definecolor{ecG}{HTML}{ED1C24}
-    \node[fill=ecA, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (a) at (\xa,0) {A};
-    \node[fill=ecB, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (b) at (\xb,0) {B};
-    \node[fill=ecC, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (c) at (\xc,0) {C};
-    \node[fill=ecD, text=ink, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (d) at (\xd,0) {D};
-    \node[fill=ecE, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (e) at (\xe,0) {E};
-    \node[fill=ecF, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (f) at (\xf,0) {F};
-    \node[fill=ecG, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] (g) at (\xg,0) {G};
-    % Aktiver Buchstabe: Outline
-    \ifthenelse{\equal{#1}{A}}{\draw[ink, line width=1pt] (a.south west) rectangle (a.north east);}{}
-    \ifthenelse{\equal{#1}{B}}{\draw[ink, line width=1pt] (b.south west) rectangle (b.north east);}{}
-    \ifthenelse{\equal{#1}{C}}{\draw[ink, line width=1pt] (c.south west) rectangle (c.north east);}{}
-    \ifthenelse{\equal{#1}{D}}{\draw[ink, line width=1pt] (d.south west) rectangle (d.north east);}{}
-    \ifthenelse{\equal{#1}{E}}{\draw[ink, line width=1pt] (e.south west) rectangle (e.north east);}{}
-    \ifthenelse{\equal{#1}{F}}{\draw[ink, line width=1pt] (f.south west) rectangle (f.north east);}{}
-    \ifthenelse{\equal{#1}{G}}{\draw[ink, line width=1pt] (g.south west) rectangle (g.north east);}{}
-    % Außenrahmen
-    \draw[ink, line width=0.4pt] (a.south west) rectangle (g.north east);
+    % Aktive-Markierung: jede Position bekommt einen Boolean-Flag
+    \def\activeA{0}\def\activeB{0}\def\activeC{0}\def\activeD{0}%
+    \def\activeE{0}\def\activeF{0}\def\activeG{0}%
+    \ifthenelse{\equal{#1}{A}}{\def\activeA{1}}{}
+    \ifthenelse{\equal{#1}{B}}{\def\activeB{1}}{}
+    \ifthenelse{\equal{#1}{C}}{\def\activeC{1}}{}
+    \ifthenelse{\equal{#1}{D}}{\def\activeD{1}}{}
+    \ifthenelse{\equal{#1}{E}}{\def\activeE{1}}{}
+    \ifthenelse{\equal{#1}{F}}{\def\activeF{1}}{}
+    \ifthenelse{\equal{#1}{G}}{\def\activeG{1}}{}
+    % Inaktive Standard-Boxen (klein, voll gesaettigte Energie-Farbe)
+    \ifthenelse{\equal{\activeA}{0}}{\node[fill=ecA, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xa,0) {A};}{}
+    \ifthenelse{\equal{\activeB}{0}}{\node[fill=ecB, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xb,0) {B};}{}
+    \ifthenelse{\equal{\activeC}{0}}{\node[fill=ecC, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xc,0) {C};}{}
+    \ifthenelse{\equal{\activeD}{0}}{\node[fill=ecD, text=ink, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xd,0) {D};}{}
+    \ifthenelse{\equal{\activeE}{0}}{\node[fill=ecE, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xe,0) {E};}{}
+    \ifthenelse{\equal{\activeF}{0}}{\node[fill=ecF, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xf,0) {F};}{}
+    \ifthenelse{\equal{\activeG}{0}}{\node[fill=ecG, text=white, font=\displayfont\bfseries\fontsize{7}{7}\selectfont, inner sep=2pt, minimum width=14pt, minimum height=11pt, anchor=south west] at (\xg,0) {G};}{}
+    % Aktive Box: groesser (18pt × 16pt), voll saturiert, schwarzer Rahmen,
+    % bricht oben/unten aus der Reihe aus. Position wird durch X-Koordinate
+    % der jeweiligen Spalte bestimmt, vertikal zentriert auf y=5.5pt (Mitte
+    % der inaktiven Reihe, die von 0pt bis 11pt geht).
+    \ifthenelse{\equal{\activeA}{1}}{\node[fill=ecA, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xa,5.5pt) + (7pt,0)$) {A};}{}
+    \ifthenelse{\equal{\activeB}{1}}{\node[fill=ecB, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xb,5.5pt) + (7pt,0)$) {B};}{}
+    \ifthenelse{\equal{\activeC}{1}}{\node[fill=ecC, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xc,5.5pt) + (7pt,0)$) {C};}{}
+    \ifthenelse{\equal{\activeD}{1}}{\node[fill=ecD, draw=ink, line width=0.6pt, text=ink, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xd,5.5pt) + (7pt,0)$) {D};}{}
+    \ifthenelse{\equal{\activeE}{1}}{\node[fill=ecE, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xe,5.5pt) + (7pt,0)$) {E};}{}
+    \ifthenelse{\equal{\activeF}{1}}{\node[fill=ecF, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xf,5.5pt) + (7pt,0)$) {F};}{}
+    \ifthenelse{\equal{\activeG}{1}}{\node[fill=ecG, draw=ink, line width=0.6pt, text=white, font=\displayfont\bfseries\fontsize{10}{10}\selectfont, inner sep=2pt, minimum width=18pt, minimum height=16pt] at ($(\xg,5.5pt) + (7pt,0)$) {G};}{}
+    \draw[hairstrong, line width=0.4pt] (\xa,0) rectangle (\dimexpr\xg+14pt\relax,11pt);
   \end{tikzpicture}%
 }
 
@@ -179,21 +198,21 @@
 
 % ─── Spec-Group-Heading (klein, accentdeep, monospace) ─────────────────────
 \newcommand{\specgroup}[1]{%
-  \par\vspace{0.4mm}%
-  {\monofont\bfseries\fontsize{6.8pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{accentdeep}\MakeUppercase{#1}}%
-  \par\vspace{0.1mm}%
+  \par\vspace{0.2mm}%
+  {\monofont\bfseries\fontsize{6.2pt}{6.8pt}\selectfont\addfontfeature{LetterSpace=14}\color{accentdeep}\MakeUppercase{#1}}%
+  \par\vspace{0mm}%
 }
 
 % ─── Spec-Row: Key links (Sans), Value rechts (Mono), gepunktete Trennlinie
 \newcommand{\specrow}[2]{%
-  {\renewcommand{\arraystretch}{0.85}%
+  {\renewcommand{\arraystretch}{0.62}%
   \noindent\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lr}
-    {\fontsize{7.6pt}{8.6pt}\selectfont\color{ink2}#1} &
-    {\monofont\bfseries\fontsize{7.6pt}{8.6pt}\selectfont\color{ink}#2} \\
+    {\fontsize{6.8pt}{7.0pt}\selectfont\color{ink2}#1} &
+    {\monofont\bfseries\fontsize{6.8pt}{7.0pt}\selectfont\color{ink}#2} \\
   \end{tabular*}}\par
-  \vspace{-1.4mm}%
+  \vspace{-2.2mm}%
   {\color{hairstrong}\dotfill}%
-  \vspace{-1mm}\par
+  \vspace{-1.8mm}\par
 }
 
 % ─── Quickfact-Cell ─────────────────────────────────────────────────────────

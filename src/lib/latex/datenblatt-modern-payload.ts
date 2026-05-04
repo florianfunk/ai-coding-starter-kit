@@ -39,6 +39,7 @@ export type ModernDatenblattPayload = {
     lead: string;
   };
   quickfacts: { label: string; value: string; unit: string }[];
+  icons: string[];
   spec_groups: { title: string; rows: { label: string; value: string }[] }[];
   paragraphs: string[];
   warnung: string | null;
@@ -46,6 +47,9 @@ export type ModernDatenblattPayload = {
   figA_filename: string | null;
   figB_filename: string | null;
   figC_filename: string | null;
+  figD_filename: string | null;
+  figE_filename: string | null;
+  figF_filename: string | null;
   images_b64: Record<string, string>;
 };
 
@@ -157,16 +161,92 @@ function fmtValue(v: any, unit?: string): string {
   return unit ? `${s} ${unit}` : s;
 }
 
-/** Quickfact-Liste (genau 6) aus DB-Werten. Leere Felder zeigen "—". */
-function buildQuickfacts(produkt: any): ModernDatenblattPayload["quickfacts"] {
-  return [
-    { label: "Leistung", value: fmtValue(produkt.leistung_w) || "—", unit: produkt.leistung_w ? "W/m" : "" },
-    { label: "Lichtstrom", value: fmtValue(produkt.lichtstrom_lm) || "—", unit: produkt.lichtstrom_lm ? "lm/m" : "" },
-    { label: "CCT", value: fmtValue(produkt.farbtemperatur_k) || "—", unit: produkt.farbtemperatur_k ? "K" : "" },
-    { label: "CRI", value: produkt.farbwiedergabeindex_cri ? `Ra ${produkt.farbwiedergabeindex_cri}` : "—", unit: "" },
-    { label: "Spannung", value: fmtValue(produkt.nennspannung_v) || "—", unit: produkt.nennspannung_v ? `V ${produkt.spannungsart || ""}`.trim() : "" },
-    { label: "IP", value: produkt.ip_schutzart || produkt.schutzart_ip || "—", unit: "" },
-  ];
+/** Mapping fuer bekannte Icon-Labels → Anzeige-Label + Einheit. */
+const ICON_LABEL_MAP: Record<string, { label: string; unit?: string }> = {
+  "Watt": { label: "Leistung", unit: "W/m" },
+  "Volt": { label: "Spannung", unit: "V" },
+  "Lumen": { label: "Lichtstrom", unit: "lm" },
+  "Lumen/mt": { label: "Lichtstrom", unit: "lm/m" },
+  "SMD/mt": { label: "LED/m", unit: "" },
+  "Cutting": { label: "Cutting", unit: "mm" },
+  "Abstrahlwinkel": { label: "Abstrahlwinkel", unit: "°" },
+  "CRI": { label: "CRI", unit: "" },
+  "Schutzklasse": { label: "Schutzklasse", unit: "" },
+  "Erdung": { label: "Erdung", unit: "" },
+  "Einbautiefe": { label: "Einbautiefe", unit: "mm" },
+  "Lebensdauer": { label: "Lebensdauer", unit: "h" },
+  "LM80": { label: "LM80", unit: "h" },
+  "Energieeffizienzklasse": { label: "EEK", unit: "" },
+  "2000K": { label: "CCT", unit: "K" },
+  "2700K": { label: "CCT", unit: "K" },
+  "3000K": { label: "CCT", unit: "K" },
+  "4000K": { label: "CCT", unit: "K" },
+  "RGB": { label: "Farbe", unit: "" },
+};
+
+/** Auffuell-Quickfacts aus Stammdaten — Reihenfolge nach Wichtigkeit. */
+function fallbackQuickfactsFromStammdaten(produkt: any): ModernDatenblattPayload["quickfacts"] {
+  const out: ModernDatenblattPayload["quickfacts"] = [];
+  if (produkt.leistung_w) out.push({ label: "Leistung", value: fmtValue(produkt.leistung_w), unit: "W/m" });
+  if (produkt.lichtstrom_lm) out.push({ label: "Lichtstrom", value: fmtValue(produkt.lichtstrom_lm), unit: "lm/m" });
+  if (produkt.farbtemperatur_k) out.push({ label: "CCT", value: fmtValue(produkt.farbtemperatur_k), unit: "K" });
+  if (produkt.farbwiedergabeindex_cri) out.push({ label: "CRI", value: `Ra ${produkt.farbwiedergabeindex_cri}`, unit: "" });
+  if (produkt.nennspannung_v) out.push({ label: "Spannung", value: fmtValue(produkt.nennspannung_v), unit: `V ${produkt.spannungsart || ""}`.trim() });
+  if (produkt.ip_schutzart || produkt.schutzart_ip) out.push({ label: "IP", value: produkt.ip_schutzart || produkt.schutzart_ip, unit: "" });
+  if (produkt.gesamteffizienz_lm_w) out.push({ label: "Effizienz", value: fmtValue(produkt.gesamteffizienz_lm_w), unit: "lm/W" });
+  if (produkt.abstrahlwinkel_grad) out.push({ label: "Abstrahlwinkel", value: String(produkt.abstrahlwinkel_grad), unit: "°" });
+  if (produkt.lebensdauer_h) out.push({ label: "Lebensdauer", value: fmtValue(produkt.lebensdauer_h), unit: "h" });
+  if (produkt.energieeffizienzklasse) out.push({ label: "EEK", value: produkt.energieeffizienzklasse, unit: "" });
+  return out;
+}
+
+/**
+ * Quickfact-Grid (3x3 = 9 Kacheln). Reihenfolge:
+ *   1. Produkt-Icons mit Wert (z.B. Watt 4,8) → werden zu Kacheln
+ *   2. Produkt-Icons ohne Wert (z.B. IP65 / RoHS / CE) → werden zu Badge-Kacheln
+ *   3. Auffuellen mit Stammdaten-Tech-Werten, die noch nicht abgedeckt sind
+ *   4. Wenn am Ende < 9: leere Platzhalter-Kacheln mit "—"
+ */
+function buildQuickfacts(
+  produkt: any,
+  produktIcons: Array<{ wert: string | null; icons: { label: string } | null }>,
+): ModernDatenblattPayload["quickfacts"] {
+  const out: ModernDatenblattPayload["quickfacts"] = [];
+  const usedLabels = new Set<string>();
+
+  for (const pi of produktIcons) {
+    const iconLabel = pi.icons?.label;
+    if (!iconLabel) continue;
+    const map = ICON_LABEL_MAP[iconLabel];
+    if (pi.wert != null && pi.wert !== "") {
+      // Icon mit Wert → "Label" + "Wert" + "Unit"
+      const label = (map?.label ?? iconLabel).toString();
+      const unit = map?.unit ?? "";
+      const value = String(pi.wert).replace(/\.(\d)/, ",$1");
+      out.push({ label, value, unit });
+      usedLabels.add(label);
+    } else {
+      // Badge-Icon (kein Wert) → Label gross als Wert, oben kleines "Zertifikat"/"Schutzart"
+      const isIp = /^IP\d+/i.test(iconLabel);
+      const isCct = /^\d+K$/i.test(iconLabel);
+      const subLabel = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
+      out.push({ label: subLabel, value: iconLabel, unit: "" });
+      usedLabels.add(subLabel + ":" + iconLabel);
+    }
+    if (out.length >= 9) break;
+  }
+
+  if (out.length < 9) {
+    for (const fb of fallbackQuickfactsFromStammdaten(produkt)) {
+      if (usedLabels.has(fb.label)) continue;
+      out.push(fb);
+      usedLabels.add(fb.label);
+      if (out.length >= 9) break;
+    }
+  }
+
+  while (out.length < 9) out.push({ label: "", value: "—", unit: "" });
+  return out.slice(0, 9);
 }
 
 /** Spec-Gruppen exakt nach Briefing 6.5.2. */
@@ -242,7 +322,7 @@ export async function buildModernDatenblattPayload(
   brand: ModernBrand,
   template?: ResolvedTemplateForPayload,
 ): Promise<ModernDatenblattPayload> {
-  const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: slotBilder }] = await Promise.all([
+  const [{ data: produkt }, { data: einstellungen }, { data: filialen }, { data: slotBilder }, { data: produktIcons }] = await Promise.all([
     supabase
       .from("produkte")
       .select("*, bereiche(name), kategorien(name)")
@@ -257,6 +337,11 @@ export async function buildModernDatenblattPayload(
           .eq("produkt_id", produktId)
           .eq("template_id", template.id)
       : Promise.resolve({ data: [] as { slot_id: string; storage_path: string | null }[] }),
+    supabase
+      .from("produkt_icons")
+      .select("sortierung, wert, icons(label)")
+      .eq("produkt_id", produktId)
+      .order("sortierung"),
   ]);
 
   if (!produkt) throw new Error(`Produkt ${produktId} nicht gefunden`);
@@ -281,9 +366,12 @@ export async function buildModernDatenblattPayload(
     }
   }
 
-  const heroPath    = slotPathByPosition.get("hero")     ?? produkt.hauptbild_path;
-  const detail1Path = slotPathByPosition.get("detail-1") ?? produkt.bild_detail_1_path;
-  const detail2Path = slotPathByPosition.get("detail-2") ?? produkt.bild_detail_2_path;
+  const heroPath      = slotPathByPosition.get("hero")        ?? produkt.hauptbild_path;
+  const detail1Path   = slotPathByPosition.get("detail-1")    ?? produkt.bild_detail_1_path;
+  const detail2Path   = slotPathByPosition.get("detail-2")    ?? produkt.bild_detail_2_path;
+  const detail3Path   = slotPathByPosition.get("detail-3")    ?? produkt.bild_zeichnung_1_path;
+  const zeichnung1Path = slotPathByPosition.get("zeichnung-1") ?? produkt.bild_zeichnung_2_path;
+  const zeichnung2Path = slotPathByPosition.get("zeichnung-2") ?? produkt.bild_zeichnung_3_path;
 
   // Hauptbild → figA
   const figA = await downloadAndCompress(supabase, "produktbilder", heroPath, "hero");
@@ -306,6 +394,27 @@ export async function buildModernDatenblattPayload(
   if (figC) {
     figC_filename = `figC.${figC.ext}`;
     images[figC_filename] = figC.base64;
+  }
+
+  const figD = await downloadAndCompress(supabase, "produktbilder", detail3Path, "detail");
+  let figD_filename: string | null = null;
+  if (figD) {
+    figD_filename = `figD.${figD.ext}`;
+    images[figD_filename] = figD.base64;
+  }
+
+  const figE = await downloadAndCompress(supabase, "produktbilder", zeichnung1Path, "detail");
+  let figE_filename: string | null = null;
+  if (figE) {
+    figE_filename = `figE.${figE.ext}`;
+    images[figE_filename] = figE.base64;
+  }
+
+  const figF = await downloadAndCompress(supabase, "produktbilder", zeichnung2Path, "detail");
+  let figF_filename: string | null = null;
+  if (figF) {
+    figF_filename = `figF.${figF.ext}`;
+    images[figF_filename] = figF.base64;
   }
 
   // Logo: statisches Brand-Asset aus dem Worker (kein Supabase-Download).
@@ -368,7 +477,8 @@ export async function buildModernDatenblattPayload(
         : produkt.verpackungseinheit || "",
       lead,
     },
-    quickfacts: buildQuickfacts(produkt),
+    quickfacts: buildQuickfacts(produkt, (produktIcons ?? []) as any),
+    icons: [],
     spec_groups: buildSpecGroups(produkt),
     paragraphs,
     warnung,
@@ -376,6 +486,9 @@ export async function buildModernDatenblattPayload(
     figA_filename,
     figB_filename,
     figC_filename,
+    figD_filename,
+    figE_filename,
+    figF_filename,
     images_b64: images,
   };
 

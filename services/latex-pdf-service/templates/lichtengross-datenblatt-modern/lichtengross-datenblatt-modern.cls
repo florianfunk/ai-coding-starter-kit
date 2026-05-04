@@ -19,7 +19,7 @@
                 marginparwidth=0pt]{geometry}
 
 \RequirePackage{fontspec}
-\RequirePackage[table,RGB]{xcolor}
+\RequirePackage[table,RGB,HTML]{xcolor}
 \RequirePackage{eso-pic}
 \RequirePackage{graphicx}
 \graphicspath{{/srv/assets/lichtengross/}{/srv/assets/}{./}}
@@ -219,8 +219,18 @@
 % Beide Varianten haben dieselbe Geometrie: feste 14mm Hoehe, oben ein
 % Mono-Label (LetterSpaced, muted), darunter entweder Wert+Unit (Text-
 % Variante) oder ein zentriertes Symbol-Bild (Icon-Variante).
-\newcommand{\quickfact}[4]{%
-  % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename (optional)
+%
+% Optional: 5. Argument = Hex-Hintergrundfarbe (z. B. "FFEBC2"), wird als
+% farbiger Hintergrund hinterlegt — gedacht fuer die CCT-Kachel, die die
+% subjektive Lichtfarbe simuliert. Leerer String = kein Hintergrund.
+\newcommand{\quickfact}[5]{%
+  % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename, #5 = bg-hex
+  % Inhalt der Kachel — kein Hintergrund hier (der wird ueber \quickfactCell
+  % gesetzt, weil \columncolor saubere zellbreite Faerbung ermoeglicht).
+  \quickfactInner{#1}{#2}{#3}{#4}%
+}
+% Innenkachel ohne Hintergrund — wird vom \quickfact-Wrapper aufgerufen.
+\newcommand{\quickfactInner}[4]{%
   \parbox[t][14mm][t]{\linewidth}{%
     \raggedright
     {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par

@@ -38,7 +38,7 @@ export type ModernDatenblattPayload = {
     pill: string;
     lead: string;
   };
-  quickfacts: { label: string; value: string; unit: string; icon_image?: string | null }[];
+  quickfacts: { label: string; value: string; unit: string; icon_image?: string | null; bg_hex?: string | null }[];
   icons: string[];
   spec_groups: { title: string; rows: { label: string; value: string }[] }[];
   paragraphs: string[];
@@ -317,12 +317,36 @@ const ICON_LABEL_MAP: Record<string, { label: string; unit?: string }> = {
   "RGB": { label: "Farbe", unit: "" },
 };
 
+/**
+ * Mappt eine Farbtemperatur (Kelvin) auf eine Pastell-Hexfarbe, die der
+ * subjektiven Lichtfarbe nahekommt. Wir verwenden helle, dezente Toene —
+ * der Kontrast zur schwarzen Quickfact-Schrift bleibt erhalten.
+ *
+ * Werte wurden visuell kalibriert; 100% farb-physikalisch korrekt waeren
+ * sie zu satt und wuerden die Lesbarkeit beeintraechtigen.
+ */
+function cctToPastelHex(cctRaw: string | number | null | undefined): string | null {
+  if (cctRaw == null || cctRaw === "") return null;
+  const k = Number(String(cctRaw).replace(/[^\d]/g, ""));
+  if (!Number.isFinite(k) || k <= 0) return null;
+  // Stuetzpunkte: warmweiss ↔ neutralweiss ↔ tageslicht
+  if (k <= 1900) return "FFE4C2";   // 1800K: warmes Bernstein
+  if (k <= 2200) return "FFE6BD";   // 2000K: tieferes Warmweiss
+  if (k <= 2800) return "FFEBC2";   // 2700K: Warmweiss klassisch
+  if (k <= 3300) return "FFEFC9";   // 3000K: warmweiss-neutral
+  if (k <= 3700) return "FFF3D5";   // 3500K
+  if (k <= 4500) return "FBF7EC";   // 4000K: neutralweiss
+  if (k <= 5500) return "F4F6F0";   // 5000K
+  if (k <= 6800) return "EEF3F8";   // 6500K: Tageslicht
+  return "E8EEF6";                  // 7000K+: kuehler Tageston
+}
+
 /** Auffuell-Quickfacts aus Stammdaten — Reihenfolge nach Wichtigkeit. */
 function fallbackQuickfactsFromStammdaten(produkt: any): ModernDatenblattPayload["quickfacts"] {
   const out: ModernDatenblattPayload["quickfacts"] = [];
   if (produkt.leistung_w) out.push({ label: "Leistung", value: fmtValue(produkt.leistung_w), unit: "W/m" });
   if (produkt.lichtstrom_lm) out.push({ label: "Lichtstrom", value: fmtValue(produkt.lichtstrom_lm), unit: "lm/m" });
-  if (produkt.farbtemperatur_k) out.push({ label: "CCT", value: fmtValue(produkt.farbtemperatur_k), unit: "K" });
+  if (produkt.farbtemperatur_k) out.push({ label: "CCT", value: fmtValue(produkt.farbtemperatur_k), unit: "K", bg_hex: cctToPastelHex(produkt.farbtemperatur_k) });
   if (produkt.farbwiedergabeindex_cri) out.push({ label: "CRI", value: `Ra ${produkt.farbwiedergabeindex_cri}`, unit: "" });
   if (produkt.nennspannung_v) out.push({ label: "Spannung", value: fmtValue(produkt.nennspannung_v), unit: `V ${produkt.spannungsart || ""}`.trim() });
   if (produkt.ip_schutzart || produkt.schutzart_ip) out.push({ label: "IP", value: produkt.ip_schutzart || produkt.schutzart_ip, unit: "" });
@@ -360,14 +384,18 @@ function buildQuickfacts(
       const label = (map?.label ?? iconLabel).toString();
       const unit = map?.unit ?? "";
       const value = String(pi.wert).replace(/\.(\d)/, ",$1");
-      out.push({ label, value, unit, icon_image: symbolPath });
+      // Lichtfarben-Hintergrund nur wenn Kachel CCT zeigt (Label "CCT" oder
+      // Unit "K"). Wert ist in dem Fall die Kelvin-Zahl.
+      const bg = (label === "CCT" || unit === "K") ? cctToPastelHex(value) : null;
+      out.push({ label, value, unit, icon_image: symbolPath, bg_hex: bg });
       usedLabels.add(label);
     } else {
       // Badge-Icon (kein Wert) → Label gross als Wert, oben kleines "Zertifikat"/"Schutzart"
       const isIp = /^IP\d+/i.test(iconLabel);
       const isCct = /^\d+K$/i.test(iconLabel);
       const subLabel = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
-      out.push({ label: subLabel, value: iconLabel, unit: "", icon_image: symbolPath });
+      const bg = isCct ? cctToPastelHex(iconLabel) : null;
+      out.push({ label: subLabel, value: iconLabel, unit: "", icon_image: symbolPath, bg_hex: bg });
       usedLabels.add(subLabel + ":" + iconLabel);
     }
     if (out.length >= 9) break;
@@ -383,7 +411,17 @@ function buildQuickfacts(
   }
 
   while (out.length < 9) out.push({ label: "", value: "—", unit: "" });
-  return out.slice(0, 9);
+  const final = out.slice(0, 9);
+
+  // CCT-Kachel (mit Lichtfarben-Hintergrund) auf Position 2 (rechts oben)
+  // schieben, damit die Lichtfarbe immer prominent steht.
+  const cctIdx = final.findIndex((q) => q.bg_hex);
+  if (cctIdx > -1 && cctIdx !== 2) {
+    const [cctTile] = final.splice(cctIdx, 1);
+    final.splice(2, 0, cctTile);
+    if (final.length > 9) final.length = 9;
+  }
+  return final;
 }
 
 /** Spec-Gruppen exakt nach Briefing 6.5.2. */
@@ -608,25 +646,11 @@ export async function buildModernDatenblattPayload(
     return collapsed.length ? collapsed : null;
   })();
 
-  // Title-Bauplan (HTML-Vorlage): kurz, technisch, nicht der ganze
-  // Marketing-Untertitel. Wir bauen aus DB-Feldern:
-  //   Zeile 1: "<Produktklasse> <Watt> W/m · <Volt> V"
-  //   Akzent:  "<CCT> K [<Lichtfarbe>]"
-  function shortProductClass(p: any): string {
-    const ak = String(p.artikelnummer ?? "");
-    if (/^bl/i.test(ak)) return "LED-Flexband";
-    if (/^pro/i.test(ak)) return "LED-Profil";
-    if (/^drv|netz/i.test(ak)) return "Netzteil";
-    return "LED-Komponente";
-  }
-  const cls = shortProductClass(produkt);
-  const titleParts: string[] = [cls];
-  if (produkt.leistung_w) titleParts.push(`${String(produkt.leistung_w).replace(".", ",")} W/m`);
-  if (produkt.nennspannung_v) titleParts.push(`${produkt.nennspannung_v} V`);
-  const title = titleParts.length > 1 ? `${titleParts[0]} ${titleParts.slice(1).join(" · ")}` : cls;
-  const titleAccent = produkt.farbtemperatur_k
-    ? `${produkt.farbtemperatur_k} K${produkt.lichtfarbe_label ? " " + produkt.lichtfarbe_label : ""}`
-    : "";
+  // Titel = "Bezeichnung" (produkt.name) aus dem Formular. Faellt auf
+  // datenblatt_titel zurueck, falls keine Bezeichnung gepflegt wurde.
+  // Kein Akzent als zweite Zeile — die Bezeichnung enthaelt bereits CCT/Watt/IP.
+  const title = (produkt.name?.trim() || produkt.datenblatt_titel?.trim() || "") as string;
+  const titleAccent = "";
 
   // Zwei-Spalten-Split: linke Spalte (unter Zeichnung) zuerst auffüllen,
   // Rest läuft rechts unter der Warnbox weiter. Harte Zeichengrenze, damit

@@ -60,7 +60,7 @@ async function downloadAndCompress(
   bucket: string,
   storagePath: string | null | undefined,
   preset: "hero" | "detail" | "logo",
-  options: { trimEdges?: boolean } = {},
+  options: { trimEdges?: boolean; cropBorderPercent?: number } = {},
 ): Promise<{ base64: string; ext: Ext } | null> {
   if (!storagePath) return null;
   const { data, error } = await supabase.storage.from(bucket).download(storagePath);
@@ -81,6 +81,23 @@ async function downloadAndCompress(
     // mitgenommen werden. Trim VOR resize, damit der eigentliche Inhalt
     // skaliert wird, nicht die Box.
     pipeline = pipeline.trim({ threshold: 30 });
+  }
+  if (options.cropBorderPercent && options.cropBorderPercent > 0) {
+    // Schneidet einen prozentualen Rand auf allen vier Seiten ab — fuer Icons
+    // mit eingebrannter Outline-Box, die sharp.trim() nicht erwischt
+    // (weil der Rand Teil des Bildes ist). Wir muessen die Originalmasse
+    // kennen, also pre-flushen.
+    const meta = await sharp(input).rotate().metadata();
+    if (meta.width && meta.height) {
+      const dx = Math.round((meta.width * options.cropBorderPercent) / 100);
+      const dy = Math.round((meta.height * options.cropBorderPercent) / 100);
+      const newW = Math.max(1, meta.width - 2 * dx);
+      const newH = Math.max(1, meta.height - 2 * dy);
+      pipeline = sharp(input)
+        .rotate()
+        .extract({ left: dx, top: dy, width: newW, height: newH });
+      if (options.trimEdges) pipeline = pipeline.trim({ threshold: 30 });
+    }
   }
   pipeline = pipeline.resize({
     width: cfg.maxWidth,
@@ -338,6 +355,7 @@ async function loadQuickfactIcons(
     const path = qf.icon_image;
     if (!path || pathToFilename.has(path)) continue;
     const dl = await downloadAndCompress(supabase, "produktbilder", path, "logo", {
+      cropBorderPercent: 5,
       trimEdges: true,
     });
     if (!dl) continue;

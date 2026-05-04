@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Bell, Lightbulb, ChevronDown, LogOut, User as UserIcon } from "lucide-react";
 import { useTransition } from "react";
 import { ThemeToggle } from "./theme-toggle";
@@ -15,28 +15,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { logoutAction } from "@/app/login/actions";
-
-type NavEntry = { label: string; href: string; match: (path: string) => boolean };
-
-const navEntries: NavEntry[] = [
-  { label: "Dashboard", href: "/", match: (p) => p === "/" },
-  {
-    label: "Katalog",
-    href: "/bereiche",
-    match: (p) =>
-      p.startsWith("/bereiche") || p.startsWith("/kategorien") || p.startsWith("/produkte"),
-  },
-  { label: "Medien", href: "/icons", match: (p) => p.startsWith("/icons") || p.startsWith("/datenblatt-vorlagen") },
-  { label: "Exporte", href: "/export/katalog", match: (p) => p.startsWith("/export") },
-  { label: "Team", href: "/benutzer", match: (p) => p.startsWith("/benutzer") || p.startsWith("/aktivitaet") },
-];
+import { WORKSPACES, getWorkspaceForPath } from "./workspace";
+import { useWorkspaceLastPage } from "./use-workspace-last-page";
 
 type SessionUser = { email: string | null; name: string | null };
 
 export function AppTopNav({ user }: { user?: SessionUser }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const { getTargetForWorkspace } = useWorkspaceLastPage();
+
+  const activeWorkspace = getWorkspaceForPath(pathname);
 
   const displayName = user?.name ?? (user?.email ? user.email.split("@")[0] : "Gast");
   const initials = displayName
@@ -71,20 +63,39 @@ export function AppTopNav({ user }: { user?: SessionUser }) {
         </span>
       </Link>
 
-      <nav className="nav-links flex items-center gap-0">
-        {navEntries.map((n) => {
-          const active = n.match(pathname);
-          return (
-            <Link
-              key={n.label}
-              href={n.href}
-              className={`navlink-dark ${active ? "active" : ""}`}
-            >
-              {n.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <TooltipProvider delayDuration={200}>
+        <nav className="nav-links flex items-center gap-0.5" aria-label="Workspaces">
+          {WORKSPACES.map((ws) => {
+            const active = ws.id === activeWorkspace.id;
+            const Icon = ws.icon;
+            const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+              e.preventDefault();
+              if (active) return;
+              const target = getTargetForWorkspace(ws.id);
+              router.push(target);
+            };
+
+            return (
+              <Tooltip key={ws.id}>
+                <TooltipTrigger asChild>
+                  <a
+                    href={ws.landingPath}
+                    onClick={handleClick}
+                    aria-current={active ? "page" : undefined}
+                    className={`navlink-dark flex items-center gap-1.5 ${active ? "active" : ""}`}
+                  >
+                    <Icon className="h-3.5 w-3.5" aria-hidden />
+                    <span className="hidden md:inline">{ws.label}</span>
+                  </a>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="md:hidden">
+                  {ws.label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </nav>
+      </TooltipProvider>
 
       <div className="flex-1" />
 

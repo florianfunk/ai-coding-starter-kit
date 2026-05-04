@@ -103,12 +103,15 @@
 
   % Beschreibung direkt unter den Detail-Bildern — nutzt linke Spalte,
   % damit die Hoehe der Tech-Daten rechts ausbalanciert wird.
+  % Ueberschrift nur, wenn auch Beschreibungstext vorhanden ist.
+  ((* if paragraphs *))
   \par\vspace{5mm}
   \sectionhead{Anwendung \& Hinweise}{}
   ((* for para in paragraphs *))
   {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
   \par\vspace{2mm}
   ((* endfor *))
+  ((* endif *))
 \end{minipage}\hspace{7mm}%
 \begin{minipage}[t]{\dimexpr 0.45\linewidth-3.15mm\relax}
   \vspace{0pt}

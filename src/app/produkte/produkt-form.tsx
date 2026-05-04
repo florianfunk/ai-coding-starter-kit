@@ -52,8 +52,8 @@ const initial: ProduktFormState = { error: null };
 // Zeichengrenzen fuer den zweispaltigen Anwendungstext im Datenblatt-PDF.
 // Muessen mit den Konstanten in src/lib/latex/datenblatt-modern-payload.ts
 // (LEFT_COL_CHAR_LIMIT, RIGHT_COL_CHAR_LIMIT) synchron bleiben.
-const LEFT_COL_LIMIT = 1300;
-const RIGHT_COL_LIMIT = 600;
+const LEFT_COL_LIMIT = 1500;
+const RIGHT_COL_LIMIT = 700;
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 

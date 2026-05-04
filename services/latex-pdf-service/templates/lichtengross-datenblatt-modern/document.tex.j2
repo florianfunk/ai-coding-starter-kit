@@ -103,11 +103,13 @@
 
   % ═════ ANWENDUNG & HINWEISE — linke Spalte, unter Zeichnung ═════
   ((* if paragraphs_left *))
-  \par\vspace{6mm}\noindent
+  \par\vspace{2mm}\noindent
   \sectionhead{Anwendung \& Hinweise}{}
+  % Anwendungstext in der gleichen Schriftgroesse wie die Tech-Daten rechts
+  % (\specrow: 6.8pt/7.0pt). Hier mit etwas mehr Zeilenabstand fuer Fliesstext.
   ((* for para in paragraphs_left *))
-  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
-  \par\vspace{2mm}
+  \begingroup\linespread{1.0}\fontsize{8pt}{12pt}\selectfont\color{ink2}(((para | e)))\par\endgroup
+  \par\vspace{1.5mm}
   ((* endfor *))
   ((* endif *))
 \end{minipage}\hspace{7mm}%
@@ -159,7 +161,7 @@
   ]
   {\monofont\bfseries\fontsize{6.4pt}{7.4pt}\selectfont\addfontfeature{LetterSpace=14}\color{warnfg}\MakeUppercase{Achtung}}\par
   \vspace{0.8mm}
-  {\fontsize{6.6pt}{8.4pt}\selectfont\color{ink2}(((warnung | e)))}
+  \begingroup\linespread{1.0}\fontsize{7pt}{9pt}\selectfont\color{ink2}(((warnung | e)))\par\endgroup
   \end{tcolorbox}
   ((* endif *))
 
@@ -173,8 +175,8 @@
   \sectionhead{Anwendung \& Hinweise}{}
   ((* endif *))
   ((* for para in paragraphs_right *))
-  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
-  \par\vspace{2mm}
+  \begingroup\linespread{1.0}\fontsize{8pt}{12pt}\selectfont\color{ink2}(((para | e)))\par\endgroup
+  \par\vspace{1.5mm}
   ((* endfor *))
   ((* endif *))
 \end{minipage}

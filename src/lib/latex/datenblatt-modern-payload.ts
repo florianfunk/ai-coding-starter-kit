@@ -186,17 +186,16 @@ function splitParagraphs(body: string): string[] {
  * (unter Hauptbild/Detail/Zeichnung) passt — bevor der Text rechts unter
  * der Warnbox weiterlaufen muss.
  *
- * Empirisch kalibriert anhand des Standard-Modern-Layouts:
- *   - Schrift 8.6/12pt
- *   - Spaltenbreite ~76mm
- *   - Vertikaler Restraum links ≈ 80mm bei vollem Bild-Set + Eyebrow + Title
+ * Kalibriert fuer Schrift 6.8pt/9pt (selbe Groesse wie Tech-Daten-Tabelle):
+ *   - Spaltenbreite ~76mm → ca. 90 Zeichen pro Zeile
+ *   - Vertikaler Restraum links ≈ 80mm
  *
  * Wir verwenden eine harte Grenze, damit der Author im UI vorhersehbar
  * erkennt, wann der Text in die rechte Spalte überläuft. Der genaue Wert
  * ist eher Layout-Konvention als physikalisch — bei Anpassung im Template
- * (Bilder/Zeichnungen-Höhe) hier mitziehen.
+ * (Schriftgroesse, Bilder/Zeichnungen-Hoehe) hier mitziehen.
  */
-export const LEFT_COL_CHAR_LIMIT = 1300;
+export const LEFT_COL_CHAR_LIMIT = 1500;
 
 /**
  * Maximale Zeichenzahl, die in die rechte Spalte (unter Tech-Daten und
@@ -204,7 +203,7 @@ export const LEFT_COL_CHAR_LIMIT = 1300;
  * gehalten — alles was darüber hinausgeht, wird abgeschnitten und nicht
  * gerendert (Author bekommt Warnung im UI).
  */
-export const RIGHT_COL_CHAR_LIMIT = 600;
+export const RIGHT_COL_CHAR_LIMIT = 700;
 
 /**
  * Verteilt Absatzliste auf zwei Spalten (links/rechts) anhand der harten

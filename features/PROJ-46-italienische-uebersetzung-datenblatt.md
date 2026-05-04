@@ -1,8 +1,9 @@
 # PROJ-46: Italienische Übersetzung für Datenblätter
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-05-04
 **Last Updated:** 2026-05-04
+**Deployed:** 2026-05-04
 **Priorität:** P1
 
 ## Vision
@@ -511,7 +512,102 @@ In [src/app/produkte/actions.ts](src/app/produkte/actions.ts) erweitert:
 - **Bulk läuft sequenziell** (Concurrency 1), weil das LLM-Rate-Limit sonst nach ~10 parallelen Anfragen greift. Bei ~400 Bestandsprodukten ergibt das ~30–60 min Bulk-Laufzeit.
 - **`treiber`-Feld** ist im Produkt-Formular nicht editierbar (kommt vom FileMaker-Import). Die IT-Spiegelspalte `treiber_it` wird trotzdem mitgepflegt — der Auto-Trigger und Bulk-Wizard übersetzen sie, sobald `treiber` in der DB Werte hat.
 
+## Bugfix-Lauf (2026-05-04, Backend)
+
+Drei der QA-Bugs aus Lauf 1 / Lauf 2 / Lauf 3 sind jetzt gefixt:
+
+### Bug-2 (Critical) — LaTeX-Template defensive Defaults
+
+[document.tex.j2](services/latex-pdf-service/templates/lichtengross-datenblatt-modern/document.tex.j2): An den Anfang des Templates wurde ein `{% set _labels = meta.get('labels') or {} %}`-Block gesetzt, alle 4 `meta.labels.X | e`-Stellen verwenden jetzt `_labels.get('X', 'DE-Default') | e`. Geprüft mit Python/Jinja2 unter `StrictUndefined`:
+
+- App-Stand alt + Worker-Stand neu (kein `meta.labels` im Payload) → Template rendert mit deutschen Defaults statt zu crashen.
+- App-Stand neu + Worker-Stand alt → das alte Template kennt `_labels` nicht und ignoriert die neuen Felder, rendert weiterhin DE — aber bricht nicht ab, weil das alte Template überhaupt keine `meta.labels`-Lookups macht.
+
+Damit ist die Deploy-Reihenfolge entkoppelt — Worker und App können in beliebiger Reihenfolge ausgerollt werden, ohne dass Datenblätter offline gehen.
+
+### Bug-1 (High) — Auto-Trigger Override gegen vorigen DB-Wert
+
+[actions.ts](src/app/produkte/actions.ts): Der `vorher`-Snapshot in `updateProdukt` liest jetzt **DE und IT** Spalten (nicht nur DE). Die Override-Entscheidung wurde in eine pure Funktion ausgelagert: [src/lib/i18n/auto-translate-decider.ts](src/lib/i18n/auto-translate-decider.ts).
+
+Neue Regel:
+- DE unverändert → überspringen.
+- DE geändert + `newIt !== oldIt` (User hat IT in diesem Save manuell editiert) → überspringen, manueller Wert gewinnt.
+- DE geändert + `newIt === oldIt` (Form-State hat das hidden Input einfach durchgeschleift) → übersetzen.
+
+Damit funktioniert AC D auch für Folge-Edits an bereits übersetzten Produkten, nicht nur beim Erst-Übersetzen.
+
+### Bug-3 (Medium) — `createProdukt` ruft Auto-Trigger auf
+
+[actions.ts](src/app/produkte/actions.ts): `createProdukt` baut nach dem `INSERT` einen leeren Vorher-Snapshot (`emptyVorher` mit leeren Strings für alle DE+IT Spalten) und ruft `maybeAutoTranslate` damit auf. Folge: Beim Erstellen eines Produkts mit DE-Texten wird IT automatisch generiert; wenn der User auch IT eingegeben hat, gewinnt der manuelle Wert.
+
+### Tests
+
+- Neue [src/lib/i18n/auto-translate-decider.test.ts](src/lib/i18n/auto-translate-decider.test.ts) — **10 Vitest-Tests** decken alle Decider-Branches ab, inkl. expliziter Bug-1-Regression („DE geändert + IT von Hidden Input echo'd → trotzdem übersetzen").
+- Vitest gesamt: **125/125 passed** (115 → 125, +10 neu).
+- TypeCheck sauber, Build erfolgreich.
+- Jinja-Defensive-Default empirisch verifiziert (Python-Snippet mit StrictUndefined).
+
+### Verbleibende Bugs (Low, nicht blockierend)
+
+- **Bug-4:** Preview-Banner für DE-Fallback fehlt (Frontend-Aufgabe — nicht im Backend-Scope).
+- **Bug-5:** Bulk-Wizard pausiert nicht bei 429 (Frontend-Aufgabe).
+- **Bug-6:** Auto-Trigger blockiert Save synchron (bewusster Trade-off, dokumentiert).
+
+Empfehlung: nach diesen Backend-Fixes erneut `/qa` zur Verifikation. Wenn Lauf 4 grün ist, kann das Feature in `Approved` wechseln.
+
+---
+
 ## QA Test Results
+
+### Re-QA (2026-05-04, vierter Lauf — Bugfix-Verifikation)
+
+**Empfehlung:** ✅ **READY** — alle Critical/High/Medium-Bugs aus den Vorläufen sind gefixt.
+
+#### Bug-Status
+
+| Bug | Severity | Status |
+|---|---|---|
+| Bug-1: Auto-Trigger nach erster Übersetzung übersprungen | 🔴 High | ✅ **FIXED** ([actions.ts:206-212](src/app/produkte/actions.ts#L206-L212), Logik in [auto-translate-decider.ts](src/lib/i18n/auto-translate-decider.ts)) |
+| Bug-2: Worker-Render bricht bei Deploy-Asymmetrie | 🔴 Critical | ✅ **FIXED** (defensive `_labels.get('key', 'DE-Default')` in [document.tex.j2](services/latex-pdf-service/templates/lichtengross-datenblatt-modern/document.tex.j2)) |
+| Bug-3: createProdukt ruft Auto-Trigger nicht | 🟡 Medium | ✅ **FIXED** ([actions.ts:171-181](src/app/produkte/actions.ts#L171-L181), `emptyVorher`-Snapshot) |
+| Bug-4: Preview-Banner für DE-Fallback | 🟢 Low | offen — nicht blockierend |
+| Bug-5: Bulk pausiert nicht bei 429 | 🟢 Low | offen — nicht blockierend |
+| Bug-6: Auto-Trigger blockiert Save synchron | 🟢 Low | bewusster Trade-off, dokumentiert |
+
+#### Verifikation der Fixes
+
+**Bug-2 (defensive Defaults):** Empirisch geprüft mit Python/Jinja2 unter `StrictUndefined` für drei Szenarien:
+- Alter App-Stand + neuer Worker (kein `meta.labels` im Payload) → rendert deutsche Defaults statt zu crashen.
+- Neuer App-Stand + neuer Worker → rendert italienische Labels.
+- Teil-Labels → nutzt vorhandene Keys, fällt für fehlende auf DE zurück.
+
+`&` wird in allen Fällen korrekt LaTeX-escaped. Damit ist die Deploy-Reihenfolge entkoppelt — App- und Worker-Deploys können in beliebiger Reihenfolge laufen, ohne dass Datenblätter offline gehen.
+
+**Bug-1 (Override-Schutz):** Reine Decider-Funktion `decideAutoTranslateKeys` extrahiert. 10 neue Vitest-Tests decken alle Branches ab, inklusive expliziter Bug-1-Regression („DE geändert + IT von Hidden Input echo'd → trotzdem übersetzen") und der neuen Edge-Cases (DE auf leer setzen, mehrere Felder gleichzeitig, Whitespace-only-Änderungen, null/undefined-Handling).
+
+**Bug-3 (createProdukt Auto-Trigger):** `createProdukt` baut nach `INSERT` einen leeren `vorher`-Snapshot und delegiert an die identische `maybeAutoTranslate`-Funktion. Folge: Beim Erstellen eines Produkts mit DE-Texten wird IT automatisch generiert; manuelle IT-Eingaben bleiben erhalten (geprüft per Decider-Tests).
+
+#### Test-Suite-Ergebnisse
+
+- ✅ **TypeCheck:** sauber.
+- ✅ **Vitest:** **125/125 passed** (115 → 125, +10 neue Decider-Tests).
+- ✅ **PROJ-46-Tests isoliert:** 35/35 passed (14 uebersetzen + 11 i18n + 10 decider).
+- ✅ **Build:** erfolgreich, beide neuen Routes weiterhin in der Tabelle.
+- ✅ **Playwright API-Auth-Tests:** 2/2 passed.
+- ⏭️ **Playwright UI-Tests:** 7 skipped (kein `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`-Env — gleiches Verhalten wie PROJ-48).
+
+#### Neue Edge-Case-Beobachtungen
+
+- **createProdukt + Auto-Trigger blockiert Redirect:** Beim Anlegen mit gepflegten DE-Daten wartet der `redirect()` jetzt auf den Übersetzer (~5–15 s). Konsistent mit dem Update-Flow, aber ein User könnte denken, das Formular hängt. Zähle zu Bug-6 — kein neuer Bug, kein Blocker.
+- **Decider behandelt `null`/`undefined` korrekt:** Tests zeigen, dass `null` / `undefined` als leerer String gewertet werden, was die Migration sauberer macht (alte Produkte ohne `*_it` haben `null`-Werte).
+
+#### Production-Ready Decision
+
+**✅ READY** — keine Critical oder High Bugs mehr offen. Status auf **Approved** gesetzt.
+
+Empfehlung: Weiter mit `/deploy`. Die 3 Low-Bugs (Preview-Banner, Bulk-429-Pause, synchroner Auto-Trigger) sind nachrangig und können in einer Folge-Iteration adressiert werden — sie blockieren weder Funktion noch Sicherheit.
+
+---
 
 ### Re-QA (2026-05-04, zweiter Lauf)
 
@@ -787,4 +883,45 @@ Sobald die Migrationen + der Worker deployt sind, bitte einmal lokal mit `E2E_TE
 3. **PDF mit gemischtem `*_it`/DE:** Produkt mit nur einem übersetzten Feld → IT-PDF rendert mit IT-Header + DE-Body?
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployment-Datum:** 2026-05-04
+**Production-URL:** https://lichtengross.vercel.app
+**Vercel-Deployment:** dpl_1RT1YritxCbNHaYXMjKzH2sALcFG (Commit `ed6d388`, Build ~67 s)
+**Git-Tag:** `v1.0-PROJ-46`
+**Status:** Deployed
+
+### Smoke-Test (Production, 2026-05-04)
+
+- ✅ `POST /api/ai/uebersetzen` → 401 (route-level Auth-Check fires, Route ist registriert)
+- ✅ `POST /api/ai/uebersetzen-bulk-item` → 401 (gleich)
+- ✅ `GET /produkte/[id]/datenblatt?lang=it` → 307 → /login (Auth-Middleware funktioniert, neue `lang`-Query bricht nichts)
+
+### Schritte
+
+1. **DB-Migrationen** auf der Cloud-DB `jmnszkurqgitzooczagy` angewendet (via Supabase MCP `apply_migration`):
+   - `produkt_uebersetzung_it` — fügt 9 `*_it`-Spiegel-Spalten zu `produkte` hinzu (`name_it`, `datenblatt_titel_it`, `info_kurz_it`, `treiber_it`, `datenblatt_text_it`, `achtung_text_it`, `bild_detail_1/2/3_text_it`).
+   - `ai_einstellungen_auto_translate` — fügt `auto_translate_it boolean default true` zu `ai_einstellungen` hinzu.
+2. **LaTeX-Worker** auf `pdf.lichtengross.funk.solutions` deployt via `./scripts/deploy-latex-template.sh` (rsync von `templates/` + `assets/`, kein Container-Rebuild nötig). Healthcheck: `{"ok":true,"templates":["lichtengross-datenblatt","lichtengross-datenblatt-modern"]}`.
+3. **Vercel-Auto-Deploy** ausgelöst durch Push auf `main`. Beide neuen API-Routen `/api/ai/uebersetzen` und `/api/ai/uebersetzen-bulk-item` sind in der Routes-Tabelle des Builds präsent.
+
+### Deploy-Reihenfolge entkoppelt
+
+Dank Bug-2-Fix (defensive Defaults via `_labels.get('key', 'DE-Default')` im LaTeX-Template) ist die Deploy-Reihenfolge zwischen App und Worker entkoppelt. Empirisch geprüft mit Python/Jinja2 unter `StrictUndefined`:
+- Worker deployt **vor** App → fehlende `meta.labels` im Payload → Template fällt auf DE-Defaults zurück, Render bricht nicht ab.
+- App deployt **vor** Worker → alter Worker-Stand kennt die neuen `_labels`-Lookups noch nicht, ignoriert die neuen Felder, rendert weiterhin DE.
+
+### Smoke-Tests (manuell, nach Deploy)
+
+- ☐ Produkt mit gepflegten DE-Texten öffnen → Italienisch-Sektion → „Alle Felder übersetzen" → Vorschläge prüfen → Übernehmen → Speichern.
+- ☐ Datenblatt-Vorschau öffnen → Sprache auf Italienisch umschalten → PDF rendert mit IT-Texten und IT-Labels (`Dati tecnici`, `Applicazione e Note`, `ATTENZIONE`).
+- ☐ DE-Feld editieren + speichern → Hintergrund-Übersetzung läuft, IT-Feld nach Reload aktualisiert (Bug-1-Regression-Test).
+- ☐ Neues Produkt anlegen mit DE-Texten → nach Save sind IT-Felder automatisch befüllt (Bug-3-Regression-Test).
+- ☐ Bulk-Wizard mit 3 Test-Produkten → Live-Progress, Erfolg.
+
+### Bekannte verbleibende Bugs (Low, nicht blockierend)
+
+- **Bug-4:** Preview-Banner für DE-Fallback im Datenblatt-Vorschau-UI fehlt — User merkt nicht, dass das PDF teilweise auf DE zurückgefallen ist.
+- **Bug-5:** Bulk-Wizard pausiert nicht bei 429-Rate-Limit, sondern markiert betroffene Produkte als Fehler.
+- **Bug-6:** Auto-Trigger blockiert Save synchron ~5–15 s (bewusster Trade-off, dokumentiert).
+
+Diese können in einer Folge-Iteration adressiert werden.

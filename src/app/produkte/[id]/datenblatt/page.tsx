@@ -1,6 +1,10 @@
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Languages, AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { TRANSLATABLE_FIELDS } from "@/lib/i18n/translatable-fields";
 
 export default async function DatenblattPreviewPage({
   params,
@@ -16,6 +20,40 @@ export default async function DatenblattPreviewPage({
   // Stil ist immer "modern" — die klassische Variante wurde entfernt.
   const qs = `?layout=${layout}&style=modern&lang=${lang}`;
   const downloadName = lang === "it" ? "Datenblatt-IT" : "Datenblatt";
+
+  // PROJ-46 Bug-4: Wenn Sprache=IT gewählt und Produkt hat noch keine
+  // (oder nur teilweise) IT-Übersetzungen → Banner mit klarem Hinweis.
+  let translationStatus: {
+    untranslated: { de: string; label: string }[];
+    translated: number;
+    total: number;
+  } | null = null;
+  if (lang === "it") {
+    const supabase = await createClient();
+    const itCols = TRANSLATABLE_FIELDS.flatMap((f) => [f.de, f.it]);
+    const { data: produkt } = await supabase
+      .from("produkte")
+      .select(itCols.join(", "))
+      .eq("id", id)
+      .single<Record<string, unknown>>();
+    if (produkt) {
+      const untranslated = TRANSLATABLE_FIELDS.filter((f) => {
+        const de = String(produkt[f.de] ?? "").trim();
+        if (!de) return false; // DE-leer → kein Übersetzungs-Bedarf
+        const it = String(produkt[f.it] ?? "").trim();
+        return it.length === 0;
+      }).map((f) => ({ de: f.de, label: f.label }));
+      const total = TRANSLATABLE_FIELDS.filter(
+        (f) => String(produkt[f.de] ?? "").trim().length > 0,
+      ).length;
+      translationStatus = {
+        untranslated,
+        translated: total - untranslated.length,
+        total,
+      };
+    }
+  }
+
   return (
     <AppShell>
       <div className="space-y-3">
@@ -43,6 +81,38 @@ export default async function DatenblattPreviewPage({
             </Button>
           </div>
         </div>
+
+        {translationStatus && translationStatus.untranslated.length > 0 && (
+          <Alert variant="default" className="border-amber-500/50 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle className="flex items-center gap-2">
+              <Languages className="h-3.5 w-3.5" />
+              {translationStatus.translated === 0
+                ? "Dieses Produkt ist noch nicht übersetzt"
+                : `Teil-Übersetzung — ${translationStatus.translated} / ${translationStatus.total} Felder auf Italienisch`}
+            </AlertTitle>
+            <AlertDescription className="text-xs">
+              {translationStatus.translated === 0 ? (
+                <>Im PDF erscheinen die deutschen Texte (mit italienischen Beschriftungen).</>
+              ) : (
+                <>
+                  Folgende Felder werden im PDF aus Deutsch gerendert:{" "}
+                  {translationStatus.untranslated.map((f) => f.label).join(", ")}
+                  .
+                </>
+              )}{" "}
+              Übersetzen kannst du im Produkt-Formular in der Sektion{" "}
+              <Link
+                href={`/produkte/${id}#section-italienisch`}
+                className="font-medium underline underline-offset-2"
+              >
+                🇮🇹 Italienisch
+              </Link>
+              .
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Server Component — Date.now() läuft serverseitig pro Request,
             kein React-Render-Purity-Problem. Cache-Buster verhindert, dass
             das iframe ein altes PDF anzeigt nach Datenblatt-Edits. */}

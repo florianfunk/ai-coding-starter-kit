@@ -51,6 +51,21 @@ export async function updateIcon(id: string, _p: IconFormState, formData: FormDa
   return { error: null };
 }
 
+export async function bulkSetShowAsSymbol(
+  ids: string[],
+  value: boolean,
+): Promise<{ error: string | null; updated: number }> {
+  if (!ids.length) return { error: null, updated: 0 };
+  const supabase = await createClient();
+  const { error, count } = await supabase
+    .from("icons")
+    .update({ show_as_symbol: value }, { count: "exact" })
+    .in("id", ids);
+  if (error) return { error: error.message, updated: 0 };
+  revalidatePath("/icons");
+  return { error: null, updated: count ?? 0 };
+}
+
 export async function deleteIcon(id: string): Promise<{ error: string | null }> {
   const supabase = await createClient();
 

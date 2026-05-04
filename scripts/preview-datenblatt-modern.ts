@@ -44,8 +44,9 @@ async function main() {
   console.log(
     `  quickfacts=${payload.quickfacts.length} ` +
     `spec_groups=${payload.spec_groups.length} (${payload.spec_groups.reduce((n, g) => n + g.rows.length, 0)} rows) ` +
-    `paragraphs=${payload.paragraphs.length} ` +
-    `images=${Object.keys(payload.images_b64).length}`,
+    `paragraphs=${payload.paragraphs.length} (left=${payload.paragraphs_left.length}, right=${payload.paragraphs_right.length}) ` +
+    `images=${Object.keys(payload.images_b64).length} ` +
+    `warnung=${payload.warnung ? "ja" : "nein"}`,
   );
 
   const pdfBuf = await renderModernDatenblattPdf(payload);

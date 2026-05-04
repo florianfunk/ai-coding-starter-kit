@@ -100,6 +100,16 @@
   \par\vspace{5mm}
   \noindent\includegraphics[width=\linewidth,height=32mm,keepaspectratio]{(((figF_filename | e)))}
   ((* endif *))
+
+  % ═════ ANWENDUNG & HINWEISE — linke Spalte, unter Zeichnung ═════
+  ((* if paragraphs_left *))
+  \par\vspace{6mm}\noindent
+  \sectionhead{Anwendung \& Hinweise}{}
+  ((* for para in paragraphs_left *))
+  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
+  \par\vspace{2mm}
+  ((* endfor *))
+  ((* endif *))
 \end{minipage}\hspace{7mm}%
 \begin{minipage}[t]{\dimexpr 0.45\linewidth-3.15mm\relax}
   \vspace{0pt}
@@ -152,19 +162,21 @@
   {\fontsize{6.6pt}{8.4pt}\selectfont\color{ink2}(((warnung | e)))}
   \end{tcolorbox}
   ((* endif *))
-\end{minipage}
 
-% ═════ ANWENDUNG & HINWEISE — eigener Block ueber volle Breite ═════
-% Steht ausserhalb der Hero-Minipages, damit langer Text nicht das ganze
-% 2-Spalten-Layout auf Seite 2 schiebt. Bei sehr langem Text bricht hier
-% sauber auf Seite 2 um.
-((* if paragraphs *))
-\par\vspace{6mm}\noindent
-\sectionhead{Anwendung \& Hinweise}{}
-((* for para in paragraphs *))
-{\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
-\par\vspace{2mm}
-((* endfor *))
-((* endif *))
+  % ═════ ANWENDUNG & HINWEISE — rechte Spalte, unter Tech-Daten/Warnbox ═════
+  % Wird nur befuellt, wenn der Text in der linken Spalte nicht reingepasst
+  % hat. Die Section-Ueberschrift wird in der linken Spalte gesetzt; rechts
+  % laeuft der Text ohne weitere Ueberschrift weiter.
+  ((* if paragraphs_right *))
+  \par\vspace{6mm}
+  ((* if not paragraphs_left *))
+  \sectionhead{Anwendung \& Hinweise}{}
+  ((* endif *))
+  ((* for para in paragraphs_right *))
+  {\fontsize{8.6pt}{12pt}\selectfont\color{ink2}(((para | e)))}
+  \par\vspace{2mm}
+  ((* endfor *))
+  ((* endif *))
+\end{minipage}
 
 \end{document}

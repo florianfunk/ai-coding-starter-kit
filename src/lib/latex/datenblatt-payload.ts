@@ -261,7 +261,26 @@ export async function buildDatenblattPayload(
     return { label: f.label, value: `${valStr}${unit}` };
   }).filter(Boolean) as { label: string; value: string }[];
 
-  const { body: beschreibungBody, warnung } = splitBeschreibung(produkt.datenblatt_text);
+  // achtung_text ist die neue, eigenständige Quelle für den Warnhinweis.
+  // Falls leer, fällt der Generator auf die Heuristik zurück (Altdaten, bei
+  // denen die Migration den Block nicht extrahieren konnte).
+  const explicitAchtung = (() => {
+    const raw = (produkt as any).achtung_text as string | null | undefined;
+    if (!raw) return null;
+    const plain = isHtmlContent(raw) ? htmlToPlainText(raw) : raw;
+    const collapsed = plain.replace(/\s+/g, " ").trim();
+    return collapsed.length ? collapsed : null;
+  })();
+
+  const split = explicitAchtung
+    ? { body: (() => {
+        const raw = produkt.datenblatt_text ?? "";
+        if (!raw) return "";
+        const plain = isHtmlContent(raw) ? htmlToPlainText(raw) : raw;
+        return plain.replace(/\r\n?/g, "\n").trim();
+      })(), warnung: explicitAchtung }
+    : splitBeschreibung(produkt.datenblatt_text);
+  const { body: beschreibungBody, warnung } = split;
 
   return {
     meta: {

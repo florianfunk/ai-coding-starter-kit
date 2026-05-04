@@ -42,6 +42,8 @@ export type ModernDatenblattPayload = {
   icons: string[];
   spec_groups: { title: string; rows: { label: string; value: string }[] }[];
   paragraphs: string[];
+  paragraphs_left: string[];
+  paragraphs_right: string[];
   warnung: string | null;
   logo_filename: string;
   figA_filename: string | null;
@@ -177,6 +179,113 @@ function splitParagraphs(body: string): string[] {
   if (!body) return [];
   const byBlank = body.split(/\n\s*\n+/).map((p) => p.replace(/\n/g, " ").trim()).filter(Boolean);
   return byBlank.length ? byBlank : [body.trim()];
+}
+
+/**
+ * Maximale Zeichenzahl, die in die linke "Anwendung & Hinweise"-Spalte
+ * (unter Hauptbild/Detail/Zeichnung) passt — bevor der Text rechts unter
+ * der Warnbox weiterlaufen muss.
+ *
+ * Empirisch kalibriert anhand des Standard-Modern-Layouts:
+ *   - Schrift 8.6/12pt
+ *   - Spaltenbreite ~76mm
+ *   - Vertikaler Restraum links ≈ 80mm bei vollem Bild-Set + Eyebrow + Title
+ *
+ * Wir verwenden eine harte Grenze, damit der Author im UI vorhersehbar
+ * erkennt, wann der Text in die rechte Spalte überläuft. Der genaue Wert
+ * ist eher Layout-Konvention als physikalisch — bei Anpassung im Template
+ * (Bilder/Zeichnungen-Höhe) hier mitziehen.
+ */
+export const LEFT_COL_CHAR_LIMIT = 1300;
+
+/**
+ * Maximale Zeichenzahl, die in die rechte Spalte (unter Tech-Daten und
+ * Warnbox) noch passt, ohne den Footer zu überschreiten. Eher knapp
+ * gehalten — alles was darüber hinausgeht, wird abgeschnitten und nicht
+ * gerendert (Author bekommt Warnung im UI).
+ */
+export const RIGHT_COL_CHAR_LIMIT = 600;
+
+/**
+ * Verteilt Absatzliste auf zwei Spalten (links/rechts) anhand der harten
+ * Zeichengrenzen oben. Erst links füllen, dann rechts. Splittet, wenn nötig,
+ * einen Absatz wortweise — der Schnitt liegt am letzten Wort, das die Grenze
+ * nicht reißt.
+ */
+function splitParagraphsTwoColumn(
+  paragraphs: string[],
+): { left: string[]; right: string[]; truncated: boolean } {
+  const left: string[] = [];
+  const right: string[] = [];
+  const queue = [...paragraphs];
+  let leftLen = 0;
+  let truncated = false;
+
+  function totalLen(parts: string[]): number {
+    return parts.reduce((acc, p) => acc + p.length, 0) + Math.max(0, parts.length - 1) * 2;
+  }
+
+  // Splitter: gibt [head, tail] zurück, head ≤ maxChars an Wortgrenze.
+  function splitAt(text: string, maxChars: number): [string, string] {
+    if (text.length <= maxChars) return [text, ""];
+    const words = text.split(/\s+/);
+    let acc = "";
+    for (let i = 0; i < words.length; i++) {
+      const next = acc ? `${acc} ${words[i]}` : words[i];
+      if (next.length > maxChars) {
+        return [acc, words.slice(i).join(" ")];
+      }
+      acc = next;
+    }
+    return [text, ""];
+  }
+
+  while (queue.length) {
+    const p = queue.shift()!;
+    const gap = left.length ? 2 : 0; // 2 Zeichen für Absatz-Gap
+    const remaining = LEFT_COL_CHAR_LIMIT - leftLen - gap;
+    if (p.length <= remaining) {
+      left.push(p);
+      leftLen += p.length + gap;
+    } else if (remaining > 40) {
+      const [head, tail] = splitAt(p, remaining);
+      if (head) {
+        left.push(head);
+        leftLen += head.length + gap;
+      }
+      if (tail) queue.unshift(tail);
+      break;
+    } else {
+      queue.unshift(p);
+      break;
+    }
+  }
+
+  let rightLen = 0;
+  while (queue.length) {
+    const p = queue.shift()!;
+    const gap = right.length ? 2 : 0;
+    const remaining = RIGHT_COL_CHAR_LIMIT - rightLen - gap;
+    if (p.length <= remaining) {
+      right.push(p);
+      rightLen += p.length + gap;
+    } else if (remaining > 40) {
+      const [head, tail] = splitAt(p, remaining);
+      if (head) {
+        right.push(head);
+        rightLen += head.length + gap;
+      }
+      // Rest geht verloren — Author muss kürzen.
+      truncated = !!tail;
+      break;
+    } else {
+      truncated = true;
+      break;
+    }
+  }
+
+  void totalLen;
+  return { left, right, truncated };
 }
 
 /** Format helper for DB values with units (skip empty). */
@@ -481,12 +590,24 @@ export async function buildModernDatenblattPayload(
   // Logo: statisches Brand-Asset aus dem Worker (kein Supabase-Download).
   const logo_filename = cfg.logoFilename;
 
-  const { body, warnung } = splitBeschreibung(produkt.datenblatt_text);
-  const allParagraphs = splitParagraphs(body);
-  // Lead = produkt.info_kurz (Marketing-Headline) ODER der erste Absatz wenn info_kurz fehlt.
-  // Body = die uebrigen Absaetze.
-  const lead = (produkt.info_kurz?.trim()) || allParagraphs[0] || "";
-  const paragraphs = produkt.info_kurz?.trim() ? allParagraphs : allParagraphs.slice(1);
+  // Den vollen "Text Block" (datenblatt_text) als Beschreibung anzeigen —
+  // ohne ACHTUNG-Split, ohne Lead-Konsum. Der Inhalt wird 1:1 in Absaetze
+  // gesplittet und unter "Anwendung & Hinweise" gerendert.
+  const rawText = produkt.datenblatt_text ?? "";
+  const plainText = rawText
+    ? (isHtmlContent(rawText) ? htmlToPlainText(rawText) : rawText).replace(/\r\n?/g, "\n").trim()
+    : "";
+  const paragraphs = splitParagraphs(plainText);
+  const lead = (produkt.info_kurz?.trim()) || "";
+
+  // ACHTUNG-Block: eigenständige Spalte. Leere Werte → keine Warnbox im PDF.
+  const rawAchtung = (produkt as any).achtung_text as string | null | undefined;
+  const warnung: string | null = (() => {
+    if (!rawAchtung) return null;
+    const plain = isHtmlContent(rawAchtung) ? htmlToPlainText(rawAchtung) : rawAchtung;
+    const collapsed = plain.replace(/\s+/g, " ").trim();
+    return collapsed.length ? collapsed : null;
+  })();
 
   // Title-Bauplan (HTML-Vorlage): kurz, technisch, nicht der ganze
   // Marketing-Untertitel. Wir bauen aus DB-Feldern:
@@ -507,6 +628,17 @@ export async function buildModernDatenblattPayload(
   const titleAccent = produkt.farbtemperatur_k
     ? `${produkt.farbtemperatur_k} K${produkt.lichtfarbe_label ? " " + produkt.lichtfarbe_label : ""}`
     : "";
+
+  // Zwei-Spalten-Split: linke Spalte (unter Zeichnung) zuerst auffüllen,
+  // Rest läuft rechts unter der Warnbox weiter. Harte Zeichengrenze, damit
+  // der Author im UI vorhersehbar weiß, wann ein Spaltenwechsel passiert.
+  const quickfactsResolved = await loadQuickfactIcons(
+    supabase,
+    buildQuickfacts(produkt, (produktIcons ?? []) as any),
+    images,
+  );
+  const specGroups = buildSpecGroups(produkt);
+  const { left: paragraphsLeft, right: paragraphsRight } = splitParagraphsTwoColumn(paragraphs);
 
   const payload: ModernDatenblattPayload = {
     meta: {
@@ -538,14 +670,12 @@ export async function buildModernDatenblattPayload(
         : produkt.verpackungseinheit || "",
       lead,
     },
-    quickfacts: await loadQuickfactIcons(
-      supabase,
-      buildQuickfacts(produkt, (produktIcons ?? []) as any),
-      images,
-    ),
+    quickfacts: quickfactsResolved,
     icons: [],
-    spec_groups: buildSpecGroups(produkt),
+    spec_groups: specGroups,
     paragraphs,
+    paragraphs_left: paragraphsLeft,
+    paragraphs_right: paragraphsRight,
     warnung,
     logo_filename,
     figA_filename,

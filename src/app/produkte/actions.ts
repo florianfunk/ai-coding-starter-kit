@@ -20,6 +20,7 @@ const baseSchema = z.object({
   hauptbild_path: z.string().optional().nullable(),
   datenblatt_titel: z.string().max(300).optional().nullable(),
   datenblatt_text: z.string().max(20000).optional().nullable(),
+  achtung_text: z.string().max(5000).optional().nullable(),
   // PROJ-36: Datenblatt-Felder
   info_kurz: z.string().max(500).optional().nullable(),
   marken: z.array(z.enum(MARKE_VALUES)).min(1, "Mindestens eine Marke wählen"),
@@ -74,6 +75,7 @@ function parseBase(formData: FormData) {
     hauptbild_path: (formData.get("hauptbild_path") as string) || null,
     datenblatt_titel: formData.get("datenblatt_titel") || null,
     datenblatt_text: sanitizeRichTextHtml(formData.get("datenblatt_text") as string | null) || null,
+    achtung_text: sanitizeRichTextHtml(formData.get("achtung_text") as string | null) || null,
     info_kurz: formData.get("info_kurz") || null,
     marken,
     bild_detail_1_path: (formData.get("bild_detail_1_path") as string) || null,

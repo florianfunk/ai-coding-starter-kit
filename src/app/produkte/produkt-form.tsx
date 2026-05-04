@@ -16,6 +16,7 @@ import { IconPicker } from "@/components/icon-picker";
 import { FieldInfo } from "@/components/field-info";
 import { RichTextEditor } from "@/components/rich-text-editor";
 import { AITeaserButton } from "@/components/ai-teaser-button";
+import { AiShortenButton } from "@/components/ai-shorten-button";
 import { AiNamenButton, type AiNamenContext } from "@/components/ai-namen-button";
 import { OptionsCombo } from "@/components/options-combo";
 import { htmlToPlainText, isHtmlContent } from "@/lib/rich-text/sanitize";
@@ -47,6 +48,12 @@ const FIELD_TOOLTIPS: Record<string, string> = {
 };
 
 const initial: ProduktFormState = { error: null };
+
+// Zeichengrenzen fuer den zweispaltigen Anwendungstext im Datenblatt-PDF.
+// Muessen mit den Konstanten in src/lib/latex/datenblatt-modern-payload.ts
+// (LEFT_COL_CHAR_LIMIT, RIGHT_COL_CHAR_LIMIT) synchron bleiben.
+const LEFT_COL_LIMIT = 1300;
+const RIGHT_COL_LIMIT = 600;
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
 
@@ -169,9 +176,25 @@ export function ProduktForm({
   const datenblattEditorRef = useRef<Editor | null>(null);
   const datenblattInitial = (defaultValues.datenblatt_text ?? "") as string;
   const datenblattContextRef = useRef<string>(datenblattInitial);
+  const initialDatenblattPlainLen = (() => {
+    if (!datenblattInitial) return 0;
+    const plain = isHtmlContent(datenblattInitial)
+      ? htmlToPlainText(datenblattInitial)
+      : datenblattInitial;
+    return plain.trim().length;
+  })();
+  const [datenblattPlainLen, setDatenblattPlainLen] = useState<number>(initialDatenblattPlainLen);
 
   const handleDatenblattReady = useCallback((editor: Editor) => {
     datenblattEditorRef.current = editor;
+    // Initial-Länge aus dem Editor, falls Markup leicht abweicht
+    setDatenblattPlainLen(editor.getText().trim().length);
+  }, []);
+
+  const handleDatenblattChange = useCallback(() => {
+    const ed = datenblattEditorRef.current;
+    if (!ed) return;
+    setDatenblattPlainLen(ed.getText().trim().length);
   }, []);
 
   function handleProduktTeaserAccept(text: string) {
@@ -181,6 +204,28 @@ export function ProduktForm({
     markDirty("datenblatt");
     toast.success("Teaser übernommen");
   }
+
+  function handleProduktShortenAccept(text: string) {
+    // Mehrzeiliger Text: Absätze an Leerzeilen splitten, jeden Absatz in <p>.
+    const paragraphs = text
+      .split(/\n\s*\n+/)
+      .map((p) => p.replace(/\n/g, " ").trim())
+      .filter(Boolean);
+    const html =
+      paragraphs.length > 0
+        ? paragraphs.map((p) => `<p>${escapeProduktHtml(p)}</p>`).join("")
+        : `<p>${escapeProduktHtml(text)}</p>`;
+    datenblattEditorRef.current?.commands.setContent(html, { emitUpdate: true });
+    datenblattContextRef.current = text;
+    markDirty("datenblatt");
+    toast.success("Gekürzter Text übernommen");
+  }
+
+  const getDatenblattPlainText = useCallback(() => {
+    const ed = datenblattEditorRef.current;
+    if (!ed) return "";
+    return ed.getText().trim();
+  }, []);
   const [iconIds, setIconIds] = useState<string[]>(() => {
     const seen = new Set<string>();
     return defaultIconIds.filter((id) => (seen.has(id) ? false : (seen.add(id), true)));
@@ -566,18 +611,44 @@ export function ProduktForm({
               <div className="space-y-2 w-full">
                 <div className="flex items-center justify-between gap-2">
                   <Label htmlFor="datenblatt_text">Text Block</Label>
-                  <AITeaserButton
-                    entityType="produkt"
-                    entityName={name || artikelnummer}
-                    entityContext={getDatenblattTeaserContext}
-                    onAccept={handleProduktTeaserAccept}
-                  />
+                  <div className="flex items-center gap-2">
+                    <AiShortenButton
+                      currentLength={datenblattPlainLen}
+                      enableAt={LEFT_COL_LIMIT}
+                      targetMaxChars={LEFT_COL_LIMIT - 50}
+                      getCurrentText={getDatenblattPlainText}
+                      productName={name || artikelnummer}
+                      onAccept={handleProduktShortenAccept}
+                    />
+                    <AITeaserButton
+                      entityType="produkt"
+                      entityName={name || artikelnummer}
+                      entityContext={getDatenblattTeaserContext}
+                      onAccept={handleProduktTeaserAccept}
+                    />
+                  </div>
                 </div>
                 <RichTextEditor
                   name="datenblatt_text"
                   defaultValue={defaultValues.datenblatt_text ?? ""}
                   onEditorReady={handleDatenblattReady}
+                  onChange={handleDatenblattChange}
                   minHeight={320}
+                />
+                <DatenblattCharCounter length={datenblattPlainLen} />
+              </div>
+              <div className="space-y-2 w-full">
+                <Label htmlFor="achtung_text">
+                  Sicherheitshinweis
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    (erscheint im Datenblatt als Warnbox „ACHTUNG“)
+                  </span>
+                </Label>
+                <RichTextEditor
+                  name="achtung_text"
+                  defaultValue={defaultValues.achtung_text ?? ""}
+                  placeholder="z. B. UNSACHGEMÄSSE UND LAIENHAFTE VORGEHENSWEISE … INSTALLATION DER LED-LICHTLINIE DARF NUR DURCH EINE QUALIFIZIERTE ELEKTROFACHKRAFT ERFOLGEN."
+                  minHeight={140}
                 />
               </div>
             </div>
@@ -864,6 +935,45 @@ export function ProduktForm({
  * ist — dann ist nichts zu markieren. Ist die Markierung aktiv, bleibt der
  * Button immer sichtbar, damit man sie auch wieder entfernen kann.
  */
+/**
+ * Live-Zeichenzaehler unter dem "Text Block"-Editor.
+ *
+ * Der Text wird im Datenblatt-PDF zweispaltig gerendert: links unter der
+ * Zeichnung, bei Ueberlauf rechts unter den Tech-Daten und der Warnbox. Wir
+ * zeigen, wieviele Zeichen noch in die linke Spalte passen, und warnen, wenn
+ * der harte Maximalwert (links + rechts) erreicht ist.
+ *
+ * Die Grenzen kommen aus datenblatt-modern-payload.ts und muessen mit dem
+ * dortigen Splitter synchron bleiben (siehe LEFT_COL_LIMIT/RIGHT_COL_LIMIT
+ * Modul-Konstanten oben in dieser Datei).
+ */
+
+function DatenblattCharCounter({ length }: { length: number }) {
+  const total = LEFT_COL_LIMIT + RIGHT_COL_LIMIT;
+  let label: string;
+  let tone: "muted" | "warn" | "error";
+  if (length <= LEFT_COL_LIMIT) {
+    const remaining = LEFT_COL_LIMIT - length;
+    label = `${length} Zeichen · noch ${remaining} bis zum Spaltenwechsel (links → rechts)`;
+    tone = "muted";
+  } else if (length <= total) {
+    const overflow = length - LEFT_COL_LIMIT;
+    label = `${length} Zeichen · Spalte wechselt — ${overflow} Zeichen laufen rechts unter der Warnbox weiter`;
+    tone = "warn";
+  } else {
+    const cut = length - total;
+    label = `${length} Zeichen · ${cut} Zeichen passen nicht mehr ins PDF und werden abgeschnitten`;
+    tone = "error";
+  }
+  const colorClass =
+    tone === "error"
+      ? "text-destructive"
+      : tone === "warn"
+      ? "text-amber-600 dark:text-amber-500"
+      : "text-muted-foreground";
+  return <p className={`text-xs ${colorClass}`}>{label}</p>;
+}
+
 function SectionCompleteToggle({
   active,
   onToggle,

@@ -216,32 +216,27 @@
 }
 
 % ─── Quickfact-Cell ─────────────────────────────────────────────────────────
-% Eine Grid-Zelle: entweder
-%  (a) wenn #4 (Icon-Image-Dateiname) gesetzt ist → nur das Bild zentriert,
-%      kein Label und kein Text — die volle Kachelflaeche zeigt das Symbol.
-%  (b) sonst kleines Mono-Label oben + grosser Display-Wert + kleine Unit.
+% Beide Varianten haben dieselbe Geometrie: feste 14mm Hoehe, oben ein
+% Mono-Label (LetterSpaced, muted), darunter entweder Wert+Unit (Text-
+% Variante) oder ein zentriertes Symbol-Bild (Icon-Variante).
 \newcommand{\quickfact}[4]{%
   % #1 = Label, #2 = Wert, #3 = Unit, #4 = Icon-Image-Filename (optional)
-  \ifthenelse{\equal{#4}{}}{%
-    % Text-Variante: oben verankert
-    \parbox[t][14mm][t]{\linewidth}{%
-      \raggedright
-      {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par
+  \parbox[t][14mm][t]{\linewidth}{%
+    \raggedright
+    {\monofont\fontsize{7pt}{8pt}\selectfont\addfontfeature{LetterSpace=14}\color{muted}\MakeUppercase{#1}}\par
+    \ifthenelse{\equal{#4}{}}{%
       \vspace{1.6mm}%
       {\displayfont\bfseries\fontsize{15pt}{16pt}\selectfont\color{ink}#2}%
       \ifthenelse{\equal{#3}{}}{}{%
         \,{\fontsize{8pt}{10pt}\selectfont\color{muted}#3}%
       }%
-    }%
-  }{%
-    % Icon-Variante: vertikal UND horizontal zentriert via TikZ-Node, der
-    % die gesamte 14mm-Kachelhoehe und die volle Spaltenbreite ausfuellt.
-    % parbox[t] mit innerem TikZ haelt Tabellenzellen-Geometrie sauber.
-    \parbox[t][14mm][t]{\linewidth}{%
+    }{%
+      % Bild-Bereich unter dem Label: ca. 9.5mm hoch, horizontal zentriert.
+      \par\vspace{0.6mm}%
       \begin{tikzpicture}[inner sep=0pt, outer sep=0pt]
-        \path (0,0) rectangle (\linewidth,14mm);
-        \node[anchor=center] at (0.5\linewidth,7mm)
-          {\includegraphics[height=11mm,width=\linewidth,keepaspectratio]{#4}};
+        \path (0,0) rectangle (\linewidth,9.5mm);
+        \node[anchor=center] at (0.5\linewidth,4.75mm)
+          {\includegraphics[height=9mm,width=\linewidth,keepaspectratio]{#4}};
       \end{tikzpicture}%
     }%
   }%

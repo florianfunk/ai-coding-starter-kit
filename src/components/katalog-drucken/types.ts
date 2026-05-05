@@ -17,6 +17,14 @@ export type WizardResult = WizardParameter & {
   produktIds: string[] | null;
 };
 
+export type KundeContext = {
+  id: string;
+  kunden_nr: string;
+  firma: string;
+  defaults: WizardParameter;
+  whitelistProduktIds: string[] | null;
+};
+
 export type ProduktKnoten = {
   id: string;
   artikelnummer: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Printer } from "lucide-react";
@@ -21,23 +21,51 @@ import { SchrittInhalt } from "./schritt-inhalt";
 import { useWizardDefaults } from "./use-wizard-defaults";
 import { useTreeSelection } from "./use-tree-selection";
 import { startKatalogWizardJob } from "./actions";
-import type { TreeData } from "./types";
+import type { TreeData, KundeContext } from "./types";
 
 type Props = {
   tree: TreeData;
   wechselkurs: number;
   triggerLabel?: string;
+  kunde?: KundeContext;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 };
 
-export function KatalogDruckenDialog({ tree, wechselkurs, triggerLabel = "Katalog drucken" }: Props) {
+export function KatalogDruckenDialog({
+  tree,
+  wechselkurs,
+  triggerLabel = "Katalog drucken",
+  kunde,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+  hideTrigger = false,
+}: Props) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = onOpenChangeProp ?? setInternalOpen;
+
   const [tab, setTab] = useState<"parameter" | "inhalt">("parameter");
   const [search, setSearch] = useState("");
   const [pending, startTransition] = useTransition();
 
   const { parameter, setParameter } = useWizardDefaults();
   const selection = useTreeSelection(tree);
+
+  // Beim Öffnen mit Kunde: Defaults aus Kunden-Daten setzen + Whitelist anwenden
+  useEffect(() => {
+    if (!open || !kunde) return;
+    setParameter(kunde.defaults);
+    if (kunde.whitelistProduktIds === null) {
+      selection.selectAll();
+    } else {
+      selection.setSelection(kunde.whitelistProduktIds);
+    }
+    // bewusst nur beim Öffnen einmalig — Nutzer-Änderungen sollen erhalten bleiben
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, kunde?.id]);
 
   const noneSelected = selection.counts.selected === 0;
 
@@ -51,6 +79,7 @@ export function KatalogDruckenDialog({ tree, wechselkurs, triggerLabel = "Katalo
       const result = await startKatalogWizardJob({
         ...parameter,
         produktIds: selection.toJobValue(),
+        kundeId: kunde?.id ?? null,
       });
       if (result.error || !result.jobId) {
         toast.error(result.error ?? "Job konnte nicht gestartet werden");
@@ -58,7 +87,7 @@ export function KatalogDruckenDialog({ tree, wechselkurs, triggerLabel = "Katalo
       }
       toast.success("Katalog wird generiert…");
       setOpen(false);
-      router.push(`/export/katalog`);
+      router.push(kunde ? `/kunden/${kunde.id}/druckhistorie` : `/export/katalog`);
       router.refresh();
       // Render-Task fire-and-forget
       fetch(`/api/katalog-jobs/${result.jobId}/run`, { method: "POST" }).catch(() => {
@@ -69,8 +98,6 @@ export function KatalogDruckenDialog({ tree, wechselkurs, triggerLabel = "Katalo
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
-    // Beim Schließen Tab + Suche zurücksetzen, damit das nächste Öffnen
-    // wieder mit Schritt 1 startet (LOW-1 Fix).
     if (!next) {
       setTab("parameter");
       setSearch("");
@@ -79,16 +106,27 @@ export function KatalogDruckenDialog({ tree, wechselkurs, triggerLabel = "Katalo
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Printer className="h-3.5 w-3.5" /> {triggerLabel}
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button size="sm">
+            <Printer className="h-3.5 w-3.5" /> {triggerLabel}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Katalog drucken</DialogTitle>
+          <DialogTitle>
+            Katalog drucken
+            {kunde && (
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                · für {kunde.firma} ({kunde.kunden_nr})
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>
-            Parameter wählen, Inhalt eingrenzen, PDF erstellen.
+            {kunde
+              ? "Parameter und Auswahl sind aus dem Kunden-Profil vorbefüllt — Anpassungen wirken nur auf diesen Druck."
+              : "Parameter wählen, Inhalt eingrenzen, PDF erstellen."}
           </DialogDescription>
         </DialogHeader>
 

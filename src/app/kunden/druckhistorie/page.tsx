@@ -1,25 +1,33 @@
 import { AppShell } from "@/components/app-shell";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { History } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { DruckhistorieTable } from "../druckhistorie-table";
 
-export default function KundenDruckhistoriePage() {
+export default async function GlobaleKundenDruckhistorie() {
+  const supabase = await createClient();
+  const { data: jobs } = await supabase
+    .from("katalog_jobs")
+    .select(
+      "id, status, typ, kunde_id, produkt_id, parameter, pdf_path, error_text, created_at, kunden(id, firma, kunden_nr)",
+    )
+    .not("kunde_id", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
   return (
     <AppShell>
       <PageHeader
         title="Druckhistorie (Kunden)"
-        subtitle="Alle für Kunden generierten Kataloge und Datenblätter"
-        breadcrumbs={[{ label: "Kunden", href: "/kunden" }, { label: "Druckhistorie" }]}
+        subtitle="Alle Kataloge und Datenblätter, die für Kunden generiert wurden."
+        breadcrumbs={[
+          { label: "Kunden", href: "/kunden" },
+          { label: "Druckhistorie" },
+        ]}
       />
       <Card>
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-          <History className="h-10 w-10 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Kommt mit PROJ-47</h2>
-          <p className="max-w-md text-sm text-muted-foreground">
-            Sobald die Kundendatenbank live ist, erscheint hier die kundenspezifische Druckhistorie.
-            Die globale Druckhistorie aller Jobs ist weiterhin unter Lösungen → Druckhistorie (alle)
-            erreichbar.
-          </p>
+        <CardContent className="py-4">
+          <DruckhistorieTable jobs={(jobs ?? []) as never} showKunde />
         </CardContent>
       </Card>
     </AppShell>

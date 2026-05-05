@@ -12,6 +12,7 @@ const wizardSchema = z.object({
   waehrung: z.enum(["EUR", "CHF"]),
   sprache: z.literal("de"),
   produktIds: z.array(z.string().uuid()).nullable(),
+  kundeId: z.string().uuid().nullable().optional(),
 });
 
 export type StartWizardJobInput = z.infer<typeof wizardSchema>;
@@ -41,18 +42,25 @@ export async function startKatalogWizardJob(
     return { error: "Wechselkurs in Einstellungen fehlt — bitte zuerst pflegen." };
   }
 
+  const { kundeId, ...parameterFields } = parsed.data;
   const parameter = {
-    ...parsed.data,
+    ...parameterFields,
     wechselkurs,
   };
 
   const { data: job, error } = await supabase
     .from("katalog_jobs")
-    .insert({ status: "queued", parameter: parameter as any })
+    .insert({
+      status: "queued",
+      parameter: parameter as never,
+      typ: "katalog",
+      kunde_id: kundeId ?? null,
+    })
     .select("id")
     .single();
   if (error || !job) return { error: error?.message ?? "Job-Anlage fehlgeschlagen" };
 
   revalidatePath("/export/katalog");
+  if (kundeId) revalidatePath(`/kunden/${kundeId}/druckhistorie`);
   return { jobId: job.id, error: null };
 }

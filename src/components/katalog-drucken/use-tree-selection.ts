@@ -64,6 +64,10 @@ export function useTreeSelection(tree: TreeData) {
 
   const selectAll = useCallback(() => setSelected(new Set(allIds)), [allIds]);
   const selectNone = useCallback(() => setSelected(new Set()), []);
+  const setSelection = useCallback(
+    (ids: string[]) => setSelected(new Set(ids.filter((id) => allIds.includes(id)))),
+    [allIds],
+  );
   const invert = useCallback(() => {
     setSelected((prev) => {
       const next = new Set<string>();
@@ -141,6 +145,7 @@ export function useTreeSelection(tree: TreeData) {
     toggleBereich,
     selectAll,
     selectNone,
+    setSelection,
     invert,
     bereichState,
     kategorieState,

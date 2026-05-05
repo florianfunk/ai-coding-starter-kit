@@ -60,7 +60,7 @@
 | PROJ-44 | KI-Vorschläge für Bezeichnung & Datenblatt-Titel | Deployed | [PROJ-44](PROJ-44-ki-bezeichnung-titel.md) | 2026-05-03 |
 | PROJ-45 | Bulk-KI-Vorschläge für Bezeichnung & Titel | Deployed | [PROJ-45](PROJ-45-bulk-ki-bezeichnung-titel.md) | 2026-05-03 |
 | PROJ-46 | Italienische Übersetzung für Datenblätter | Deployed | [PROJ-46](PROJ-46-italienische-uebersetzung-datenblatt.md) | 2026-05-04 |
-| PROJ-47 | Kundendatenbank mit individuellen Auswahlen & Preisen | Planned | [PROJ-47](PROJ-47-kundendatenbank.md) | 2026-05-04 |
+| PROJ-47 | Kundendatenbank mit individuellen Auswahlen & Preisen | Approved | [PROJ-47](PROJ-47-kundendatenbank.md) | 2026-05-04 |
 | PROJ-48 | Workspace-Navigation (Topnav + kontextsensitive Sidebar) | Deployed | [PROJ-48](PROJ-48-workspace-navigation.md) | 2026-05-04 |
 
 <!-- Add features above this line -->

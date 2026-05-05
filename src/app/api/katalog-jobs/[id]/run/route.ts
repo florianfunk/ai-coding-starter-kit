@@ -47,6 +47,22 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
   log("status → running (claimed)");
 
+  // Datenblatt-Jobs (PROJ-47): werden im Frontend-Step von PROJ-47 implementiert.
+  // Bis dahin Job sauber als Fehler abschließen, damit die Druckhistorie nicht
+  // dauerhaft "running" zeigt.
+  if (job.typ === "datenblatt") {
+    await admin
+      .from("katalog_jobs")
+      .update({
+        status: "error",
+        progress: 0,
+        error_text: "Datenblatt-Render noch nicht implementiert (PROJ-47 Frontend-Step folgt)",
+      })
+      .eq("id", jobId);
+    log("typ=datenblatt — not yet implemented");
+    return NextResponse.json({ ok: false, message: "datenblatt rendering pending" });
+  }
+
   const p = normalizeParams(job.parameter, log);
 
   try {

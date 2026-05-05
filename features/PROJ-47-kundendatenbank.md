@@ -1,6 +1,6 @@
 # PROJ-47: Kundendatenbank mit individuellen Auswahlen & Preisen
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-04
 **Last Updated:** 2026-05-05
 
@@ -881,5 +881,41 @@ src/components/katalog-drucken/use-tree-selection.ts          (setSelection-Meth
 
 Beide Low-Bugs blockieren das Deployment nicht — Datenkonsistenz ist nicht gefährdet, UX-Beschränkung ist akzeptabel.
 
-## Deployment
-_To be added by /deploy_
+## Deployment (2026-05-05)
+
+| | |
+|---|---|
+| **Production-URL** | https://lichtengross.vercel.app |
+| **Production-Alias** | https://lichtengross-soulschoki-5679s-projects.vercel.app |
+| **Branch-Alias** | https://lichtengross-git-main-soulschoki-5679s-projects.vercel.app |
+| **Deployment-ID** | `dpl_5Ppnv8GEKE3DaQr6Ky25pSPnV4AU` |
+| **Commit** | `3af8fa3` (`feat(PROJ-47): Kundendatenbank mit individuellen Auswahlen & Preisen`) |
+| **Build-Dauer** | ~1 Minute |
+| **Region** | iad1 (Vercel Default) |
+| **Bundler** | Webpack |
+| **Runtime** | Node.js (Lambda Functions) |
+
+### Deploy-Verifikation
+- ✅ Vercel-Status: **Ready**
+- ✅ HTTP 307 (Auth-Redirect) auf `/kunden`, `/kunden/branchen`, `/kunden/sonderpreise` — erwartetes Verhalten bei aktiver Auth-Middleware
+- ✅ Alle 8 neuen Kunden-Routes kompiliert (`/kunden`, `/kunden/neu`, `/kunden/[id]/{stammdaten,auswahl,preise,druckhistorie}`, plus `/kunden/druckhistorie`, `/kunden/branchen`, `/kunden/sonderpreise`)
+- ✅ DB-Migrations bereits am 2026-05-05 in Production eingespielt — keine zusätzliche Migration beim Deploy nötig
+
+### Deploy-Methode
+Auto-Deploy via `git push origin main` → Vercel-GitHub-Integration. DB-Migrations (`0031_kunden`, `0032_katalog_jobs_kunde_typ`) wurden vorab via Supabase MCP applied — keine Migration zur Deploy-Zeit.
+
+### Rollback-Option
+Falls Probleme auftreten: Im Vercel-Dashboard das vorherige Deployment `dpl_72diywpcu...` (PROJ-46-Fixes, `befd4a1`) als „Promote to Production" auswählen. Es ist als Ready-Status markiert.
+
+**Achtung:** Rollback der App reicht nicht — die DB-Schema-Änderungen aus 0031/0032 bleiben bestehen. Das ist okay: bestehende Features ignorieren `kunde_id`/`typ`/`produkt_id` einfach (alle nullable), die neuen Tabellen werden nicht referenziert.
+
+### Bewusst nicht enthalten in PROJ-47-Deploy
+- **Datenblatt-Druck mit Kundenpreis** — Quick-Button im Kunden-Header ist disabled mit Tooltip-Hinweis. Folge-Schritt mit Job-Runner-Branch für `typ='datenblatt'` und LaTeX-Template-Anpassung "Sonderkonditionen für: Firma X".
+- **LOW-2 Branchen-Sync-Rollback** — braucht Postgres-Transaction via Supabase RPC.
+- **LOW-3 Multi-Select Branchen-Filter** — UI-Refactor mit Combobox.
+
+### Offene QA-Punkte (post-deploy)
+Vor dem ersten produktiven Einsatz mit echten Daten:
+1. **Browser-Smoke-Test mit Login:** auf https://lichtengross.vercel.app einloggen, Workspace "Kunden" anklicken, ersten Kunden anlegen, Auswahl machen, Preise setzen, Katalog drucken → Druckhistorie checken
+2. **Mobile-Layout-Check:** Tabs-Nav + Kundenliste-Tabelle bei <768 px (LOW-Beobachtung in QA)
+3. **E2E-Tests aktivieren:** Test-User in Supabase anlegen, `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` in `.env.local` ergänzen, dann `npx playwright test PROJ-47` ausführen — die 13 Specs sind bereits geschrieben.

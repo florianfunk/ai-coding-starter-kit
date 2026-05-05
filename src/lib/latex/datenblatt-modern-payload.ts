@@ -17,6 +17,11 @@ import {
   STATIC_LABELS,
   formatDateForLang,
   localizedField,
+  tLabel,
+  QUICKFACT_LABELS,
+  SPEC_GROUP_LABELS,
+  SPEC_ROW_LABELS,
+  BOOL_VALUES,
   type DatenblattLang,
 } from "./i18n";
 
@@ -353,18 +358,22 @@ function cctToPastelHex(cctRaw: string | number | null | undefined): string | nu
 }
 
 /** Auffuell-Quickfacts aus Stammdaten — Reihenfolge nach Wichtigkeit. */
-function fallbackQuickfactsFromStammdaten(produkt: any): ModernDatenblattPayload["quickfacts"] {
+function fallbackQuickfactsFromStammdaten(
+  produkt: any,
+  lang: DatenblattLang = "de",
+): ModernDatenblattPayload["quickfacts"] {
+  const t = (de: string) => tLabel(QUICKFACT_LABELS, de, lang);
   const out: ModernDatenblattPayload["quickfacts"] = [];
-  if (produkt.leistung_w) out.push({ label: "Leistung", value: fmtValue(produkt.leistung_w), unit: "W/m" });
-  if (produkt.lichtstrom_lm) out.push({ label: "Lichtstrom", value: fmtValue(produkt.lichtstrom_lm), unit: "lm/m" });
-  if (produkt.farbtemperatur_k) out.push({ label: "CCT", value: fmtValue(produkt.farbtemperatur_k), unit: "K", bg_hex: cctToPastelHex(produkt.farbtemperatur_k) });
-  if (produkt.farbwiedergabeindex_cri) out.push({ label: "CRI", value: `Ra ${produkt.farbwiedergabeindex_cri}`, unit: "" });
-  if (produkt.nennspannung_v) out.push({ label: "Spannung", value: fmtValue(produkt.nennspannung_v), unit: `V ${produkt.spannungsart || ""}`.trim() });
-  if (produkt.ip_schutzart || produkt.schutzart_ip) out.push({ label: "IP", value: produkt.ip_schutzart || produkt.schutzart_ip, unit: "" });
-  if (produkt.gesamteffizienz_lm_w) out.push({ label: "Effizienz", value: fmtValue(produkt.gesamteffizienz_lm_w), unit: "lm/W" });
-  if (produkt.abstrahlwinkel_grad) out.push({ label: "Abstrahlwinkel", value: String(produkt.abstrahlwinkel_grad), unit: "°" });
-  if (produkt.lebensdauer_h) out.push({ label: "Lebensdauer", value: fmtValue(produkt.lebensdauer_h), unit: "h" });
-  if (produkt.energieeffizienzklasse) out.push({ label: "EEK", value: produkt.energieeffizienzklasse, unit: "" });
+  if (produkt.leistung_w) out.push({ label: t("Leistung"), value: fmtValue(produkt.leistung_w), unit: "W/m" });
+  if (produkt.lichtstrom_lm) out.push({ label: t("Lichtstrom"), value: fmtValue(produkt.lichtstrom_lm), unit: "lm/m" });
+  if (produkt.farbtemperatur_k) out.push({ label: t("CCT"), value: fmtValue(produkt.farbtemperatur_k), unit: "K", bg_hex: cctToPastelHex(produkt.farbtemperatur_k) });
+  if (produkt.farbwiedergabeindex_cri) out.push({ label: t("CRI"), value: `Ra ${produkt.farbwiedergabeindex_cri}`, unit: "" });
+  if (produkt.nennspannung_v) out.push({ label: t("Spannung"), value: fmtValue(produkt.nennspannung_v), unit: `V ${produkt.spannungsart || ""}`.trim() });
+  if (produkt.ip_schutzart || produkt.schutzart_ip) out.push({ label: t("IP"), value: produkt.ip_schutzart || produkt.schutzart_ip, unit: "" });
+  if (produkt.gesamteffizienz_lm_w) out.push({ label: t("Effizienz"), value: fmtValue(produkt.gesamteffizienz_lm_w), unit: "lm/W" });
+  if (produkt.abstrahlwinkel_grad) out.push({ label: t("Abstrahlwinkel"), value: String(produkt.abstrahlwinkel_grad), unit: "°" });
+  if (produkt.lebensdauer_h) out.push({ label: t("Lebensdauer"), value: fmtValue(produkt.lebensdauer_h), unit: "h" });
+  if (produkt.energieeffizienzklasse) out.push({ label: t("EEK"), value: produkt.energieeffizienzklasse, unit: "" });
   return out;
 }
 
@@ -378,7 +387,9 @@ function fallbackQuickfactsFromStammdaten(produkt: any): ModernDatenblattPayload
 function buildQuickfacts(
   produkt: any,
   produktIcons: Array<{ wert: string | null; icons: { label: string; symbol_path: string | null; show_as_symbol: boolean | null } | null }>,
+  lang: DatenblattLang = "de",
 ): ModernDatenblattPayload["quickfacts"] {
+  const tQ = (de: string) => tLabel(QUICKFACT_LABELS, de, lang);
   const out: ModernDatenblattPayload["quickfacts"] = [];
   const usedLabels = new Set<string>();
 
@@ -392,34 +403,46 @@ function buildQuickfacts(
       pi.icons?.show_as_symbol && pi.icons?.symbol_path ? pi.icons.symbol_path : null;
     if (pi.wert != null && pi.wert !== "") {
       // Icon mit Wert → "Label" + "Wert" + "Unit"
-      const label = (map?.label ?? iconLabel).toString();
+      // ICON_LABEL_MAP.label liefert immer einen DE-Standardnamen, den wir
+      // dann via tLabel(QUICKFACT_LABELS, …, lang) ins IT übersetzen.
+      const labelDe = (map?.label ?? iconLabel).toString();
+      const label = tQ(labelDe);
       const unit = map?.unit ?? "";
       const value = String(pi.wert).replace(/\.(\d)/, ",$1");
       // Lichtfarben-Hintergrund nur wenn Kachel CCT zeigt (Label "CCT" oder
       // Unit "K"). Wert ist in dem Fall die Kelvin-Zahl.
-      const bg = (label === "CCT" || unit === "K") ? cctToPastelHex(value) : null;
+      const bg = (labelDe === "CCT" || unit === "K") ? cctToPastelHex(value) : null;
       out.push({ label, value, unit, icon_image: symbolPath, bg_hex: bg });
-      usedLabels.add(label);
+      // Im usedLabels-Set bleibt der DE-Name — das Stammdaten-Fallback nutzt
+      // ebenfalls die DE-Schlüssel zum Vergleichen.
+      usedLabels.add(labelDe);
     } else {
       // Badge-Icon (kein Wert) → Label gross als Wert, oben kleines "Zertifikat"/"Schutzart"
       const isIp = /^IP\d+/i.test(iconLabel);
       const isCct = /^\d+K$/i.test(iconLabel);
-      const subLabel = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
+      const subLabelDe = isIp ? "Schutzart" : isCct ? "CCT" : "Zertifikat";
+      const subLabel = tQ(subLabelDe);
       const bg = isCct ? cctToPastelHex(iconLabel) : null;
       out.push({ label: subLabel, value: iconLabel, unit: "", icon_image: symbolPath, bg_hex: bg });
       // Sowohl den kombinierten Schluessel als auch das reine subLabel
       // markieren — das Stammdaten-Fallback dedupliziert nur per fb.label.
-      usedLabels.add(subLabel + ":" + iconLabel);
-      usedLabels.add(subLabel);
+      // Wir nutzen DE-Namen zum Deduplizieren.
+      usedLabels.add(subLabelDe + ":" + iconLabel);
+      usedLabels.add(subLabelDe);
     }
     if (out.length >= 9) break;
   }
 
   if (out.length < 9) {
-    for (const fb of fallbackQuickfactsFromStammdaten(produkt)) {
-      if (usedLabels.has(fb.label)) continue;
+    for (const fb of fallbackQuickfactsFromStammdaten(produkt, lang)) {
+      // Dedup: vergleiche gegen DE-Originalwerte (in usedLabels stehen die DE-Namen).
+      // fb.label kann hier IT sein, daher Reverse-Lookup.
+      const fbDeLabel = lang === "it"
+        ? (Object.keys(QUICKFACT_LABELS).find((k) => QUICKFACT_LABELS[k] === fb.label) ?? fb.label)
+        : fb.label;
+      if (usedLabels.has(fbDeLabel)) continue;
       out.push(fb);
-      usedLabels.add(fb.label);
+      usedLabels.add(fbDeLabel);
       if (out.length >= 9) break;
     }
   }
@@ -461,14 +484,19 @@ function buildQuickfacts(
 }
 
 /** Spec-Gruppen exakt nach Briefing 6.5.2. */
-function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
+function buildSpecGroups(
+  produkt: any,
+  lang: DatenblattLang = "de",
+): ModernDatenblattPayload["spec_groups"] {
+  // Lokalisierte Bool-Werte
+  const bool = BOOL_VALUES[lang];
   // Konsolidierte Specs — Leistung/CCT/CRI/Spannung/IP sind schon in Quickfacts,
   // hier nur das, was im Detail relevant ist. Pro Gruppe max. 4 Zeilen.
   const groups = [
     {
       title: "Elektrik & Sicherheit",
       rows: [
-        ["Mit Betriebsgerät", produkt.mit_betriebsgeraet === true ? "Ja" : produkt.mit_betriebsgeraet === false ? "Nein" : ""],
+        ["Mit Betriebsgerät", produkt.mit_betriebsgeraet === true ? bool.ja : produkt.mit_betriebsgeraet === false ? bool.nein : ""],
         ["Schutzklasse / IP", [produkt.schutzklasse, produkt.ip_schutzart || produkt.schutzart_ip].filter(Boolean).join(" · ")],
         ["Effizienz", fmtValue(produkt.gesamteffizienz_lm_w, "lm/W")],
         ["Energieeffizienzklasse", produkt.energieeffizienzklasse || ""],
@@ -505,11 +533,16 @@ function buildSpecGroups(produkt: any): ModernDatenblattPayload["spec_groups"] {
       ],
     },
   ];
-  // Leere Zeilen rauswerfen pro Gruppe
+  // Leere Zeilen rauswerfen pro Gruppe + Labels lokalisieren
   return groups
     .map((g) => ({
-      title: g.title,
-      rows: g.rows.filter(([, v]) => v && v !== "" && v !== "—").map(([label, value]) => ({ label: String(label), value: String(value) })),
+      title: tLabel(SPEC_GROUP_LABELS, g.title, lang),
+      rows: g.rows
+        .filter(([, v]) => v && v !== "" && v !== "—")
+        .map(([label, value]) => ({
+          label: tLabel(SPEC_ROW_LABELS, String(label), lang),
+          value: String(value),
+        })),
     }))
     .filter((g) => g.rows.length > 0);
 }
@@ -662,10 +695,10 @@ export async function buildModernDatenblattPayload(
   // der Author im UI vorhersehbar weiß, wann ein Spaltenwechsel passiert.
   const quickfactsResolved = await loadQuickfactIcons(
     supabase,
-    buildQuickfacts(produkt, (produktIcons ?? []) as any),
+    buildQuickfacts(produkt, (produktIcons ?? []) as any, lang),
     images,
   );
-  const specGroups = buildSpecGroups(produkt);
+  const specGroups = buildSpecGroups(produkt, lang);
   const { left: paragraphsLeft, right: paragraphsRight } = splitParagraphsTwoColumn(paragraphs);
 
   const payload: ModernDatenblattPayload = {

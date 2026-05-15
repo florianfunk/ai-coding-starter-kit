@@ -1,6 +1,6 @@
 # PROJ-8: Umsatzsteuer-Voranmeldung (Vorschlag)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -75,6 +75,64 @@ Keine neuen.
 
 ### Edge-Case-Behandlung
 Nachträgliche Buchungen → Berichtigungshinweis statt stillem Überschreiben; unklares Datum → Ausschluss + Warnung; Vorsteuer ohne Beleg nicht abziehbar; Storno/Gutschrift verrechnet; Reverse-Charge/0 % separate Kennzahl.
+
+## Implementierungsnotizen
+
+**Stand:** In Progress (Implementierung abgeschlossen, QA ausstehend)
+
+### Gebaute Dateien
+- `src/lib/tax/perioden.ts` — reine, generische Periodenlogik (date-fns):
+  USt-VA-Perioden je Jahr (monatlich=12 / quartalsweise=4 / jährlich=1),
+  Start/Ende je Periode, `periodeFuerDatum`, Wirtschaftsjahr-Grenzen
+  (`wirtschaftsjahrGrenzen`, `wirtschaftsjahrZuDatum`) + robustes ISO-Parsing.
+  Wirtschaftsjahr-Teil bewusst generisch — von PROJ-9 lesend mitnutzbar.
+- `src/lib/tax/ust.ts` — rein deterministische USt-VA-Berechnung. Rechnung in
+  Cent (keine Float-Drift), Brutto→Netto-Herausrechnung je Satz, Umsätze
+  19/7/0, Umsatzsteuer, abziehbare Vorsteuer **nur** aus belegten
+  Eingangsbuchungen, unbelegte Vorsteuer separat (Diagnostik). ELSTER-Feld-Map
+  `ELSTER_USTVA` als pflegbare Konstante (Kz 81/86/35/66/83).
+  Kleinunternehmer → Nullmeldung + Hinweis. Filter: nur
+  klassifikation='geschaeftlich' UND steuerrelevant=true.
+- `src/lib/tax/ust.test.ts` + `src/lib/tax/perioden.test.ts` — 30 Vitest-Tests
+  (Perioden monatlich/quartal/jährlich, Schaltjahr, abweichendes WJ,
+  Umsatz/Vorsteuer je Satz, Vorsteuer ohne Beleg, private/neutrale
+  ausgeschlossen, Zahllast-Vorzeichen, Storno-Verrechnung,
+  Kleinunternehmer-Nullmeldung, Cent-Rundung).
+- `src/lib/validation/ustva.ts` — Zod (Perioden-Query mit coerce,
+  Abschluss-Body).
+- `src/app/api/steuer/ust/route.ts` — GET berechnet on-the-fly aus aktuellen
+  Daten ODER liefert Snapshot wenn abgeschlossen (+ Berichtigungshinweis bei
+  Abweichung); liefert Jahresübersicht, Warnungen mit Anzahl
+  (offene Prüffälle, Geschäftsbuchungen ohne Beleg, unklassifiziert, unklares
+  Datum, ohne USt-Satz) sowie `buchung_details` für den Drill-down. POST
+  friert Snapshot ein (status='abgeschlossen', unveränderlich, kein stilles
+  Überschreiben), Audit-Eintrag. getApiUser→401, owner-scoped, Zod.
+- `src/app/(app)/ust-voranmeldung/page.tsx` + `src/components/ustva/*`
+  (`ustva-ansicht.tsx`, `kennzahl-drilldown.tsx`, `typen.ts`) —
+  Perioden-Auswahl + Jahresübersicht, Kennzahl-Tabelle mit ELSTER-Feldnr.,
+  Drill-down-Sheet je Kennzahl (einbezogene Buchungen, Beleg-Status),
+  Warnpanel, Abschluss-Button mit Bestätigungsdialog. Lade-/Fehler-/
+  Leerzustände, nur shadcn/ui, Deutsch.
+
+### Designentscheidungen / Hinweise
+- USt-VA-Perioden folgen dem **Kalenderjahr** (USt ist Kalenderjahr-Steuer);
+  die Wirtschaftsjahr-Funktionen in `perioden.ts` sind unabhängig davon
+  generisch für PROJ-9 (EÜR) ausgelegt.
+- Gutschriften/Stornos werden über das Betragsvorzeichen automatisch
+  saldiert (negative Einnahme/Ausgabe).
+- Drill-down nutzt die bereits geladene API-Antwort (`buchung_details`),
+  kein zusätzlicher Roundtrip; vollständige Belegdetails bleiben auf der
+  Buchungsseite.
+
+### Status Verifikation
+- `npx tsc --noEmit`: fehlerfrei (gesamtes Projekt).
+- ESLint auf allen PROJ-8-Pfaden: keine Fehler/Warnungen.
+- Vitest: 30/30 Tests grün (perioden + ust).
+
+### Offene Punkte (für /qa)
+- Manuelle E2E-Prüfung der Seite mit echten Buchungsdaten steht aus.
+- DB-Migration `0001_init_steueragent.sql` deckt `steuerperiode` bereits ab
+  (keine Schemaänderung nötig).
 
 ## QA Test Results
 _To be added by /qa_

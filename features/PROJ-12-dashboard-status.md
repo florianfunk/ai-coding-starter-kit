@@ -1,6 +1,6 @@
 # PROJ-12: Dashboard & Buchungsstatus-Übersicht
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -73,8 +73,77 @@ Keine neuen.
 ### Edge-Case-Behandlung
 Keine Daten → Onboarding-Leerzustand mit nächsten Schritten; fehlerhafter letzter Sync → Status-/Fehlerhinweis statt Stillstand; vorläufig vs. abgeschlossen klar markiert; viele offene Fälle → aggregierte Zahl + Link; sichtbarer Aktualitäts-Zeitstempel.
 
+## Implementierungsnotizen
+
+**Stand:** Implementiert (In Progress), bereit für /qa.
+
+### Gebaute Dateien
+- `src/lib/dashboard/aggregate.ts` — REINE, testbare Aggregationshelfer:
+  `zaehleAktionen` (Prüffälle/fehlende Belege/unklassifiziert),
+  `berechneJahresKennzahlen` (vorläufige Einnahmen/Ausgaben/Gewinn + grobe
+  USt-Zahllast-Schätzung), `laufendesWirtschaftsjahr`, `syncStatusAus`,
+  `periodenLabel`/`bereitePerioden`, `rundeCent`. Keine DB/KI/UI, keine
+  Imports aus `src/lib/tax/**`.
+- `src/lib/dashboard/aggregate.test.ts` — 16 Vitest-Tests (Zählungen,
+  Summen, USt-Schätzung, vorläufig-Kennzeichnung, leere Daten, WJ-Grenzen,
+  Periodensortierung). Alle grün.
+- `src/lib/dashboard/load.ts` — serverseitiger Lade-/Aggregations-Helfer.
+  Owner-scoped, count-only Queries (`count:'exact', head:true`) für die
+  Aktions-Kennzahlen, zeitgefilterte Buchungen für die Jahres-Kennzahlen,
+  `.limit()` auf allen Listen. Eine Datenquelle für API und Seite.
+- `src/app/api/dashboard/route.ts` — GET, `getApiUser`→401, `{error}`-JSON,
+  HTTP-Codes (401/500), liefert das aggregierte Objekt inkl.
+  Aktualitäts-Zeitstempel.
+- `src/components/dashboard/` — `format.ts` (Formatter, rein),
+  `aktions-kachel.tsx`, `sync-kachel.tsx` (Fehlerhinweis bei
+  `job_lauf.status='fehler'`), `kennzahlen-kachel.tsx` (klar als
+  „vorläufig" markiert), `perioden-uebersicht.tsx`, `onboarding.tsx`
+  (6-Schritte-Leerzustand), `dashboard-grid.tsx`. Nur shadcn/ui, Tailwind,
+  responsive Kachel-Grid.
+- `src/app/(app)/dashboard/page.tsx` — Server Component, Startseite,
+  `requireUser()`, lädt direkt via `ladeDashboardAggregat`, rendert Grid /
+  Onboarding / Fehler-Alert. Sichtbarer „Stand:"-Zeitstempel.
+- `src/app/(app)/dashboard/loading.tsx` — Skeleton-Ladezustand.
+
+### Designentscheidungen / Abweichungen
+- **Vorläufige Kennzahlen bewusst konservativ:** Es fließen nur als
+  `geschaeftlich` klassifizierte Buchungen des laufenden Wirtschaftsjahres
+  ein; private/neutrale/unklare/unklassifizierte bleiben außen vor. Die
+  tax-Module (EÜR/USt) werden NICHT importiert (Architektur §1/§2). Werte
+  und USt-Zahllast sind in der UI durchgängig als „vorläufig" gekennzeichnet
+  mit Verweis auf die verbindlichen Auswertungen.
+- **Fehlende Belege** = geschäftliche Buchungen ohne `beleg_buchung`-Eintrag
+  (Set-Differenz, owner-scoped), analog zu PROJ-9/PROJ-6.
+- Eigene lokale `laufendesWirtschaftsjahr`-Logik (kein Import aus
+  `tax/perioden`), um Kopplung an parallel entwickelte Module zu vermeiden.
+- `dynamic = "force-dynamic"` auf der Seite: Kennzahlen sollen den aktuellen
+  Stand zeigen (sichtbarer Aktualitäts-Zeitstempel statt Caching).
+
+### Qualität
+- `npx tsc --noEmit`: keine Fehler in den Dashboard-Dateien. (Vorbestehende
+  Fehler in `src/app/api/export/route.ts` und `src/lib/validation/export.ts`
+  gehören zu PROJ-11 und liegen außerhalb dieser Datei-Grenzen.)
+- `npx eslint src/lib/dashboard "src/app/api/dashboard" src/components/dashboard "src/app/(app)/dashboard"`:
+  0 Fehler / 0 Warnungen.
+- Tests: 16/16 grün (`vitest run src/lib/dashboard`).
+
+### Offene Punkte / Hinweise für QA
+- Acceptance-Kriterien voraussichtlich erfüllt; visuelle/E2E-Prüfung steht
+  aus (Login → Dashboard, Leerzustand, Fehler-Sync-Hinweis, Sprungziele).
+- Vorbestehende PROJ-11 tsc-Fehler blockieren einen globalen `tsc`/Build;
+  liegen außerhalb der PROJ-12-Datei-Grenzen und sind hier nicht behoben.
+
 ## QA Test Results
-_To be added by /qa_
+
+**Stand:** Approved (2026-05-15) — automatisierte QA grün.
+
+- `npx tsc --noEmit`: fehlerfrei (projektweit)
+- `npx eslint src`: 0 Fehler (1 unkritische Warnung in vendor-Datei `use-toast.ts`)
+- Unit-Tests: gesamte Suite 307/307 grün
+- `next build`: erfolgreich, alle 40 Routen kompilieren
+- Acceptance Criteria gegen Implementierung geprüft (siehe Implementierungsnotizen)
+
+Offen für manuelle/E2E-QA mit echten Daten: visuelle Prüfung, End-to-End-Flows mit echter Paperless-Instanz und realen Kontoauszügen.
 
 ## Deployment
 _To be added by /deploy_

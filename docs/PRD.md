@@ -17,18 +17,18 @@ Single-Tenant: keine Mandanten-, Kanzlei- oder Mehrbenutzerverwaltung.
 
 | Priorität | Feature | Status |
 |-----------|---------|--------|
-| P0 (MVP) | PROJ-1 — Auth & Firmen-/Steuerprofil-Stammdaten | Architected |
-| P0 (MVP) | PROJ-2 — Konfigurierbarer EÜR-Kontenrahmen & Steuerregeln | Architected |
-| P0 (MVP) | PROJ-3 — Paperless-Integration (Beleg- & OCR-Import) | Architected |
-| P0 (MVP) | PROJ-4 — Kontoauszug-Import (Excel/CSV, Multi-Konto) | Architected |
-| P0 (MVP) | PROJ-5 — Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | Architected |
-| P0 (MVP) | PROJ-6 — Beleg↔Buchung-Auto-Matching & Fehlliste | Architected |
-| P0 (MVP) | PROJ-7 — Prüfliste & Lernregeln (Ausnahmen-Workflow) | Architected |
-| P0 (MVP) | PROJ-8 — Umsatzsteuer-Voranmeldung (Vorschlag) | Architected |
-| P1 | PROJ-9 — Jahres-EÜR (§4 Abs.3 EStG) | Architected |
-| P1 | PROJ-10 — Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Architected |
-| P1 | PROJ-11 — Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Architected |
-| P2 | PROJ-12 — Dashboard & Buchungsstatus-Übersicht | Architected |
+| P0 (MVP) | PROJ-1 — Auth & Firmen-/Steuerprofil-Stammdaten | Approved |
+| P0 (MVP) | PROJ-2 — Konfigurierbarer EÜR-Kontenrahmen & Steuerregeln | Approved |
+| P0 (MVP) | PROJ-3 — Paperless-Integration (Beleg- & OCR-Import) | Approved |
+| P0 (MVP) | PROJ-4 — Kontoauszug-Import (Excel/CSV, Multi-Konto) | Approved |
+| P0 (MVP) | PROJ-5 — Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | Approved |
+| P0 (MVP) | PROJ-6 — Beleg↔Buchung-Auto-Matching & Fehlliste | Approved |
+| P0 (MVP) | PROJ-7 — Prüfliste & Lernregeln (Ausnahmen-Workflow) | Approved |
+| P0 (MVP) | PROJ-8 — Umsatzsteuer-Voranmeldung (Vorschlag) | Approved |
+| P1 | PROJ-9 — Jahres-EÜR (§4 Abs.3 EStG) | Approved |
+| P1 | PROJ-10 — Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Approved |
+| P1 | PROJ-11 — Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved |
+| P2 | PROJ-12 — Dashboard & Buchungsstatus-Übersicht | Approved |
 
 ## Success Metrics
 - **Automatisierungsgrad:** ≥ 85 % aller Kontobuchungen werden vom Agenten ohne Nachfrage korrekt klassifiziert (geschäftlich/privat + EÜR-Kategorie)

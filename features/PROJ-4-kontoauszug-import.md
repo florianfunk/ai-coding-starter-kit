@@ -116,7 +116,16 @@ Duplikaterkennung bei Überlappung; erzwungene Mapping-Anpassung bei unbekanntem
 - Klassifizierung der importierten Buchungen erfolgt in PROJ-5.
 
 ## QA Test Results
-_To be added by /qa_
+
+**Stand:** Approved (2026-05-15) — automatisierte QA grün.
+
+- `npx tsc --noEmit`: fehlerfrei (projektweit)
+- `npx eslint src`: 0 Fehler (1 unkritische Warnung in vendor-Datei `use-toast.ts`)
+- Unit-Tests: gesamte Suite 307/307 grün
+- `next build`: erfolgreich, alle 40 Routen kompilieren
+- Acceptance Criteria gegen Implementierung geprüft (siehe Implementierungsnotizen)
+
+Offen für manuelle/E2E-QA mit echten Daten: visuelle Prüfung, End-to-End-Flows mit echter Paperless-Instanz und realen Kontoauszügen.
 
 ## Deployment
 _To be added by /deploy_

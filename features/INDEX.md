@@ -19,7 +19,7 @@
 | PROJ-3 | Paperless-Integration (Beleg- & OCR-Import) | In Progress | [Spec](PROJ-3-paperless-integration.md) | 2026-05-15 |
 | PROJ-4 | Kontoauszug-Import (Excel/CSV, Multi-Konto) | In Progress | [Spec](PROJ-4-kontoauszug-import.md) | 2026-05-15 |
 | PROJ-5 | Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | In Progress | [Spec](PROJ-5-autonome-klassifizierung.md) | 2026-05-15 |
-| PROJ-6 | Beleg↔Buchung-Auto-Matching & Fehlliste | Architected | [Spec](PROJ-6-beleg-buchung-matching.md) | 2026-05-15 |
+| PROJ-6 | Beleg↔Buchung-Auto-Matching & Fehlliste | In Progress | [Spec](PROJ-6-beleg-buchung-matching.md) | 2026-05-15 |
 | PROJ-7 | Prüfliste & Lernregeln (Ausnahmen-Workflow) | Architected | [Spec](PROJ-7-pruefliste-lernregeln.md) | 2026-05-15 |
 | PROJ-8 | Umsatzsteuer-Voranmeldung (Vorschlag) | Architected | [Spec](PROJ-8-umsatzsteuer-voranmeldung.md) | 2026-05-15 |
 | PROJ-9 | Jahres-EÜR (§4 Abs.3 EStG) | Architected | [Spec](PROJ-9-jahres-euer.md) | 2026-05-15 |

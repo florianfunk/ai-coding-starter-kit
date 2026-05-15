@@ -1,6 +1,6 @@
 # PROJ-7: Prüfliste & Lernregeln (Ausnahmen-Workflow)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -78,6 +78,73 @@ Keine neuen.
 
 ### Edge-Case-Behandlung
 Regelkonflikt → Priorität + Warnung; zu breite Regel → Trefferzähler + Deaktivierung (nur offene Fälle betroffen); Split 60/40 → zwei Teilbuchungen; kombinierte Klassifizierungs-+Match-Unsicherheit in einem Schritt; Rückwirkungsschutz für bestätigte Fälle.
+
+## Implementierungsnotizen
+
+**Implementiert (Frontend + Backend):**
+
+- **`src/lib/validation/regel.ts`** — Zod-Schemata `regelInputSchema`/`regelUpdateSchema`
+  mit `bedingungSchema`/`aktionSchema`. Feldnamen und Typen sind exakt
+  kompatibel zur Regel-Engine (`src/lib/classifier/rules.ts`,
+  `Lernregel`-Typ): `bedingung` = empfaenger_muster/zweck_muster/konto_id/
+  betrag_min/betrag_max, `aktion` = kategorie_id/ust_satz/klassifikation.
+  Bedingung erzwingt mind. eine Teilbedingung (kein versehentlicher
+  Catch-All, wie in rules.ts) und betrag_min ≤ betrag_max; Aktion erzwingt
+  mind. ein Feld. Reine Konfliktprüfung: `findeRegelKonflikte` +
+  Helfer `bedingungenGleich`/`widerspruechlicheFelder` — spiegelt die
+  Konflikt-Semantik der Pipeline (gleiche Priorität + gleich greifende
+  Bedingung + widersprüchliche Aktion). Unit-Tests
+  `regel.test.ts`: 16 Tests (Validierung + Konfliktprüfung), grün.
+- **`src/app/api/regeln/route.ts`** — GET (Liste, nach Priorität absteigend,
+  `.limit(1000)`), POST (anlegen). **`/[id]/route.ts`** — PUT
+  (inkl. aktiv/Priorität), DELETE (Hard-Delete; DB-FK `regel_id ON DELETE
+  SET NULL` schützt bereits verbuchte Buchungen → kein Rückwirkungseffekt).
+  POST/PUT liefern `konflikte` + `warnung` im Response. getApiUser→401,
+  Zod vor DB, owner_id-Scoping zusätzlich zur RLS.
+- **`src/app/api/pruefliste/route.ts`** — GET: offene Prüffälle
+  (status='zur_pruefung') + pruef_grund, Filter (Konto, Grund),
+  Sortierung (Datum/Betrag), Mustergruppierung nach normalisiertem
+  Empfänger (≥2 Fälle). **`/entscheiden/route.ts`** — POST: Einzel-/Bulk-
+  Entscheidung; setzt status='manuell_bestaetigt' (Update mit
+  `.neq("status","manuell_bestaetigt")` als letzte Sicherung), quelle='manuell',
+  schreibt audit_eintrag je Fall. Optionaler Betrag-Split → zwei
+  Teilbuchungen (parent_buchung_id + split_anteil), Eltern wird zur
+  eingefrorenen Klammerbuchung. Optionaler Belegzuordnungs-Hinweis (Audit).
+  Optionales `regel_anlegen` erzeugt eine Lernregel aus der Entscheidung
+  und meldet `gleichartige_offen` (Anzahl weiterer passender offener Fälle).
+- **Frontend:** `/pruefliste` (Server Component) + `pruefliste-ansicht.tsx`
+  (Fall-Liste mit Grund-Badges, Filter/Sortierung, Mustergruppen-Buttons,
+  Bulk-Checkboxen), `entscheidungs-dialog.tsx` (Kategorie+USt-Select,
+  privat/geschäftlich, Belegzuordnungs-Hinweis, Betrag-Split,
+  "Als Lernregel speichern" mit aus dem Fall vorbefüllter Bedingung),
+  `labels.ts` (Grund-Klartext). `/einstellungen/regeln` + `regeln-tabelle.tsx`
+  (Bedingung/Aktion lesbar, Priorität, aktiv-Switch, Trefferzähler, Löschen
+  mit Bestätigung), `regel-dialog.tsx` (react-hook-form, Konfliktwarnung
+  sichtbar als destructive Alert). Nur shadcn/ui, Deutsch, responsive,
+  Lade-/Fehler-/Leerzustände.
+
+**Designentscheidungen / Abweichungen:**
+
+- Das "gleichartige offene Fälle mitnehmen"-Angebot löst die bestehende
+  Re-Klassifizierung (`POST /api/klassifizierung?nur_offen=false`) aus,
+  statt einen eigenen Bulk-Pfad zu duplizieren — die neu angelegte Regel
+  greift dann deterministisch und mit Vorrang (kein neuer Code-Pfad,
+  keine Doppellogik, bestätigte Buchungen bleiben durch den
+  Pipeline-Schutz unverändert).
+- Lernregel-DELETE ist ein Hard-Delete (kein Soft-Delete wie beim
+  Kontenrahmen), da Regeln nur künftige/offene Klassifizierungen steuern
+  und der DB-FK den Rückwirkungsschutz garantiert.
+- Decision-Endpoint-Validierung liegt inline im Route-Handler (Datei-
+  Grenze: nur `regel.ts` unter validation erlaubt).
+
+**Status Tooling:** `npx tsc --noEmit` ohne Fehler; ESLint ohne
+Fehler/Warnungen in allen PROJ-7-Dateien; Vitest 198/198 grün
+(davon 16 neue für `regel.ts`).
+
+**Offen / nicht in dieser Iteration:** keine echte Beleg↔Buchung-
+Zuordnung im Entscheidungs-Schritt (PROJ-6) — hier nur ein freier
+Beleg-Hinweis im Audit; eine vollständige Verknüpfung kann später an
+PROJ-6 angedockt werden. E2E-Tests (Playwright) noch nicht ergänzt.
 
 ## QA Test Results
 _To be added by /qa_

@@ -5,9 +5,10 @@
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
-import type { Buchung, Konto } from "@/lib/types";
+import type { Buchung, JobLauf, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BuchungenAnsicht } from "@/components/buchungen/buchungen-ansicht";
+import { KlassifizierungPanel } from "@/components/buchungen/klassifizierung-panel";
 
 export const metadata = {
   title: "Buchungen · STEUERAGENT",
@@ -45,6 +46,28 @@ export default async function BuchungenPage({
     .limit(100);
   const konten = (kontenData ?? []) as Konto[];
 
+  const { data: kategorienData } = await supabase
+    .from("kategorie")
+    .select(
+      "id, bezeichnung, typ, ust_satz, euer_zeile, elster_kennzahl, aktiv, gueltig_ab",
+    )
+    .eq("owner_id", user.id)
+    .order("bezeichnung", { ascending: true })
+    .limit(500);
+  const kategorien = (kategorienData ?? []) as Kategorie[];
+
+  const { data: jobData } = await supabase
+    .from("job_lauf")
+    .select(
+      "id, art, status, fortschritt, gesamt, ergebnis, fehler_text, created_at",
+    )
+    .eq("owner_id", user.id)
+    .eq("art", "klassifizierung")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const letzterJob = (jobData ?? null) as JobLauf | null;
+
   let query = supabase
     .from("buchung")
     .select(SELECT_FELDER)
@@ -70,10 +93,13 @@ export default async function BuchungenPage({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Buchungen</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Alle importierten Kontobewegungen. Die Klassifizierung (Kategorie,
-          privat/geschäftlich, Status) erfolgt in einem späteren Schritt.
+          Alle importierten Kontobewegungen. Der Agent klassifiziert sie
+          autonom (privat/geschäftlich, Steuerrelevanz, EÜR-Kategorie). Klicke
+          eine Zeile für Begründung und Audit-Trail.
         </p>
       </div>
+
+      <KlassifizierungPanel initialJob={letzterJob} />
 
       {error ? (
         <Alert variant="destructive">
@@ -87,6 +113,7 @@ export default async function BuchungenPage({
         <BuchungenAnsicht
           buchungen={(data ?? []) as Buchung[]}
           konten={konten}
+          kategorien={kategorien}
           filter={filter}
         />
       )}

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import type {
   Buchung,
   BuchungStatus,
+  Kategorie,
   Klassifikation,
   Konto,
 } from "@/lib/types";
+import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -75,16 +77,25 @@ function formatDatum(iso: string): string {
 export function BuchungenAnsicht({
   buchungen,
   konten,
+  kategorien,
   filter,
 }: {
   buchungen: Buchung[];
   konten: Konto[];
+  kategorien: Kategorie[];
   filter: { konto?: string; von?: string; bis?: string };
 }) {
   const router = useRouter();
   const [konto, setKonto] = useState(filter.konto ?? "alle");
   const [von, setVon] = useState(filter.von ?? "");
   const [bis, setBis] = useState(filter.bis ?? "");
+  const [detail, setDetail] = useState<Buchung | null>(null);
+  const [detailOffen, setDetailOffen] = useState(false);
+
+  function oeffneDetail(b: Buchung) {
+    setDetail(b);
+    setDetailOffen(true);
+  }
 
   const kontoName = (id: string) =>
     konten.find((k) => k.id === id)?.bezeichnung ?? "—";
@@ -182,12 +193,17 @@ export function BuchungenAnsicht({
                   <TableHead>Verwendungszweck</TableHead>
                   <TableHead>Empfänger</TableHead>
                   <TableHead>Klassifikation</TableHead>
+                  <TableHead className="text-right">Konfidenz</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {buchungen.map((b) => (
-                  <TableRow key={b.id}>
+                  <TableRow
+                    key={b.id}
+                    onClick={() => oeffneDetail(b)}
+                    className="cursor-pointer"
+                  >
                     <TableCell className="text-sm">
                       {kontoName(b.konto_id)}
                     </TableCell>
@@ -217,6 +233,11 @@ export function BuchungenAnsicht({
                         ? KLASS_LABEL[b.klassifikation]
                         : "—"}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">
+                      {b.konfidenz === null
+                        ? "—"
+                        : `${Math.round(b.konfidenz * 100)} %`}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[b.status]}>
                         {STATUS_LABEL[b.status]}
@@ -229,6 +250,12 @@ export function BuchungenAnsicht({
           </div>
         )}
       </CardContent>
+      <BuchungDetailSheet
+        buchung={detail}
+        kategorien={kategorien}
+        open={detailOffen}
+        onOpenChange={setDetailOffen}
+      />
     </Card>
   );
 }

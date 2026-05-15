@@ -16,8 +16,8 @@
 |----|---------|--------|------|---------|
 | PROJ-1 | Auth & Firmen-/Steuerprofil-Stammdaten | In Progress | [Spec](PROJ-1-auth-firmen-steuerprofil.md) | 2026-05-15 |
 | PROJ-2 | Konfigurierbarer EÜR-Kontenrahmen & Steuerregeln | In Progress | [Spec](PROJ-2-euer-kontenrahmen-steuerregeln.md) | 2026-05-15 |
-| PROJ-3 | Paperless-Integration (Beleg- & OCR-Import) | Architected | [Spec](PROJ-3-paperless-integration.md) | 2026-05-15 |
-| PROJ-4 | Kontoauszug-Import (Excel/CSV, Multi-Konto) | Architected | [Spec](PROJ-4-kontoauszug-import.md) | 2026-05-15 |
+| PROJ-3 | Paperless-Integration (Beleg- & OCR-Import) | In Progress | [Spec](PROJ-3-paperless-integration.md) | 2026-05-15 |
+| PROJ-4 | Kontoauszug-Import (Excel/CSV, Multi-Konto) | In Progress | [Spec](PROJ-4-kontoauszug-import.md) | 2026-05-15 |
 | PROJ-5 | Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | Architected | [Spec](PROJ-5-autonome-klassifizierung.md) | 2026-05-15 |
 | PROJ-6 | Beleg↔Buchung-Auto-Matching & Fehlliste | Architected | [Spec](PROJ-6-beleg-buchung-matching.md) | 2026-05-15 |
 | PROJ-7 | Prüfliste & Lernregeln (Ausnahmen-Workflow) | Architected | [Spec](PROJ-7-pruefliste-lernregeln.md) | 2026-05-15 |

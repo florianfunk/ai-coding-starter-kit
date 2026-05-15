@@ -1,6 +1,6 @@
 # PROJ-4: Kontoauszug-Import (Excel/CSV, Multi-Konto)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-15
 **Last Updated:** 2026-05-15
 
@@ -76,6 +76,44 @@ Konten › Import (/einstellungen/konten/import)
 
 ### Edge-Case-Behandlung
 Duplikaterkennung bei Überlappung; erzwungene Mapping-Anpassung bei unbekanntem Layout; Storno/negative Beträge korrekt; Fremdwährung gekennzeichnet; Header/Summen-/Leerzeilen gefiltert; Warnung bei falschem Konto-Mapping.
+
+## Implementierungsnotizen
+
+**Implementiert am:** 2026-05-15 · Branch `feat/steueragent-mvp` (kein Commit/Branch im Auftrag)
+
+### Erstellte Dateien
+- `src/lib/importer/parser.ts` — reine, testbare Parsing-/Normalisierungslogik:
+  - `leseMatrix` (xlsx + csv via `XLSX.read`, SheetJS erkennt CSV automatisch)
+  - `normalisiereBetrag` (DE `1.234,56` / EN / Klammern / Soll-Haben / invertieren)
+  - `normalisiereDatum` (TT.MM.JJJJ, T.M.JJJJ, 2-stelliges Jahr, /-., ISO, Excel-Serienzahl → ISO)
+  - `bildeDuplikatHash` (FNV-1a 64-bit aus `konto_id|datum|betrag(2 NK)|zweck normalisiert`, ohne externe Abhängigkeit)
+  - `parseKontoauszug` (Header-Erkennung, Leer-/Summenzeilen-Filter, Mapping-Anwendung, Fehlerzeilen ohne Abbruch)
+- `src/lib/importer/parser.test.ts` — 27 Vitest-Tests (Betrag DE/EN/negativ/Soll-Haben/invertieren, Datum, Hash-Stabilität, Header/Leer/Summen-Filter, falsches Mapping)
+- `src/lib/validation/konto.ts` + `konto.test.ts` — Zod-Schemas (Konto-Anlage, Mapping, Import-Request), 10 Tests
+- `src/app/api/konten/route.ts` (GET-Liste owner-scoped `.limit(100)`, POST), `src/app/api/konten/[id]/route.ts` (PUT, DELETE)
+- `src/app/api/konten/import/route.ts` (POST FormData, `?preview`/`preview=1`, Duplikaterkennung gegen `buchung.duplikat_hash`, `job_lauf` art=`konto_import`, Protokoll `{importiert, uebersprungen, fehlerhaft}`)
+- `src/app/(app)/einstellungen/konten/page.tsx` + `src/components/konten/konten-tabelle.tsx` + `konto-dialog.tsx` (Mapping-Editor im Dialog integriert)
+- `src/app/(app)/einstellungen/konten/import/page.tsx` + `src/components/konten/import-panel.tsx` (Upload, Vorschau mit Duplikatmarkierung, Übernehmen, Protokoll)
+- `src/app/(app)/buchungen/page.tsx` + `src/components/buchungen/buchungen-ansicht.tsx` (Server Component lädt, Client filtert nach Konto/Zeitraum via URL-Params, `.limit(500)`)
+
+### Designentscheidungen / Abweichungen
+- Mapping-Editor wurde in den Konto-Dialog integriert (statt separater Editor-Komponente) — eine Maske für Stammdaten + Vorlage, weniger Klicks. Acceptance-Kriterium (Mapping pro Konto, wiederverwendbar) bleibt erfüllt.
+- Duplikat-Hash: eigener FNV-1a statt Crypto-Abhängigkeit (Vorgabe: keine neuen Pakete; reine Funktion). Stabil gegen Whitespace/Groß-Klein im Zweck.
+- Import nutzt `upsert(onConflict: owner_id,duplikat_hash, ignoreDuplicates)` als zweite Verteidigungslinie gegen Race-Conditions bei überlappenden Auszügen; das DB-Unique-Constraint bleibt maßgeblich.
+- DELETE eines Kontos ist Hard-Delete (Buchungen via `ON DELETE CASCADE`), mit deutlicher Bestätigungswarnung im UI. Bewusste Abweichung vom Soft-Delete des Kontenrahmens, da Konten keine historische Referenz wie Kategorien benötigen.
+- Klassifizierungsfelder (`klassifikation`, `kategorie_id`, `status` etc.) bleiben beim Import leer/Default `offen` — wird von PROJ-5 gefüllt. Buchungsliste zeigt diese Spalten an, „—“ wenn leer.
+- Fremdwährung: `waehrung` wird übernommen/normalisiert (Default EUR), in Vorschau und Buchungsliste gekennzeichnet; Umrechnung später (außerhalb Scope).
+
+### Status Tooling
+- `npx tsc --noEmit`: fehlerfrei
+- `npx eslint` (alle PROJ-4-Pfade inkl. Tests): keine Fehler/Warnungen
+- Unit-Tests: 37 neue Tests grün (27 parser + 10 konto); Gesamtsuite 115/115 grün, keine Regression
+- Migration `0001_init_steueragent.sql` NICHT geändert (Tabellen `konto`/`buchung`/`job_lauf` wie vorgegeben verwendet)
+
+### Offene Punkte / Folgefeatures
+- E2E-Tests (Playwright) für den Upload-Flow nicht erstellt (nicht beauftragt; `/qa` übernimmt).
+- Geschützte Storage-Ablage der Originaldatei: Datei wird derzeit nur transient geparst, nicht im Supabase Storage abgelegt. Falls Aufbewahrung der Quelldatei gefordert ist, in PROJ-4-Erweiterung/`/qa` adressieren.
+- Klassifizierung der importierten Buchungen erfolgt in PROJ-5.
 
 ## QA Test Results
 _To be added by /qa_

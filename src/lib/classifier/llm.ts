@@ -11,6 +11,8 @@
 // fängt diesen Fehler ab und schickt die Buchung in die Prüfliste.
 
 import { createGateway, generateObject, NoObjectGeneratedError } from "ai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import type { LanguageModel } from "ai";
 import { z } from "zod";
 import type { Klassifikation } from "@/lib/types";
 import { ladeAiKey } from "@/lib/admin/ai-key";
@@ -131,6 +133,31 @@ const SYSTEM_PROMPT = [
 ].join("\n");
 
 /**
+ * Wählt den richtigen LLM-Provider anhand des Key-Formats:
+ * - `sk-ant-…` → direkter Anthropic-Provider (`@ai-sdk/anthropic`)
+ * - sonst (`vck_…` u. a.) → Vercel AI Gateway
+ *
+ * Der Modell-Slug wird beim direkten Anthropic-Pfad normalisiert:
+ * `anthropic/claude-haiku-4.5` → `claude-haiku-4-5` (Anthropic API
+ * erwartet Bindestrich-Format ohne Provider-Präfix).
+ */
+function wahleProvider(
+  key: string,
+  modell: string,
+): { model: LanguageModel; provider: "anthropic" | "gateway" } {
+  if (key.startsWith("sk-ant-")) {
+    const anthropic = createAnthropic({ apiKey: key });
+    // "anthropic/claude-haiku-4.5" → "claude-haiku-4-5"
+    const normalisiert = modell
+      .replace(/^anthropic\//, "")
+      .replace(/\./g, "-");
+    return { model: anthropic(normalisiert), provider: "anthropic" };
+  }
+  const gateway = createGateway({ apiKey: key });
+  return { model: gateway(modell), provider: "gateway" };
+}
+
+/**
  * Ruft das LLM serverseitig auf und liefert eine validierte Klassifikation.
  * Wirft `LlmKlassifiziererError` bei jedem Fehlerfall (kein Raten).
  */
@@ -142,10 +169,10 @@ export async function klassifiziereMitLlm(
   const { key, model } = await ladeAiKey();
   if (!key) {
     throw new LlmKlassifiziererError(
-      "AI_GATEWAY_API_KEY ist nicht konfiguriert.",
+      "Kein LLM-Key konfiguriert (weder DB noch ENV).",
     );
   }
-  const gateway = createGateway({ apiKey: key });
+  const { model: llmModel } = wahleProvider(key, model);
 
   const stichworte =
     eingabe.beleg_stichworte && eingabe.beleg_stichworte.length > 0
@@ -170,7 +197,7 @@ export async function klassifiziereMitLlm(
 
   try {
     const { object } = await generateObject({
-      model: gateway(model),
+      model: llmModel,
       schema: ausgabeSchema,
       system: SYSTEM_PROMPT,
       prompt,

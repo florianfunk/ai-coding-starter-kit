@@ -43,6 +43,15 @@ export interface PipelineConfig {
    * ohne Effekt).
    */
   web_recherche_aktiv?: boolean;
+  /**
+   * Default-Kategorie-Fallback: wenn die KI eine eindeutige Klassifikation
+   * liefert (privat/neutral, Konfidenz ≥ Schwellwert), aber keine
+   * spezifische Kategorie wählt, weist die Pipeline die hier hinterlegte
+   * Default-Kategorie zu — statt die Buchung in die Prüfliste zu schieben.
+   * Schlüssel = Klassifikation, Wert = kategorie_id (aus PROJ-2-Seed).
+   * Optional; ohne Wert greift der Fallback nicht.
+   */
+  default_kategorie?: Partial<Record<Klassifikation, string>>;
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
@@ -202,11 +211,26 @@ export function entscheideBuchung(
     });
   }
 
+  // Fallback: bei eindeutig privater/neutraler Klassifikation mit hoher
+  // Konfidenz, aber ohne kategorie_id — Default-Kategorie zuweisen
+  // (z. B. „Privatentnahme" für privat). Verhindert, dass klar erkannte
+  // private Posten nur deshalb in der Prüfliste landen, weil der Kontenrahmen
+  // keine spezifische Privat-Unterkategorie hat.
+  let effektiveKategorieId = llm.kategorie_id;
+  if (
+    !effektiveKategorieId &&
+    (llm.klassifikation === "privat" || llm.klassifikation === "neutral") &&
+    llm.konfidenz >= config.konfidenz_schwellwert &&
+    config.default_kategorie?.[llm.klassifikation]
+  ) {
+    effektiveKategorieId = config.default_kategorie[llm.klassifikation]!;
+  }
+
   const gruende: string[] = [];
   if (llm.konfidenz < config.konfidenz_schwellwert) {
     gruende.push("konfidenz_unter_schwellwert");
   }
-  if (!llm.kategorie_id) {
+  if (!effektiveKategorieId) {
     gruende.push("keine_kategorie");
   }
   if (llm.klassifikation === "unklar") {
@@ -221,7 +245,7 @@ export function entscheideBuchung(
   return baue(buchung, {
     klassifikation: llm.klassifikation,
     steuerrelevant: llm.steuerrelevant,
-    kategorie_id: llm.kategorie_id,
+    kategorie_id: effektiveKategorieId,
     ust_satz: llm.ust_satz,
     begruendung: llm.begruendung,
     konfidenz: llm.konfidenz,

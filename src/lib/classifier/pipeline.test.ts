@@ -121,6 +121,85 @@ describe("entscheideBuchung — Konfidenz & Ausreißer", () => {
     expect(ergebnis.pruef_grund).toContain("keine_kategorie");
   });
 
+  it("Fallback: privat ohne kategorie_id + Konfidenz≥Schwelle → Default-Privatentnahme, auto_verbucht", () => {
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({
+        klassifikation: "privat",
+        kategorie_id: null,
+        konfidenz: 0.95,
+      }),
+      {
+        konfidenz_schwellwert: 0.85,
+        betrag_limit: 2000,
+        default_kategorie: { privat: "kat-privatentnahme" },
+      },
+    );
+    expect(ergebnis.kategorie_id).toBe("kat-privatentnahme");
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.pruef_grund).toBeNull();
+  });
+
+  it("Fallback: neutral ohne kategorie_id → Default-Geldtransit, auto_verbucht", () => {
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({
+        klassifikation: "neutral",
+        kategorie_id: null,
+        konfidenz: 0.95,
+      }),
+      {
+        konfidenz_schwellwert: 0.85,
+        betrag_limit: 2000,
+        default_kategorie: { neutral: "kat-geldtransit" },
+      },
+    );
+    expect(ergebnis.kategorie_id).toBe("kat-geldtransit");
+    expect(ergebnis.status).toBe("auto_verbucht");
+  });
+
+  it("Fallback greift NICHT bei klassifikation='geschaeftlich' (zu spezifisch — soll in Prüfliste)", () => {
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({
+        klassifikation: "geschaeftlich",
+        kategorie_id: null,
+        konfidenz: 0.95,
+      }),
+      {
+        konfidenz_schwellwert: 0.85,
+        betrag_limit: 2000,
+        default_kategorie: { privat: "kat-privatentnahme" },
+      },
+    );
+    expect(ergebnis.kategorie_id).toBeNull();
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toContain("keine_kategorie");
+  });
+
+  it("Fallback greift NICHT bei niedriger Konfidenz", () => {
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({
+        klassifikation: "privat",
+        kategorie_id: null,
+        konfidenz: 0.7,
+      }),
+      {
+        konfidenz_schwellwert: 0.85,
+        betrag_limit: 2000,
+        default_kategorie: { privat: "kat-privatentnahme" },
+      },
+    );
+    expect(ergebnis.kategorie_id).toBeNull();
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toContain("konfidenz_unter_schwellwert");
+  });
+
   it("klassifikation 'unklar' → zur_pruefung", () => {
     const { ergebnis } = entscheideBuchung(
       buchung(),

@@ -108,6 +108,8 @@ export async function POST(request: Request) {
     );
   }
   const { nur_offen, konfidenz_schwellwert, betrag_limit } = parsed.data;
+  // Default-Kategorien für die Pipeline werden weiter unten ermittelt
+  // (nachdem Kategorien geladen wurden) und in `config` ergänzt.
   const config: PipelineConfig = {
     konfidenz_schwellwert,
     betrag_limit,
@@ -165,6 +167,28 @@ export async function POST(request: Request) {
     );
   }
   const kategorien = (katData ?? []) as KategorieOption[];
+
+  // Pipeline-Fallback: Default-Kategorien für privat/neutral identifizieren.
+  // Konvention: die Standard-Seed-Kategorien "Privatentnahme" (typ=privat)
+  // und "Geldtransit (Umbuchung zwischen Konten)" (typ=neutral).
+  // Wenn die KI klar privat/neutral klassifiziert aber keine spezifische
+  // Unterkategorie wählt, fallen wir auf diese Defaults zurück.
+  const defaultPrivat = kategorien.find(
+    (k) =>
+      k.typ === "privat" &&
+      k.bezeichnung.toLowerCase() === "privatentnahme",
+  );
+  const defaultNeutral = kategorien.find(
+    (k) =>
+      k.typ === "neutral" &&
+      k.bezeichnung.toLowerCase().startsWith("geldtransit"),
+  );
+  if (defaultPrivat || defaultNeutral) {
+    config.default_kategorie = {
+      ...(defaultPrivat ? { privat: defaultPrivat.id } : {}),
+      ...(defaultNeutral ? { neutral: defaultNeutral.id } : {}),
+    };
+  }
 
   // Zu klassifizierende Buchungen.
   let buchungQuery = supabase

@@ -39,8 +39,8 @@ import {
 
 const STATUS_LABEL: Record<BuchungStatus, string> = {
   offen: "Offen",
-  auto_verbucht: "Auto-verbucht",
-  zur_pruefung: "Zur Prüfung",
+  auto_verbucht: "Auto",
+  zur_pruefung: "Prüfung",
   manuell_bestaetigt: "Bestätigt",
 };
 
@@ -194,7 +194,9 @@ export function BuchungenAnsicht({
                   <TableHead>Empfänger</TableHead>
                   <TableHead>Klassifikation</TableHead>
                   <TableHead className="text-right">Konfidenz</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[110px] whitespace-nowrap">
+                    Status
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -238,8 +240,11 @@ export function BuchungenAnsicht({
                         ? "—"
                         : `${Math.round(b.konfidenz * 100)} %`}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[b.status]}>
+                    <TableCell className="whitespace-nowrap">
+                      <Badge
+                        variant={STATUS_VARIANT[b.status]}
+                        className="whitespace-nowrap"
+                      >
                         {STATUS_LABEL[b.status]}
                       </Badge>
                     </TableCell>

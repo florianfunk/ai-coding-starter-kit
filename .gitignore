@@ -37,3 +37,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Lokale Testdaten / Kontoauszüge — NIEMALS committen (sensible Steuerdaten)
+data/

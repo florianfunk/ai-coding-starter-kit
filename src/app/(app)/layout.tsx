@@ -20,6 +20,7 @@ const SETTINGS = [
   { href: "/einstellungen/konten", label: "Bankkonten" },
   { href: "/einstellungen/paperless", label: "Paperless" },
   { href: "/einstellungen/regeln", label: "Lernregeln" },
+  { href: "/einstellungen/admin", label: "Admin" },
 ];
 
 export default async function AppLayout({

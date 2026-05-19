@@ -26,7 +26,8 @@
 | PROJ-10 | Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Approved | [Spec](PROJ-10-est-vorschau-privatentnahmen.md) | 2026-05-15 |
 | PROJ-11 | Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved | [Spec](PROJ-11-export.md) | 2026-05-15 |
 | PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Approved | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
+| PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-13
+## Next Available ID: PROJ-14

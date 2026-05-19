@@ -3,18 +3,17 @@
 // DSGVO / Datensparsamkeit (siehe docs/ARCHITECTURE.md Abschnitt 3):
 // An das LLM gehen AUSSCHLIESSLICH Verwendungszweck, Betrag, Empfänger und
 // optional Beleg-Stichworte. KEINE Steuernummer, USt-IdNr., Kontodaten oder
-// vollständigen Belegtexte. Modell + Gateway-Key kommen aus ENV.
+// vollständigen Belegtexte. Modell + Gateway-Key werden zentral über
+// ladeAiKey() aufgelöst (DB-Key hat Vorrang vor ENV — PROJ-13).
 //
 // Robustheit: Bei LLM-Ausfall/ungültiger Antwort wird ein definierter
 // LlmKlassifiziererError geworfen — es wird NICHT geraten. Die Pipeline
 // fängt diesen Fehler ab und schickt die Buchung in die Prüfliste.
 
-import { generateObject, NoObjectGeneratedError } from "ai";
+import { createGateway, generateObject, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import type { Klassifikation } from "@/lib/types";
-
-/** Standard-Modell, falls STEUERAGENT_LLM_MODEL nicht gesetzt ist. */
-const DEFAULT_MODEL = "anthropic/claude-haiku-4-5";
+import { ladeAiKey } from "@/lib/admin/ai-key";
 
 /** Definierter Fehler bei LLM-Ausfall — kein Raten, sauberer Fallback. */
 export class LlmKlassifiziererError extends Error {
@@ -75,11 +74,6 @@ const ausgabeSchema = z.object({
     .describe("Selbsteinschätzung der Sicherheit von 0 bis 1"),
 });
 
-function modellName(): string {
-  const m = process.env.STEUERAGENT_LLM_MODEL?.trim();
-  return m && m.length > 0 ? m : DEFAULT_MODEL;
-}
-
 function baueKategorienListe(kategorien: readonly KategorieOption[]): string {
   if (kategorien.length === 0) return "(keine Kategorien vorhanden)";
   return kategorien
@@ -106,11 +100,14 @@ export async function klassifiziereMitLlm(
   eingabe: LlmEingabe,
   kategorien: readonly KategorieOption[],
 ): Promise<LlmErgebnis> {
-  if (!process.env.AI_GATEWAY_API_KEY) {
+  // Key + Modell zentral auflösen: DB-Key (PROJ-13) hat Vorrang vor ENV.
+  const { key, model } = await ladeAiKey();
+  if (!key) {
     throw new LlmKlassifiziererError(
       "AI_GATEWAY_API_KEY ist nicht konfiguriert.",
     );
   }
+  const gateway = createGateway({ apiKey: key });
 
   const stichworte =
     eingabe.beleg_stichworte && eingabe.beleg_stichworte.length > 0
@@ -130,7 +127,7 @@ export async function klassifiziereMitLlm(
 
   try {
     const { object } = await generateObject({
-      model: modellName(),
+      model: gateway(model),
       schema: ausgabeSchema,
       system: SYSTEM_PROMPT,
       prompt,

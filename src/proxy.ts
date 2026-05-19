@@ -35,7 +35,11 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
 
-  if (!user && !isPublic) {
+  // API-Routen schützen sich selbst via getApiUser() (401 JSON).
+  // Nur HTML-Seiten werden zum Login umgeleitet.
+  const isApi = path.startsWith("/api/");
+
+  if (!user && !isPublic && !isApi) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

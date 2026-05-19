@@ -29,6 +29,7 @@ Single-Tenant: keine Mandanten-, Kanzlei- oder Mehrbenutzerverwaltung.
 | P1 | PROJ-10 — Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Approved |
 | P1 | PROJ-11 — Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved |
 | P2 | PROJ-12 — Dashboard & Buchungsstatus-Übersicht | Approved |
+| P2 | PROJ-13 — Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved |
 
 ## Success Metrics
 - **Automatisierungsgrad:** ≥ 85 % aller Kontobuchungen werden vom Agenten ohne Nachfrage korrekt klassifiziert (geschäftlich/privat + EÜR-Kategorie)

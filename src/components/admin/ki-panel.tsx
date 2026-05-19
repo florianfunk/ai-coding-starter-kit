@@ -3,7 +3,7 @@
 // PROJ-13 — Tab "KI": AI-Gateway-Key (Status statt Klartext) + Modell.
 // react-hook-form + zod (gemeinsames Schema). Key-Feld: leer = unverändert.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,9 +11,21 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { aiEinstellungSchema } from "@/lib/validation/admin";
+import {
+  CLAUDE_MODELLE,
+  FREITEXT_OPTION,
+  type ClaudeModell,
+} from "@/lib/admin/claude-modelle";
 import type { KiStatus } from "@/app/(app)/einstellungen/admin/page";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -35,10 +47,18 @@ import {
 
 type FormValues = { ai_key: string; ai_model: string };
 
+type ModellOption = Pick<ClaudeModell, "slug" | "label">;
+
+const KURATIERT: ModellOption[] = CLAUDE_MODELLE.map((m) => ({
+  slug: m.slug,
+  label: m.label,
+}));
+
 export function KiPanel({ initialKi }: { initialKi: KiStatus }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialKi);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [modelle, setModelle] = useState<ModellOption[]>(KURATIERT);
 
   const form = useForm<FormValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,6 +69,36 @@ export function KiPanel({ initialKi }: { initialKi: KiStatus }) {
 
   const submitting = form.formState.isSubmitting;
   const keyGesetzt = status.ai_key_gesetzt;
+
+  // Gespeichertes Modell nicht in der Liste → Freitext-Modus.
+  const aktuellesModell = form.watch("ai_model");
+  const inListe = modelle.some((m) => m.slug === aktuellesModell);
+  const [freitext, setFreitext] = useState(
+    () => !KURATIERT.some((m) => m.slug === initialKi.ai_model),
+  );
+
+  // Live-Liste vom Gateway nachladen (Fallback bleibt die kuratierte Liste).
+  useEffect(() => {
+    let aktiv = true;
+    fetch("/api/admin/ki/modelle")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { modelle?: ModellOption[] } | null) => {
+        if (aktiv && j?.modelle && j.modelle.length > 0) {
+          setModelle(j.modelle);
+          setFreitext((vorher) => {
+            if (vorher) return true;
+            const m = form.getValues("ai_model");
+            return !j.modelle!.some((x) => x.slug === m);
+          });
+        }
+      })
+      .catch(() => {
+        /* kuratierte Liste bleibt — kein UI-Fehler nötig */
+      });
+    return () => {
+      aktiv = false;
+    };
+  }, [form]);
 
   async function onSubmit(values: FormValues) {
     setServerError(null);
@@ -156,15 +206,50 @@ export function KiPanel({ initialKi }: { initialKi: KiStatus }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Modell *</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        autoComplete="off"
-                        placeholder="anthropic/claude-haiku-4-5"
-                      />
-                    </FormControl>
+                    <Select
+                      value={
+                        freitext || !inListe
+                          ? FREITEXT_OPTION
+                          : aktuellesModell
+                      }
+                      onValueChange={(v) => {
+                        if (v === FREITEXT_OPTION) {
+                          setFreitext(true);
+                        } else {
+                          setFreitext(false);
+                          field.onChange(v);
+                        }
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Modell wählen" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {modelle.map((m) => (
+                          <SelectItem key={m.slug} value={m.slug}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={FREITEXT_OPTION}>
+                          Anderes Modell (Slug eingeben)…
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(freitext || !inListe) && (
+                      <FormControl>
+                        <Input
+                          {...field}
+                          autoComplete="off"
+                          placeholder="anthropic/claude-…"
+                          className="mt-2"
+                        />
+                      </FormControl>
+                    )}
                     <FormDescription>
-                      Modell-Slug für das AI Gateway. Standard:
+                      Aktuelle Claude-Modelle. Mit gültigem Key wird die
+                      Live-Liste vom AI Gateway geladen. Standard:
                       anthropic/claude-haiku-4-5
                     </FormDescription>
                     <FormMessage />

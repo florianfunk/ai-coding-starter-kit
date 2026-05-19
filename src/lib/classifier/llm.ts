@@ -30,6 +30,12 @@ export interface LlmEingabe {
   empfaenger: string | null;
   /** Optionale Beleg-Stichworte (z. B. Titel/Tags), KEIN OCR-Volltext. */
   beleg_stichworte?: string[];
+  /**
+   * Optionaler Web-Recherche-Kontext (Klartext-Block, vorformatiert).
+   * Wird nur bei Retry nach Unsicherheit gefüllt. Datensparsam:
+   * Suchanfrage enthält NUR den Empfängernamen, keine Buchungsdetails.
+   */
+  web_kontext?: string;
 }
 
 /** Eine wählbare Zielkategorie (nur ID + Bezeichnung + Typ ans LLM). */
@@ -81,16 +87,48 @@ function baueKategorienListe(kategorien: readonly KategorieOption[]): string {
     .join("\n");
 }
 
-const SYSTEM_PROMPT =
-  "Du bist ein deutscher Buchhaltungs-Assistent für ein Einzelunternehmen " +
-  "(EÜR). Ordne eine einzelne Kontobuchung ein. Entscheide: privat, " +
-  "geschaeftlich, neutral (Geldtransit/Umbuchung) oder unklar; ob sie " +
-  "steuerrelevant ist; welche EÜR-Kategorie aus der vorgegebenen Liste am " +
-  "besten passt (nur deren id verwenden, sonst null); welcher USt-Satz " +
-  "(0, 7, 19 oder null). Bei gemischt privat/geschäftlichen Ausgaben " +
-  "(z. B. Tankstelle, Telefon) oder unbekanntem Text: klassifikation " +
-  "'unklar' und niedrige Konfidenz — NICHT raten. Antworte ausschließlich " +
-  "über das vorgegebene Schema.";
+const SYSTEM_PROMPT = [
+  "Du bist ein deutscher Buchhaltungs-Assistent für ein Einzelunternehmen (EÜR).",
+  "Aufgabe: Ordne eine einzelne Kontobuchung anhand von Empfänger und",
+  "Verwendungszweck (und optional Beleg-Stichworten) ein.",
+  "",
+  "ARBEITSWEISE:",
+  "1) Analysiere zuerst den EMPFÄNGER (Name/Firma). Der Empfänger ist das",
+  "   stärkste Signal — viele Firmen sind eindeutig privat (REWE, Edeka,",
+  "   Apotheke, Krankenkasse, Stromanbieter, Telekom Mobilfunk) oder",
+  "   eindeutig geschäftlich (Cloud-/SaaS-Dienste wie Strato, AWS,",
+  "   Amazon Business, Adobe; Steuerberater; Werbeplattformen).",
+  "2) Prüfe dann den VERWENDUNGSZWECK auf weitere Hinweise (Rechnungsnr.,",
+  "   Lastschrift-Mandat, 'Mobilfunk', 'Miete', 'Gehalt', 'Geburtstag' etc.).",
+  "3) Wähle aus der Kategorienliste die spezifischste passende — bevorzugt",
+  "   eine PRIVAT-Kategorie für private Ausgaben (z. B. 'Privat: Lebensmittel'",
+  "   statt nur 'Privatentnahme'), und eine konkrete Geschäfts-Kategorie",
+  "   (z. B. 'Software / IT / Cloud-Dienste' für Strato/AWS/Adobe,",
+  "   'Bewirtung / Spesen' für Restaurants im geschäftlichen Kontext).",
+  "",
+  "ENTSCHEIDUNGSGRUNDSÄTZE:",
+  "- klassifikation: 'privat' (Lebenshaltung, Familie, Privat-KFZ, Hobby,",
+  "   private Versicherungen), 'geschaeftlich' (Betriebsausgaben, Umsätze),",
+  "   'neutral' (Geldtransit zwischen eigenen Konten, USt-Zahllast/-Erstattung,",
+  "   PayPal-Übertrag aufs eigene Konto), 'unklar' (gemischt privat/geschäftlich",
+  "   wie Tankstelle ohne Kontext, oder unbekannter Empfänger).",
+  "- steuerrelevant: true nur, wenn die Buchung in die EÜR/USt einfließt.",
+  "   Private Ausgaben sind nicht steuerrelevant (ggf. Sonderausgaben/außerg.",
+  "   Belastungen, aber das gehört in die ESt-Anlage, nicht in die EÜR).",
+  "- ust_satz: 0, 7 oder 19 für Geschäftsausgaben (Standard 19% bei Sach-/",
+  "   Dienstleistungen, 7% bei Büchern/Lebensmitteln/Personenbeförderung,",
+  "   0% bei Versicherungen/Bankgebühren/Mieten ohne USt-Option). null bei",
+  "   privat/neutral.",
+  "- Bei eindeutig privat (z. B. 'Geburtstag', 'Miete privat', 'REWE'):",
+  "   hohe Konfidenz (≥0.9) ist erlaubt.",
+  "- Bei gemischt nutzbaren Ausgaben (Tankstelle, Restaurant, Telefon,",
+  "   Amazon ohne 'Business') ohne klaren Kontext: 'unklar', Konfidenz ≤0.5.",
+  "- NICHT raten bei vollständig unbekannten Empfängern — lieber 'unklar'.",
+  "- ID-Pflicht: kategorie_id MUSS exakt einer id aus der Liste entsprechen,",
+  "   sonst null setzen.",
+  "",
+  "Antworte ausschließlich über das vorgegebene JSON-Schema.",
+].join("\n");
 
 /**
  * Ruft das LLM serverseitig auf und liefert eine validierte Klassifikation.
@@ -116,13 +154,18 @@ export async function klassifiziereMitLlm(
           .join(", ")}`
       : "";
 
+  const webBlock =
+    eingabe.web_kontext && eingabe.web_kontext.trim().length > 0
+      ? `\n\n${eingabe.web_kontext.trim()}`
+      : "";
+
   const prompt =
     `Buchung:\n` +
     `Verwendungszweck: ${eingabe.verwendungszweck ?? "(leer)"}\n` +
     `Empfänger: ${eingabe.empfaenger ?? "(leer)"}\n` +
     `Betrag: ${eingabe.betrag.toFixed(2)} EUR ` +
     `(${eingabe.betrag < 0 ? "Ausgabe" : "Einnahme/Zugang"})` +
-    `${stichworte}\n\n` +
+    `${stichworte}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
   try {

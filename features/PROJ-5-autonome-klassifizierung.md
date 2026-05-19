@@ -2,7 +2,7 @@
 
 ## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-20
 
 ## Dependencies
 - Requires: PROJ-2 (EÜR-Kontenrahmen) — Zielsystematik für die Einordnung
@@ -158,6 +158,32 @@ Gemischt privat/geschäftlich → „Aufteilung nötig" → Prüfliste; unbekann
   (+ audit/validation): fehlerfrei (1 react-hooks-Fehler im Detail-Sheet
   behoben — kein synchrones setState im Effekt mehr).
 - Tests: 31 neue Tests grün (rules + pipeline); Gesamtsuite 146/146 grün.
+
+### Nachtrag 2026-05-20 — Kategorien-Feinheit + Web-Recherche-Fallback
+**Anlass:** Klassifizierung schlug fehl, weil das LLM keine privaten Kategorien hatte (nur „Privatentnahme") und unbekannte Empfänger nicht selbst nachschlagen konnte.
+
+- **Standard-Kontenrahmen erweitert** (`src/app/api/kontenrahmen/seed/route.ts`):
+  - +8 Geschäfts-Kategorien: Bewirtung/Spesen (70%), Fortbildung, Werbung/Marketing, Rechts-/Beratungskosten, Porto, Software/IT/Cloud, Reparatur/Wartung, GWG bis 800€, Bankgebühren, Beiträge/Mitgliedschaften.
+  - +18 Privat-Kategorien: Lebensmittel, Restaurant, Kleidung, Wohnen/Miete, Strom/Gas/Wasser, Krankenversicherung (Sonderausgabe), sonstige Versicherungen, Altersvorsorge (Sonderausgabe), Telekommunikation privat, Mobilität privat, Gesundheit/Apotheke, Freizeit/Streaming, Bildung/Kita, Geschenke, Spenden (Sonderausgabe), Familie/Unterhalt, Sparen, Sonstige.
+  - Seed-Endpoint ist idempotent — Owner mit altem Kontenrahmen klicken „Standard-Kontenrahmen anlegen" und bekommen nur die neuen Einträge, ohne Konflikt mit bestehenden Buchungs-Zuordnungen.
+- **System-Prompt geschärft** (`src/lib/classifier/llm.ts`):
+  - Klare Arbeitsanweisung: zuerst Empfänger analysieren (stärkstes Signal), dann Verwendungszweck.
+  - Explizite Vorgaben für Privat-Kategorien (spezifisch statt nur „Privatentnahme") und konkrete Geschäfts-Kategorien (Cloud → „Software/IT/Cloud").
+  - Konfidenz-Regeln: privat eindeutig → ≥0.9; gemischt nutzbar (Tankstelle/Restaurant ohne Kontext) → „unklar" + ≤0.5; unbekannte Empfänger → nicht raten.
+- **Firecrawl-Web-Recherche-Fallback** (`src/lib/classifier/web-research.ts`, neu):
+  - Wird nur bei unsicheren LLM-Ergebnissen aktiv (Konfidenz < Schwellwert, „unklar" oder keine Kategorie).
+  - An Firecrawl geht NUR der Empfängername (öffentliche Firmendaten), KEIN Verwendungszweck/Betrag.
+  - Eigener 8s-Timeout, alle Fehler stillschweigend → `null` (Recherche ist optional, kein Datenverlust).
+  - Ohne `FIRECRAWL_API_KEY` → automatisch deaktiviert.
+  - Pipeline ruft das LLM nach Recherche erneut mit Web-Kontext; Ergebnis wird nur übernommen, wenn es echt besser ist (`istBesser`-Heuristik: Kategorie ergänzt, „unklar" → eindeutig, oder Konfidenz +0.05).
+  - Audit-Trail vermerkt `web_recherche: { genutzt, query }`.
+- **Konfiguration:** `PipelineConfig.web_recherche_aktiv` (Default true). `FIRECRAWL_API_KEY` in `.env.local.example` dokumentiert. Paket `@mendable/firecrawl-js@4.24.2` als Dependency.
+- **Tests:** 4 neue Pipeline-Tests (Web-Retry verbessert, Web-Retry behält Original bei marginalen Gewinnen, Recherche abschaltbar, kein-Key-Fallback). Gesamtsuite 335/335 grün, TS+ESLint sauber.
+
+**Nutzung:**
+1. Im Adminbereich „Standard-Kontenrahmen anlegen" klicken (legt nur die neuen Kategorien an).
+2. Optional `FIRECRAWL_API_KEY` in `.env.local` setzen (sonst läuft nur LLM ohne Web-Recherche).
+3. Auf der Buchungs-Seite „Klassifizierung starten" — bisher unsichere Buchungen mit erkennbarem Empfänger werden jetzt mit Web-Kontext nachklassifiziert.
 
 ### Offene Punkte
 - Massen-Klassifizierung läuft synchron im Request (MVP). Bei sehr großen

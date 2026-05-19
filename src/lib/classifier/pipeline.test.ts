@@ -258,4 +258,109 @@ describe("klassifiziereBuchung — Orchestrierung & LLM-Fallback", () => {
     ).rejects.toThrow(ManuellBestaetigtError);
     expect(llmFn).not.toHaveBeenCalled();
   });
+
+  it("Web-Retry: bei niedriger Konfidenz wird recherchiert und LLM erneut befragt", async () => {
+    const llmFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
+      )
+      .mockResolvedValueOnce(
+        llmOk({ konfidenz: 0.92, klassifikation: "geschaeftlich" }),
+      );
+    const rechercheFn = vi.fn().mockResolvedValue({
+      query: "Acme GmbH Deutschland Unternehmen Branche",
+      treffer: [
+        {
+          titel: "Acme GmbH",
+          beschreibung: "Software-Anbieter aus Berlin.",
+          url: "https://acme.example",
+        },
+      ],
+    });
+    const { ergebnis, audit } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+    );
+    expect(rechercheFn).toHaveBeenCalledOnce();
+    expect(llmFn).toHaveBeenCalledTimes(2);
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.konfidenz).toBe(0.92);
+    expect(audit.details.web_recherche).toMatchObject({ genutzt: true });
+  });
+
+  it("Web-Retry liefert keinen Mehrwert → Original-Ergebnis bleibt", async () => {
+    const erster = llmOk({
+      konfidenz: 0.5,
+      klassifikation: "unklar",
+      kategorie_id: null,
+    });
+    const llmFn = vi
+      .fn()
+      .mockResolvedValueOnce(erster)
+      .mockResolvedValueOnce(
+        llmOk({ konfidenz: 0.52, klassifikation: "unklar", kategorie_id: null }),
+      );
+    const rechercheFn = vi.fn().mockResolvedValue({
+      query: "Unbekannt",
+      treffer: [
+        { titel: "Unklar", beschreibung: "Keine eindeutige Information.", url: "https://x" },
+      ],
+    });
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Unbekannt" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+    );
+    expect(rechercheFn).toHaveBeenCalledOnce();
+    // Original behalten (Konfidenz-Gewinn unter 0.05, Kategorie weiter fehlend)
+    expect(ergebnis.konfidenz).toBe(0.5);
+    expect(ergebnis.status).toBe("zur_pruefung");
+  });
+
+  it("Web-Retry abgeschaltet → keine Recherche", async () => {
+    const llmFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
+      );
+    const rechercheFn = vi.fn();
+    await klassifiziereBuchung(
+      buchung(),
+      [],
+      kategorien,
+      { ...DEFAULT_CONFIG, web_recherche_aktiv: false },
+      llmFn,
+      rechercheFn,
+    );
+    expect(rechercheFn).not.toHaveBeenCalled();
+    expect(llmFn).toHaveBeenCalledOnce();
+  });
+
+  it("Web-Recherche liefert null (kein API-Key) → kein Retry, Original bleibt", async () => {
+    const llmFn = vi
+      .fn()
+      .mockResolvedValueOnce(
+        llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
+      );
+    const rechercheFn = vi.fn().mockResolvedValue(null);
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung(),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+    );
+    expect(rechercheFn).toHaveBeenCalledOnce();
+    expect(llmFn).toHaveBeenCalledOnce();
+    expect(ergebnis.konfidenz).toBe(0.4);
+  });
 });

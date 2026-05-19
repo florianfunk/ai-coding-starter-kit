@@ -26,17 +26,29 @@ import {
   type LlmEingabe,
   type LlmErgebnis,
 } from "@/lib/classifier/llm";
+import {
+  formatiereRechercheKontext,
+  rechercheEmpfaenger,
+  type WebRechercheErgebnis,
+} from "@/lib/classifier/web-research";
 
 export interface PipelineConfig {
   /** Mindest-Konfidenz für Auto-Verbuchung (Default 0.85). */
   konfidenz_schwellwert: number;
   /** Ausreißer-Limit in EUR (|Betrag| darüber → immer Prüfung). Default 2000. */
   betrag_limit: number;
+  /**
+   * Web-Recherche-Retry bei unsicheren LLM-Antworten aktivieren.
+   * Default true — erfordert `FIRECRAWL_API_KEY` (sonst stillschweigend
+   * ohne Effekt).
+   */
+  web_recherche_aktiv?: boolean;
 }
 
 export const DEFAULT_CONFIG: PipelineConfig = {
   konfidenz_schwellwert: 0.85,
   betrag_limit: 2000,
+  web_recherche_aktiv: true,
 };
 
 /** Felder, die die Pipeline an der Buchung setzt. */
@@ -92,6 +104,7 @@ export function entscheideBuchung(
   regeln: readonly Lernregel[],
   llm: LlmErgebnis | null,
   config: PipelineConfig = DEFAULT_CONFIG,
+  llmFehler: string | null = null,
 ): PipelineEntscheidung {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
@@ -172,19 +185,20 @@ export function entscheideBuchung(
 
   // --- Stufe 2/3: KI + Konfidenz-Bewertung --------------------------------
   if (!llm) {
+    const detail = llmFehler ? ` Details: ${llmFehler}` : "";
     return baue(buchung, {
       klassifikation: null,
       steuerrelevant: null,
       kategorie_id: null,
       ust_satz: null,
       begruendung:
-        "Keine passende Regel und KI-Klassifizierung nicht verfügbar — zur Prüfung.",
+        `Keine passende Regel und KI-Klassifizierung nicht verfügbar — zur Prüfung.${detail}`,
       konfidenz: null,
       quelle: "ki",
       regel_id: null,
       status: "zur_pruefung",
       pruef_grund: "ki_nicht_verfuegbar",
-      auditExtra: { llm: "nicht_verfuegbar" },
+      auditExtra: { llm: "nicht_verfuegbar", llm_fehler: llmFehler },
     });
   }
 
@@ -265,6 +279,12 @@ function baue(
  * Orchestriert eine einzelne Buchung: Regeln zuerst; nur wenn keine Regel
  * greift, wird das LLM befragt. LLM-Ausfall → Buchung wandert in die
  * Prüfliste (kein Datenverlust, kein Raten).
+ *
+ * Web-Recherche-Retry: Wenn der erste LLM-Aufruf unsicher ist (Konfidenz
+ * unter Schwellwert, 'unklar' oder keine Kategorie), wird der Empfänger
+ * einmalig im Web nachgeschlagen und das LLM mit dem Kontext erneut
+ * befragt. Wenn das zweite Ergebnis besser ist (höhere Konfidenz oder
+ * spezifischer), wird es übernommen — sonst bleibt das Original.
  */
 export async function klassifiziereBuchung(
   buchung: BuchungFuerPipeline,
@@ -275,6 +295,9 @@ export async function klassifiziereBuchung(
     e: LlmEingabe,
     k: readonly KategorieOption[],
   ) => Promise<LlmErgebnis> = klassifiziereMitLlm,
+  rechercheFn: (
+    empfaenger: string | null,
+  ) => Promise<WebRechercheErgebnis | null> = rechercheEmpfaenger,
 ): Promise<PipelineEntscheidung> {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
@@ -292,7 +315,9 @@ export async function klassifiziereBuchung(
     return entscheideBuchung(buchung, regeln, null, config);
   }
 
+  // Erster LLM-Versuch (ohne Web).
   let llm: LlmErgebnis | null = null;
+  let llmFehler: string | null = null;
   try {
     llm = await llmFn(
       {
@@ -304,11 +329,73 @@ export async function klassifiziereBuchung(
     );
   } catch (err) {
     if (err instanceof LlmKlassifiziererError) {
-      llm = null; // Fallback: zur Prüfung, kein Raten.
+      llm = null;
+      llmFehler = err.message;
     } else {
       throw err;
     }
   }
 
-  return entscheideBuchung(buchung, regeln, llm, config);
+  // Web-Recherche-Retry bei unsicherem Ergebnis.
+  let webGenutzt = false;
+  let webQuery: string | null = null;
+  if (
+    llm &&
+    (config.web_recherche_aktiv ?? true) &&
+    istUnsicher(llm, config)
+  ) {
+    const ergebnis = await rechercheFn(buchung.empfaenger);
+    if (ergebnis) {
+      webGenutzt = true;
+      webQuery = ergebnis.query;
+      try {
+        const llm2 = await llmFn(
+          {
+            verwendungszweck: buchung.verwendungszweck,
+            betrag: buchung.betrag,
+            empfaenger: buchung.empfaenger,
+            web_kontext: formatiereRechercheKontext(ergebnis),
+          },
+          kategorien,
+        );
+        // Nur übernehmen, wenn der zweite Versuch echt besser ist.
+        if (istBesser(llm2, llm)) {
+          llm = llm2;
+        }
+      } catch (err) {
+        if (!(err instanceof LlmKlassifiziererError)) throw err;
+        // sonst: bei Retry-Fehler bleibt das Original-Ergebnis.
+      }
+    }
+  }
+
+  const entscheidung = entscheideBuchung(buchung, regeln, llm, config, llmFehler);
+  if (webGenutzt) {
+    entscheidung.audit.details = {
+      ...entscheidung.audit.details,
+      web_recherche: { genutzt: true, query: webQuery },
+    };
+  }
+  return entscheidung;
+}
+
+/** Heuristik: ist das LLM-Ergebnis unsicher genug für einen Web-Retry? */
+function istUnsicher(llm: LlmErgebnis, config: PipelineConfig): boolean {
+  return (
+    llm.konfidenz < config.konfidenz_schwellwert ||
+    llm.klassifikation === "unklar" ||
+    llm.kategorie_id === null
+  );
+}
+
+/** True, wenn der zweite Versuch echt besser ist als der erste. */
+function istBesser(neu: LlmErgebnis, alt: LlmErgebnis): boolean {
+  // Spezifischer (Kategorie vorhanden, vorher nicht) → besser.
+  if (neu.kategorie_id !== null && alt.kategorie_id === null) return true;
+  // Klassifikation eindeutiger geworden → besser.
+  if (alt.klassifikation === "unklar" && neu.klassifikation !== "unklar") {
+    return true;
+  }
+  // Sonst muss die Konfidenz spürbar steigen (mind. +0.05).
+  return neu.konfidenz >= alt.konfidenz + 0.05;
 }

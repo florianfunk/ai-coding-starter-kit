@@ -2,84 +2,226 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   STEUERAGENT — „Cobalt" Mono-Tint Designsystem
+   Übernommen aus dem Claude-Design-Bundle (Editorial Ledger v3, Cobalt).
+   Eine einzige Hue (--H) tönt die komplette UI — Flächen, Linien, Schrift.
+   Für die bestehenden shadcn/ui-Komponenten gibt es parallel HSL-Tokens, die
+   visuell denselben Look erzeugen → kein Komponenten-Rewrite nötig.
+───────────────────────────────────────────────────────────────────────────── */
+
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+  :root,
+  .theme-light {
+    /* ── Mono-Tint Steuerung ───────────────────────────────────────────── */
+    --H: 255;            /* Hue: Cobalt-Blau */
+    --Cmax: 0.26;        /* Max-Chroma für Akzent */
+    --Cmid: 0.06;        /* Mid-Chroma für weiche Flächen */
+    --Clow: 0.018;       /* Low-Chroma für Backgrounds */
+
+    /* ── Native Design-Tokens (OKLCH) ───────────────────────────────────── */
+    --bg:           oklch(0.985 var(--Clow) var(--H));
+    --surface:      oklch(0.999 var(--Clow) var(--H));
+    --surface-2:    oklch(0.955 calc(var(--Clow) * 1.6) var(--H));
+    --surface-sunk: oklch(0.935 calc(var(--Clow) * 1.8) var(--H));
+
+    --text:         oklch(0.16 0.085 var(--H));
+    --text-muted:   oklch(0.42 0.060 var(--H));
+    --text-subtle:  oklch(0.58 0.040 var(--H));
+    --text-faint:   oklch(0.74 0.025 var(--H));
+
+    --line:         oklch(0.88 0.030 var(--H));
+    --line-strong:  oklch(0.74 0.045 var(--H));
+    --line-hair:    oklch(0.93 0.022 var(--H));
+
+    --accent-color:  oklch(0.54 var(--Cmax) var(--H));
+    --accent-hover:  oklch(0.48 var(--Cmax) var(--H));
+    --accent-soft:   oklch(0.92 var(--Cmid) var(--H));
+    --accent-fg:     oklch(0.995 0.005 var(--H));
+    --accent-ring:   oklch(0.54 var(--Cmax) var(--H) / 0.32);
+
+    --positive:    oklch(0.58 0.180 148);
+    --positive-bg: oklch(0.94 0.080 148);
+    --warning:     oklch(0.72 0.180 75);
+    --warning-bg:  oklch(0.95 0.090 80);
+    --danger-color: oklch(0.58 0.230 28);
+    --danger-bg:    oklch(0.94 0.080 28);
+    --info:        oklch(0.58 0.180 235);
+    --info-bg:     oklch(0.94 0.080 235);
+
+    /* ── shadcn HSL-Tokens (visuell äquivalent zum OKLCH-Schema) ───────── */
+    /* Cobalt = ca. HSL 232 — eine Hue für die ganze App, Sättigung pro Schicht */
+    --background:           232 50% 98%;
+    --foreground:           232 35% 12%;
+    --card:                 232 60% 100%;
+    --card-foreground:      232 35% 12%;
+    --popover:              232 60% 100%;
+    --popover-foreground:   232 35% 12%;
+    --primary:              232 90% 55%;     /* Cobalt-Akzent */
+    --primary-foreground:   232 100% 99%;
+    --secondary:            232 30% 94%;
+    --secondary-foreground: 232 35% 18%;
+    --muted:                232 30% 94%;
+    --muted-foreground:     232 15% 42%;
+    --accent:               232 70% 92%;
+    --accent-foreground:    232 90% 32%;
+    --destructive:          12 78% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border:               232 20% 88%;
+    --input:                232 20% 86%;
+    --ring:                 232 90% 55%;
+
+    /* Editorial: kleinere, härtere Radien */
+    --radius: 0.5rem;     /* 8px — passt zu --radius-lg im Design (10px) */
+
+    --chart-1: 232 90% 55%;
+    --chart-2: 148 60% 42%;
+    --chart-3: 28 85% 52%;
+    --chart-4: 340 80% 55%;
+    --chart-5: 165 60% 42%;
+
+    --sidebar-background:        232 40% 95%;
+    --sidebar-foreground:        232 25% 32%;
+    --sidebar-primary:           232 90% 55%;
+    --sidebar-primary-foreground: 232 100% 99%;
+    --sidebar-accent:            232 70% 90%;
+    --sidebar-accent-foreground: 232 90% 30%;
+    --sidebar-border:            232 20% 86%;
+    --sidebar-ring:              232 90% 55%;
+
+    /* Cobalt-getönte Schatten */
+    --shadow-1:   0 1px 0 oklch(0.20 0.10 var(--H) / 0.04), 0 1px 2px oklch(0.20 0.10 var(--H) / 0.06);
+    --shadow-2:   0 1px 0 oklch(0.20 0.10 var(--H) / 0.04), 0 6px 18px oklch(0.20 0.10 var(--H) / 0.10);
+    --shadow-pop: 0 14px 40px oklch(0.20 0.10 var(--H) / 0.18), 0 2px 8px oklch(0.20 0.10 var(--H) / 0.10);
+
+    --sidebar-w: 232px;
+
+    /* Editorial-Typografie — verbindet sich mit next/font im Root-Layout */
+    --font-display: var(--font-source-serif), Georgia, serif;
+    --font-ui:      var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+    --font-mono:    var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+    --display-weight: 400;
+    --display-tracking: -0.01em;
+
+    color-scheme: light;
   }
 
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+  .dark,
+  .theme-dark {
+    /* OKLCH dark */
+    --bg:           oklch(0.135 0.045 var(--H));
+    --surface:      oklch(0.175 0.055 var(--H));
+    --surface-2:    oklch(0.215 0.065 var(--H));
+    --surface-sunk: oklch(0.110 0.040 var(--H));
+
+    --text:         oklch(0.97 0.020 var(--H));
+    --text-muted:   oklch(0.74 0.040 var(--H));
+    --text-subtle:  oklch(0.58 0.050 var(--H));
+    --text-faint:   oklch(0.42 0.045 var(--H));
+
+    --line:         oklch(0.295 0.075 var(--H));
+    --line-strong:  oklch(0.395 0.090 var(--H));
+    --line-hair:    oklch(0.245 0.065 var(--H));
+
+    --accent-color:  oklch(0.74 var(--Cmax) var(--H));
+    --accent-hover:  oklch(0.80 var(--Cmax) var(--H));
+    --accent-soft:   oklch(0.30 calc(var(--Cmax) * 0.55) var(--H));
+    --accent-fg:     oklch(0.10 0.04 var(--H));
+    --accent-ring:   oklch(0.74 var(--Cmax) var(--H) / 0.45);
+
+    --positive:    oklch(0.82 0.190 148);
+    --positive-bg: oklch(0.30 0.110 148);
+    --warning:     oklch(0.85 0.180 78);
+    --warning-bg:  oklch(0.32 0.110 78);
+    --danger-color: oklch(0.74 0.220 28);
+    --danger-bg:    oklch(0.32 0.130 28);
+    --info:        oklch(0.80 0.180 235);
+    --info-bg:     oklch(0.30 0.100 235);
+
+    --shadow-1:   0 1px 0 oklch(1 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.40);
+    --shadow-2:   0 1px 0 oklch(1 0 0 / 0.04), 0 6px 16px oklch(0 0 0 / 0.50);
+    --shadow-pop: 0 14px 40px oklch(0 0 0 / 0.65), 0 2px 8px oklch(0 0 0 / 0.40);
+
+    /* shadcn HSL dark (Cobalt) */
+    --background:           232 35% 8%;
+    --foreground:           232 18% 96%;
+    --card:                 232 30% 11%;
+    --card-foreground:      232 18% 96%;
+    --popover:              232 30% 12%;
+    --popover-foreground:   232 18% 96%;
+    --primary:              232 100% 72%;
+    --primary-foreground:   232 60% 10%;
+    --secondary:            232 25% 18%;
+    --secondary-foreground: 232 18% 96%;
+    --muted:                232 25% 16%;
+    --muted-foreground:     232 18% 72%;
+    --accent:               232 50% 22%;
+    --accent-foreground:    232 100% 80%;
+    --destructive:          12 80% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border:               232 25% 20%;
+    --input:                232 25% 22%;
+    --ring:                 232 100% 72%;
+
+    --chart-1: 232 100% 72%;
+    --chart-2: 148 65% 55%;
+    --chart-3: 28 85% 62%;
+    --chart-4: 340 80% 65%;
+    --chart-5: 165 60% 55%;
+
+    --sidebar-background:        232 35% 9%;
+    --sidebar-foreground:        232 18% 80%;
+    --sidebar-primary:           232 100% 72%;
+    --sidebar-primary-foreground: 232 60% 10%;
+    --sidebar-accent:            232 50% 22%;
+    --sidebar-accent-foreground: 232 100% 80%;
+    --sidebar-border:            232 25% 20%;
+    --sidebar-ring:              232 100% 72%;
+
+    color-scheme: dark;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { border-color: hsl(var(--border)); }
+  html, body, #__next { height: 100%; }
   body {
-    @apply bg-background text-foreground;
+    background: var(--bg, hsl(var(--background)));
+    color: var(--text, hsl(var(--foreground)));
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "ss01", "cv11";
+  }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+}
+
+@layer utilities {
+  /* Editorial Schatten (überschreiben shadcn-Defaults) */
+  .shadow-sm { box-shadow: var(--shadow-1); }
+  .shadow,
+  .shadow-md { box-shadow: var(--shadow-2); }
+  .shadow-lg,
+  .shadow-xl { box-shadow: var(--shadow-pop); }
+
+  /* Tabellarische Mono-Ziffern — kritisch in der Steuer-App */
+  .num, .ng-num, .tabular-nums { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+  /* Display-Headlines im Editorial-Stil */
+  .font-display {
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+  }
+
+  /* Eyebrow-Mini-Label (über Page-Titeln, Card-Headern) */
+  .eyebrow {
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--text-subtle);
   }
 }

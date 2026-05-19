@@ -2,6 +2,14 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/*
+ * Card im „Editorial Ledger"-Stil:
+ *  - kleinere Radien (10 px), Haarlinien-Border, getönter Sunk-Schatten
+ *  - CardHeader trennt sich optisch durch eine feine Border-bottom
+ *  - CardTitle nutzt die Display-Serif (Source Serif 4)
+ *  - API kompatibel zu shadcn → bestehende Pages bleiben unverändert
+ */
+
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -9,7 +17,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      "rounded-[10px] border bg-card text-card-foreground shadow-sm",
       className
     )}
     {...props}
@@ -23,7 +31,10 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn(
+      "flex flex-col space-y-1.5 border-b px-[18px] py-3.5",
+      className
+    )}
     {...props}
   />
 ))
@@ -36,7 +47,7 @@ const CardTitle = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
+      "font-display text-[17px] font-normal leading-tight tracking-[-0.01em]",
       className
     )}
     {...props}
@@ -50,7 +61,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-[12px] text-muted-foreground", className)}
     {...props}
   />
 ))
@@ -60,7 +71,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  <div ref={ref} className={cn("p-[18px]", className)} {...props} />
 ))
 CardContent.displayName = "CardContent"
 
@@ -70,7 +81,7 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center p-6 pt-0", className)}
+    className={cn("flex items-center border-t px-[18px] py-3", className)}
     {...props}
   />
 ))

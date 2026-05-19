@@ -1,27 +1,16 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/auth/guard";
-import { Button } from "@/components/ui/button";
+import { AppSidebar } from "@/components/app-sidebar";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/buchungen", label: "Buchungen" },
-  { href: "/pruefliste", label: "Prüfliste" },
-  { href: "/abgleich", label: "Beleg-Abgleich" },
-  { href: "/belege", label: "Belege" },
-  { href: "/ust-voranmeldung", label: "USt-Voranmeldung" },
-  { href: "/euer", label: "EÜR" },
-  { href: "/einkommensteuer", label: "Einkommensteuer" },
-  { href: "/export", label: "Export" },
-];
-
-const SETTINGS = [
-  { href: "/einstellungen/firma", label: "Firma & Steuerprofil" },
-  { href: "/einstellungen/kontenrahmen", label: "Kontenrahmen" },
-  { href: "/einstellungen/konten", label: "Bankkonten" },
-  { href: "/einstellungen/paperless", label: "Paperless" },
-  { href: "/einstellungen/regeln", label: "Lernregeln" },
-  { href: "/einstellungen/admin", label: "Admin" },
-];
+/*
+ * App-Shell im Editorial-Stil:
+ *   ┌──────────┬─────────────────────────┐
+ *   │ Sidebar  │ Topbar (56 px)          │
+ *   │ 232 px   ├─────────────────────────┤
+ *   │          │ Content (max 1320 px)   │
+ *   │          │                         │
+ *   └──────────┴─────────────────────────┘
+ * Grid + overflow:hidden auf dem Wrapper, Content scrollt separat.
+ */
 
 export default async function AppLayout({
   children,
@@ -31,39 +20,34 @@ export default async function AppLayout({
   await requireUser();
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-60 shrink-0 border-r bg-muted/20 p-4 md:block">
-        <div className="mb-6 px-2 text-lg font-semibold">STEUERAGENT</div>
-        <nav className="space-y-1">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
+    <div
+      className="md:grid md:h-screen md:grid-cols-[232px_1fr] md:overflow-hidden"
+      style={{ background: "var(--bg)" }}
+    >
+      <AppSidebar />
+      <main className="flex flex-col md:overflow-hidden">
+        <div
+          className="hidden min-h-[56px] items-center gap-3 px-6 md:flex"
+          style={{ borderBottom: "1px solid var(--line)" }}
+        >
+          <div
+            className="text-[12px]"
+            style={{ color: "var(--text-muted)" }}
+          >
+            STEUERAGENT
+            <span
+              className="mx-2"
+              style={{ color: "var(--text-faint)" }}
             >
-              {item.label}
-            </Link>
-          ))}
-          <div className="pt-4 text-xs font-medium uppercase text-muted-foreground px-3">
-            Einstellungen
+              /
+            </span>
+            <span style={{ color: "var(--text)" }}>Arbeitsbereich</span>
           </div>
-          {SETTINGS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-md px-3 py-2 text-sm hover:bg-muted"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <form action="/auth/signout" method="post" className="mt-6">
-          <Button variant="outline" size="sm" className="w-full">
-            Abmelden
-          </Button>
-        </form>
-      </aside>
-      <main className="flex-1 overflow-x-hidden p-6 md:p-8">{children}</main>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-8 md:px-8 md:pb-14">
+          <div className="mx-auto w-full max-w-[1320px]">{children}</div>
+        </div>
+      </main>
     </div>
   );
 }

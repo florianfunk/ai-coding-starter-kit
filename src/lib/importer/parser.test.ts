@@ -100,6 +100,23 @@ describe("normalisiereDatum — DE-Formate → ISO", () => {
     expect(normalisiereDatum("abc")).toBeNull();
     expect(normalisiereDatum("")).toBeNull();
   });
+
+  it("erkennt US-Format M/D/YY automatisch, wenn DE unmöglich ist", () => {
+    // 3/31/26 → US-Layout: Monat=3, Tag=31, Jahr=2026 (DE wäre Tag=3, Monat=31 → invalid)
+    expect(normalisiereDatum("3/31/26")).toBe("2026-03-31");
+    expect(normalisiereDatum("12/25/25")).toBe("2025-12-25");
+  });
+
+  it("respektiert format=US auch bei DE-doppeldeutigen Eingaben", () => {
+    // 1/2/26: in DE = 2026-02-01, in US = 2026-01-02 — Format entscheidet.
+    expect(normalisiereDatum("1/2/26", "US")).toBe("2026-01-02");
+    expect(normalisiereDatum("1/2/26", "DE")).toBe("2026-02-01");
+  });
+
+  it("respektiert format=DE auch bei US-Format, das in DE ungültig wäre", () => {
+    // 3/31/26 ist in DE invalid (Monat=31). Mit erzwungenem DE → null.
+    expect(normalisiereDatum("3/31/26", "DE")).toBeNull();
+  });
 });
 
 describe("bildeDuplikatHash — Stabilität", () => {
@@ -204,6 +221,66 @@ describe("parseKontoauszug — Header/Leer/Summen-Filter & Mapping", () => {
     const erg = parseKontoauszug(buf, m, "k");
     expect(erg.buchungen).toHaveLength(0);
     expect(erg.fehlerhaft[0].grund).toContain("Betrags-Spalte");
+  });
+
+  it("parst MoneyMoney-Export (US-Datum, EN-Zahlen, Name=Empfänger)", () => {
+    const mmMapping: KontoMapping = {
+      datum: "Datum",
+      betrag: "Betrag",
+      verwendungszweck: "Verwendungszweck",
+      empfaenger: "Name",
+      waehrung: "Währung",
+      datum_format: "US",
+    };
+    const buf = macheXlsx([
+      [
+        "Datum",
+        "Wertstellung",
+        "Kategorie",
+        "Name",
+        "Verwendungszweck",
+        "Konto",
+        "Bank",
+        "Betrag",
+        "Währung",
+      ],
+      [
+        "3/31/26",
+        "3/31/26",
+        "",
+        "Strato GmbH",
+        "DRP 151703823, Umsatzart: Folgelastschrift",
+        "DE26380400070100679001",
+        "COBADEFF",
+        "-30.00",
+        "EUR",
+      ],
+      [
+        "3/26/26",
+        "3/26/26",
+        "",
+        "PayPal",
+        "Instant Transfer",
+        "LU947510261215211218",
+        "PPLXLUL2",
+        "5,488.96",
+        "EUR",
+      ],
+    ]);
+    const erg = parseKontoauszug(buf, mmMapping, "konto-mm");
+    expect(erg.fehlerhaft).toHaveLength(0);
+    expect(erg.buchungen).toHaveLength(2);
+    expect(erg.buchungen[0]).toMatchObject({
+      buchung_datum: "2026-03-31",
+      betrag: -30,
+      empfaenger: "Strato GmbH",
+      waehrung: "EUR",
+    });
+    expect(erg.buchungen[1]).toMatchObject({
+      buchung_datum: "2026-03-26",
+      betrag: 5488.96,
+      empfaenger: "PayPal",
+    });
   });
 
   it("invertiert Beträge, wenn Mapping betrag_vorzeichen_invertieren=true", () => {

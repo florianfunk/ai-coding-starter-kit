@@ -2,7 +2,7 @@
 
 ## Status: In Progress
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-05-19
 
 ## Dependencies
 - Requires: PROJ-1 (Auth & Steuerprofil) — für geschützten Zugriff
@@ -109,6 +109,14 @@ Duplikaterkennung bei Überlappung; erzwungene Mapping-Anpassung bei unbekanntem
 - `npx eslint` (alle PROJ-4-Pfade inkl. Tests): keine Fehler/Warnungen
 - Unit-Tests: 37 neue Tests grün (27 parser + 10 konto); Gesamtsuite 115/115 grün, keine Regression
 - Migration `0001_init_steueragent.sql` NICHT geändert (Tabellen `konto`/`buchung`/`job_lauf` wie vorgegeben verwendet)
+
+### Nachtrag 2026-05-19 — Realdatei-Anpassung MoneyMoney
+- Erster echter Bankexport (`data/Geschäftsgiro Business-Giro Ko Q1.xls`, MoneyMoney) führte mit dem ursprünglichen Parser zu 0 Buchungen + 425 Fehlerzeilen, weil das US-Datumsformat `M/D/YY` (`3/31/26`) nicht erkannt wurde.
+- Parser (`src/lib/importer/parser.ts`) erweitert: `normalisiereDatum(roh, format?)` mit `format ∈ {"auto","DE","US","ISO"}`. „auto" bevorzugt DE (Rückwärtskompatibilität) und fällt nur dann auf US zurück, wenn DE-Interpretation eindeutig invalid ist (z. B. Monat > 12).
+- `KontoMapping`-Typ (`src/lib/types.ts`) + Zod-Schema (`src/lib/validation/konto.ts`) um `datum_format` erweitert. `parseKontoauszug` reicht das Format aus dem Mapping durch.
+- Konto-Dialog (`src/components/konten/konto-dialog.tsx`): neues Select „Datumsformat in der Datei" + Quick-Preset-Button „MoneyMoney (Bank-Export)", das Mapping (Datum/Betrag/Verwendungszweck/Name=Empfänger/Währung) und `datum_format: "US"` in einem Klick setzt.
+- Tests: 4 neue Datums-Tests (US-Auto-Erkennung, erzwungenes DE/US, Doppeldeutigkeit) + ein End-to-End-Test mit MoneyMoney-Header. Zusätzlicher Real-File-Smoke-Test (`parser.realfile.test.ts`) gegen `data/Geschäftsgiro Business-Giro Ko Q1.xls`: 425 Buchungen geparst, 0 Fehler, alle in Q1-2026, alle EUR. Test überspringt sich, wenn die Datei nicht vorhanden ist.
+- Status Tooling: `tsc --noEmit` fehlerfrei, ESLint fehlerfrei, gesamte Suite 331/331 grün.
 
 ### Offene Punkte / Folgefeatures
 - E2E-Tests (Playwright) für den Upload-Flow nicht erstellt (nicht beauftragt; `/qa` übernimmt).

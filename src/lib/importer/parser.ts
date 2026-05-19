@@ -13,7 +13,7 @@
 // Funktionen und kümmert sich um Persistenz/Duplikaterkennung gegen die DB.
 
 import * as XLSX from "xlsx";
-import type { KontoMapping } from "@/lib/types";
+import type { DatumFormat, KontoMapping } from "@/lib/types";
 
 /** Eine normalisierte Buchungszeile (noch ohne DB-Felder/owner). */
 export interface GeparsteBuchung {
@@ -198,17 +198,25 @@ export function normalisiereBetrag(
 }
 
 /**
- * Parst ein Datum aus gängigen DE-Formaten zu ISO (JJJJ-MM-TT).
+ * Parst ein Datum aus gängigen Formaten zu ISO (JJJJ-MM-TT).
  *
  * Unterstützt:
- * - TT.MM.JJJJ, T.M.JJJJ, TT.MM.JJ
- * - TT/MM/JJJJ, TT-MM-JJJJ
- * - bereits ISO JJJJ-MM-TT
+ * - DE: TT.MM.JJJJ, T.M.JJJJ, TT.MM.JJ, TT/MM/JJJJ, TT-MM-JJJJ
+ * - US: M/D/YY, M/D/YYYY (z. B. MoneyMoney-Export)
+ * - ISO: JJJJ-MM-TT (auch JJJJ/MM/TT, JJJJ.MM.TT)
  * - Excel-Serienzahl (Tage seit 1899-12-30)
+ *
+ * Mit `format`:
+ * - "auto" (Default): DE wird bevorzugt; ist DE eindeutig ungültig
+ *   (z. B. erster Teil ≤12, zweiter Teil >12), wird US versucht.
+ * - "DE" / "US" / "ISO": erzwingt das jeweilige Layout.
  *
  * @returns ISO-String oder null bei unbekanntem/ungültigem Datum.
  */
-export function normalisiereDatum(roh: string): string | null {
+export function normalisiereDatum(
+  roh: string,
+  format: DatumFormat = "auto",
+): string | null {
   if (roh == null) return null;
   const s = String(roh).trim();
   if (s === "") return null;
@@ -233,25 +241,36 @@ export function normalisiereDatum(roh: string): string | null {
     }
   }
 
-  // TT.MM.JJJJ / TT/MM/JJJJ / TT-MM-JJJJ (auch 2-stelliges Jahr)
-  const m = s.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{2}|\d{4})$/);
+  // Drei numerische Teile, getrennt durch . / -
+  const m = s.match(/^(\d{1,4})[.\-/](\d{1,2})[.\-/](\d{1,4})$/);
   if (m) {
-    const tag = +m[1];
-    const monat = +m[2];
-    let jahr = +m[3];
-    if (m[3].length === 2) jahr += jahr < 70 ? 2000 : 1900;
-    if (!gueltigesDatum(jahr, monat, tag)) return null;
-    return formatIso(jahr, monat, tag);
-  }
+    const a = +m[1];
+    const b = +m[2];
+    const c = +m[3];
+    const aRaw = m[1];
+    const cRaw = m[3];
 
-  // JJJJ.MM.TT oder JJJJ/MM/TT
-  const m2 = s.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
-  if (m2) {
-    const jahr = +m2[1];
-    const monat = +m2[2];
-    const tag = +m2[3];
-    if (!gueltigesDatum(jahr, monat, tag)) return null;
-    return formatIso(jahr, monat, tag);
+    // ISO-Layout (4-stelliges Jahr vorne): JJJJ-MM-TT
+    if (aRaw.length === 4) {
+      if (format === "auto" || format === "ISO") {
+        if (gueltigesDatum(a, b, c)) return formatIso(a, b, c);
+      }
+      return null;
+    }
+
+    const jahr = cRaw.length === 2 ? c + (c < 70 ? 2000 : 1900) : c;
+
+    if (format === "DE") {
+      return gueltigesDatum(jahr, b, a) ? formatIso(jahr, b, a) : null;
+    }
+    if (format === "US") {
+      return gueltigesDatum(jahr, a, b) ? formatIso(jahr, a, b) : null;
+    }
+
+    // auto: DE-Layout bevorzugen. Wenn DE ungültig, aber US gültig → US.
+    if (gueltigesDatum(jahr, b, a)) return formatIso(jahr, b, a);
+    if (gueltigesDatum(jahr, a, b)) return formatIso(jahr, a, b);
+    return null;
   }
 
   return null;
@@ -416,7 +435,7 @@ export function parseKontoauszug(
 
     if (rohDatum.trim() === "" && rohBetrag.trim() === "") continue;
 
-    const datum = normalisiereDatum(rohDatum);
+    const datum = normalisiereDatum(rohDatum, mapping.datum_format ?? "auto");
     if (!datum) {
       fehlerhaft.push({
         zeile: zeilenNr,

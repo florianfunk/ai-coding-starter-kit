@@ -43,6 +43,8 @@ export interface Konto {
   mapping: KontoMapping | null;
 }
 
+export type DatumFormat = "auto" | "DE" | "US" | "ISO";
+
 export interface KontoMapping {
   datum: string;
   betrag: string;
@@ -50,6 +52,15 @@ export interface KontoMapping {
   empfaenger?: string;
   waehrung?: string;
   betrag_vorzeichen_invertieren?: boolean;
+  /**
+   * Reihenfolge in Datumsstrings mit Trennzeichen "." "/" "-".
+   * - "auto" (Default): DE (TT.MM.JJJJ) wird bevorzugt; bei eindeutigem
+   *   US-Layout (erster Teil ≤12, zweiter Teil >12) wird US erkannt.
+   * - "DE": TT.MM.JJJJ erzwingen (Bank-/Sparkassen-Exporte).
+   * - "US": M/D/YY erzwingen (z. B. MoneyMoney-Export).
+   * - "ISO": JJJJ-MM-TT erzwingen.
+   */
+  datum_format?: DatumFormat;
 }
 
 export type BuchungStatus =

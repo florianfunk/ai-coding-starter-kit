@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import type { Konto, KontoTyp } from "@/lib/types";
+import type { DatumFormat, Konto, KontoTyp } from "@/lib/types";
 import {
+  DATUM_FORMATE,
   kontoInputSchema,
   type KontoInput,
 } from "@/lib/validation/konto";
@@ -43,6 +44,37 @@ const TYP_LABELS: Record<KontoTyp, string> = {
   kreditkarte: "Kreditkarte",
 };
 
+const DATUM_FORMAT_LABELS: Record<DatumFormat, string> = {
+  auto: "Automatisch erkennen",
+  DE: "DE — TT.MM.JJJJ",
+  US: "US — M/D/JJ (z. B. MoneyMoney)",
+  ISO: "ISO — JJJJ-MM-TT",
+};
+
+/** Vorgefertigte Mapping-Vorlagen für gängige Export-Formate. */
+const MAPPING_PRESETS: Array<{
+  id: string;
+  label: string;
+  beschreibung: string;
+  werte: Omit<FormValues, "bezeichnung" | "typ">;
+}> = [
+  {
+    id: "moneymoney",
+    label: "MoneyMoney (Bank-Export)",
+    beschreibung:
+      "Excel-Export aus MoneyMoney: Datum/Wertstellung/Name/Verwendungszweck/Betrag/Währung, US-Datum.",
+    werte: {
+      map_datum: "Datum",
+      map_betrag: "Betrag",
+      map_verwendungszweck: "Verwendungszweck",
+      map_empfaenger: "Name",
+      map_waehrung: "Währung",
+      map_invertieren: false,
+      map_datum_format: "US",
+    },
+  },
+];
+
 type FormValues = {
   bezeichnung: string;
   typ: KontoTyp;
@@ -52,6 +84,7 @@ type FormValues = {
   map_empfaenger: string;
   map_waehrung: string;
   map_invertieren: boolean;
+  map_datum_format: DatumFormat;
 };
 
 function toFormValues(k: Konto | null): FormValues {
@@ -64,6 +97,7 @@ function toFormValues(k: Konto | null): FormValues {
     map_empfaenger: k?.mapping?.empfaenger ?? "",
     map_waehrung: k?.mapping?.waehrung ?? "",
     map_invertieren: k?.mapping?.betrag_vorzeichen_invertieren ?? false,
+    map_datum_format: k?.mapping?.datum_format ?? "auto",
   };
 }
 
@@ -81,6 +115,7 @@ function toPayload(v: FormValues): KontoInput {
           empfaenger: v.map_empfaenger || undefined,
           waehrung: v.map_waehrung || undefined,
           betrag_vorzeichen_invertieren: v.map_invertieren,
+          datum_format: v.map_datum_format,
         }
       : null,
   };
@@ -208,6 +243,41 @@ export function KontoDialog({
                 Vorlage wird bei jedem weiteren Import dieses Kontos
                 wiederverwendet.
               </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {MAPPING_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      form.setValue("map_datum", preset.werte.map_datum);
+                      form.setValue("map_betrag", preset.werte.map_betrag);
+                      form.setValue(
+                        "map_verwendungszweck",
+                        preset.werte.map_verwendungszweck,
+                      );
+                      form.setValue(
+                        "map_empfaenger",
+                        preset.werte.map_empfaenger,
+                      );
+                      form.setValue("map_waehrung", preset.werte.map_waehrung);
+                      form.setValue(
+                        "map_invertieren",
+                        preset.werte.map_invertieren,
+                      );
+                      form.setValue(
+                        "map_datum_format",
+                        preset.werte.map_datum_format,
+                      );
+                      toast.success(`Vorlage „${preset.label}“ übernommen`);
+                    }}
+                    title={preset.beschreibung}
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -286,6 +356,36 @@ export function KontoDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="map_datum_format"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Datumsformat in der Datei</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Datumsformat wählen" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {DATUM_FORMATE.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {DATUM_FORMAT_LABELS[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    „Automatisch“ bevorzugt DE (TT.MM.JJJJ). Bei MoneyMoney
+                    explizit „US“ wählen — sonst werden Daten wie „3/31/26“
+                    falsch interpretiert.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

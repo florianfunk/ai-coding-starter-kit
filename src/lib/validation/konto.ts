@@ -5,6 +5,9 @@ import { z } from "zod";
 /** Konto-Typen (Spiegel des DB-CHECK auf `konto.typ`). */
 export const KONTO_TYPEN = ["bank", "paypal", "kreditkarte"] as const;
 
+/** Zulässige Datumsformate für die Mapping-Vorlage. */
+export const DATUM_FORMATE = ["auto", "DE", "US", "ISO"] as const;
+
 /**
  * Spalten→Feld-Mapping-Vorlage eines Kontos.
  *
@@ -43,6 +46,7 @@ export const kontoMappingSchema = z.object({
     .optional()
     .transform((v) => (v && v.length > 0 ? v : undefined)),
   betrag_vorzeichen_invertieren: z.boolean().optional().default(false),
+  datum_format: z.enum(DATUM_FORMATE).optional().default("auto"),
 });
 
 /** Eingabeschema für Konto-Anlage (POST) und -Bearbeitung (PUT). */

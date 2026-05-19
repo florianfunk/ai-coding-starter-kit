@@ -32,7 +32,22 @@ verweigert der Guard den Zugriff (Redirect auf /login?error=not-allowed).
 
 `AI_GATEWAY_API_KEY` aus Vercel AI Gateway. Ohne gültigen Key fällt die
 Klassifizierungs-Pipeline auf reine Regel-Engine zurück (kein Datenverlust,
-unsichere Fälle landen in der Prüfliste).
+unsichere Fälle landen in der Prüfliste mit pruef_grund 'ki_nicht_verfuegbar').
+
+### Key später nachtragen
+1. https://vercel.com/dashboard → AI Gateway → API Keys → Create Key (Format `vck_...`)
+2. In `.env.local` die Zeile `AI_GATEWAY_API_KEY=` mit dem echten Key ersetzen
+3. Dev-Server neu starten (`npm run dev`)
+
+## Status (2026-05-19)
+
+- Supabase-Projekt live, Schema + RLS verifiziert (EU/Frankfurt)
+- Auth-User `soulschoki@googlemail.com` angelegt (E-Mail bestätigt)
+- ESt-Tarife 2024/2025 in `est_tarif` geseedet
+- Standard-Kontenrahmen (20 Kategorien) via App-API angelegt
+- End-to-End-Smoketest grün (Login → App-Middleware → API → DB mit RLS)
+- Branch `feat/steueragent-mvp` auf GitHub gepusht
+- Offen: AI-Gateway-Key (App läuft ohne KI über Regel-Engine + Prüfliste)
 
 ## Externe Voraussetzung: Paperless-ngx
 

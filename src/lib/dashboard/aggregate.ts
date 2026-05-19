@@ -309,6 +309,37 @@ export function bereitePerioden(
     });
 }
 
+/**
+ * Status der 6 Ersteinrichtungs-Schritte (Onboarding). Jedes Flag = Schritt
+ * abgeschlossen. Reihenfolge entspricht der Schrittnummerierung im UI.
+ */
+export interface OnboardingStatus {
+  /** 1. Firmen-/Steuerprofil angelegt. */
+  profil: boolean;
+  /** 2. Mindestens eine Kontenrahmen-Kategorie vorhanden. */
+  kontenrahmen: boolean;
+  /** 3. Paperless-Verbindung mit Token hinterlegt. */
+  paperless: boolean;
+  /** 4. Mindestens ein Bankkonto angelegt. */
+  konten: boolean;
+  /** 5. Mindestens eine Buchung importiert. */
+  import: boolean;
+  /** 6. Mindestens eine Buchung klassifiziert (Status != offen). */
+  klassifizierung: boolean;
+}
+
+/** True, wenn alle 6 Onboarding-Schritte abgeschlossen sind. */
+export function onboardingVollstaendig(s: OnboardingStatus): boolean {
+  return (
+    s.profil &&
+    s.kontenrahmen &&
+    s.paperless &&
+    s.konten &&
+    s.import &&
+    s.klassifizierung
+  );
+}
+
 /** Vollständiges Dashboard-Aggregat (Rückgabe der API/Server-Komponente). */
 export interface DashboardAggregat {
   aktionen: AktionsKennzahlen;
@@ -318,6 +349,8 @@ export interface DashboardAggregat {
   konto_import: SyncStatus;
   /** true, wenn weder Buchungen noch Belege noch Konten vorhanden sind. */
   ist_leer: boolean;
+  /** Status der 6 Ersteinrichtungs-Schritte. */
+  onboarding: OnboardingStatus;
   /** ISO-Zeitstempel des Aggregations-Zeitpunkts (Aktualitätsstand). */
   stand: string;
 }

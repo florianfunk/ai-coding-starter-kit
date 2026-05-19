@@ -7,6 +7,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { ladeDashboardAggregat } from "@/lib/dashboard/load";
+import { onboardingVollstaendig } from "@/lib/dashboard/aggregate";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
 import { Onboarding } from "@/components/dashboard/onboarding";
@@ -49,8 +50,18 @@ export default async function DashboardPage() {
             Seite neu.
           </AlertDescription>
         </Alert>
-      ) : aggregat.ist_leer ? (
-        <Onboarding />
+      ) : !onboardingVollstaendig(aggregat.onboarding) ? (
+        <>
+          <Onboarding status={aggregat.onboarding} />
+          {!aggregat.ist_leer && (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Stand: {formatZeitpunkt(aggregat.stand)}
+              </p>
+              <DashboardGrid data={aggregat} />
+            </>
+          )}
+        </>
       ) : (
         <>
           <p className="text-xs text-muted-foreground">

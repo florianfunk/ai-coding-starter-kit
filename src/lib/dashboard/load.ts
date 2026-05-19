@@ -75,35 +75,62 @@ export async function ladeDashboardAggregat(
   const heute = heuteIso();
 
   // Wirtschaftsjahr-Beginn aus dem Firmenprofil (Default Kalenderjahr).
+  // firmenname dient zugleich als Onboarding-Signal "Profil angelegt".
   const { data: profil } = await supabase
     .from("firmenprofil")
-    .select("wirtschaftsjahr_beginn")
+    .select("wirtschaftsjahr_beginn, firmenname")
     .eq("owner_id", ownerId)
     .limit(1)
     .maybeSingle();
-  const wjBeginn =
-    (profil as { wirtschaftsjahr_beginn?: number } | null)
-      ?.wirtschaftsjahr_beginn ?? 1;
+  const profilRow = profil as {
+    wirtschaftsjahr_beginn?: number;
+    firmenname?: string | null;
+  } | null;
+  const wjBeginn = profilRow?.wirtschaftsjahr_beginn ?? 1;
+  const profilAngelegt = !!profilRow?.firmenname?.trim();
 
   const { von, bis } = laufendesWirtschaftsjahr(heute, wjBeginn);
 
-  // Aktions-Kennzahlen: count-only Queries (kein Datentransfer der Zeilen).
-  const [prueffaelleC, unklassifiziertC, belegeC, kontenC, gesamtBuchungenC] =
-    await Promise.all([
-      supabase
-        .from("buchung")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", ownerId)
-        .eq("status", "zur_pruefung"),
-      supabase
-        .from("buchung")
-        .select("id", { count: "exact", head: true })
-        .eq("owner_id", ownerId)
-        .eq("status", "offen"),
-      exaktZaehlen(supabase, ownerId, "beleg"),
-      exaktZaehlen(supabase, ownerId, "konto"),
-      exaktZaehlen(supabase, ownerId, "buchung"),
-    ]);
+  // Aktions-Kennzahlen + Onboarding-Signale: count-only / top-1 Queries.
+  const [
+    prueffaelleC,
+    unklassifiziertC,
+    belegeC,
+    kontenC,
+    gesamtBuchungenC,
+    kategorienC,
+    klassifiziertC,
+    paperlessRow,
+  ] = await Promise.all([
+    supabase
+      .from("buchung")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerId)
+      .eq("status", "zur_pruefung"),
+    supabase
+      .from("buchung")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerId)
+      .eq("status", "offen"),
+    exaktZaehlen(supabase, ownerId, "beleg"),
+    exaktZaehlen(supabase, ownerId, "konto"),
+    exaktZaehlen(supabase, ownerId, "buchung"),
+    supabase
+      .from("kategorie")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerId),
+    supabase
+      .from("buchung")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", ownerId)
+      .neq("status", "offen"),
+    supabase
+      .from("paperless_verbindung")
+      .select("token_cipher")
+      .eq("owner_id", ownerId)
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   // Fehlende Belege: geschäftliche Buchungen ohne beleg_buchung-Zuordnung.
   // Wir laden nur IDs der geschäftlichen Buchungen (schlank) + die belegten
@@ -215,6 +242,19 @@ export async function ladeDashboardAggregat(
   // gebildet (Performance). Die reine `zaehleAktionen` aus ./aggregate
   // liefert dasselbe Ergebnis aus Rohdaten und ist dort separat getestet.
 
+  const paperlessToken = (
+    paperlessRow.data as { token_cipher?: string | null } | null
+  )?.token_cipher;
+
+  const onboarding = {
+    profil: profilAngelegt,
+    kontenrahmen: (kategorienC.count ?? 0) > 0,
+    paperless: !!paperlessToken && paperlessToken.length > 0,
+    konten: kontenC > 0,
+    import: gesamtBuchungenC > 0,
+    klassifizierung: (klassifiziertC.count ?? 0) > 0,
+  };
+
   return {
     aktionen,
     jahr,
@@ -223,6 +263,7 @@ export async function ladeDashboardAggregat(
     konto_import: syncStatusAus(importJob),
     ist_leer:
       gesamtBuchungenC === 0 && belegeC === 0 && kontenC === 0,
+    onboarding,
     stand,
   };
 }

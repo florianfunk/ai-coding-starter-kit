@@ -174,6 +174,37 @@ export function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
+/**
+ * Schreibt einen von Paperless gelieferten Pagination-`next`-Link auf den
+ * Origin (Protokoll + Host) der konfigurierten Basis-URL um.
+ *
+ * Hintergrund: Paperless hinter einem Reverse-Proxy liefert `next`-Links
+ * oft mit `http://` statt `https://` (X-Forwarded-Proto fehlkonfiguriert).
+ * `fetch` entfernt bei einem Protokollwechsel (https→http) aus
+ * Sicherheitsgründen den `Authorization`-Header — Folge: HTTP 401 ab Seite 2.
+ * Pfad + Query bleiben unverändert; nur Origin wird angeglichen.
+ *
+ * @returns normalisierte absolute URL, oder `null` wenn `next` leer/ungültig.
+ */
+export function normalizeNextUrl(
+  next: string | null | undefined,
+  baseUrl: string,
+): string | null {
+  if (!next) return null;
+  try {
+    const ziel = new URL(next);
+    const basis = new URL(normalizeBaseUrl(baseUrl));
+    // Origin vollständig angleichen (Protokoll, Host UND Port); Pfad +
+    // Query des next-Links bleiben unverändert.
+    ziel.protocol = basis.protocol;
+    ziel.hostname = basis.hostname;
+    ziel.port = basis.port;
+    return ziel.toString();
+  } catch {
+    return null;
+  }
+}
+
 async function fetchLookup(
   baseUrl: string,
   token: string,
@@ -192,7 +223,9 @@ async function fetchLookup(
     for (const item of json.results) {
       if (typeof item.id === "number") map.set(item.id, item.name ?? "");
     }
-    next = json.next;
+    // next-Link auf den konfigurierten Origin normalisieren, sonst geht
+    // ab Seite 2 bei http/https-Mismatch der Auth-Header verloren (401).
+    next = normalizeNextUrl(json.next, baseUrl);
     pages++;
   }
   return map;

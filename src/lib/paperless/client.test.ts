@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   normalizeBaseUrl,
+  normalizeNextUrl,
   normalizeAmountString,
   parseBetragAusText,
   inhaltHash,
@@ -127,6 +128,39 @@ describe("buildDocumentsUrl", () => {
   it("ohne Speicherpfad kein storage_path-Parameter", () => {
     const u = buildDocumentsUrl("https://p.example.com", {}, 1);
     expect(u).not.toContain("storage_path");
+  });
+});
+
+describe("normalizeNextUrl", () => {
+  it("schreibt http-next bei https-base auf https um (der Bug-Fall)", () => {
+    const r = normalizeNextUrl(
+      "http://paperless.diefunkys.de/api/correspondents/?page=2&page_size=100",
+      "https://paperless.diefunkys.de",
+    );
+    expect(r).toBe(
+      "https://paperless.diefunkys.de/api/correspondents/?page=2&page_size=100",
+    );
+  });
+  it("erhält Pfad und Query unverändert", () => {
+    const r = normalizeNextUrl(
+      "http://host.tld/api/documents/?page=3&ordering=id",
+      "https://host.tld/",
+    );
+    expect(r).toBe("https://host.tld/api/documents/?page=3&ordering=id");
+  });
+  it("gleicht auch abweichenden Host an den konfigurierten an", () => {
+    const r = normalizeNextUrl(
+      "http://intern:8000/api/tags/?page=2",
+      "https://paperless.example.com",
+    );
+    expect(r).toBe("https://paperless.example.com/api/tags/?page=2");
+  });
+  it("liefert null bei leerem next (Ende der Pagination)", () => {
+    expect(normalizeNextUrl(null, "https://x.tld")).toBeNull();
+    expect(normalizeNextUrl(undefined, "https://x.tld")).toBeNull();
+  });
+  it("liefert null bei ungültigem next", () => {
+    expect(normalizeNextUrl("kein-url", "https://x.tld")).toBeNull();
   });
 });
 

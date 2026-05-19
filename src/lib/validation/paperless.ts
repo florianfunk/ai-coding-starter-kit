@@ -47,6 +47,8 @@ export type PaperlessVerbindungParsed = z.output<
  * - von/bis: ISO-Datum (JJJJ-MM-TT) auf das Paperless-Erstelldatum.
  * - tag: Paperless-Tag-Name (Volltextfilter serverseitig auf Tags).
  * - korrespondent: Paperless-Korrespondent-Name (Volltextfilter).
+ * - speicherpfad: Paperless-Speicherpfad (Storage Path), z. B. "Rechnungen" —
+ *   importiert nur Belege aus diesem Pfad statt aller Dokumente.
  */
 export const paperlessSyncFilterSchema = z
   .object({
@@ -72,6 +74,12 @@ export const paperlessSyncFilterSchema = z
       .string()
       .trim()
       .max(200, "Korrespondent ist zu lang (max. 200 Zeichen)")
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined)),
+    speicherpfad: z
+      .string()
+      .trim()
+      .max(200, "Speicherpfad ist zu lang (max. 200 Zeichen)")
       .optional()
       .transform((v) => (v && v.length > 0 ? v : undefined)),
   })

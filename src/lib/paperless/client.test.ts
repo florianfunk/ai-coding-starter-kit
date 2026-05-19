@@ -116,6 +116,18 @@ describe("buildDocumentsUrl", () => {
     expect(u).toContain("tags__name__icontains=Steuer");
     expect(u).toContain("correspondent__name__icontains=Telekom");
   });
+  it("setzt Speicherpfad-Filter (storage_path)", () => {
+    const u = buildDocumentsUrl(
+      "https://p.example.com",
+      { speicherpfad: "Rechnungen" },
+      1,
+    );
+    expect(u).toContain("storage_path__name__icontains=Rechnungen");
+  });
+  it("ohne Speicherpfad kein storage_path-Parameter", () => {
+    const u = buildDocumentsUrl("https://p.example.com", {}, 1);
+    expect(u).not.toContain("storage_path");
+  });
 });
 
 describe("betragAusCustomFields", () => {

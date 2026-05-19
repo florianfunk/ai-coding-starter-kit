@@ -45,6 +45,8 @@ export interface PaperlessFilter {
   bis?: string;
   tag?: string;
   korrespondent?: string;
+  /** Paperless-Speicherpfad (Storage Path), z. B. "Rechnungen". */
+  speicherpfad?: string;
 }
 
 export class PaperlessError extends Error {
@@ -226,6 +228,12 @@ export function buildDocumentsUrl(
     u.searchParams.set(
       "correspondent__name__icontains",
       filter.korrespondent,
+    );
+  }
+  if (filter.speicherpfad) {
+    u.searchParams.set(
+      "storage_path__name__icontains",
+      filter.speicherpfad,
     );
   }
   return u.toString();

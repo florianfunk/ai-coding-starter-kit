@@ -67,6 +67,9 @@ export function PaperlessPanel({
   const [bis, setBis] = useState("");
   const [tag, setTag] = useState("");
   const [korrespondent, setKorrespondent] = useState("");
+  // Default "Rechnungen": nur Buchhaltungsbelege aus diesem Paperless-
+  // Speicherpfad importieren (nicht Arztrechnungen/Versicherungen etc.).
+  const [speicherpfad, setSpeicherpfad] = useState("Rechnungen");
 
   const tokenGesetzt = verbindung?.token_gesetzt ?? false;
 
@@ -167,6 +170,7 @@ export function PaperlessPanel({
       if (bis) filter.bis = bis;
       if (tag) filter.tag = tag;
       if (korrespondent) filter.korrespondent = korrespondent;
+      if (speicherpfad.trim()) filter.speicherpfad = speicherpfad.trim();
 
       const res = await fetch("/api/paperless/sync", {
         method: "POST",
@@ -340,6 +344,26 @@ export function PaperlessPanel({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-1">
+            <label
+              htmlFor="filter-speicherpfad"
+              className="text-sm font-medium"
+            >
+              Speicherpfad (enthält)
+            </label>
+            <Input
+              id="filter-speicherpfad"
+              value={speicherpfad}
+              onChange={(e) => setSpeicherpfad(e.target.value)}
+              placeholder="z. B. Rechnungen"
+            />
+            <p className="text-xs text-muted-foreground">
+              Nur Belege aus diesem Paperless-Speicherpfad werden importiert.
+              Standard: „Rechnungen“ (Buchhaltungsbelege). Leer lassen, um alle
+              Dokumente zu importieren.
+            </p>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1">
               <label

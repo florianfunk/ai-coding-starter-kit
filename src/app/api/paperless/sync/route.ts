@@ -267,7 +267,11 @@ export async function POST(request: Request) {
 
     // In Quelle entfernte Belege markieren (nur ohne Filter, sonst False-Positives).
     const ohneFilter =
-      !filter.von && !filter.bis && !filter.tag && !filter.korrespondent;
+      !filter.von &&
+      !filter.bis &&
+      !filter.tag &&
+      !filter.korrespondent &&
+      !filter.speicherpfad;
     if (ohneFilter && gesehenePaperlessIds.size > 0) {
       const { data: alle } = await supabase
         .from("beleg")

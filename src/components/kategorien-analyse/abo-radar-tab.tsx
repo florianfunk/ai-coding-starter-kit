@@ -74,12 +74,18 @@ export function AboRadarTab({ filter }: { filter: AboRadarTabFilter }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KennCard
-          label="Aktive Abos / Jahr"
-          wert={eur(daten.jahresbelastung_aktiv)}
+          label="Aktive Ausgaben / Jahr"
+          wert={eur(daten.jahresbelastung_ausgaben_aktiv)}
           akzent="negativ"
           hint={`${aktiv.length} aktive · ${inaktiv.length} gekündigt`}
+        />
+        <KennCard
+          label="Aktive Einnahmen / Jahr"
+          wert={eur(daten.jahresbelastung_einnahmen_aktiv)}
+          akzent="positiv"
+          hint="Gehälter, Mieten, Erstattungen"
         />
         <KennCard
           label="Erkannte Wiederkehr-Items"
@@ -106,7 +112,7 @@ function KennCard({
   label: string;
   wert: string;
   hint?: string;
-  akzent?: "negativ";
+  akzent?: "negativ" | "positiv";
 }) {
   return (
     <Card>
@@ -117,7 +123,11 @@ function KennCard({
         <div
           className={
             "mt-1 text-xl font-semibold tabular-nums " +
-            (akzent === "negativ" ? "text-destructive" : "")
+            (akzent === "negativ"
+              ? "text-destructive"
+              : akzent === "positiv"
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "")
           }
         >
           {wert}

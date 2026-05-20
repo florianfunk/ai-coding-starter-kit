@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Eye,
   Loader2,
 } from "lucide-react";
@@ -83,6 +85,11 @@ const TYP_LABEL: Record<string, string> = {
   neutral: "Neutral",
 };
 
+const RICHTUNG_LABEL: Record<WiederkehrendItem["richtung"], string> = {
+  einnahme: "Einnahme",
+  ausgabe: "Ausgabe",
+};
+
 function eur(n: number): string {
   return new Intl.NumberFormat("de-DE", {
     style: "currency",
@@ -141,45 +148,93 @@ export function AboRadar({
     });
   }
 
+  const alleAufgeklappt =
+    abos.items.length > 0 && aufgeklappt.size === abos.items.length;
+
+  function toggleAlle() {
+    if (alleAufgeklappt) {
+      setAufgeklappt(new Set());
+    } else {
+      setAufgeklappt(new Set(abos.items.map(itemKey)));
+    }
+  }
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          Abo-/Wiederkehr-Radar
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            Lookback {abos.lookback.von} – {abos.lookback.bis}
-          </span>
-        </CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+        <div className="space-y-1">
+          <CardTitle className="text-base">
+            Abo-/Wiederkehr-Radar
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              Lookback {abos.lookback.von} – {abos.lookback.bis}
+            </span>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Wiederkehrende Buchungen (Einnahmen &amp; Ausgaben)
+          </p>
+        </div>
+        {abos.items.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={toggleAlle}
+            className="h-8 shrink-0 gap-1.5 text-xs"
+            title={
+              alleAufgeklappt
+                ? "Alle Buchungslisten zuklappen"
+                : "Alle Buchungslisten aufklappen"
+            }
+          >
+            {alleAufgeklappt ? (
+              <ChevronsDownUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+            )}
+            {alleAufgeklappt ? "Alle zuklappen" : "Alle aufklappen"}
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {abos.items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Keine wiederkehrenden Zahlungen erkannt. Erkannt werden
-            Zahlungen mit ≥ 3 Buchungen, stabilem Betrag (±20 %) und
-            regelmäßigem Abstand.
+            Zahlungen mit ≥ 3 Buchungen, stabilem Betrag (±30 %) und
+            regelmäßigem Abstand. Einzelne Ausreißer werden toleriert.
           </p>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-md bg-muted/40 p-3 text-sm">
-              <span className="text-muted-foreground">
-                Geschätzte Jahresbelastung aktiver Abos:
-              </span>{" "}
-              <span className="font-semibold text-destructive tabular-nums">
-                {eur(abos.jahresbelastung_aktiv)}
-              </span>{" "}
-              <span className="text-xs text-muted-foreground">
-                ({aktiv.length} aktiv · {inaktiv.length} inaktiv/gekündigt)
-              </span>
+            <div className="grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-2">
+              <div>
+                <span className="text-muted-foreground">
+                  Aktive Ausgaben / Jahr:
+                </span>{" "}
+                <span className="font-semibold text-destructive tabular-nums">
+                  {eur(abos.jahresbelastung_ausgaben_aktiv)}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">
+                  Aktive Einnahmen / Jahr:
+                </span>{" "}
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {eur(abos.jahresbelastung_einnahmen_aktiv)}
+                </span>
+              </div>
+              <div className="sm:col-span-2 text-xs text-muted-foreground">
+                {aktiv.length} aktiv · {inaktiv.length} inaktiv/gekündigt
+              </div>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[28px]"></TableHead>
                   <TableHead>Empfänger</TableHead>
+                  <TableHead>Richtung</TableHead>
                   <TableHead>Intervall</TableHead>
                   <TableHead className="text-right">Anzahl</TableHead>
                   <TableHead className="text-right">Pro Zahlung</TableHead>
-                  <TableHead className="text-right">Jahr</TableHead>
+                  <TableHead className="text-right">Jahresvolumen</TableHead>
                   <TableHead>Letzte</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Konf.</TableHead>
@@ -221,6 +276,21 @@ export function AboRadar({
                           {i.empfaenger}
                         </TableCell>
                         <TableCell>
+                          <Badge
+                            variant={
+                              i.richtung === "einnahme" ? "default" : "secondary"
+                            }
+                            className={
+                              "text-xs " +
+                              (i.richtung === "einnahme"
+                                ? "bg-emerald-600 hover:bg-emerald-600 text-white"
+                                : "")
+                            }
+                          >
+                            {RICHTUNG_LABEL[i.richtung]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="outline" className="text-xs">
                             {INTERVALL_LABEL[i.intervall]} (~{i.intervall_tage} T)
                           </Badge>
@@ -255,12 +325,19 @@ export function AboRadar({
                       {expanded ? (
                         <TableRow className="bg-muted/30 hover:bg-muted/30">
                           <TableCell />
-                          <TableCell colSpan={8} className="py-3">
+                          <TableCell colSpan={9} className="py-3">
                             <ItemDrilldown
                               item={i}
                               kategorien={kategorien}
                               onOpenSheet={(id) => setDetailId(id)}
                               onMutiert={onMutiert}
+                              onZuklappen={() => {
+                                setAufgeklappt((s) => {
+                                  const n = new Set(s);
+                                  n.delete(k);
+                                  return n;
+                                });
+                              }}
                             />
                           </TableCell>
                         </TableRow>
@@ -289,11 +366,14 @@ function ItemDrilldown({
   kategorien,
   onOpenSheet,
   onMutiert,
+  onZuklappen,
 }: {
   item: WiederkehrendItem;
   kategorien: KategorieOption[];
   onOpenSheet: (id: string) => void;
   onMutiert?: () => void;
+  /** Wird nach "Alle bestätigen & Regel lernen" aufgerufen, um die Gruppe automatisch zu schließen. */
+  onZuklappen?: () => void;
 }) {
   // Lokaler Snapshot der Buchungen, damit Inline-Edit + Bulk optimistisch
   // sichtbar werden, ohne dass der ganze Radar neu lädt.
@@ -350,6 +430,79 @@ function ItemDrilldown({
     }
   }
 
+  /**
+   * Legt eine Lernregel für `item.empfaenger → kategorie_id` an. Idempotent:
+   * existiert bereits eine aktive Regel mit demselben Muster + derselben
+   * Kategorie, wird sie nicht erneut angelegt. Liefert ein Status-Flag, damit
+   * der Aufrufer den passenden Toast zeigen kann.
+   */
+  async function lerneRegelFuer(
+    kategorieId: string,
+    kategorieTyp: KategorieTyp | null,
+  ): Promise<"angelegt" | "vorhanden" | "fehler" | "uebersprungen"> {
+    const muster = item.empfaenger.trim();
+    if (muster.length < 2) return "uebersprungen";
+
+    const klassifikation: "privat" | "geschaeftlich" | "neutral" =
+      kategorieTyp === "privat"
+        ? "privat"
+        : kategorieTyp === "neutral"
+          ? "neutral"
+          : "geschaeftlich";
+
+    const rg = await fetch("/api/regeln");
+    if (rg.ok) {
+      const jr = (await rg.json()) as {
+        data: Array<{
+          bedingung: { empfaenger_muster?: string | null } | null;
+          aktion: { kategorie_id?: string | null } | null;
+          aktiv: boolean;
+        }>;
+      };
+      const norm = muster.toLowerCase();
+      const bestehtSchon = (jr.data ?? []).some(
+        (re) =>
+          re.aktiv &&
+          (re.bedingung?.empfaenger_muster ?? "").toLowerCase().trim() ===
+            norm &&
+          re.aktion?.kategorie_id === kategorieId,
+      );
+      if (bestehtSchon) return "vorhanden";
+    }
+
+    const reg = await fetch("/api/regeln", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bezeichnung: `Empfänger: ${muster}`.slice(0, 120),
+        bedingung: { empfaenger_muster: muster },
+        aktion: { kategorie_id: kategorieId, klassifikation },
+        prioritaet: 100,
+        aktiv: true,
+      }),
+    });
+    if (reg.ok) return "angelegt";
+    const e = (await reg.json().catch(() => null)) as { error?: string } | null;
+    toast.warning(
+      "Regel konnte nicht angelegt werden: " +
+        (e?.error ?? `HTTP ${reg.status}`),
+    );
+    return "fehler";
+  }
+
+  function regelToast(
+    status: "angelegt" | "vorhanden" | "fehler" | "uebersprungen",
+    fallback: string,
+  ) {
+    if (status === "angelegt") {
+      toast.success(`${fallback} — Regel für "${item.empfaenger}" gelernt`);
+    } else if (status === "vorhanden") {
+      toast.success(`${fallback} — passende Regel ist bereits aktiv`);
+    } else {
+      toast.success(fallback);
+    }
+  }
+
   async function bestaetigeUndLerne(b: WiederkehrendBuchung) {
     if (!b.kategorie_id) {
       toast.error("Bitte zuerst eine Kategorie wählen.");
@@ -357,7 +510,6 @@ function ItemDrilldown({
     }
     setBestaetigeId(b.id);
     try {
-      // 1) Buchung bestätigen
       const r = await fetch(`/api/buchungen/${b.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -368,79 +520,14 @@ function ItemDrilldown({
         throw new Error(e?.error ?? `HTTP ${r.status}`);
       }
 
-      // 2) Lernregel anlegen (idempotent: vorher prüfen, ob es schon eine gibt)
-      const muster = item.empfaenger.trim();
-      let regelAngelegt = false;
-      let regelUebersprungen = false;
-      if (muster.length >= 2) {
-        const klassifikation: "privat" | "geschaeftlich" | "neutral" =
-          b.kategorie_typ === "privat"
-            ? "privat"
-            : b.kategorie_typ === "neutral"
-              ? "neutral"
-              : "geschaeftlich";
-
-        const rg = await fetch("/api/regeln");
-        let bestehtSchon = false;
-        if (rg.ok) {
-          const jr = (await rg.json()) as {
-            data: Array<{
-              bedingung: { empfaenger_muster?: string | null } | null;
-              aktion: { kategorie_id?: string | null } | null;
-              aktiv: boolean;
-            }>;
-          };
-          const norm = muster.toLowerCase();
-          bestehtSchon = (jr.data ?? []).some(
-            (re) =>
-              re.aktiv &&
-              (re.bedingung?.empfaenger_muster ?? "").toLowerCase().trim() ===
-                norm &&
-              re.aktion?.kategorie_id === b.kategorie_id,
-          );
-        }
-
-        if (!bestehtSchon) {
-          const reg = await fetch("/api/regeln", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              bezeichnung: `Empfänger: ${muster}`.slice(0, 120),
-              bedingung: { empfaenger_muster: muster },
-              aktion: {
-                kategorie_id: b.kategorie_id,
-                klassifikation,
-              },
-              prioritaet: 100,
-              aktiv: true,
-            }),
-          });
-          if (reg.ok) {
-            regelAngelegt = true;
-          } else {
-            const e = (await reg.json().catch(() => null)) as { error?: string } | null;
-            toast.warning(
-              "Regel konnte nicht angelegt werden: " +
-                (e?.error ?? `HTTP ${reg.status}`),
-            );
-          }
-        } else {
-          regelUebersprungen = true;
-        }
-      }
+      const regelStatus = await lerneRegelFuer(b.kategorie_id, b.kategorie_typ);
 
       setBuchungen((bs) =>
         bs.map((x) =>
           x.id === b.id ? { ...x, status: "manuell_bestaetigt" } : x,
         ),
       );
-      if (regelAngelegt) {
-        toast.success(`Bestätigt — Regel für "${muster}" gelernt`);
-      } else if (regelUebersprungen) {
-        toast.success("Bestätigt — passende Regel ist bereits aktiv");
-      } else {
-        toast.success("Buchung bestätigt");
-      }
+      regelToast(regelStatus, "Buchung bestätigt");
       onMutiert?.();
     } catch (e) {
       toast.error(
@@ -450,6 +537,105 @@ function ItemDrilldown({
     } finally {
       setBestaetigeId(null);
     }
+  }
+
+  /**
+   * Pro Zeile: Kategorie dieser Buchung auf ALLE Buchungen des Items
+   * anwenden + alle als manuell bestätigt markieren + Lernregel anlegen.
+   */
+  async function uebernehmeKategorieUndBestaetige(b: WiederkehrendBuchung) {
+    if (!b.kategorie_id) {
+      toast.error("Diese Buchung hat noch keine Kategorie.");
+      return;
+    }
+    setBestaetigeId(b.id);
+    try {
+      const ids = buchungen.map((x) => x.id);
+      const r = await fetch("/api/buchungen/bulk-kategorie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, kategorie_id: b.kategorie_id }),
+      });
+      if (!r.ok) {
+        const e = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(e?.error ?? `HTTP ${r.status}`);
+      }
+      const j = (await r.json()) as BulkKategorieResponse;
+      setBuchungen((bs) =>
+        bs.map((x) => ({
+          ...x,
+          kategorie_id: j.kategorie.id,
+          kategorie_bezeichnung: j.kategorie.bezeichnung,
+          kategorie_typ: j.kategorie.typ,
+          status: "manuell_bestaetigt",
+        })),
+      );
+
+      const regelStatus = await lerneRegelFuer(j.kategorie.id, j.kategorie.typ);
+      regelToast(
+        regelStatus,
+        `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} auf "${j.kategorie.bezeichnung}" gesetzt`,
+      );
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "Übernehmen fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
+      );
+    } finally {
+      setBestaetigeId(null);
+    }
+  }
+
+  /**
+   * Header-Button: alle Buchungen mit identischer Kategorie bestätigen +
+   * Lernregel anlegen. Disabled, wenn Kategorien uneinheitlich sind oder
+   * keine Kategorie gesetzt ist.
+   */
+  function alleBestaetigenMitRegel() {
+    if (!alleGleicheKategorie || !aktuelleKategorieId) {
+      toast.error(
+        "Geht nur, wenn alle Buchungen dieselbe Kategorie haben. Vorher 'auf alle anwenden' nutzen oder eine Zeile mit 'Übernehmen' verwenden.",
+      );
+      return;
+    }
+    startBulk(async () => {
+      try {
+        const ids = buchungen.map((b) => b.id);
+        const r = await fetch("/api/buchungen/bulk-kategorie", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids, kategorie_id: aktuelleKategorieId }),
+        });
+        if (!r.ok) {
+          const e = (await r.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(e?.error ?? `HTTP ${r.status}`);
+        }
+        const j = (await r.json()) as BulkKategorieResponse;
+        setBuchungen((bs) =>
+          bs.map((b) => ({
+            ...b,
+            kategorie_id: j.kategorie.id,
+            kategorie_bezeichnung: j.kategorie.bezeichnung,
+            kategorie_typ: j.kategorie.typ,
+            status: "manuell_bestaetigt",
+          })),
+        );
+
+        const regelStatus = await lerneRegelFuer(j.kategorie.id, j.kategorie.typ);
+        regelToast(
+          regelStatus,
+          `Alle ${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} bestätigt`,
+        );
+        onMutiert?.();
+        onZuklappen?.();
+      } catch (e) {
+        toast.error(
+          "Alle bestätigen fehlgeschlagen: " +
+            (e instanceof Error ? e.message : "unbekannt"),
+        );
+      }
+    });
   }
 
   function wendeAuAlleAn() {
@@ -526,6 +712,28 @@ function ItemDrilldown({
               )}
               Auf alle {buchungen.length} anwenden
             </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={alleBestaetigenMitRegel}
+              disabled={
+                bulkBusy || !alleGleicheKategorie || !aktuelleKategorieId
+              }
+              title={
+                !alleGleicheKategorie
+                  ? "Buchungen haben uneinheitliche Kategorien — vorher 'auf alle anwenden' nutzen"
+                  : !aktuelleKategorieId
+                    ? "Es ist keine Kategorie gesetzt"
+                    : `Alle ${buchungen.length} bestätigen und Regel für "${item.empfaenger}" lernen`
+              }
+            >
+              {bulkBusy ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCheck className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Alle bestätigen & Regel lernen
+            </Button>
           </div>
         </div>
         <div className="ml-auto text-xs text-muted-foreground">
@@ -546,14 +754,28 @@ function ItemDrilldown({
             <TableHead className="text-right w-[110px]">Betrag</TableHead>
             <TableHead>Kategorie</TableHead>
             <TableHead className="w-[110px]">Status</TableHead>
-            <TableHead className="w-[150px]"></TableHead>
+            <TableHead className="w-[280px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {buchungen.map((b) => (
-            <TableRow key={b.id}>
+            <TableRow
+              key={b.id}
+              className={b.ausreisser ? "bg-amber-50/40 dark:bg-amber-950/20" : ""}
+            >
               <TableCell className="tabular-nums text-sm">
-                {deDate(b.buchung_datum)}
+                <div className="flex items-center gap-1.5">
+                  <span>{deDate(b.buchung_datum)}</span>
+                  {b.ausreisser ? (
+                    <Badge
+                      variant="outline"
+                      className="border-amber-500 text-[10px] text-amber-700 dark:text-amber-400"
+                      title="Weicht stark vom Cluster-Median ab"
+                    >
+                      Ausreißer
+                    </Badge>
+                  ) : null}
+                </div>
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
                 {b.konto_bezeichnung}
@@ -561,9 +783,11 @@ function ItemDrilldown({
               <TableCell
                 className={
                   "text-right tabular-nums font-mono text-sm " +
-                  (b.betrag < 0
-                    ? "text-destructive"
-                    : "text-emerald-600 dark:text-emerald-400")
+                  (b.ausreisser
+                    ? "text-amber-700 dark:text-amber-400"
+                    : b.betrag < 0
+                      ? "text-destructive"
+                      : "text-emerald-600 dark:text-emerald-400")
                 }
               >
                 {eur(b.betrag)}
@@ -624,6 +848,7 @@ function ItemDrilldown({
                     disabled={
                       bestaetigeId === b.id ||
                       savingId === b.id ||
+                      bulkBusy ||
                       !b.kategorie_id ||
                       b.status === "manuell_bestaetigt"
                     }
@@ -641,6 +866,33 @@ function ItemDrilldown({
                       <CheckCheck className="h-3.5 w-3.5" />
                     )}
                     Bestätigen
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => uebernehmeKategorieUndBestaetige(b)}
+                    disabled={
+                      bestaetigeId === b.id ||
+                      savingId === b.id ||
+                      bulkBusy ||
+                      !b.kategorie_id ||
+                      buchungen.length <= 1
+                    }
+                    title={
+                      !b.kategorie_id
+                        ? "Diese Buchung hat noch keine Kategorie"
+                        : buchungen.length <= 1
+                          ? "Nur eine Buchung in dieser Gruppe"
+                          : `Kategorie "${b.kategorie_bezeichnung ?? "—"}" auf alle ${buchungen.length} anwenden und Regel lernen`
+                    }
+                  >
+                    {bestaetigeId === b.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    )}
+                    Für alle
                   </Button>
                   <Button
                     variant="ghost"

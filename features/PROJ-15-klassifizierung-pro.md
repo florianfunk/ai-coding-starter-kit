@@ -701,6 +701,41 @@ Loesung in zwei Schritten:
   triggern. Verworfen, weil der Job-globale Pass am Ende dieselbe
   Wirkung mit weniger Code-Komplexitaet hat.
 
+### 2026-05-20 — Abo-Radar Fix: Einnahmen + normalisierter Schluessel + Ausreisser-Toleranz
+- `src/app/api/finanzen/wiederkehrend/route.ts` erkennt jetzt
+  wiederkehrende Einnahmen UND Ausgaben. Filter "nur Ausgaben"
+  entfernt. Response um `richtung: 'einnahme' | 'ausgabe'` pro Item
+  erweitert. Summary-Felder aufgesplittet in
+  `jahresbelastung_ausgaben_aktiv` und `jahresbelastung_einnahmen_aktiv`
+  (alter Schluessel bleibt aus Kompat-Gruenden als Spiegelung der
+  Ausgaben erhalten).
+- Gruppierung nutzt jetzt `empfaenger_normalisiert` aus der DB
+  (PROJ-15-Spalte) statt einer eigenen Mini-Normalisierung. Fallback
+  auf `normalisiereEmpfaenger()` falls Spalte NULL ist (Altdaten-Schutz).
+  Damit landen "STRIPE*ACME LTD" und "Acme Ltd." korrekt im selben
+  Cluster. Anzeige-Empfaenger wird per Mode (haeufigste Original-
+  Variante) gewaehlt.
+- Ausreisser-Toleranz: einzelne Buchungen mit > 50 % Median-Abweichung
+  werden im Cluster markiert (`ausreisser: true`), aber aus der
+  Stabilitaets-Bewertung ausgenommen. Behebt den Accenture-Fall
+  (3x ~6000 + 1x 1698): das Cluster wird erkannt, der Ausreisser bleibt
+  in der Detailliste sichtbar. Verworfen wird das Cluster nur, wenn
+  die Ausreisser-Quote ≥ 50 % erreicht oder die stabile Restmenge
+  unter `MIN_BUCHUNGEN` faellt. Konfidenz wird bei Bereinigung um den
+  Faktor 0.9 gedaempft. Toleranz von 0.2 auf 0.3 erhoeht.
+- Reine Kern-Algorithmik in `src/lib/finanzen/wiederkehrend-erkennung.ts`
+  herausgezogen — testbar ohne Supabase. 26 Unit-Tests
+  (`wiederkehrend-erkennung.test.ts`) decken Median, Intervall-
+  Klassifizierung, Ausreisser-Filter, Richtungs-Bestimmung und
+  End-to-End-Cluster-Erkennung ab.
+- UI (`src/components/kategorien-analyse/abo-radar.tsx`,
+  `abo-radar-tab.tsx`): neue Richtungs-Spalte (gruene Einnahme- /
+  graue Ausgabe-Badges), getrennte Jahres-Kennzahlen
+  (Ausgaben/Einnahmen), Ausreisser-Buchungen in Detail-Ansicht mit
+  Bernstein-Badge und farblicher Hervorhebung. Spaltentitel umbenannt
+  in "Jahresvolumen". Komponenten-Header-Untertitel: "Wiederkehrende
+  Buchungen (Einnahmen & Ausgaben)".
+
 ## QA Test Results
 _To be added by /qa_
 

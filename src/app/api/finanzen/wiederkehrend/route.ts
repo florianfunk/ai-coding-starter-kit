@@ -3,15 +3,14 @@
 // rein über Muster.
 //
 // Algorithmus (knapp):
-//   1) Lade Ausgaben-Buchungen im (großzügig erweiterten) Zeitraum.
-//   2) Gruppiere nach normalisiertem Empfänger.
-//   3) Für jede Gruppe mit ≥ 3 Buchungen:
-//      - Sortiere chronologisch
-//      - Berechne Abstände in Tagen, nimm den Median
-//      - Klassifiziere Intervall (wöchentlich/monatlich/quartalsweise/jährlich)
-//      - Beträge: prüfe Stabilität (relativer Median-Abweichung-Median < 20%)
+//   1) Lade Buchungen (Einnahmen UND Ausgaben) im erweiterten Zeitraum.
+//   2) Gruppiere nach `empfaenger_normalisiert` (PROJ-15-Spalte), Fallback auf
+//      `normalisiereEmpfaenger(empfaenger)` für eventuelle Altdaten.
+//   3) Für jede Gruppe mit ≥ MIN_BUCHUNGEN:
+//      - Cluster-Erkennung über src/lib/finanzen/wiederkehrend-erkennung.ts
+//      - Toleriert einzelne Ausreißer-Buchungen (siehe dortige Doku).
 //      - Aktivität: letzte Zahlung darf nicht älter als 1.5× Intervall sein
-//   4) Berechne erwartete Jahresbelastung.
+//   4) Berechne erwartetes Jahresvolumen, getrennt nach Einnahmen/Ausgaben.
 //
 // Filter: Zeitraum, Konto, Bereich. Filter wird *vorsichtig* angewendet —
 // wir erweitern den Zeitraum nach vorne, um auch Abos mit nur wenigen
@@ -22,6 +21,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { analyseFilterSchema } from "@/lib/validation/kategorien-analyse";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
+import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
+import {
+  erkenneCluster,
+  modusEmpfaenger,
+  MIN_BUCHUNGEN,
+  MIN_LOOKBACK_TAGE,
+  tageZwischen,
+  klassifiziereIntervall,
+  type Intervall,
+  type Richtung,
+} from "@/lib/finanzen/wiederkehrend-erkennung";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungRow {
@@ -30,6 +40,7 @@ interface BuchungRow {
   buchung_datum: string;
   betrag: number;
   empfaenger: string | null;
+  empfaenger_normalisiert: string | null;
   klassifikation: Klassifikation | null;
   kategorie_id: string | null;
   status: BuchungStatus;
@@ -46,9 +57,11 @@ export interface WiederkehrendBuchung {
   kategorie_bezeichnung: string | null;
   kategorie_typ: KategorieTyp | null;
   status: BuchungStatus;
+  /** Bug-3-Fix: Wenn true, weicht der Betrag stark vom Cluster-Median ab. */
+  ausreisser?: boolean;
 }
 
-export type Intervall = "woechentlich" | "monatlich" | "quartalsweise" | "jaehrlich";
+export type { Intervall, Richtung };
 
 export interface WiederkehrendItem {
   empfaenger: string;
@@ -57,9 +70,11 @@ export interface WiederkehrendItem {
   intervall_tage: number;
   /** Mittlerer Buchungs-Betrag (Absolutwert). */
   durchschnitt: number;
-  /** Geschätzte Jahresbelastung. */
+  /** Geschätztes Jahresvolumen (positiv = Einnahme, identisch bei Ausgabe als Absolutwert). */
   jahresbelastung: number;
-  /** Anzahl gefundener Buchungen im erweiterten Lookback. */
+  /** Richtung: 'einnahme' wenn Mehrheit positive Beträge, sonst 'ausgabe'. */
+  richtung: Richtung;
+  /** Anzahl gefundener Buchungen im erweiterten Lookback (inkl. Ausreißer). */
   anzahl: number;
   /** ISO-Datum der ersten / letzten Buchung. */
   erste: string;
@@ -80,55 +95,17 @@ export interface WiederkehrendItem {
 
 export interface WiederkehrendResponse {
   items: WiederkehrendItem[];
-  /** Summe aller geschätzten Jahresbelastungen der aktiven Wiederkehr-Items. */
+  /** Summe aller geschätzten Jahresvolumina der aktiven Ausgaben-Items. */
+  jahresbelastung_ausgaben_aktiv: number;
+  /** Summe aller geschätzten Jahresvolumina der aktiven Einnahmen-Items. */
+  jahresbelastung_einnahmen_aktiv: number;
+  /**
+   * @deprecated — bleibt aus Kompat-Gründen erhalten, entspricht
+   * `jahresbelastung_ausgaben_aktiv`. UI soll die getrennten Felder nutzen.
+   */
   jahresbelastung_aktiv: number;
   /** Lookback-Fenster, das tatsächlich abgefragt wurde (Debug). */
   lookback: { von: string; bis: string };
-}
-
-const MIN_BUCHUNGEN = 3;
-const BETRAG_TOLERANZ = 0.2; // 20% relative Median-Abweichung max
-const MIN_LOOKBACK_TAGE = 365;
-
-interface IntervallProfil {
-  name: Intervall;
-  min: number;
-  max: number;
-  proJahr: number;
-}
-const INTERVALL_PROFILE: IntervallProfil[] = [
-  { name: "woechentlich", min: 5, max: 10, proJahr: 52 },
-  { name: "monatlich", min: 25, max: 35, proJahr: 12 },
-  { name: "quartalsweise", min: 80, max: 100, proJahr: 4 },
-  { name: "jaehrlich", min: 330, max: 400, proJahr: 1 },
-];
-
-function normEmpfaenger(s: string | null): string {
-  if (!s) return "";
-  return s
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, " ")
-    .replace(/[\.,;:]+$/g, "");
-}
-
-function median(zahlen: number[]): number {
-  if (zahlen.length === 0) return 0;
-  const sortiert = [...zahlen].sort((a, b) => a - b);
-  const m = Math.floor(sortiert.length / 2);
-  return sortiert.length % 2
-    ? sortiert[m]
-    : (sortiert[m - 1] + sortiert[m]) / 2;
-}
-
-function tageZwischen(a: string, b: string): number {
-  const da = new Date(a).getTime();
-  const db = new Date(b).getTime();
-  return Math.round((db - da) / (24 * 60 * 60 * 1000));
-}
-
-function klassifiziereIntervall(tage: number): IntervallProfil | null {
-  return INTERVALL_PROFILE.find((p) => tage >= p.min && tage <= p.max) ?? null;
 }
 
 function round2(n: number): number {
@@ -174,7 +151,7 @@ export async function GET(request: Request) {
   let q = supabase
     .from("buchung")
     .select(
-      "id, konto_id, buchung_datum, betrag, empfaenger, klassifikation, kategorie_id, status",
+      "id, konto_id, buchung_datum, betrag, empfaenger, empfaenger_normalisiert, klassifikation, kategorie_id, status",
     )
     .eq("owner_id", user.id)
     .gte("buchung_datum", lookbackVon)
@@ -218,8 +195,10 @@ export async function GET(request: Request) {
     ),
   );
 
-  // Nur Ausgaben + Bereichs-Filter.
-  const ausgaben = ((bData ?? []) as BuchungRow[]).filter((b) => {
+  // Bereichs-Filter — Einnahmen werden NICHT mehr generell rausgeworfen
+  // (Bug 1). Plus-Beträge ohne Kategorie sind potenzielle Einnahmen-Abos
+  // (z. B. Gehalt vor Klassifizierung) und bleiben daher drin.
+  const buchungenGefiltert = ((bData ?? []) as BuchungRow[]).filter((b) => {
     const katInfo = b.kategorie_id ? katMap.get(b.kategorie_id) : undefined;
     if (
       !istImBereich(
@@ -232,15 +211,17 @@ export async function GET(request: Request) {
     ) {
       return false;
     }
-    if (katInfo?.typ === "einnahme") return false;
-    if (Number(b.betrag) > 0 && !katInfo) return false; // Plus ohne Kategorie → Einnahme-Fallback
     return Number(b.betrag) !== 0;
   });
 
-  // Gruppierung nach normalisiertem Empfänger.
+  // Gruppierung nach `empfaenger_normalisiert`. Bei NULL/leer als Fallback
+  // einmal `normalisiereEmpfaenger(empfaenger)` aufrufen (Altdaten ohne
+  // Backfill — sollte nach PROJ-15 nicht mehr auftauchen, aber wir lassen
+  // das Sicherheitsnetz drin).
   const gruppen = new Map<string, BuchungRow[]>();
-  for (const b of ausgaben) {
-    const key = normEmpfaenger(b.empfaenger);
+  for (const b of buchungenGefiltert) {
+    const normaus = (b.empfaenger_normalisiert ?? "").trim();
+    const key = normaus || normalisiereEmpfaenger(b.empfaenger);
     if (!key) continue; // ohne Empfänger keine Wiederkehr-Aussage möglich
     const arr = gruppen.get(key) ?? [];
     arr.push(b);
@@ -254,84 +235,76 @@ export async function GET(request: Request) {
     if (buchungen.length < MIN_BUCHUNGEN) continue;
     buchungen.sort((a, b) => a.buchung_datum.localeCompare(b.buchung_datum));
 
-    // Intervall-Median berechnen
-    const abstaende: number[] = [];
-    for (let i = 1; i < buchungen.length; i++) {
-      abstaende.push(
-        tageZwischen(buchungen[i - 1].buchung_datum, buchungen[i].buchung_datum),
-      );
-    }
-    const intervallTage = median(abstaende);
-    const profil = klassifiziereIntervall(intervallTage);
-    if (!profil) continue; // kein erkennbarer Rhythmus
-
-    // Beträge: Stabilitäts-Check über Median-Abweichung
-    const betraege = buchungen.map((b) => Math.abs(Number(b.betrag) || 0));
-    const betragMedian = median(betraege);
-    if (betragMedian === 0) continue;
-    const relAbw =
-      median(betraege.map((b) => Math.abs(b - betragMedian) / betragMedian));
-    if (relAbw > BETRAG_TOLERANZ) continue;
+    const cluster = erkenneCluster(buchungen);
+    if (!cluster) continue;
 
     // Aktivität: letzte Zahlung < 1.5× Intervall her?
     const letzte = buchungen[buchungen.length - 1].buchung_datum;
+    const profil = klassifiziereIntervall(cluster.intervall_tage);
+    if (!profil) continue;
     const tageSeitLetzter = tageZwischen(letzte, toIso(heute));
     const nochAktiv = tageSeitLetzter <= profil.max * 1.5;
 
-    // Konfidenz: mehr Buchungen + stabilerer Betrag = höher.
-    // (Mind. 0.5 wenn die Erkennung überhaupt griff, max 0.95.)
-    const konfidenz = Math.min(
-      0.95,
-      0.5 +
-        Math.min(0.2, (buchungen.length - MIN_BUCHUNGEN) * 0.05) +
-        (BETRAG_TOLERANZ - relAbw) * 1.5,
+    const buchungenDetail: WiederkehrendBuchung[] = cluster.buchungen.map(
+      (b) => {
+        const k = b.kategorie_id ? katMap.get(b.kategorie_id) : undefined;
+        return {
+          id: b.id,
+          buchung_datum: b.buchung_datum,
+          betrag: Number(b.betrag) || 0,
+          konto_id: b.konto_id,
+          konto_bezeichnung: kontoMap.get(b.konto_id) ?? "—",
+          kategorie_id: b.kategorie_id,
+          kategorie_bezeichnung: k?.bezeichnung ?? null,
+          kategorie_typ: k?.typ ?? null,
+          status: b.status,
+          ausreisser: b.ausreisser || undefined,
+        };
+      },
     );
 
-    const buchungenDetail: WiederkehrendBuchung[] = buchungen.map((b) => {
-      const k = b.kategorie_id ? katMap.get(b.kategorie_id) : undefined;
-      return {
-        id: b.id,
-        buchung_datum: b.buchung_datum,
-        betrag: Number(b.betrag) || 0,
-        konto_id: b.konto_id,
-        konto_bezeichnung: kontoMap.get(b.konto_id) ?? "—",
-        kategorie_id: b.kategorie_id,
-        kategorie_bezeichnung: k?.bezeichnung ?? null,
-        kategorie_typ: k?.typ ?? null,
-        status: b.status,
-      };
-    });
+    // Anzeige-Empfänger: häufigste Original-Variante im Cluster (Mode).
+    const anzeigeEmpfaenger =
+      modusEmpfaenger(buchungen.map((b) => b.empfaenger)) || "—";
 
     items.push({
-      empfaenger: buchungen[0].empfaenger?.trim() || "—",
-      intervall: profil.name,
-      intervall_tage: Math.round(intervallTage),
-      durchschnitt: round2(betragMedian),
-      jahresbelastung: round2(betragMedian * profil.proJahr),
-      anzahl: buchungen.length,
+      empfaenger: anzeigeEmpfaenger,
+      intervall: cluster.intervall,
+      intervall_tage: cluster.intervall_tage,
+      durchschnitt: round2(cluster.betrag_median),
+      jahresbelastung: round2(cluster.jahresvolumen),
+      richtung: cluster.richtung,
+      anzahl: cluster.anzahl,
       erste: buchungen[0].buchung_datum,
       letzte,
       noch_aktiv: nochAktiv,
-      konfidenz: round2(konfidenz),
+      konfidenz: round2(cluster.konfidenz),
       buchungen: buchungenDetail,
     });
   }
 
-  // Sortierung: aktiv zuerst, dann nach Jahresbelastung absteigend.
+  // Sortierung: aktiv zuerst, dann nach Jahresvolumen absteigend.
   items.sort((a, b) => {
     if (a.noch_aktiv !== b.noch_aktiv) return a.noch_aktiv ? -1 : 1;
     return b.jahresbelastung - a.jahresbelastung;
   });
 
-  const jahresbelastungAktiv = round2(
+  const jahresbelastungAusgabenAktiv = round2(
     items
-      .filter((i) => i.noch_aktiv)
+      .filter((i) => i.noch_aktiv && i.richtung === "ausgabe")
+      .reduce((s, i) => s + i.jahresbelastung, 0),
+  );
+  const jahresbelastungEinnahmenAktiv = round2(
+    items
+      .filter((i) => i.noch_aktiv && i.richtung === "einnahme")
       .reduce((s, i) => s + i.jahresbelastung, 0),
   );
 
   const payload: WiederkehrendResponse = {
     items,
-    jahresbelastung_aktiv: jahresbelastungAktiv,
+    jahresbelastung_ausgaben_aktiv: jahresbelastungAusgabenAktiv,
+    jahresbelastung_einnahmen_aktiv: jahresbelastungEinnahmenAktiv,
+    jahresbelastung_aktiv: jahresbelastungAusgabenAktiv, // Backwards-Compat
     lookback: { von: lookbackVon, bis },
   };
   return NextResponse.json(payload);

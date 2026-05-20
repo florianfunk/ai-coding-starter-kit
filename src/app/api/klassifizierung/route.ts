@@ -23,6 +23,8 @@ import {
   type PipelineConfig,
 } from "@/lib/classifier/pipeline";
 import { neueInflightMap } from "@/lib/classifier/empfaenger-cache";
+import { wendeKonsistenzPassAn } from "@/lib/classifier/konsistenz-pass";
+import type { KonsistenzPassResultat } from "@/lib/classifier/konsistenz-pass";
 import type { KategorieOption } from "@/lib/classifier/llm";
 import type { Lernregel } from "@/lib/types";
 
@@ -46,6 +48,12 @@ interface Klassifikationsergebnis {
   via_ki: number;
   uebersprungen_manuell: number;
   fehler: Array<{ buchung_id: string; grund: string }>;
+  /**
+   * PROJ-15 (Konsistenz-Pro): Phase-2-Statistik aus dem Konsistenz-Pass,
+   * der nach der Hauptschleife laeuft. `null`, wenn der Pass uebersprungen
+   * oder die Hauptphase frueh abgebrochen wurde.
+   */
+  konsistenz_pass?: KonsistenzPassResultat | null;
 }
 
 export async function GET() {
@@ -243,6 +251,7 @@ export async function POST(request: Request) {
     via_ki: 0,
     uebersprungen_manuell: 0,
     fehler: [],
+    konsistenz_pass: null,
   };
   // Trefferzähler je angewandter Regel (am Ende gebündelt erhöhen).
   const regelTreffer = new Map<string, number>();
@@ -350,6 +359,23 @@ export async function POST(request: Request) {
           .eq("id", regelId)
           .eq("owner_id", user.id);
       }
+    }
+
+    // PROJ-15 (Konsistenz-Pro) — Phase 2: Konsistenz-Pass laeuft NACH der
+    // Hauptschleife im selben Job. Er gleicht haeufig vorkommende Empfaenger
+    // mit Mehrfach-Kategorien auf die Mehrheits-Kategorie an, sofern die
+    // Mehrheit mindestens 60% mit >=0.85 Durchschnitts-Konfidenz hat und
+    // die Klassifikation einheitlich ist. Manuell bestaetigte Buchungen
+    // werden niemals angefasst.
+    try {
+      ergebnis.konsistenz_pass = await wendeKonsistenzPassAn(
+        supabase,
+        user.id,
+      );
+    } catch {
+      // Pass ist best-effort: Fehler darf den Lauf nicht als 'fehler'
+      // markieren, die Hauptphase ist erfolgreich fertig.
+      ergebnis.konsistenz_pass = null;
     }
 
     await supabase

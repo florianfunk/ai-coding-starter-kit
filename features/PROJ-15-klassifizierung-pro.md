@@ -566,6 +566,141 @@ auch wenn das LLM nur die Klassifikation aktualisieren sollte.
   Empfaengers — Erwartung: Net-positiv, weil der LLM-Haupt-Klassifizierer
   mit Branche/Leistung-Kontext seltener in die Pruefliste rutscht.
 
+### 2026-05-20 — Retry-Mechanismus + Konsistenz-Pass (Phase 2)
+
+Hintergrund: Im laufenden Betrieb fielen zwei wiederkehrende Schwaechen auf,
+die der bisherige Cache-/Historie-Stack nicht abdeckt:
+1. Das LLM liefert stochastisch immer wieder `NoObjectGeneratedError` —
+   beim zweiten Versuch ist die Antwort meist sofort konform. Bisher landeten
+   diese Buchungen sofort mit `pruef_grund='ki_nicht_verfuegbar'` in der
+   Prueflisten-Warteschlange.
+2. Bei haeufig vorkommenden Empfaengern (Accenture, Enercity, Rene Kilian)
+   sehen wir 1-2 Ausreisser-Klassifikationen pro Empfaenger. Der Cache
+   selber sortiert das nicht auf, weil der LLM-Konfidenz-Upsert die
+   Default-Klassifikation immer fuer einzelne Buchungen entscheidet.
+
+Loesung in zwei Schritten:
+
+**(A) Retry-Mechanismus in `llm.ts`**
+- Neue reine Funktion `istRetryFaehig(err)` unterscheidet zwischen
+  retry-faehigen Fehlern (`NoObjectGeneratedError` aus dem AI-SDK,
+  `APICallError` mit Status 5xx oder ohne Statuscode) und permanenten
+  Fehlern (4xx — fehlender Key, falsches Modell, Schema-Fehler im
+  Aufruf). `fehler.isRetryable === false` wird respektiert.
+- `klassifiziereMitLlm` hat jetzt eine Schleife `for (versuch = 0;
+  versuch <= MAX_RETRIES; versuch++)`. `MAX_RETRIES = 1` → insgesamt
+  bis zu 2 Versuche pro Buchung. Wartezeit zwischen Versuchen:
+  `RETRY_BASE_DELAY_MS = 800` + bis zu `RETRY_JITTER_MS = 200` Jitter.
+- Test-Override `_setRetryDelayForTest(0)` druckt die Wartezeit in der
+  Test-Suite auf 0, damit Retry-Tests deterministisch und schnell laufen.
+  Bewusst NICHT oeffentlich exportiert (Helper-Konvention `_set…ForTest`).
+- `LlmKlassifiziererError` traegt das neue Feld `retries` (Anzahl
+  durchgefuehrter Retries). Erfolgreiche LLM-Antworten transportieren
+  `retries` als zusaetzliches Feld im Rueckgabe-Objekt — Pipeline
+  uebernimmt es ins Audit.
+- `src/lib/classifier/llm.test.ts` (NEU, 11 Tests): Initial-Erfolg ohne
+  Retry, Retry nach `NoObjectGeneratedError` mit anschliessendem Erfolg,
+  Retry nach `APICallError` 503/Netzwerk, KEIN Retry bei 401/422,
+  KEIN Retry bei `isRetryable=false`, beide Versuche fehlgeschlagen
+  → `retries=1` im Error, Audit-Feld `llm_retries` korrekt gesetzt.
+
+**(B) Konsistenz-Pass (Phase 2 des Jobs)**
+- Neues Modul `src/lib/classifier/konsistenz-pass.ts`:
+  - Reine Funktion `bestimmeMehrheit(buchungen)` mit den 4 Sicherheits-
+    Kriterien: mind. 3 Buchungen je Empfaenger, mind. 2 distinct
+    `kategorie_id`, Mehrheits-Anteil ≥ 60 %, Durchschnitts-Konfidenz
+    der Mehrheits-Kategorie ≥ 0.85, einheitliche Klassifikation
+    (privat/geschaeftlich/neutral darf NICHT gemischt sein — der
+    PayPal-Mischfall mit 75% Privat + 25% Neutral-Geldtransit faellt
+    genau hier raus und bleibt unangetastet).
+  - End-to-end `wendeKonsistenzPassAn(supabase, owner_id)`:
+    laed in EINEM Query alle Buchungen mit Status `auto_verbucht` oder
+    `zur_pruefung` und nicht-null `empfaenger_normalisiert` (Limit
+    10000), gruppiert in JS nach Empfaenger, ruft `bestimmeMehrheit`,
+    schreibt nicht-konforme Buchungen pro Empfaenger in Batches von 50
+    auf die Mehrheits-Kategorie um, mit `status='auto_verbucht'`,
+    `pruef_grund=null`, `konfidenz=max(alt, 0.85)`, `quelle='ki'`.
+  - Schutz-Invariante: `.neq("status", "manuell_bestaetigt")` in jedem
+    Update — manuell bestaetigte Buchungen sind NIE Ziel des Passes,
+    weder vom Query noch von der UPDATE-Bedingung.
+  - Priorisierung: Buchungen mit `pruef_grund='ki_nicht_verfuegbar'`
+    (LLM-Aussetzer aus (A)) werden zuerst angefasst — wenn die
+    Mehrheits-Klassifikation klar ist, ist die zweite Chance des Passes
+    fachlich der bessere Match als ein zweiter Retry.
+  - Audit-Eintrag je angepasster Buchung: `aktion='konsistenz_pass'`,
+    `quelle='ki'`, `entitaet='buchung'`. `details`-Felder:
+    `empfaenger_norm`, `vorher_kategorie_id`, `nachher_kategorie_id`,
+    `vorher_status`, `vorher_pruef_grund`, `mehrheit_anzahl`,
+    `gesamt_anzahl`, `avg_konfidenz_mehrheit`.
+  - Best-effort: Audit-Insert wird mit `.then(noop, noop)` abgesichert,
+    damit Audit-Fehler den Pass nicht abbrechen.
+- `src/lib/classifier/konsistenz-pass.test.ts` (NEU, 14 Tests):
+  - 7 reine Funktions-Tests fuer `bestimmeMehrheit`: 3+1-Mehrheit,
+    2+2-Patt, niedrige Konfidenz, Mischklassifikation,
+    PayPal-Pattern (3 Privat + 1 Neutral → NICHT angepasst),
+    konsistente Gruppe, nur `zur_pruefung`-Buchungen.
+  - 7 End-to-end-Tests mit Mock-Supabase (`makeSupabase`): 3+1-Anpassung
+    mit Audit-Capture, Patt → `empfaenger_uneinheitlich`, PayPal-Pattern,
+    `manuell_bestaetigt` bleibt unberuehrt, Gruppe mit nur 2 Buchungen
+    wird uebersprungen, Audit-Details enthalten alle Zaehlfelder,
+    `pruef_grund='ki_nicht_verfuegbar'` wird mit Vorrang angepasst.
+  - **Mock-Mutability-Fix**: Der Mock-Update mutiert `state.buchungen`
+    direkt via `Object.assign(target, patch)`. Damit der Audit-Capture-
+    Code in `wendeKonsistenzPassAn` die `vorher`-Werte unverfaelscht
+    lesen kann, liefert der Mock-Read aus `limit()` eine flache
+    Kopie der Buchungen (`.map((b) => ({ ...b }))`), damit Updates
+    auf `state.buchungen` die Referenzen in `data` nicht beruehren.
+    Reicht aus, weil die zu pruefenden Felder primitiv sind (keine
+    verschachtelten Objekte/Arrays in `BuchungRow`).
+- `src/app/api/klassifizierung/route.ts`: nach der Hauptschleife wird
+  `wendeKonsistenzPassAn(supabase, user.id)` als Phase 2 desselben Jobs
+  aufgerufen. Ergebnis landet im Response-Feld `konsistenz_pass`. Pass
+  ist best-effort: Fehler wird mit `try/catch` geschluckt und
+  `konsistenz_pass = null` gesetzt, damit Hauptphasen-Erfolge nicht
+  als `status='fehler'` markiert werden.
+- `src/components/buchungen/klassifizierung-panel.tsx`: neue Karte
+  „Konsistenz-Pass (Phase 2)" mit 4 Badges (Geprueft, Angepasst,
+  Buchungen, Uneinheitlich) — nur sichtbar, wenn `konsistenz_pass`
+  im Ergebnis vorhanden ist.
+
+**Ergebnis**
+- Tests: 492 passed (vorher 463 — +29 neu: 14 konsistenz-pass + 11 llm +
+  4 weitere im pipeline-Stack), 25 Test-Dateien gruen.
+- Lint: 0 Errors, 2 unveraenderte Warnings (ki-panel.tsx, use-toast.ts —
+  beides Bestand).
+- Build: ✓ erfolgreich. Ein Cast `data as unknown as BuchungRow[]` in
+  `konsistenz-pass.ts` war noetig, weil der Supabase-Client den
+  Select-String nicht statisch in den Zieltyp aufloesen kann
+  (Returnform `GenericStringError | T` aus dem Supabase-Generic) —
+  gleiche Workaround-Form wie in `holeKenntnis`.
+
+**Offene Entscheidungen / Trade-offs**
+- **Retry-Wartezeit**: 800 ms + 200 ms Jitter ist ein Kompromiss zwischen
+  Provider-Rate-Limit-Schonung und Job-Laufzeit. Bei groesseren
+  Buchungs-Stapeln (> 200) koennte das zu spuerbarem Overhead werden
+  (worst case: 200 × 1 s = 3 Min extra fuer Retries). Wenn das zum
+  Problem wird, sollten wir den Delay auf < 500 ms reduzieren oder den
+  Retry pro Buchung bei `ki_nicht_verfuegbar` direkt in den Konsistenz-
+  Pass schieben (der ja sowieso eine zweite Chance liefert).
+- **60%-Mehrheits-Schwelle**: bewusst defensiv. Bei 4 Buchungen heisst
+  60% mind. 3 von 4 — perfekt fuer den typischen Accenture-/Enercity-
+  Fall (3-4 Buchungen/Empfaenger/Monat). Bei groesseren Empfaenger-
+  Gruppen (> 20 Buchungen) waere 60% evtl. zu lax — falls wir das
+  beobachten, koennte ein dynamischer Schwellwert (z. B. `0.6 +
+  0.005 * gesamt`) das adressieren. Aktuell: konstant.
+- **Audit-Feld-Namen**: `details.vorher_kategorie_id` /
+  `nachher_kategorie_id` / `mehrheit_anzahl` / `gesamt_anzahl` /
+  `avg_konfidenz_mehrheit` — falls Reporting/Export auf andere
+  Konventionen aufsetzt (`prior_` / `posterior_` / `count_total`),
+  muessen die Feldnamen abgestimmt werden. Aktuell sind sie nur fuer
+  Audit-Log + manuelle DB-Inspektion gedacht; kein UI haengt direkt
+  daran.
+- **Reihenfolge Retry vs. Konsistenz-Pass**: Wir retryen zuerst und
+  schicken danach den Pass. Alternative waere, im Retry-Fehlerfall
+  direkt einen Mini-Pass NUR fuer den betroffenen Empfaenger zu
+  triggern. Verworfen, weil der Job-globale Pass am Ende dieselbe
+  Wirkung mit weniger Code-Komplexitaet hat.
+
 ## QA Test Results
 _To be added by /qa_
 

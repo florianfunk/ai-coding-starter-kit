@@ -146,6 +146,7 @@ export function entscheideBuchung(
   llm: LlmErgebnis | null,
   config: PipelineConfig = DEFAULT_CONFIG,
   llmFehler: string | null = null,
+  llmRetries: number = 0,
 ): PipelineEntscheidung {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
@@ -239,7 +240,11 @@ export function entscheideBuchung(
       regel_id: null,
       status: "zur_pruefung",
       pruef_grund: "ki_nicht_verfuegbar",
-      auditExtra: { llm: "nicht_verfuegbar", llm_fehler: llmFehler },
+      auditExtra: {
+        llm: "nicht_verfuegbar",
+        llm_fehler: llmFehler,
+        llm_retries: llmRetries,
+      },
     });
   }
 
@@ -289,6 +294,9 @@ export function entscheideBuchung(
       konfidenz: llm.konfidenz,
       schwellwert: config.konfidenz_schwellwert,
       betrag_limit: config.betrag_limit,
+      // 0 bei erfolgreichem Initial-Versuch; >0 wenn das LLM stochastisch
+      // zurueckkam (Retry-Mechanismus aus llm.ts).
+      llm_retries: llmRetries,
     },
   });
 }
@@ -486,6 +494,7 @@ export async function klassifiziereBuchung(
   // (4) LLM-Aufruf mit allem Kontext.
   let llm: LlmErgebnis | null = null;
   let llmFehler: string | null = null;
+  let llmRetries = 0;
   try {
     llm = await llmFn(
       {
@@ -498,17 +507,29 @@ export async function klassifiziereBuchung(
       },
       kategorien,
     );
+    llmRetries = llm?.retries ?? 0;
   } catch (err) {
     if (err instanceof LlmKlassifiziererError) {
       llm = null;
       llmFehler = err.message;
+      // PROJ-15 (Retry-Mechanismus): Anzahl der tatsaechlich durchgefuehrten
+      // Retries wird mit ins Audit geschrieben, damit wir auswerten koennen,
+      // wie haeufig die zweite Chance gebraucht (und gescheitert) ist.
+      llmRetries = err.retries;
     } else {
       throw err;
     }
   }
 
   // (5) Entscheidung berechnen.
-  const entscheidung = entscheideBuchung(buchung, regeln, llm, config, llmFehler);
+  const entscheidung = entscheideBuchung(
+    buchung,
+    regeln,
+    llm,
+    config,
+    llmFehler,
+    llmRetries,
+  );
 
   // (6) Bei hoher LLM-Konfidenz und Recherche-Kandidat: in Cache uebernehmen.
   // Verzweigung nach Quelle (PROJ-15-Bugfix):

@@ -22,6 +22,13 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+interface KonsistenzPassErgebnis {
+  empfaenger_geprueft?: number;
+  empfaenger_angepasst?: number;
+  buchungen_angepasst?: number;
+  empfaenger_uneinheitlich?: number;
+}
+
 interface KlassErgebnis {
   verarbeitet?: number;
   auto_verbucht?: number;
@@ -30,6 +37,8 @@ interface KlassErgebnis {
   via_ki?: number;
   uebersprungen_manuell?: number;
   fehler?: Array<{ buchung_id: string; grund: string }>;
+  /** PROJ-15: Phase-2-Statistik des Konsistenz-Passes (optional). */
+  konsistenz_pass?: KonsistenzPassErgebnis | null;
 }
 
 const STATUS_LABEL: Record<JobLauf["status"], string> = {
@@ -233,6 +242,31 @@ export function KlassifizierungPanel({
                   ))}
                 </ul>
               </details>
+            )}
+
+            {e.konsistenz_pass && (
+              <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
+                <div className="font-medium">Konsistenz-Pass (Phase 2)</div>
+                <p className="text-xs text-muted-foreground">
+                  Empfaenger mit mehreren Kategorien wurden auf die
+                  Mehrheits-Kategorie zusammengezogen — manuell bestaetigte
+                  Buchungen bleiben unangetastet.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">
+                    Geprueft: {e.konsistenz_pass.empfaenger_geprueft ?? 0}
+                  </Badge>
+                  <Badge variant="default">
+                    Angepasst: {e.konsistenz_pass.empfaenger_angepasst ?? 0}
+                  </Badge>
+                  <Badge variant="secondary">
+                    Buchungen: {e.konsistenz_pass.buchungen_angepasst ?? 0}
+                  </Badge>
+                  <Badge variant="outline">
+                    Uneinheitlich: {e.konsistenz_pass.empfaenger_uneinheitlich ?? 0}
+                  </Badge>
+                </div>
+              </div>
             )}
           </div>
         )}

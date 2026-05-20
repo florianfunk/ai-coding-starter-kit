@@ -18,6 +18,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import {
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -303,6 +304,7 @@ function ItemDrilldown({
 
   const [bulkKat, setBulkKat] = useState<string>("__none__");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [bestaetigeId, setBestaetigeId] = useState<string | null>(null);
   const [bulkBusy, startBulk] = useTransition();
 
   const distinct = new Set(buchungen.map((b) => b.kategorie_id ?? "__none__"));
@@ -345,6 +347,108 @@ function ItemDrilldown({
       toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function bestaetigeUndLerne(b: WiederkehrendBuchung) {
+    if (!b.kategorie_id) {
+      toast.error("Bitte zuerst eine Kategorie wählen.");
+      return;
+    }
+    setBestaetigeId(b.id);
+    try {
+      // 1) Buchung bestätigen
+      const r = await fetch(`/api/buchungen/${b.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bestaetigen: true }),
+      });
+      if (!r.ok) {
+        const e = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(e?.error ?? `HTTP ${r.status}`);
+      }
+
+      // 2) Lernregel anlegen (idempotent: vorher prüfen, ob es schon eine gibt)
+      const muster = item.empfaenger.trim();
+      let regelAngelegt = false;
+      let regelUebersprungen = false;
+      if (muster.length >= 2) {
+        const klassifikation: "privat" | "geschaeftlich" | "neutral" =
+          b.kategorie_typ === "privat"
+            ? "privat"
+            : b.kategorie_typ === "neutral"
+              ? "neutral"
+              : "geschaeftlich";
+
+        const rg = await fetch("/api/regeln");
+        let bestehtSchon = false;
+        if (rg.ok) {
+          const jr = (await rg.json()) as {
+            data: Array<{
+              bedingung: { empfaenger_muster?: string | null } | null;
+              aktion: { kategorie_id?: string | null } | null;
+              aktiv: boolean;
+            }>;
+          };
+          const norm = muster.toLowerCase();
+          bestehtSchon = (jr.data ?? []).some(
+            (re) =>
+              re.aktiv &&
+              (re.bedingung?.empfaenger_muster ?? "").toLowerCase().trim() ===
+                norm &&
+              re.aktion?.kategorie_id === b.kategorie_id,
+          );
+        }
+
+        if (!bestehtSchon) {
+          const reg = await fetch("/api/regeln", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              bezeichnung: `Empfänger: ${muster}`.slice(0, 120),
+              bedingung: { empfaenger_muster: muster },
+              aktion: {
+                kategorie_id: b.kategorie_id,
+                klassifikation,
+              },
+              prioritaet: 100,
+              aktiv: true,
+            }),
+          });
+          if (reg.ok) {
+            regelAngelegt = true;
+          } else {
+            const e = (await reg.json().catch(() => null)) as { error?: string } | null;
+            toast.warning(
+              "Regel konnte nicht angelegt werden: " +
+                (e?.error ?? `HTTP ${reg.status}`),
+            );
+          }
+        } else {
+          regelUebersprungen = true;
+        }
+      }
+
+      setBuchungen((bs) =>
+        bs.map((x) =>
+          x.id === b.id ? { ...x, status: "manuell_bestaetigt" } : x,
+        ),
+      );
+      if (regelAngelegt) {
+        toast.success(`Bestätigt — Regel für "${muster}" gelernt`);
+      } else if (regelUebersprungen) {
+        toast.success("Bestätigt — passende Regel ist bereits aktiv");
+      } else {
+        toast.success("Buchung bestätigt");
+      }
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "Bestätigen fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
+      );
+    } finally {
+      setBestaetigeId(null);
     }
   }
 
@@ -442,7 +546,7 @@ function ItemDrilldown({
             <TableHead className="text-right w-[110px]">Betrag</TableHead>
             <TableHead>Kategorie</TableHead>
             <TableHead className="w-[110px]">Status</TableHead>
-            <TableHead className="w-[110px]"></TableHead>
+            <TableHead className="w-[150px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -511,15 +615,43 @@ function ItemDrilldown({
                 )}
               </TableCell>
               <TableCell>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => onOpenSheet(b.id)}
-                  title="Volle Details öffnen"
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 px-2 text-xs"
+                    onClick={() => bestaetigeUndLerne(b)}
+                    disabled={
+                      bestaetigeId === b.id ||
+                      savingId === b.id ||
+                      !b.kategorie_id ||
+                      b.status === "manuell_bestaetigt"
+                    }
+                    title={
+                      !b.kategorie_id
+                        ? "Erst Kategorie wählen"
+                        : b.status === "manuell_bestaetigt"
+                          ? "Bereits bestätigt"
+                          : `Bestätigen und Regel für "${item.empfaenger}" lernen`
+                    }
+                  >
+                    {bestaetigeId === b.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <CheckCheck className="h-3.5 w-3.5" />
+                    )}
+                    Bestätigen
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onOpenSheet(b.id)}
+                    title="Volle Details öffnen"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}

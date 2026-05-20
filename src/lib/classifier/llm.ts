@@ -10,7 +10,12 @@
 // LlmKlassifiziererError geworfen — es wird NICHT geraten. Die Pipeline
 // fängt diesen Fehler ab und schickt die Buchung in die Prüfliste.
 
-import { createGateway, generateObject, NoObjectGeneratedError } from "ai";
+import {
+  APICallError,
+  createGateway,
+  generateObject,
+  NoObjectGeneratedError,
+} from "ai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { LanguageModel } from "ai";
 import { z } from "zod";
@@ -21,10 +26,86 @@ import type { HistorieSummary } from "@/lib/classifier/historie";
 
 /** Definierter Fehler bei LLM-Ausfall — kein Raten, sauberer Fallback. */
 export class LlmKlassifiziererError extends Error {
-  constructor(message: string, options?: { cause?: unknown }) {
+  /**
+   * Anzahl der zusaetzlich zum initialen Versuch durchgefuehrten Retries
+   * (0 = nur der initiale Versuch, 1 = ein Retry). Wird vom Aufrufer im
+   * Audit-Eintrag als `details.llm_retries` vermerkt, damit wir nachvollziehen
+   * koennen, wie oft die stochastischen NoObjectGeneratedError-Aussetzer
+   * tatsaechlich geretried werden mussten.
+   */
+  public readonly retries: number;
+
+  constructor(
+    message: string,
+    options?: { cause?: unknown; retries?: number },
+  ) {
     super(message, options);
     this.name = "LlmKlassifiziererError";
+    this.retries = options?.retries ?? 0;
   }
+}
+
+/**
+ * Wieviele zusaetzliche Versuche maximal gemacht werden, wenn `generateObject`
+ * mit einem retry-faehigen Fehler scheitert. 1 Retry zusaetzlich zum initialen
+ * Versuch bedeutet: insgesamt bis zu 2 LLM-Calls pro Buchung.
+ */
+const MAX_RETRIES = 1;
+
+/** Basis-Wartezeit zwischen den Versuchen (ms) — Jitter wird addiert. */
+const RETRY_BASE_DELAY_MS = 800;
+const RETRY_JITTER_MS = 200;
+
+/**
+ * Test-Override: Wenn gesetzt, ueberschreibt die Wartezeit zwischen Retries.
+ * Wird ausschliesslich in `llm.test.ts` benutzt, um die 800ms-Sleeps fuer
+ * die Test-Suite auf 0 zu druecken. Nicht oeffentlich exportiert (intern).
+ */
+let retryDelayOverrideMs: number | null = null;
+export function _setRetryDelayForTest(ms: number | null): void {
+  retryDelayOverrideMs = ms;
+}
+
+/**
+ * Entscheidet, ob ein Fehler von `generateObject` retry-faehig ist:
+ *  - `NoObjectGeneratedError` (Schema-Mismatch / halluzinierte Felder) ist
+ *    klassisch stochastisch und beim zweiten Versuch oft sofort erfolgreich.
+ *  - `APICallError` mit Status 5xx oder ohne Statuscode (Netzwerk-/Timeout-
+ *    Fehler) — Provider hat selbst signalisiert „transient".
+ *  - Alle 4xx (z. B. 401/403/404/422 — fehlender Key, ungueltige Eingabe,
+ *    Modellname falsch) sind permanent und werden NICHT geretried.
+ *
+ * Reine Funktion — testbar ohne IO.
+ */
+export function istRetryFaehig(fehler: unknown): boolean {
+  if (NoObjectGeneratedError.isInstance(fehler)) return true;
+  if (APICallError.isInstance(fehler)) {
+    // Provider sagt explizit: nicht retryen → respektieren.
+    if (fehler.isRetryable === false) {
+      // 5xx aber explizit als nicht-retryable markiert → durchreichen.
+      // (In der Praxis selten, aber SDK darf das setzen.)
+      return false;
+    }
+    const status = fehler.statusCode;
+    if (typeof status !== "number") {
+      // Netzwerk-/Timeout-Fehler ohne Statuscode → retryen.
+      return true;
+    }
+    return status >= 500 && status < 600;
+  }
+  return false;
+}
+
+/** Hilfsfunktion fuer Retry-Delay mit symmetrischem Jitter (+/- 200ms). */
+function ermittleDelayMs(): number {
+  if (retryDelayOverrideMs !== null) return retryDelayOverrideMs;
+  const jitter = Math.floor((Math.random() * 2 - 1) * RETRY_JITTER_MS);
+  return Math.max(0, RETRY_BASE_DELAY_MS + jitter);
+}
+
+async function warte(ms: number): Promise<void> {
+  if (ms <= 0) return;
+  await new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
 /** Minimaler, datensparsamer Input an das LLM. */
@@ -68,6 +149,13 @@ export interface LlmErgebnis {
   begruendung: string;
   /** Konfidenz 0..1. */
   konfidenz: number;
+  /**
+   * Anzahl der zusaetzlich zum initialen Versuch durchgefuehrten Retries
+   * (0 = initialer Versuch hat geklappt). Optional, weil reine Helper-
+   * Funktionen + Tests, die `LlmErgebnis` von Hand bauen, das Feld nicht
+   * setzen muessen. Im Audit-Pfad wird `retries ?? 0` verwendet.
+   */
+  retries?: number;
 }
 
 /** Strukturiertes Ausgabe-Schema (erzwingt valide LLM-Antwort). */
@@ -226,8 +314,68 @@ function wahleProvider(
 }
 
 /**
+ * Ein einzelner LLM-Aufruf — wirft den Roh-Fehler durch, damit die Retry-
+ * Schicht entscheiden kann. Reines Wrap um `generateObject` + Schema-
+ * Postprocessing (Kategorie-Whitelist).
+ *
+ * Beim Retry (`versuchsNummer > 0`) wird dem System-Prompt eine zusaetzliche
+ * Schema-Mahnung vorangestellt. Subtile Variation — der LLM-Stochastik reicht
+ * meistens schon, aber die Mahnung schadet nichts und macht den Retry beim
+ * Lesen des Audit-Eintrags nachvollziehbar.
+ */
+async function einVersuch(
+  llmModel: LanguageModel,
+  prompt: string,
+  kategorien: readonly KategorieOption[],
+  versuchsNummer: number,
+): Promise<Omit<LlmErgebnis, "retries">> {
+  const system =
+    versuchsNummer === 0
+      ? SYSTEM_PROMPT
+      : `Antworte STRENG nach dem JSON-Schema. Jedes Feld muss genau dem im Schema vorgegebenen Typ entsprechen.\n\n${SYSTEM_PROMPT}`;
+
+  const { object } = await generateObject({
+    model: llmModel,
+    schema: ausgabeSchema,
+    system,
+    prompt,
+  });
+
+  // Halluzinierte Kategorie-IDs verwerfen (nur erlaubte zulassen).
+  const erlaubt = new Set(kategorien.map((k) => k.id));
+  const kategorieId =
+    object.kategorie_id && erlaubt.has(object.kategorie_id)
+      ? object.kategorie_id
+      : null;
+
+  return {
+    klassifikation: object.klassifikation,
+    steuerrelevant: object.steuerrelevant,
+    kategorie_id: kategorieId,
+    ust_satz: object.ust_satz,
+    begruendung: object.begruendung,
+    konfidenz: object.konfidenz,
+  };
+}
+
+/**
  * Ruft das LLM serverseitig auf und liefert eine validierte Klassifikation.
  * Wirft `LlmKlassifiziererError` bei jedem Fehlerfall (kein Raten).
+ *
+ * Retry-Strategie (PROJ-15 Konsistenz/Pro):
+ *  - Maximal `MAX_RETRIES` zusaetzliche Versuche (1 Retry → insgesamt 2 Calls).
+ *  - Retry NUR bei `NoObjectGeneratedError` (Schema-Mismatch, oft stochastisch)
+ *    und `APICallError` mit Status 5xx oder fehlendem Statuscode (Timeout).
+ *  - 4xx (Auth/Eingabe/Modell-Slug) wird NICHT geretried — das ist permanent.
+ *  - Zwischen den Versuchen warten wir `RETRY_BASE_DELAY_MS` +/- Jitter, damit
+ *    parallele Buchungen mit demselben Aussetzer nicht synchron laufen.
+ *  - Beim Retry-Versuch wird das System-Prompt um eine zusaetzliche Mahnung
+ *    ergaenzt ("Antworte STRENG nach Schema."). Identische LLM-Settings,
+ *    identische User-Prompt — die Variation ist subtil und zielt nur darauf,
+ *    dem Modell den Schema-Zwang noch einmal explizit zu nennen.
+ *  - Wenn beide Versuche scheitern, wirft die Funktion `LlmKlassifiziererError`
+ *    mit `retries` = Anzahl der getaetigten Retries, damit der Aufrufer das
+ *    im Audit-Eintrag dokumentieren kann.
  */
 export async function klassifiziereMitLlm(
   eingabe: LlmEingabe,
@@ -266,41 +414,35 @@ export async function klassifiziereMitLlm(
     `${stichworte}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
-  try {
-    const { object } = await generateObject({
-      model: llmModel,
-      schema: ausgabeSchema,
-      system: SYSTEM_PROMPT,
-      prompt,
-    });
+  let letzterFehler: unknown = null;
+  let retries = 0;
 
-    // Halluzinierte Kategorie-IDs verwerfen (nur erlaubte zulassen).
-    const erlaubt = new Set(kategorien.map((k) => k.id));
-    const kategorieId =
-      object.kategorie_id && erlaubt.has(object.kategorie_id)
-        ? object.kategorie_id
-        : null;
-
-    return {
-      klassifikation: object.klassifikation,
-      steuerrelevant: object.steuerrelevant,
-      kategorie_id: kategorieId,
-      ust_satz: object.ust_satz,
-      begruendung: object.begruendung,
-      konfidenz: object.konfidenz,
-    };
-  } catch (err) {
-    if (NoObjectGeneratedError.isInstance(err)) {
-      throw new LlmKlassifiziererError(
-        "LLM lieferte keine schemakonforme Antwort.",
-        { cause: err },
-      );
+  // Insgesamt MAX_RETRIES + 1 Versuche.
+  for (let versuch = 0; versuch <= MAX_RETRIES; versuch++) {
+    try {
+      const ergebnis = await einVersuch(llmModel, prompt, kategorien, versuch);
+      return { ...ergebnis, retries: versuch };
+    } catch (err) {
+      letzterFehler = err;
+      const kannRetryen =
+        versuch < MAX_RETRIES && istRetryFaehig(err);
+      if (!kannRetryen) break;
+      retries++;
+      await warte(ermittleDelayMs());
     }
+  }
+
+  // Beide Versuche fehlgeschlagen — sauber als LlmKlassifiziererError werfen.
+  if (NoObjectGeneratedError.isInstance(letzterFehler)) {
     throw new LlmKlassifiziererError(
-      err instanceof Error
-        ? `LLM-Aufruf fehlgeschlagen: ${err.message}`
-        : "LLM-Aufruf fehlgeschlagen.",
-      { cause: err },
+      "LLM lieferte keine schemakonforme Antwort.",
+      { cause: letzterFehler, retries },
     );
   }
+  throw new LlmKlassifiziererError(
+    letzterFehler instanceof Error
+      ? `LLM-Aufruf fehlgeschlagen: ${letzterFehler.message}`
+      : "LLM-Aufruf fehlgeschlagen.",
+    { cause: letzterFehler, retries },
+  );
 }

@@ -34,6 +34,7 @@ import {
   type LlmErgebnis,
 } from "@/lib/classifier/llm";
 import {
+  aktualisiereLetzteKlassifikation,
   defaultTtl,
   holeKenntnis,
   istAbgelaufen,
@@ -47,9 +48,12 @@ import {
   type HistorieSummary,
 } from "@/lib/classifier/historie";
 import {
+  extrahiereBrancheUndLeistung,
   formatiereRechercheKontext,
   rechercheEmpfaenger,
+  type BrancheUndLeistung,
   type WebRechercheErgebnis,
+  type WebRechercheTreffer,
 } from "@/lib/classifier/web-research";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -352,6 +356,16 @@ type RechercheFn = (
 ) => Promise<WebRechercheErgebnis | null>;
 
 /**
+ * Funktion, die aus den Web-Snippets eine kompakte Branche + Leistung
+ * extrahiert. Per Default ein LLM-Call (siehe `web-research.ts`); in Tests
+ * mockbar — analog zu `RechercheFn`.
+ */
+type ExtrahiereFn = (
+  snippets: readonly WebRechercheTreffer[],
+  empfaengername: string,
+) => Promise<BrancheUndLeistung | null>;
+
+/**
  * Orchestriert eine einzelne Buchung mit neuer Reihenfolge (PROJ-15):
  *  1) Regel-Engine (Vorrang).
  *  2) Cache-Lookup auf `empfaenger_normalisiert` (nur wenn ctx.supabase
@@ -375,6 +389,7 @@ export async function klassifiziereBuchung(
   llmFn: LlmFn = klassifiziereMitLlm,
   rechercheFn: RechercheFn = rechercheEmpfaenger,
   ctx: PipelineKontext = {},
+  extrahiereFn: ExtrahiereFn = extrahiereBrancheUndLeistung,
 ): Promise<PipelineEntscheidung> {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
@@ -436,6 +451,7 @@ export async function klassifiziereBuchung(
           norm,
           buchung.empfaenger,
           rechercheFn,
+          extrahiereFn,
         );
         if (inflight) inflight.set(key, promise);
         // Nur die Buchung, die den Call wirklich AUSGELOEST hat, zaehlt
@@ -494,9 +510,14 @@ export async function klassifiziereBuchung(
   // (5) Entscheidung berechnen.
   const entscheidung = entscheideBuchung(buchung, regeln, llm, config, llmFehler);
 
-  // (6) Bei hoher LLM-Konfidenz und Recherche-Kandidat: in Cache uebernehmen
-  // (quelle='llm', kuerzere TTL). Verhindert, dass die naechste Buchung mit
-  // demselben Empfaenger wieder ratlos ist.
+  // (6) Bei hoher LLM-Konfidenz und Recherche-Kandidat: in Cache uebernehmen.
+  // Verzweigung nach Quelle (PROJ-15-Bugfix):
+  //  - kenntnis === null         → Neuanlage mit quelle='llm'
+  //  - kenntnis.quelle === 'web' → NUR letzte_klassifikation_default updaten;
+  //                                 quelle/Branche/Leistung/Snippets bleiben
+  //                                 unangetastet (Web-Wissen nicht verlieren)
+  //  - kenntnis.quelle === 'llm' → vollstaendiger Upsert mit quelle='llm'
+  //  - kenntnis.quelle === 'manuell' → NIE anfassen
   if (
     ctx.supabase &&
     ctx.ownerId &&
@@ -505,28 +526,52 @@ export async function klassifiziereBuchung(
     kandidat &&
     llm.konfidenz >= config.konfidenz_schwellwert
   ) {
-    // Nicht ueberschreiben, wenn schon eine MANUELLE Korrektur drin liegt.
-    if (!(kenntnis && kenntnis.quelle === "manuell")) {
+    const letzteKlassifikation = {
+      klassifikation: llm.klassifikation,
+      steuerrelevant: llm.steuerrelevant,
+      kategorie_id: llm.kategorie_id,
+      ust_satz: llm.ust_satz as 0 | 7 | 19 | null,
+      konfidenz: llm.konfidenz,
+    };
+
+    if (kenntnis === null) {
       await upsertKenntnis(ctx.supabase, {
         owner_id: ctx.ownerId,
         empfaenger_norm: norm,
         rohwert_beispiel: buchung.empfaenger ?? null,
         quelle: "llm",
         ttl_tage: defaultTtl("llm"),
-        // Bei vorhandener Web-Kenntnis Branche/Leistung erhalten.
-        branche: kenntnis?.branche ?? null,
-        leistung: kenntnis?.leistung ?? null,
-        web_snippets: kenntnis?.web_snippets ?? null,
-        recherche_versucht: kenntnis?.recherche_versucht ?? false,
-        letzte_klassifikation_default: {
-          klassifikation: llm.klassifikation,
-          steuerrelevant: llm.steuerrelevant,
-          kategorie_id: llm.kategorie_id,
-          ust_satz: llm.ust_satz as 0 | 7 | 19 | null,
-          konfidenz: llm.konfidenz,
-        },
+        branche: null,
+        leistung: null,
+        web_snippets: null,
+        recherche_versucht: false,
+        letzte_klassifikation_default: letzteKlassifikation,
+      });
+    } else if (kenntnis.quelle === "web") {
+      // Web-Eintrag mit Branche/Leistung/Snippets bleibt unveraendert —
+      // wir merken uns nur die zuletzt erfolgreiche LLM-Klassifikation.
+      await aktualisiereLetzteKlassifikation(
+        ctx.supabase,
+        ctx.ownerId,
+        norm,
+        letzteKlassifikation,
+      );
+    } else if (kenntnis.quelle === "llm") {
+      // Reiner LLM-Eintrag: Klassifikations-Defaults neu setzen.
+      await upsertKenntnis(ctx.supabase, {
+        owner_id: ctx.ownerId,
+        empfaenger_norm: norm,
+        rohwert_beispiel: buchung.empfaenger ?? null,
+        quelle: "llm",
+        ttl_tage: defaultTtl("llm"),
+        branche: kenntnis.branche,
+        leistung: kenntnis.leistung,
+        web_snippets: kenntnis.web_snippets,
+        recherche_versucht: kenntnis.recherche_versucht,
+        letzte_klassifikation_default: letzteKlassifikation,
       });
     }
+    // kenntnis.quelle === 'manuell' → bewusst keine Aktion.
   }
 
   if (webGenutzt) {
@@ -566,6 +611,12 @@ export async function klassifiziereBuchung(
  * Bei Recherche-Fehler/leerer Antwort wird trotzdem ein Cooldown-Eintrag
  * (`recherche_versucht=true`, leere Snippets) geschrieben, damit derselbe
  * Empfaenger im selben Lauf nicht 50x erneut Firecrawl belaestigt.
+ *
+ * PROJ-15-Bugfix: Sobald Snippets vorhanden sind, wird ein zusaetzlicher
+ * kleiner LLM-Call gemacht, um Branche + Leistung aus den Snippets zu
+ * destillieren. Schlaegt der LLM-Call fehl (Timeout, kein Key, leere
+ * Antwort), bleiben Branche/Leistung schlicht `null` — der Web-Eintrag
+ * selbst wird auf jeden Fall geschrieben.
  */
 async function recherchiereUndUpserte(
   supabase: SupabaseClient,
@@ -573,9 +624,22 @@ async function recherchiereUndUpserte(
   norm: string,
   rohwert: string | null,
   rechercheFn: RechercheFn,
+  extrahiereFn: ExtrahiereFn,
 ): Promise<EmpfaengerKenntnis | null> {
   const ergebnis = await rechercheFn(rohwert);
   const snippets = ergebnis?.treffer ?? null;
+
+  let branche: string | null = null;
+  let leistung: string | null = null;
+  if (snippets && snippets.length > 0) {
+    try {
+      const struk = await extrahiereFn(snippets, rohwert ?? "");
+      branche = struk?.branche ?? null;
+      leistung = struk?.leistung ?? null;
+    } catch {
+      // Cache-Pflege ist optional — bei Fehlern bleibt es bei null/null.
+    }
+  }
 
   await upsertKenntnis(supabase, {
     owner_id: ownerId,
@@ -584,6 +648,8 @@ async function recherchiereUndUpserte(
     quelle: "web",
     recherche_versucht: true,
     web_snippets: snippets,
+    branche,
+    leistung,
     ttl_tage: defaultTtl("web"),
   });
 

@@ -405,6 +405,7 @@ function makePipelineSupabase(opts: {
   }
 
   const upsertSpy = vi.fn();
+  const updateSpy = vi.fn();
   const insertSpy = vi.fn();
   const historieResult = {
     data: opts.historieRows ?? null,
@@ -451,6 +452,36 @@ function makePipelineSupabase(opts: {
           });
           return { error: null };
         }),
+        // PROJ-15-Bugfix: UPDATE auf nur ein Feld (aktualisiere
+        // LetzteKlassifikation). Wir filtern owner_id + empfaenger_norm und
+        // wenden das Patch auf den bestehenden Cache-Eintrag an.
+        update: vi.fn((patch: Partial<CacheRow>) => {
+          const filter: { owner_id?: string; empfaenger_norm?: string } = {};
+          const updateChain: {
+            eq: (col: string, val: string) => unknown;
+          } = {
+            eq: function (col: string, val: string) {
+              if (col === "owner_id") filter.owner_id = val;
+              if (col === "empfaenger_norm") {
+                filter.empfaenger_norm = val;
+                const key = `${filter.owner_id ?? ""}::${filter.empfaenger_norm ?? ""}`;
+                const existing = cache.get(key);
+                if (existing) {
+                  const merged: CacheRow = {
+                    ...existing,
+                    ...patch,
+                    updated_at: new Date().toISOString(),
+                  };
+                  cache.set(key, merged);
+                  updateSpy({ filter: { ...filter }, patch });
+                }
+                return Promise.resolve({ error: null });
+              }
+              return updateChain;
+            },
+          };
+          return updateChain;
+        }),
         insert: vi.fn(async () => ({ error: null })),
       };
     }
@@ -471,7 +502,7 @@ function makePipelineSupabase(opts: {
     throw new Error(`Unerwartete Tabelle im Mock: ${tabelle}`);
   });
 
-  return { from, cache, upsertSpy, insertSpy };
+  return { from, cache, upsertSpy, updateSpy, insertSpy };
 }
 
 describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
@@ -489,6 +520,9 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
         { titel: "Acme GmbH", beschreibung: "Software-Anbieter.", url: "https://acme.example" },
       ],
     });
+    const extrahiereFn = vi
+      .fn()
+      .mockResolvedValue({ branche: "Software", leistung: "SaaS-Anbieter." });
 
     const { audit } = await klassifiziereBuchung(
       buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
@@ -498,14 +532,24 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
       llmFn,
       rechercheFn,
       { supabase, ownerId: "owner-1" },
+      extrahiereFn,
     );
 
     expect(rechercheFn).toHaveBeenCalledOnce();
     // Genau EIN LLM-Call — kein Retry-Schema mehr.
     expect(llmFn).toHaveBeenCalledOnce();
-    // Upsert wurde aufgerufen — initial mit web-Quelle (Snippets persistiert)
-    // und danach optional erneut mit llm-Quelle (Konfidenz >= 0.85).
-    expect(upsertSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    // Branche/Leistung-Extraktion wurde aufgerufen.
+    expect(extrahiereFn).toHaveBeenCalledOnce();
+    // Initialer Web-Upsert enthaelt Branche + Leistung.
+    const webUpserts = upsertSpy.mock.calls.filter(
+      (c: unknown[]) => (c[0] as { quelle: string }).quelle === "web",
+    );
+    expect(webUpserts.length).toBeGreaterThanOrEqual(1);
+    expect(webUpserts[0][0]).toMatchObject({
+      quelle: "web",
+      branche: "Software",
+      leistung: "SaaS-Anbieter.",
+    });
     expect(audit.details.web_recherche).toMatchObject({ genutzt: true });
     expect(audit.details.empfaenger_kenntnis).toBeDefined();
   });
@@ -607,6 +651,9 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
         ),
     );
     const llmFn = vi.fn().mockResolvedValue(llmOk({ konfidenz: 0.92 }));
+    const extrahiereFn = vi
+      .fn()
+      .mockResolvedValue({ branche: "Software", leistung: "SaaS." });
 
     const inflight = new Map<string, Promise<unknown>>() as never;
 
@@ -623,6 +670,7 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
         llmFn,
         rechercheFn,
         { supabase, ownerId: "owner-1", inflight },
+        extrahiereFn,
       ),
       klassifiziereBuchung(
         buchung({
@@ -636,10 +684,14 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
         llmFn,
         rechercheFn,
         { supabase, ownerId: "owner-1", inflight },
+        extrahiereFn,
       ),
     ]);
 
     expect(rechercheFn).toHaveBeenCalledOnce();
+    // Auch die Extraktion wird nur EINMAL pro Empfaenger ausgeloest, weil
+    // die Inflight-Map den gesamten recherchiereUndUpserte-Aufruf bundlet.
+    expect(extrahiereFn).toHaveBeenCalledOnce();
     expect(a.ergebnis.status).toBe("auto_verbucht");
     expect(b.ergebnis.status).toBe("auto_verbucht");
   });
@@ -666,16 +718,127 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
     expect(llmFn).toHaveBeenCalledOnce();
   });
 
-  it("hohe LLM-Konfidenz → Upsert mit quelle='llm' wird ausgeloest", async () => {
-    const { from, upsertSpy } = makePipelineSupabase({ cache: [] });
-    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+  it("Cache leer + hohe LLM-Konfidenz → Web-Recherche schreibt 'web', LLM-Upsert hebt letzte Klassifikation per UPDATE nach (quelle bleibt 'web')", async () => {
+    // PROJ-15-Bugfix: Wenn schon ein Web-Eintrag existiert (auch ein leerer
+    // Cooldown-Eintrag aus dem Recherche-Versuch), darf der LLM-Konfidenz-
+    // Pfad die quelle NICHT auf 'llm' kippen. Stattdessen wird nur
+    // `letzte_klassifikation_default` per UPDATE nachgezogen.
+    const { from, upsertSpy, updateSpy } = makePipelineSupabase({ cache: [] });
     const supabase = { from } as never;
 
     const llmFn = vi.fn().mockResolvedValue(
       llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.95 }),
     );
-    // Recherche liefert nichts — kein Cache-Eintrag mit Snippets.
+    // Recherche liefert nichts — schreibt aber dennoch einen Cooldown-Eintrag
+    // mit quelle='web' (recherche_versucht=true, snippets=null).
     const rechercheFn = vi.fn().mockResolvedValue(null);
+    const extrahiereFn = vi.fn(); // wird nicht aufgerufen, weil snippets null
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+      extrahiereFn,
+    );
+
+    expect(extrahiereFn).not.toHaveBeenCalled();
+
+    // Es darf KEINEN Upsert mit quelle='llm' geben — der Web-Eintrag muss
+    // erhalten bleiben.
+    const llmUpserts = upsertSpy.mock.calls.filter(
+      (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
+    );
+    expect(llmUpserts).toHaveLength(0);
+
+    // Stattdessen wurde per UPDATE nur letzte_klassifikation_default gesetzt.
+    const updateCalls = updateSpy.mock.calls.filter(
+      (c: unknown[]) =>
+        Object.prototype.hasOwnProperty.call(
+          (c[0] as { patch: Record<string, unknown> }).patch,
+          "letzte_klassifikation_default",
+        ),
+    );
+    expect(updateCalls.length).toBeGreaterThanOrEqual(1);
+    const patch = (updateCalls[0][0] as {
+      patch: { letzte_klassifikation_default: { konfidenz: number } };
+    }).patch;
+    expect(patch.letzte_klassifikation_default.konfidenz).toBe(0.95);
+  });
+
+  it("Cache leer ohne Recherche-Kandidat + hohe LLM-Konfidenz → Upsert mit quelle='llm', alle Felder neu", async () => {
+    // Ohne Recherche-Kandidat (z. B. nur 2 Wortteile + keine Rechtsform):
+    // Der LLM-Konfidenz-Pfad greift gar nicht, weil `kandidat=false`.
+    // Daher KEIN Upsert. Stattdessen testen wir hier den Pfad
+    // `kenntnis === null` mit Recherche-Kandidat aber abgeschalteter
+    // Web-Recherche.
+    const { from, upsertSpy } = makePipelineSupabase({ cache: [] });
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.95 }),
+    );
+    const rechercheFn = vi.fn();
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      { ...DEFAULT_CONFIG, web_recherche_aktiv: false },
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).not.toHaveBeenCalled();
+    // Genau ein Upsert mit quelle='llm', branche/leistung/snippets null.
+    const llmUpserts = upsertSpy.mock.calls.filter(
+      (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
+    );
+    expect(llmUpserts.length).toBe(1);
+    const upsert = llmUpserts[0][0] as {
+      branche: string | null;
+      leistung: string | null;
+      web_snippets: unknown;
+      letzte_klassifikation_default: { konfidenz: number };
+    };
+    expect(upsert.branche).toBeNull();
+    expect(upsert.leistung).toBeNull();
+    expect(upsert.web_snippets).toBeNull();
+    expect(upsert.letzte_klassifikation_default.konfidenz).toBe(0.95);
+  });
+
+  it("Cache 'web' vorhanden + hohe LLM-Konfidenz → quelle bleibt 'web', branche/leistung/snippets unveraendert, nur letzte_klassifikation_default neu", async () => {
+    const initialSnippets = [
+      { titel: "Acme", beschreibung: "Cloud.", url: "https://acme.example" },
+    ];
+    const { from, upsertSpy, updateSpy, cache } = makePipelineSupabase({
+      cache: [
+        {
+          owner_id: "owner-1",
+          empfaenger_norm: "acme",
+          rohwert_beispiel: "Acme GmbH",
+          branche: "Software",
+          leistung: "Cloud-Hosting",
+          web_snippets: initialSnippets,
+          letzte_klassifikation_default: null,
+          quelle: "web",
+          recherche_versucht: true,
+          cached_at: new Date().toISOString(),
+          ttl_tage: 180,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.95 }),
+    );
+    const rechercheFn = vi.fn();
 
     await klassifiziereBuchung(
       buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
@@ -687,16 +850,33 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
       { supabase, ownerId: "owner-1" },
     );
 
-    // Mindestens ein Upsert mit quelle='llm'.
+    // Keine Web-Recherche (Cache-Hit).
+    expect(rechercheFn).not.toHaveBeenCalled();
+    // Kein quelle='llm'-Upsert.
     const llmUpserts = upsertSpy.mock.calls.filter(
       (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
     );
-    expect(llmUpserts.length).toBeGreaterThanOrEqual(1);
-    // letzte_klassifikation_default ist gefuellt.
-    const llmUpsert = llmUpserts[0][0] as {
-      letzte_klassifikation_default: { konfidenz: number };
-    };
-    expect(llmUpsert.letzte_klassifikation_default.konfidenz).toBe(0.95);
+    expect(llmUpserts).toHaveLength(0);
+
+    // UPDATE wurde aufgerufen, nur mit letzte_klassifikation_default.
+    expect(updateSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    const lastCall = updateSpy.mock.calls[updateSpy.mock.calls.length - 1];
+    expect((lastCall[0] as { patch: Record<string, unknown> }).patch).toEqual({
+      letzte_klassifikation_default: {
+        klassifikation: "geschaeftlich",
+        steuerrelevant: true,
+        kategorie_id: "kat-soft",
+        ust_satz: 19,
+        konfidenz: 0.95,
+      },
+    });
+
+    // Cache-Eintrag bleibt 'web' mit unveraenderter Branche/Leistung/Snippets.
+    const stored = cache.get("owner-1::acme");
+    expect(stored?.quelle).toBe("web");
+    expect(stored?.branche).toBe("Software");
+    expect(stored?.leistung).toBe("Cloud-Hosting");
+    expect(stored?.web_snippets).toEqual(initialSnippets);
   });
 
   it("manuelle Kenntnis wird NICHT vom LLM-Upsert ueberschrieben", async () => {

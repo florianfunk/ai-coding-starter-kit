@@ -485,6 +485,87 @@ Offen / bewusste Annahmen:
   Strassen-Suffix-Liste wird empfohlen, sobald skandinavische/
   franzoesische Adressen haeufiger auftauchen.
 
+### 2026-05-20 — Bug-Fix: Branche/Leistung-Extraktion + Cache-Quelle bewahren
+
+Hintergrund: Nach dem ersten Re-Klassifizierungs-Lauf gegen reale Daten
+hatten 76/84 Cache-Eintraege zwar `web_snippets`, aber ALLE 84 hatten
+`branche=NULL` und `leistung=NULL`. Ausserdem ueberschrieb der hochkonfidente
+LLM-Konfidenz-Upsert in der Pipeline einen bestehenden `quelle='web'`-
+Eintrag mit `quelle='llm'` — und nullte dabei Branche/Leistung/Snippets,
+auch wenn das LLM nur die Klassifikation aktualisieren sollte.
+
+**Bug 1: Branche/Leistung wurden nie extrahiert**
+- `src/lib/classifier/web-research.ts`: neue Funktion
+  `extrahiereBrancheUndLeistung(snippets, empfaengername, opts?)` macht
+  einen kleinen LLM-Call ueber `generateObject` + Zod-Schema mit den drei
+  Snippets. Schema beider Felder ist `string.nullable()`: das LLM soll
+  explizit `null` zurueckgeben, wenn aus den Snippets nichts Eindeutiges
+  ablesbar ist (statt zu raten oder leere Strings zu liefern).
+- Provider-Wahl spiegelt das Pattern aus `lib/classifier/llm.ts`:
+  `sk-ant-…` → direkter Anthropic-Provider mit Modell-Slug-Normalisierung
+  (`anthropic/claude-haiku-4.5` → `claude-haiku-4-5`), sonst Vercel AI
+  Gateway. Modell-Default aus `process.env.STEUERAGENT_LLM_MODEL` via
+  `ladeAiKey()` (gleiche Quelle wie der Haupt-Klassifizierer).
+- Timeout 5s ueber Promise-Race. Bei jedem Fehler (kein Key, Timeout,
+  Schema-Bruch, LLM-Exception) → `null`. Wirft NIE — Cache-Pflege darf
+  den Klassifikations-Pfad nicht abbrechen.
+- `recherchiereUndUpserte` in `pipeline.ts` ruft die Extraktion nach
+  Firecrawl-Erfolg auf und schreibt Branche/Leistung mit in den Cache-
+  Upsert. Bei leeren Snippets / null wird der Aufruf uebersprungen.
+- Mockbarkeit: neuer `ExtrahiereFn`-Typ in `pipeline.ts`, als 8. Parameter
+  von `klassifiziereBuchung` mit Default-Implementierung. Tests koennen
+  ihn ueber denselben Mechanismus mocken wie `rechercheFn`.
+
+**Bug 2: LLM-Konfidenz-Upsert ueberschrieb `quelle='web'` mit `quelle='llm'`**
+- `src/lib/classifier/empfaenger-cache.ts`: neue Funktion
+  `aktualisiereLetzteKlassifikation(supabase, owner_id, empfaenger_norm,
+  letzte_klassifikation_default)` setzt per UPDATE ausschliesslich
+  `letzte_klassifikation_default`, ohne `quelle`, `branche`, `leistung`
+  oder `web_snippets` anzufassen. Best-effort (kein Throw bei DB-Fehler).
+- `pipeline.ts`: Der LLM-Konfidenz-Upsert verzweigt nach Kenntnis-Quelle:
+  - `kenntnis === null` → `upsertKenntnis` mit `quelle='llm'`, alle Felder
+    null (kein Web-Wissen vorhanden).
+  - `kenntnis.quelle === 'web'` → `aktualisiereLetzteKlassifikation`
+    (nur das eine Feld). Branche/Leistung/Snippets/Quelle bleiben.
+  - `kenntnis.quelle === 'llm'` → `upsertKenntnis` mit `quelle='llm'`,
+    bestehende Branche/Leistung/Snippets werden erhalten.
+  - `kenntnis.quelle === 'manuell'` → bewusst KEINE Aktion (wie bisher).
+
+**Tests (3 Module)**
+- `web-research.test.ts` (NEU, 8 Tests): happy path, Trim/null-
+  Normalisierung, LLM liefert null/null, leeres Snippets-Array, LLM-
+  Exception, kein AI-Key, `ladeAiKey` wirft, Timeout greift, Gateway-
+  Provider-Pfad. AI-SDK + `ladeAiKey` werden via `vi.mock` gestubbt.
+- `empfaenger-cache.test.ts` (+3 Tests): Skip-Bedingung leerer Norm,
+  korrekter UPDATE-Aufruf mit Filtern, Best-effort bei DB-Fehler.
+- `pipeline.test.ts` (3 neue + 1 erweiterter Test): Web-Recherche schreibt
+  Branche/Leistung mit (statt nur Snippets); Inflight-Map dedupliziert
+  auch die Extraktion; (a) Cache leer ohne Recherche → Upsert mit
+  `quelle='llm'`, alle Felder neu; (b) Cache 'web' vorhanden → quelle
+  bleibt 'web', nur `letzte_klassifikation_default` per UPDATE; (c) Web-
+  Recherche schlaegt fehl (kein Snippets) → kein 'llm'-Upsert, sondern
+  UPDATE auf bestehenden Web-Cooldown-Eintrag. Pipeline-Mock-Supabase um
+  `update`-Branch erweitert (in-memory Patch + UpdateSpy).
+
+**Ergebnis**
+- Tests: 463 passed (vorher 449 — +14 neu, alle bestehenden gruen).
+- Lint: 0 Errors, 2 unveraenderte Warnings (ki-panel.tsx, use-toast.ts).
+- Build: erfolgreich.
+
+**Offene Annahmen / Trade-offs**
+- Wenn Firecrawl Snippets liefert, aber der Extraktor anschliessend
+  hängt/scheitert, schreiben wir den Cache-Eintrag trotzdem (mit
+  `branche=null`, `leistung=null`). Beim naechsten Treffer wird der
+  Empfaenger wegen `recherche_versucht=true` nicht erneut recherchiert
+  — Branche/Leistung bleiben dann leer, bis der Cache abgelaufen ist
+  oder manuell invalidiert wird. Bewusste Entscheidung: Firecrawl-
+  Budget > Extraktions-Retry.
+- Der `extrahiereBrancheUndLeistung`-Aufruf verbraucht zusaetzliches LLM-
+  Budget pro Erstkontakt mit einem Empfaenger. Bei 84 Cache-Eintraegen
+  einmalig, danach amortisiert ueber alle Folge-Buchungen desselben
+  Empfaengers — Erwartung: Net-positiv, weil der LLM-Haupt-Klassifizierer
+  mit Branche/Leistung-Kontext seltener in die Pruefliste rutscht.
+
 ## QA Test Results
 _To be added by /qa_
 

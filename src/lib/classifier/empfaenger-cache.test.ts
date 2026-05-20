@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  aktualisiereLetzteKlassifikation,
   defaultTtl,
   holeKenntnis,
   istAbgelaufen,
@@ -361,6 +362,99 @@ describe("upsertKenntnis", () => {
       },
     );
     expect(insertSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// aktualisiereLetzteKlassifikation (PROJ-15-Bugfix)
+// ---------------------------------------------------------------------------
+
+describe("aktualisiereLetzteKlassifikation", () => {
+  it("ueberspringt leeren empfaenger_norm (kein DB-Call)", async () => {
+    const from = vi.fn();
+    await aktualisiereLetzteKlassifikation(
+      { from } as unknown as Parameters<typeof aktualisiereLetzteKlassifikation>[0],
+      "owner-1",
+      "   ",
+      {
+        klassifikation: "geschaeftlich",
+        steuerrelevant: true,
+        kategorie_id: "kat-soft",
+        ust_satz: 19,
+        konfidenz: 0.95,
+      },
+    );
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("schreibt UPDATE auf empfaenger_kenntnis mit korrekten Filtern", async () => {
+    const eqSpy = vi.fn().mockReturnThis();
+    const chain = {
+      eq: eqSpy,
+    };
+    // Letzter .eq() Aufruf liefert eine Promise — Supabase JS gibt thenable
+    // Builder zurueck; wir simulieren das schlicht ueber Promise.resolve am
+    // letzten eq-Call. `_val` ungenutzt, weil das Test-Mock den konkreten
+    // Wert nicht prueft, sondern nur die Spaltenreihenfolge.
+    chain.eq = vi.fn((col: string, _val: string) => {
+      if (col === "empfaenger_norm") {
+        return Promise.resolve({ error: null });
+      }
+      return chain;
+    }) as never;
+
+    const updateSpy = vi.fn(() => chain);
+    const from = vi.fn(() => ({ update: updateSpy }));
+
+    const klass = {
+      klassifikation: "geschaeftlich" as const,
+      steuerrelevant: true,
+      kategorie_id: "kat-soft",
+      ust_satz: 19 as const,
+      konfidenz: 0.95,
+    };
+    await aktualisiereLetzteKlassifikation(
+      { from } as unknown as Parameters<typeof aktualisiereLetzteKlassifikation>[0],
+      "owner-1",
+      "acme",
+      klass,
+    );
+
+    expect(from).toHaveBeenCalledWith("empfaenger_kenntnis");
+    expect(updateSpy).toHaveBeenCalledWith({
+      letzte_klassifikation_default: klass,
+    });
+  });
+
+  it("propagiert keine DB-Fehler (best-effort)", async () => {
+    const finalEq = vi
+      .fn()
+      .mockResolvedValue({ error: { message: "RLS" } });
+    const chain = {
+      eq: vi.fn(function (this: unknown, col: string) {
+        if (col === "empfaenger_norm") return finalEq();
+        return chain;
+      }),
+    };
+    const updateSpy = vi.fn(() => chain);
+    const from = vi.fn(() => ({ update: updateSpy }));
+
+    await expect(
+      aktualisiereLetzteKlassifikation(
+        { from } as unknown as Parameters<
+          typeof aktualisiereLetzteKlassifikation
+        >[0],
+        "owner-1",
+        "acme",
+        {
+          klassifikation: "geschaeftlich",
+          steuerrelevant: true,
+          kategorie_id: null,
+          ust_satz: null,
+          konfidenz: 0.9,
+        },
+      ),
+    ).resolves.toBeUndefined();
   });
 });
 

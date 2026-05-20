@@ -275,3 +275,32 @@ export async function upsertKenntnis(
     // best-effort: Fehler hier nicht propagieren.
     .then(() => undefined, () => undefined);
 }
+
+/**
+ * PROJ-15-Bugfix: Aktualisiert AUSSCHLIESSLICH
+ * `letzte_klassifikation_default`, ohne `quelle`, `branche`, `leistung` oder
+ * `web_snippets` anzufassen. Verhindert, dass ein erfolgreicher LLM-Lauf
+ * einen bestehenden `quelle='web'`-Eintrag (inkl. Branche/Leistung/Snippets)
+ * auf `quelle='llm'` umstellt und damit das Web-Wissen verliert.
+ *
+ * Geht still durch, wenn kein Datensatz existiert (kein Insert!). Die
+ * Erstanlage erfolgt ueber `upsertKenntnis`.
+ */
+export async function aktualisiereLetzteKlassifikation(
+  supabase: SupabaseClient,
+  owner_id: string,
+  empfaenger_norm: string,
+  letzte_klassifikation_default: LetzteKlassifikation,
+): Promise<void> {
+  const norm = empfaenger_norm.trim();
+  if (norm.length === 0) return;
+
+  await supabase
+    .from("empfaenger_kenntnis")
+    .update({ letzte_klassifikation_default })
+    .eq("owner_id", owner_id)
+    .eq("empfaenger_norm", norm);
+  // Best-effort: ein Fehler hier (z. B. fehlende RLS-Berechtigung) darf den
+  // Klassifikations-Pfad nicht abbrechen. Der Cache ist Optimierung,
+  // kein Pflicht-Pfad — analog zu `upsertKenntnis`.
+}

@@ -22,6 +22,7 @@ import {
   type BuchungFuerPipeline,
   type PipelineConfig,
 } from "@/lib/classifier/pipeline";
+import { neueInflightMap } from "@/lib/classifier/empfaenger-cache";
 import type { KategorieOption } from "@/lib/classifier/llm";
 import type { Lernregel } from "@/lib/types";
 
@@ -32,8 +33,10 @@ export const maxDuration = 300;
 const SELECT_JOB =
   "id, art, status, fortschritt, gesamt, ergebnis, fehler_text, created_at";
 
+// PROJ-15: `empfaenger_normalisiert` wird mitgeladen, damit Cache/Historie
+// owner-scoped pro normalisiertem Empfaenger nachschlagen koennen.
 const SELECT_BUCHUNG =
-  "id, konto_id, betrag, verwendungszweck, empfaenger, status";
+  "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, status";
 
 interface Klassifikationsergebnis {
   verarbeitet: number;
@@ -244,6 +247,14 @@ export async function POST(request: Request) {
   // Trefferzähler je angewandter Regel (am Ende gebündelt erhöhen).
   const regelTreffer = new Map<string, number>();
 
+  // PROJ-15: Job-scoped InflightMap fuer Race-Schutz beim Massen-Lauf.
+  // Wenn 50 Buchungen denselben unbekannten Empfaenger haben, teilen sie
+  // sich genau einen Firecrawl-Call. Bewusst hier (job-scoped) statt
+  // als Modul-Singleton in empfaenger-cache.ts: Tests muessen nichts
+  // mocken, parallele Jobs blockieren sich nicht, kein Memory-Leak ueber
+  // die Server-Lebenszeit.
+  const inflight = neueInflightMap();
+
   try {
     for (let i = 0; i < buchungen.length; i++) {
       const b = buchungen[i];
@@ -253,6 +264,9 @@ export async function POST(request: Request) {
           regeln,
           kategorien,
           config,
+          undefined,
+          undefined,
+          { supabase, ownerId: user.id, inflight },
         );
 
         const { error: updErr } = await supabase

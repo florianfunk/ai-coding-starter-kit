@@ -13,6 +13,9 @@ import {
 } from "./llm";
 import type { Lernregel } from "@/lib/types";
 
+// PROJ-15: Factory liefert `empfaenger_normalisiert` immer mit (Default "")
+// damit Tests den realen Pfad nach dem Import widerspiegeln. Tests, die
+// Cache/Recherche bewusst auslösen wollen, setzen den Wert explizit.
 function buchung(p: Partial<BuchungFuerPipeline> = {}): BuchungFuerPipeline {
   return {
     id: p.id ?? "b1",
@@ -21,6 +24,7 @@ function buchung(p: Partial<BuchungFuerPipeline> = {}): BuchungFuerPipeline {
     verwendungszweck: p.verwendungszweck ?? "Testzweck",
     empfaenger: p.empfaenger ?? "Test GmbH",
     status: p.status ?? "offen",
+    empfaenger_normalisiert: p.empfaenger_normalisiert ?? "",
   };
 }
 
@@ -338,108 +342,405 @@ describe("klassifiziereBuchung — Orchestrierung & LLM-Fallback", () => {
     expect(llmFn).not.toHaveBeenCalled();
   });
 
-  it("Web-Retry: bei niedriger Konfidenz wird recherchiert und LLM erneut befragt", async () => {
-    const llmFn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
-      )
-      .mockResolvedValueOnce(
-        llmOk({ konfidenz: 0.92, klassifikation: "geschaeftlich" }),
-      );
-    const rechercheFn = vi.fn().mockResolvedValue({
-      query: "Acme GmbH Deutschland Unternehmen Branche",
-      treffer: [
-        {
-          titel: "Acme GmbH",
-          beschreibung: "Software-Anbieter aus Berlin.",
-          url: "https://acme.example",
-        },
-      ],
-    });
-    const { ergebnis, audit } = await klassifiziereBuchung(
-      buchung({ empfaenger: "Acme GmbH" }),
-      [],
-      kategorien,
-      DEFAULT_CONFIG,
-      llmFn,
-      rechercheFn,
-    );
-    expect(rechercheFn).toHaveBeenCalledOnce();
-    expect(llmFn).toHaveBeenCalledTimes(2);
-    expect(ergebnis.status).toBe("auto_verbucht");
-    expect(ergebnis.konfidenz).toBe(0.92);
-    expect(audit.details.web_recherche).toMatchObject({ genutzt: true });
-  });
-
-  it("Web-Retry liefert keinen Mehrwert → Original-Ergebnis bleibt", async () => {
-    const erster = llmOk({
-      konfidenz: 0.5,
-      klassifikation: "unklar",
-      kategorie_id: null,
-    });
-    const llmFn = vi
-      .fn()
-      .mockResolvedValueOnce(erster)
-      .mockResolvedValueOnce(
-        llmOk({ konfidenz: 0.52, klassifikation: "unklar", kategorie_id: null }),
-      );
-    const rechercheFn = vi.fn().mockResolvedValue({
-      query: "Unbekannt",
-      treffer: [
-        { titel: "Unklar", beschreibung: "Keine eindeutige Information.", url: "https://x" },
-      ],
-    });
-    const { ergebnis } = await klassifiziereBuchung(
-      buchung({ empfaenger: "Unbekannt" }),
-      [],
-      kategorien,
-      DEFAULT_CONFIG,
-      llmFn,
-      rechercheFn,
-    );
-    expect(rechercheFn).toHaveBeenCalledOnce();
-    // Original behalten (Konfidenz-Gewinn unter 0.05, Kategorie weiter fehlend)
-    expect(ergebnis.konfidenz).toBe(0.5);
-    expect(ergebnis.status).toBe("zur_pruefung");
-  });
-
-  it("Web-Retry abgeschaltet → keine Recherche", async () => {
+  it("ohne PipelineKontext (kein Supabase) → KEIN Cache-Lookup, KEINE Recherche, einmaliger LLM-Aufruf", async () => {
+    // Ab PROJ-15: Web-Recherche ist Cache-Fuell-Mechanismus, kein Pipeline-
+    // Retry mehr. Ohne ctx.supabase + ctx.ownerId greift weder Cache noch
+    // Recherche — LLM wird genau einmal aufgerufen.
     const llmFn = vi
       .fn()
       .mockResolvedValueOnce(
         llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
       );
     const rechercheFn = vi.fn();
-    await klassifiziereBuchung(
-      buchung(),
-      [],
-      kategorien,
-      { ...DEFAULT_CONFIG, web_recherche_aktiv: false },
-      llmFn,
-      rechercheFn,
-    );
-    expect(rechercheFn).not.toHaveBeenCalled();
-    expect(llmFn).toHaveBeenCalledOnce();
-  });
-
-  it("Web-Recherche liefert null (kein API-Key) → kein Retry, Original bleibt", async () => {
-    const llmFn = vi
-      .fn()
-      .mockResolvedValueOnce(
-        llmOk({ konfidenz: 0.4, klassifikation: "unklar", kategorie_id: null }),
-      );
-    const rechercheFn = vi.fn().mockResolvedValue(null);
     const { ergebnis } = await klassifiziereBuchung(
-      buchung(),
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
       [],
       kategorien,
       DEFAULT_CONFIG,
       llmFn,
       rechercheFn,
     );
-    expect(rechercheFn).toHaveBeenCalledOnce();
+    expect(rechercheFn).not.toHaveBeenCalled();
     expect(llmFn).toHaveBeenCalledOnce();
     expect(ergebnis.konfidenz).toBe(0.4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PROJ-15: Cache-First-Pipeline mit Mock-Supabase
+// ---------------------------------------------------------------------------
+
+interface CacheRow {
+  owner_id: string;
+  empfaenger_norm: string;
+  rohwert_beispiel: string | null;
+  branche: string | null;
+  leistung: string | null;
+  web_snippets: Array<{ titel: string; beschreibung: string; url: string }> | null;
+  letzte_klassifikation_default: unknown;
+  quelle: "web" | "manuell" | "llm";
+  recherche_versucht: boolean;
+  cached_at: string;
+  ttl_tage: number;
+  updated_at: string;
+}
+
+/**
+ * Minimaler Supabase-Mock fuer Pipeline-Tests:
+ *  - empfaenger_kenntnis: in-memory Map
+ *  - audit_eintrag: ignoriert (best-effort)
+ *  - buchung: liefert konfigurierbares Historie-Result
+ */
+function makePipelineSupabase(opts: {
+  cache?: CacheRow[];
+  historieRows?: Array<{
+    betrag: number;
+    kategorie_id: string | null;
+    klassifikation: string | null;
+  }>;
+}) {
+  const cache = new Map<string, CacheRow>();
+  for (const c of opts.cache ?? []) {
+    cache.set(`${c.owner_id}::${c.empfaenger_norm}`, c);
+  }
+
+  const upsertSpy = vi.fn();
+  const insertSpy = vi.fn();
+  const historieResult = {
+    data: opts.historieRows ?? null,
+    error: null,
+  };
+
+  function buildKenntnisChain() {
+    const filter: { owner_id?: string; empfaenger_norm?: string } = {};
+    const chain: {
+      eq: (col: string, val: string) => typeof chain;
+      maybeSingle: () => Promise<{ data: CacheRow | null; error: null }>;
+    } = {
+      eq: (col: string, val: string) => {
+        if (col === "owner_id") filter.owner_id = val;
+        if (col === "empfaenger_norm") filter.empfaenger_norm = val;
+        return chain;
+      },
+      maybeSingle: async () => {
+        const key = `${filter.owner_id ?? ""}::${filter.empfaenger_norm ?? ""}`;
+        return { data: cache.get(key) ?? null, error: null };
+      },
+    };
+    return chain;
+  }
+
+  function buildBuchungChain() {
+    return {
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue(historieResult),
+    };
+  }
+
+  const from = vi.fn((tabelle: string) => {
+    if (tabelle === "empfaenger_kenntnis") {
+      return {
+        select: vi.fn(() => buildKenntnisChain()),
+        upsert: vi.fn(async (row: CacheRow) => {
+          upsertSpy(row);
+          cache.set(`${row.owner_id}::${row.empfaenger_norm}`, {
+            ...row,
+            updated_at: new Date().toISOString(),
+          });
+          return { error: null };
+        }),
+        insert: vi.fn(async () => ({ error: null })),
+      };
+    }
+    if (tabelle === "buchung") {
+      return {
+        select: vi.fn(() => buildBuchungChain()),
+      };
+    }
+    if (tabelle === "audit_eintrag") {
+      return {
+        select: vi.fn(),
+        insert: vi.fn(async (row: unknown) => {
+          insertSpy(row);
+          return { error: null };
+        }),
+      };
+    }
+    throw new Error(`Unerwartete Tabelle im Mock: ${tabelle}`);
+  });
+
+  return { from, cache, upsertSpy, insertSpy };
+}
+
+describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
+  it("Cache-Miss + Recherche-Kandidat → Firecrawl-Call, Cache-Upsert, EIN LLM-Aufruf", async () => {
+    const { from, upsertSpy } = makePipelineSupabase({ cache: [] });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.92 }),
+    );
+    const rechercheFn = vi.fn().mockResolvedValue({
+      query: "Acme GmbH Deutschland",
+      treffer: [
+        { titel: "Acme GmbH", beschreibung: "Software-Anbieter.", url: "https://acme.example" },
+      ],
+    });
+
+    const { audit } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).toHaveBeenCalledOnce();
+    // Genau EIN LLM-Call — kein Retry-Schema mehr.
+    expect(llmFn).toHaveBeenCalledOnce();
+    // Upsert wurde aufgerufen — initial mit web-Quelle (Snippets persistiert)
+    // und danach optional erneut mit llm-Quelle (Konfidenz >= 0.85).
+    expect(upsertSpy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    expect(audit.details.web_recherche).toMatchObject({ genutzt: true });
+    expect(audit.details.empfaenger_kenntnis).toBeDefined();
+  });
+
+  it("Cache-Hit (nicht abgelaufen) → KEINE Recherche, EIN LLM-Aufruf mit Kontext", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [
+        {
+          owner_id: "owner-1",
+          empfaenger_norm: "acme",
+          rohwert_beispiel: "Acme GmbH",
+          branche: "Software",
+          leistung: "Cloud-Hosting",
+          web_snippets: [
+            { titel: "Acme", beschreibung: "Cloud.", url: "https://acme.example" },
+          ],
+          letzte_klassifikation_default: null,
+          quelle: "web",
+          recherche_versucht: true,
+          cached_at: new Date().toISOString(),
+          ttl_tage: 180,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const rechercheFn = vi.fn();
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).not.toHaveBeenCalled();
+    expect(llmFn).toHaveBeenCalledOnce();
+    // LLM bekommt Kenntnis-Block mit.
+    const llmEingabe = llmFn.mock.calls[0][0] as { empfaenger_kenntnis?: unknown };
+    expect(llmEingabe.empfaenger_kenntnis).not.toBeNull();
+  });
+
+  it("Privatperson 'Max Mustermann' → KEINE Recherche (DSGVO)", async () => {
+    const { from } = makePipelineSupabase({ cache: [] });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "privat", konfidenz: 0.6, kategorie_id: null }),
+    );
+    const rechercheFn = vi.fn();
+
+    await klassifiziereBuchung(
+      buchung({
+        empfaenger: "Max Mustermann",
+        empfaenger_normalisiert: "max mustermann",
+      }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).not.toHaveBeenCalled();
+    expect(llmFn).toHaveBeenCalledOnce();
+  });
+
+  it("Inflight-Map: zwei parallele Buchungen mit gleichem Empfaenger → EIN Firecrawl-Call", async () => {
+    const { from } = makePipelineSupabase({ cache: [] });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    // Recherche bewusst mit Delay, damit beide Tasks im Inflight-Status sind.
+    const rechercheFn = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                query: "Acme GmbH Deutschland",
+                treffer: [
+                  {
+                    titel: "Acme GmbH",
+                    beschreibung: "Software.",
+                    url: "https://acme.example",
+                  },
+                ],
+              }),
+            20,
+          ),
+        ),
+    );
+    const llmFn = vi.fn().mockResolvedValue(llmOk({ konfidenz: 0.92 }));
+
+    const inflight = new Map<string, Promise<unknown>>() as never;
+
+    const [a, b] = await Promise.all([
+      klassifiziereBuchung(
+        buchung({
+          id: "b1",
+          empfaenger: "Acme GmbH",
+          empfaenger_normalisiert: "acme",
+        }),
+        [],
+        kategorien,
+        DEFAULT_CONFIG,
+        llmFn,
+        rechercheFn,
+        { supabase, ownerId: "owner-1", inflight },
+      ),
+      klassifiziereBuchung(
+        buchung({
+          id: "b2",
+          empfaenger: "Acme GmbH",
+          empfaenger_normalisiert: "acme",
+        }),
+        [],
+        kategorien,
+        DEFAULT_CONFIG,
+        llmFn,
+        rechercheFn,
+        { supabase, ownerId: "owner-1", inflight },
+      ),
+    ]);
+
+    expect(rechercheFn).toHaveBeenCalledOnce();
+    expect(a.ergebnis.status).toBe("auto_verbucht");
+    expect(b.ergebnis.status).toBe("auto_verbucht");
+  });
+
+  it("Web-Recherche abgeschaltet → kein Firecrawl-Call, Kenntnis bleibt leer", async () => {
+    const { from } = makePipelineSupabase({ cache: [] });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const rechercheFn = vi.fn();
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      { ...DEFAULT_CONFIG, web_recherche_aktiv: false },
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).not.toHaveBeenCalled();
+    expect(llmFn).toHaveBeenCalledOnce();
+  });
+
+  it("hohe LLM-Konfidenz → Upsert mit quelle='llm' wird ausgeloest", async () => {
+    const { from, upsertSpy } = makePipelineSupabase({ cache: [] });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.95 }),
+    );
+    // Recherche liefert nichts — kein Cache-Eintrag mit Snippets.
+    const rechercheFn = vi.fn().mockResolvedValue(null);
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    // Mindestens ein Upsert mit quelle='llm'.
+    const llmUpserts = upsertSpy.mock.calls.filter(
+      (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
+    );
+    expect(llmUpserts.length).toBeGreaterThanOrEqual(1);
+    // letzte_klassifikation_default ist gefuellt.
+    const llmUpsert = llmUpserts[0][0] as {
+      letzte_klassifikation_default: { konfidenz: number };
+    };
+    expect(llmUpsert.letzte_klassifikation_default.konfidenz).toBe(0.95);
+  });
+
+  it("manuelle Kenntnis wird NICHT vom LLM-Upsert ueberschrieben", async () => {
+    const { from, upsertSpy } = makePipelineSupabase({
+      cache: [
+        {
+          owner_id: "owner-1",
+          empfaenger_norm: "acme",
+          rohwert_beispiel: "Acme GmbH",
+          branche: "Steuerberatung",
+          leistung: "Beratung",
+          web_snippets: null,
+          letzte_klassifikation_default: null,
+          quelle: "manuell",
+          recherche_versucht: false,
+          cached_at: new Date().toISOString(),
+          ttl_tage: 36500,
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    });
+    // Mock-Supabase als minimaler Client. Pipeline ruft nur from() auf.
+    const supabase = { from } as never;
+
+    const llmFn = vi.fn().mockResolvedValue(
+      llmOk({ klassifikation: "geschaeftlich", konfidenz: 0.95 }),
+    );
+    const rechercheFn = vi.fn();
+
+    await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(rechercheFn).not.toHaveBeenCalled();
+    // Kein LLM-Upsert, weil die Kenntnis manuell ist.
+    const llmUpserts = upsertSpy.mock.calls.filter(
+      (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
+    );
+    expect(llmUpserts).toHaveLength(0);
   });
 });

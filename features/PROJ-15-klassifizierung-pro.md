@@ -279,6 +279,102 @@ nutzen statischen Linter, um Vercel-Runtime-Kompatibilität zu garantieren.
   Hinweis und `use-toast.ts` ungenutzte Konstante — beides Bestand).
 - Build: ✓ erfolgreich.
 
+### 2026-05-20 — P0-5/P0-6/P0-7/P0-8 — Cache + Historie + Pipeline-Umbau
+
+- Migration `supabase/migrations/0004_empfaenger_kenntnis.sql` legt die
+  Cache-Tabelle `empfaenger_kenntnis` mit Composite-PK
+  `(owner_id, empfaenger_norm)`, Quelle-Check
+  `(web|manuell|llm)`, `recherche_versucht`-Cooldown, `cached_at`/`ttl_tage`
+  und `set_updated_at`-Trigger an. RLS owner-scoped (`owner_id = auth.uid()`),
+  Sekundaerindex `idx_empfaenger_kenntnis_cached_at` fuer Admin-Listen.
+- `src/lib/classifier/empfaenger-cache.ts` implementiert die Cache-API:
+  - `holeKenntnis` / `upsertKenntnis` / `istAbgelaufen` / `istRechercheKandidat`
+    / `defaultTtl` / `neueInflightMap`.
+  - TTL-Defaults: manuell ≈ 100 Jahre (faktisch unbegrenzt), web 180 Tage,
+    llm 30 Tage (kuerzer, weil LLM-Klassifikation auch falsch sein kann).
+  - DSGVO-Gate `istRechercheKandidat(roh, normalisiert)` schickt nur dann
+    in die Recherche, wenn der Rohwert einen Rechtsform-Indikator enthaelt
+    (GmbH/UG/AG/KG/OHG/GbR/eK/eV/Inc/Ltd/LLC/LLP/BV/SA/SL/Co/Corp/SE/SpA/
+    Srl/Oy/Ab) ODER der normalisierte Wert ≥ 3 Wortteile hat.
+  - Best-effort-Audit: nach erfolgreichem Upsert wird ein zusaetzlicher
+    `audit_eintrag`-Insert mit `aktion='kenntnis_aktualisiert'` und
+    `entitaet='empfaenger_kenntnis'` geschrieben. Schlaegt der Audit-Insert
+    fehl, propagiert das KEINEN Fehler (Cache ist die fachlich wichtige
+    Operation).
+- `src/lib/classifier/historie.ts` implementiert
+  `holeAehnlicheBuchungen(owner_id, empfaenger_norm, opts)` als einzige
+  Supabase-Query (`SELECT betrag, kategorie_id, klassifikation` mit
+  Owner/Norm/Status-Filter, optionaler `ausschluss_id` fuer Self-Ref,
+  Limit 50). Aggregation in JS via `aggregiere()` (Min/Max/Median, Mode
+  fuer Kategorie und Klassifikation). Reine Funktion + DB-Wrapper
+  getrennt fuer Testbarkeit.
+- `src/lib/classifier/pipeline.ts` umgebaut auf die neue Reihenfolge:
+  1. Regel-Engine (Vorrang, unveraendert).
+  2. Cache-Lookup ueber `empfaenger_normalisiert` — Hit & nicht abgelaufen
+     liefert den LLM-Kontext direkt; Miss + DSGVO-Kandidat +
+     `web_recherche_aktiv` triggert genau einen Firecrawl-Call (mit
+     InflightMap-Race-Schutz) und schreibt das Ergebnis in den Cache.
+  3. Historie-Lookup fuer denselben normalisierten Empfaenger.
+  4. EIN LLM-Call mit `empfaenger_kenntnis` + `historie` + optionalem
+     `web_kontext` — KEIN Retry-Loop mehr; die Web-Recherche ist
+     Fuell-Mechanismus des Caches, kein Pipeline-Fallback.
+  5. Konfidenz-Routing wie bisher (Schwellwert, Ausreisser, Default-
+     Kategorien).
+  6. Nach erfolgreichem LLM-Call mit Konfidenz ≥ Schwellwert: Upsert
+     mit `quelle='llm'` und kuerzerer TTL, AUSSER es liegt schon eine
+     manuelle Kenntnis vor (die wird NIE vom LLM-Upsert ueberschrieben).
+- Bewusste Entscheidung: `webGenutzt`/`webQuery` werden in der Pipeline
+  ueber das separate Flag `frischRecherchiert` getrackt, NICHT aus
+  `cacheVorhanden` abgeleitet — der frisch-upsertete Cache-Eintrag ist
+  ja per Definition nicht abgelaufen, sodass `cacheVorhanden` nach der
+  Recherche immer true ist. Genau diese Race war initial im Code und
+  hat den Test "Cache-Miss + Recherche-Kandidat → Firecrawl-Call" auf
+  `audit.details.web_recherche = undefined` brechen lassen.
+- `src/lib/classifier/llm.ts` bekommt zwei neue, optionale Felder im
+  `LlmEingabe`-Interface (`empfaenger_kenntnis`, `historie`) und zwei
+  reine Helper `baueKenntnisBlock` / `baueHistorieBlock`, die nur dann
+  Text emittieren, wenn der jeweilige Kontext sinnvoll ist
+  (Kenntnis: vorhanden; Historie: anzahl ≥ 2). Datensparsamkeit
+  unveraendert: an das LLM gehen weiterhin nur Verwendungszweck/Betrag/
+  Empfaenger + optionaler Kontext, KEIN OCR-Volltext oder Steuernummern.
+- `src/app/api/klassifizierung/route.ts` zieht das `empfaenger_normalisiert`
+  jetzt mit aus `buchung`, legt EINE `InflightMap` pro Job an und uebergibt
+  `{ supabase, ownerId, inflight }` als `PipelineKontext` an
+  `klassifiziereBuchung`. Die Map ist BEWUSST job-scoped (nicht modul-global)
+  — siehe "Offene Entscheidungen" oben: Tests muessen nichts mocken,
+  parallele Jobs blockieren sich nicht und es gibt keinen Memory-Leak
+  ueber die Lebenszeit des Server-Prozesses.
+- `src/lib/classifier/pipeline.test.ts`: Buchungs-Factory liefert jetzt
+  `empfaenger_normalisiert` immer mit (Default `""`), damit der reale
+  Pipeline-Pfad nach dem Import abgebildet wird. Tests, die Cache oder
+  Recherche bewusst triggern, setzen den Wert explizit. Zusaetzlich
+  ein kompletter neuer `describe`-Block "PROJ-15 Cache-First" mit
+  Supabase-Mock-Helper `makePipelineSupabase` (Cache als in-memory Map,
+  Audit-Insert als Spy, Historie-Result konfigurierbar). 7 neue Tests:
+  Cache-Miss + Recherche + Upsert + Audit, Cache-Hit, DSGVO-Gate
+  Privatperson, InflightMap-Dedup unter Promise.all, Web-Recherche
+  abgeschaltet, LLM-Upsert mit `letzte_klassifikation_default`,
+  manuelle Kenntnis wird nicht vom LLM-Upsert ueberschrieben. Ausserdem
+  ein angepasster Bestandstest "ohne PipelineKontext → kein Cache, kein
+  Recherche, EIN LLM-Aufruf", der die alte Retry-Logik ersetzt
+  (Web-Recherche ist nicht mehr Pipeline-Retry).
+- `src/lib/classifier/empfaenger-cache.test.ts` mit 18 Tests (`istAbgelaufen`
+  inkl. Grenzfaellen ttl=0 / genau am Ablauftag, `istRechercheKandidat`
+  inkl. "Agentur" vs. "AG" Wortgrenzen-Schutz, `defaultTtl`,
+  `holeKenntnis`/`upsertKenntnis` mit Supabase-Mock, `neueInflightMap`).
+- `src/lib/classifier/historie.test.ts` mit 9 Tests (`aggregiere` inkl.
+  Median ungerade/gerade, Mode-Zaehlung, Eintraege ohne kat/klass;
+  `holeAehnlicheBuchungen` mit Mock fuer leere/fehlerhafte/erfolgreiche
+  DB-Aufrufe und Self-Ref-Ausschluss).
+- Tests: 434 passed (vorher 391 — 43 neue Tests fuer Cache + Historie +
+  Pipeline-Cache-First, alle gruen).
+- Lint: 0 Errors, 2 unveraenderte Warnings (`ki-panel.tsx` und
+  `use-toast.ts` — beides Bestand, nicht PROJ-15).
+- Build: ✓ erfolgreich. Ein TypeScript-Cast in `holeKenntnis` musste auf
+  `as unknown as EmpfaengerKenntnis` ausgeweitet werden, weil der
+  Supabase-Client den Select-String nicht statisch in den Zieltyp
+  aufloesen kann (Returnform `GenericStringError | T`).
+
 ## QA Test Results
 _To be added by /qa_
 

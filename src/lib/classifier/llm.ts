@@ -16,6 +16,8 @@ import type { LanguageModel } from "ai";
 import { z } from "zod";
 import type { Klassifikation } from "@/lib/types";
 import { ladeAiKey } from "@/lib/admin/ai-key";
+import type { EmpfaengerKenntnis } from "@/lib/classifier/empfaenger-cache";
+import type { HistorieSummary } from "@/lib/classifier/historie";
 
 /** Definierter Fehler bei LLM-Ausfall — kein Raten, sauberer Fallback. */
 export class LlmKlassifiziererError extends Error {
@@ -38,6 +40,16 @@ export interface LlmEingabe {
    * Suchanfrage enthält NUR den Empfängernamen, keine Buchungsdetails.
    */
   web_kontext?: string;
+  /**
+   * Optionaler Empfaenger-Kenntnis-Cache (Branche, Leistung, Snippets).
+   * Wird vom Pipeline-Wiring aus empfaenger-cache.ts gefuettert.
+   */
+  empfaenger_kenntnis?: EmpfaengerKenntnis | null;
+  /**
+   * Optionale Buchungs-Historie fuer denselben normalisierten Empfaenger.
+   * Wird nur eingeblendet, wenn anzahl >= 2 (sonst keine Aussagekraft).
+   */
+  historie?: HistorieSummary | null;
 }
 
 /** Eine wählbare Zielkategorie (nur ID + Bezeichnung + Typ ans LLM). */
@@ -87,6 +99,62 @@ function baueKategorienListe(kategorien: readonly KategorieOption[]): string {
   return kategorien
     .map((k) => `- id=${k.id} | ${k.bezeichnung} (${k.typ})`)
     .join("\n");
+}
+
+/**
+ * Baut den optionalen Empfaenger-Kenntnis-Block fuer den User-Prompt.
+ * Bei `null/undefined` Eingabe → leerer String (Block wird ueberhaupt nicht
+ * ausgegeben). Reine Funktion.
+ */
+function baueKenntnisBlock(
+  kenntnis: EmpfaengerKenntnis | null | undefined,
+): string {
+  if (!kenntnis) return "";
+  const branche = kenntnis.branche?.trim() || "unbekannt";
+  const leistung = kenntnis.leistung?.trim() || "unbekannt";
+  const snippets = (kenntnis.web_snippets ?? [])
+    .map((s) => s.titel)
+    .filter((t) => t.trim().length > 0)
+    .slice(0, 3)
+    .join("; ");
+  const quellen = snippets.length > 0 ? snippets : "(keine)";
+  return (
+    `\n\nEmpfaenger-Hintergrund:\n` +
+    `- Branche: ${branche}\n` +
+    `- Leistung: ${leistung}\n` +
+    `- Web-Quellen: ${quellen}`
+  );
+}
+
+/**
+ * Baut den optionalen Historie-Block. Nur ab anzahl >= 2 sinnvoll
+ * (1 Treffer = aktuelle Buchung ist erstmal noch ein Einzelfall).
+ * Reine Funktion.
+ */
+function baueHistorieBlock(
+  historie: HistorieSummary | null | undefined,
+  kategorien: readonly KategorieOption[],
+): string {
+  if (!historie || historie.anzahl < 2) return "";
+
+  const minStr = historie.betrag_min.toFixed(2);
+  const maxStr = historie.betrag_max.toFixed(2);
+  const medStr = historie.betrag_median.toFixed(2);
+
+  const katBez =
+    historie.haeufigste_kategorie_id
+      ? kategorien.find((k) => k.id === historie.haeufigste_kategorie_id)
+          ?.bezeichnung ?? "(unbekannte Kategorie)"
+      : "(keine Kategorie)";
+
+  const klass = historie.haeufigste_klassifikation ?? "unklar";
+
+  return (
+    `\n\nHistorie fuer diesen Empfaenger:\n` +
+    `- Bisher ${historie.anzahl}x verbucht, Betrag zwischen ${minStr} EUR und ${maxStr} EUR (Median ${medStr} EUR)\n` +
+    `- Meistens als "${katBez}" (${historie.haeufigste_kategorie_anzahl}x), Klassifikation ${klass}\n` +
+    `- Hinweis: Wenn der aktuelle Betrag und Empfaenger gut passen, hohe Konfidenz vergeben.`
+  );
 }
 
 const SYSTEM_PROMPT = [
@@ -186,13 +254,16 @@ export async function klassifiziereMitLlm(
       ? `\n\n${eingabe.web_kontext.trim()}`
       : "";
 
+  const kenntnisBlock = baueKenntnisBlock(eingabe.empfaenger_kenntnis);
+  const historieBlock = baueHistorieBlock(eingabe.historie, kategorien);
+
   const prompt =
     `Buchung:\n` +
     `Verwendungszweck: ${eingabe.verwendungszweck ?? "(leer)"}\n` +
     `Empfänger: ${eingabe.empfaenger ?? "(leer)"}\n` +
     `Betrag: ${eingabe.betrag.toFixed(2)} EUR ` +
     `(${eingabe.betrag < 0 ? "Ausgabe" : "Einnahme/Zugang"})` +
-    `${stichworte}${webBlock}\n\n` +
+    `${stichworte}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
   try {

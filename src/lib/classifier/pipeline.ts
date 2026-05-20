@@ -1,21 +1,28 @@
-// PROJ-5 — Stufe 3 + Orchestrierung der Klassifizierungs-Pipeline.
+// PROJ-5 + PROJ-15 — Orchestrierung der Klassifizierungs-Pipeline.
 //
-// Ablauf je Buchung:
-//   1. Regel-Engine (rules.ts) — deterministisch, Vorrang vor KI.
+// Ablauf je Buchung (neue Reihenfolge ab PROJ-15):
+//   1. (Normalisierung erfolgte beim Import — empfaenger_normalisiert ist
+//       in der Buchung mitgegeben; Pipeline normalisiert hier NICHTS mehr.)
+//   2. Regel-Engine (rules.ts) — deterministisch, Vorrang vor KI.
 //      Treffer ohne Konflikt → status 'auto_verbucht', quelle 'regel'.
-//   2. Kein Regeltreffer → LLM (llm.ts), datensparsam.
-//   3. Konfidenz-Bewertung:
-//      konfidenz >= schwellwert UND Kategorie vorhanden → 'auto_verbucht'.
-//      sonst → 'zur_pruefung' mit pruef_grund.
-//   Ausreißer-Regel: |Betrag| > betrag_limit → IMMER 'zur_pruefung'
-//      (trotz hoher Konfidenz), konfigurierbar.
+//   3. Empfaenger-Kenntnis-Cache-Lookup (empfaenger-cache.ts):
+//      - Hit & nicht abgelaufen → Kenntnis als LLM-Kontext.
+//      - Miss & DSGVO-Recherche-Kandidat → Firecrawl-Call (Race-Schutz via
+//        InflightMap) → Upsert in Cache.
+//   4. Buchungs-Historie (historie.ts) als LLM-Kontext.
+//   5. LLM (llm.ts) — bekommt jetzt Kenntnis + Historie mit, ein einziger
+//      Aufruf, KEIN Retry-Loop mehr (Web-Recherche ist Fuell-Mechanismus
+//      des Caches, nicht Pipeline-Fallback).
+//   6. Konfidenz-Bewertung wie bisher.
+//   7. Bei Konfidenz >= Schwellwert UND nicht-aus-Cache-erstklassifiziert →
+//      Upsert in Cache (quelle='llm', kuerzere TTL).
 //
 // Schutz: Buchungen mit status 'manuell_bestaetigt' werden NIE überschrieben
 // (Re-Klassifizierung überspringt sie). LLM-Ausfall → nur Regeln, Rest in die
 // Prüfliste, kein Datenverlust, kein Raten.
 //
 // `entscheideBuchung` ist eine REINE Funktion (testbar ohne IO).
-// `klassifiziereBuchung` orchestriert inkl. LLM-Aufruf + Fehlerfang.
+// `klassifiziereBuchung` orchestriert inkl. LLM-Aufruf, Cache und Historie.
 
 import type { Buchung, Klassifikation, Lernregel } from "@/lib/types";
 import { werteRegelnAus, type BuchungFuerRegel } from "@/lib/classifier/rules";
@@ -27,10 +34,24 @@ import {
   type LlmErgebnis,
 } from "@/lib/classifier/llm";
 import {
+  defaultTtl,
+  holeKenntnis,
+  istAbgelaufen,
+  istRechercheKandidat,
+  upsertKenntnis,
+  type EmpfaengerKenntnis,
+  type InflightMap,
+} from "@/lib/classifier/empfaenger-cache";
+import {
+  holeAehnlicheBuchungen,
+  type HistorieSummary,
+} from "@/lib/classifier/historie";
+import {
   formatiereRechercheKontext,
   rechercheEmpfaenger,
   type WebRechercheErgebnis,
 } from "@/lib/classifier/web-research";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface PipelineConfig {
   /** Mindest-Konfidenz für Auto-Verbuchung (Default 0.85). */
@@ -38,9 +59,10 @@ export interface PipelineConfig {
   /** Ausreißer-Limit in EUR (|Betrag| darüber → immer Prüfung). Default 2000. */
   betrag_limit: number;
   /**
-   * Web-Recherche-Retry bei unsicheren LLM-Antworten aktivieren.
-   * Default true — erfordert `FIRECRAWL_API_KEY` (sonst stillschweigend
-   * ohne Effekt).
+   * Web-Recherche aktivieren (ab PROJ-15 als Cache-Fuell-Mechanismus, NICHT
+   * mehr als Pipeline-Retry). Default true — erfordert `FIRECRAWL_API_KEY`
+   * (sonst stillschweigend ohne Effekt; ein Cooldown-Eintrag wird trotzdem
+   * geschrieben, damit es keine Endlos-Retries pro Lauf gibt).
    */
   web_recherche_aktiv?: boolean;
   /**
@@ -91,7 +113,13 @@ export interface PipelineEntscheidung {
 export type BuchungFuerPipeline = Pick<
   Buchung,
   "id" | "konto_id" | "betrag" | "verwendungszweck" | "empfaenger" | "status"
->;
+> & {
+  /**
+   * Normalisierter Empfaenger (Pipeline-Stufe 0, beim Import gesetzt).
+   * Optional, weil Altdaten ohne Backfill diese Spalte noch leer haben.
+   */
+  empfaenger_normalisiert?: string | null;
+};
 
 /** Wird geworfen, wenn eine bereits manuell bestätigte Buchung übergeben wird. */
 export class ManuellBestaetigtError extends Error {
@@ -299,47 +327,147 @@ function baue(
   };
 }
 
+/** Optionales Daten-Bundle, das die API-Route an die Pipeline reicht. */
+export interface PipelineKontext {
+  /**
+   * Job-scoped Map fuer Race-Schutz beim Massen-Lauf: wenn 50 Buchungen
+   * denselben unbekannten Empfaenger haben, teilen sie sich einen
+   * Firecrawl-Call. Bewusst nicht modul-global, damit Tests nichts mocken
+   * muessen und parallele Jobs sich nicht blockieren.
+   */
+  inflight?: InflightMap;
+  /** Supabase-Client (server-cookies) fuer Cache- und Historie-DB-Calls. */
+  supabase?: SupabaseClient;
+  /** Owner-ID, fuer DB-Calls nach Cache und Historie. */
+  ownerId?: string;
+}
+
+type LlmFn = (
+  e: LlmEingabe,
+  k: readonly KategorieOption[],
+) => Promise<LlmErgebnis>;
+
+type RechercheFn = (
+  empfaenger: string | null,
+) => Promise<WebRechercheErgebnis | null>;
+
 /**
- * Orchestriert eine einzelne Buchung: Regeln zuerst; nur wenn keine Regel
- * greift, wird das LLM befragt. LLM-Ausfall → Buchung wandert in die
- * Prüfliste (kein Datenverlust, kein Raten).
+ * Orchestriert eine einzelne Buchung mit neuer Reihenfolge (PROJ-15):
+ *  1) Regel-Engine (Vorrang).
+ *  2) Cache-Lookup auf `empfaenger_normalisiert` (nur wenn ctx.supabase
+ *     + ctx.ownerId gesetzt). Miss + Recherche-Kandidat → Firecrawl mit
+ *     InflightMap-Race-Schutz → Upsert.
+ *  3) Buchungs-Historie als LLM-Kontext.
+ *  4) LLM-Aufruf mit Kenntnis + Historie + Web-Kontext (einmalig).
+ *  5) Konfidenz-Routing.
+ *  6) Bei Konfidenz >= Schwellwert UND nicht aus Cache erstklassifiziert →
+ *     Upsert `quelle='llm'` mit kuerzerer TTL.
  *
- * Web-Recherche-Retry: Wenn der erste LLM-Aufruf unsicher ist (Konfidenz
- * unter Schwellwert, 'unklar' oder keine Kategorie), wird der Empfänger
- * einmalig im Web nachgeschlagen und das LLM mit dem Kontext erneut
- * befragt. Wenn das zweite Ergebnis besser ist (höhere Konfidenz oder
- * spezifischer), wird es übernommen — sonst bleibt das Original.
+ * Web-Recherche-Retry entfaellt: Cache fuellt das Wissen schon vor dem
+ * ersten LLM-Aufruf an. Wenn der Cache leer ist, recherchieren wir EINMAL
+ * und uebergeben das Ergebnis dem LLM direkt — kein zweiter Aufruf.
  */
 export async function klassifiziereBuchung(
   buchung: BuchungFuerPipeline,
   regeln: readonly Lernregel[],
   kategorien: readonly KategorieOption[],
   config: PipelineConfig = DEFAULT_CONFIG,
-  llmFn: (
-    e: LlmEingabe,
-    k: readonly KategorieOption[],
-  ) => Promise<LlmErgebnis> = klassifiziereMitLlm,
-  rechercheFn: (
-    empfaenger: string | null,
-  ) => Promise<WebRechercheErgebnis | null> = rechercheEmpfaenger,
+  llmFn: LlmFn = klassifiziereMitLlm,
+  rechercheFn: RechercheFn = rechercheEmpfaenger,
+  ctx: PipelineKontext = {},
 ): Promise<PipelineEntscheidung> {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
   }
 
-  // Schneller Pfad: greift eine Regel, wird das LLM gar nicht aufgerufen.
+  // (1) Regel-Engine — schneller Pfad: greift eine Regel, wird das LLM gar
+  // nicht aufgerufen.
   const regelAuswertung = werteRegelnAus(regeln, {
     konto_id: buchung.konto_id,
     betrag: buchung.betrag,
     verwendungszweck: buchung.verwendungszweck,
     empfaenger: buchung.empfaenger,
   });
-
   if (regelAuswertung.treffer) {
     return entscheideBuchung(buchung, regeln, null, config);
   }
 
-  // Erster LLM-Versuch (ohne Web).
+  // (2) Cache-Lookup + ggf. Web-Recherche. Funktioniert nur mit ctx.supabase
+  // + ctx.ownerId; ohne diese Felder ist die Pipeline cache-blind (z. B.
+  // im Unit-Test).
+  const norm = (buchung.empfaenger_normalisiert ?? "").trim();
+  const kandidat = istRechercheKandidat(buchung.empfaenger, norm);
+
+  let kenntnis: EmpfaengerKenntnis | null = null;
+  let webGenutzt = false;
+  let webQuery: string | null = null;
+  let webKontext: string | undefined = undefined;
+  let cacheVorhanden = false;
+
+  // True genau dann, wenn in diesem konkreten Lauf eine Web-Recherche
+  // ausgeloest wurde (Cache-Miss + Kandidat + Recherche aktiv). Unabhaengig
+  // davon, ob die Recherche Snippets gefunden hat — fuer das Audit zaehlt
+  // der Aufruf selbst, weil Firecrawl-Budget verbraucht wurde.
+  let frischRecherchiert = false;
+
+  if (ctx.supabase && ctx.ownerId && norm.length > 0) {
+    kenntnis = await holeKenntnis(ctx.supabase, ctx.ownerId, norm);
+    cacheVorhanden = kenntnis !== null && !istAbgelaufen(kenntnis);
+
+    if (
+      !cacheVorhanden &&
+      kandidat &&
+      (config.web_recherche_aktiv ?? true)
+    ) {
+      // Race-Schutz: gleicher Empfaenger im selben Job → ein Web-Call.
+      // Die InflightMap ist BEWUSST job-scoped (kein Modul-Singleton):
+      // Tests muessen nichts mocken, parallele Jobs blockieren sich nicht
+      // und es gibt keine Memory-Leaks ueber die Server-Lebenszeit.
+      const inflight = ctx.inflight;
+      const key = `${ctx.ownerId}::${norm}`;
+      let promise: Promise<EmpfaengerKenntnis | null> | undefined;
+      if (inflight && inflight.has(key)) {
+        promise = inflight.get(key);
+      }
+      if (!promise) {
+        promise = recherchiereUndUpserte(
+          ctx.supabase,
+          ctx.ownerId,
+          norm,
+          buchung.empfaenger,
+          rechercheFn,
+        );
+        if (inflight) inflight.set(key, promise);
+        // Nur die Buchung, die den Call wirklich AUSGELOEST hat, zaehlt
+        // als "frisch recherchiert"; die per Inflight-Map mitlaufenden
+        // schoepfen aus dem geteilten Promise.
+        frischRecherchiert = true;
+      }
+      kenntnis = (await promise) ?? kenntnis;
+      cacheVorhanden = kenntnis !== null && !istAbgelaufen(kenntnis);
+    }
+  }
+
+  if (kenntnis && Array.isArray(kenntnis.web_snippets) && kenntnis.web_snippets.length > 0) {
+    webKontext = formatiereRechercheKontext({
+      query: `${(buchung.empfaenger ?? norm).slice(0, 80)} Deutschland Unternehmen Branche`,
+      treffer: kenntnis.web_snippets,
+    });
+  }
+  if (frischRecherchiert) {
+    webGenutzt = true;
+    webQuery = `${(buchung.empfaenger ?? norm).slice(0, 80)} Deutschland Unternehmen Branche`;
+  }
+
+  // (3) Historie laden — owner-scoped, finalisierte Status, ohne self.
+  let historie: HistorieSummary | null = null;
+  if (ctx.supabase && ctx.ownerId && norm.length > 0) {
+    historie = await holeAehnlicheBuchungen(ctx.supabase, ctx.ownerId, norm, {
+      ausschluss_id: buchung.id,
+    });
+  }
+
+  // (4) LLM-Aufruf mit allem Kontext.
   let llm: LlmErgebnis | null = null;
   let llmFehler: string | null = null;
   try {
@@ -348,6 +476,9 @@ export async function klassifiziereBuchung(
         verwendungszweck: buchung.verwendungszweck,
         betrag: buchung.betrag,
         empfaenger: buchung.empfaenger,
+        web_kontext: webKontext,
+        empfaenger_kenntnis: kenntnis,
+        historie,
       },
       kategorien,
     );
@@ -360,66 +491,102 @@ export async function klassifiziereBuchung(
     }
   }
 
-  // Web-Recherche-Retry bei unsicherem Ergebnis.
-  let webGenutzt = false;
-  let webQuery: string | null = null;
+  // (5) Entscheidung berechnen.
+  const entscheidung = entscheideBuchung(buchung, regeln, llm, config, llmFehler);
+
+  // (6) Bei hoher LLM-Konfidenz und Recherche-Kandidat: in Cache uebernehmen
+  // (quelle='llm', kuerzere TTL). Verhindert, dass die naechste Buchung mit
+  // demselben Empfaenger wieder ratlos ist.
   if (
+    ctx.supabase &&
+    ctx.ownerId &&
+    norm.length > 0 &&
     llm &&
-    (config.web_recherche_aktiv ?? true) &&
-    istUnsicher(llm, config)
+    kandidat &&
+    llm.konfidenz >= config.konfidenz_schwellwert
   ) {
-    const ergebnis = await rechercheFn(buchung.empfaenger);
-    if (ergebnis) {
-      webGenutzt = true;
-      webQuery = ergebnis.query;
-      try {
-        const llm2 = await llmFn(
-          {
-            verwendungszweck: buchung.verwendungszweck,
-            betrag: buchung.betrag,
-            empfaenger: buchung.empfaenger,
-            web_kontext: formatiereRechercheKontext(ergebnis),
-          },
-          kategorien,
-        );
-        // Nur übernehmen, wenn der zweite Versuch echt besser ist.
-        if (istBesser(llm2, llm)) {
-          llm = llm2;
-        }
-      } catch (err) {
-        if (!(err instanceof LlmKlassifiziererError)) throw err;
-        // sonst: bei Retry-Fehler bleibt das Original-Ergebnis.
-      }
+    // Nicht ueberschreiben, wenn schon eine MANUELLE Korrektur drin liegt.
+    if (!(kenntnis && kenntnis.quelle === "manuell")) {
+      await upsertKenntnis(ctx.supabase, {
+        owner_id: ctx.ownerId,
+        empfaenger_norm: norm,
+        rohwert_beispiel: buchung.empfaenger ?? null,
+        quelle: "llm",
+        ttl_tage: defaultTtl("llm"),
+        // Bei vorhandener Web-Kenntnis Branche/Leistung erhalten.
+        branche: kenntnis?.branche ?? null,
+        leistung: kenntnis?.leistung ?? null,
+        web_snippets: kenntnis?.web_snippets ?? null,
+        recherche_versucht: kenntnis?.recherche_versucht ?? false,
+        letzte_klassifikation_default: {
+          klassifikation: llm.klassifikation,
+          steuerrelevant: llm.steuerrelevant,
+          kategorie_id: llm.kategorie_id,
+          ust_satz: llm.ust_satz as 0 | 7 | 19 | null,
+          konfidenz: llm.konfidenz,
+        },
+      });
     }
   }
 
-  const entscheidung = entscheideBuchung(buchung, regeln, llm, config, llmFehler);
   if (webGenutzt) {
     entscheidung.audit.details = {
       ...entscheidung.audit.details,
       web_recherche: { genutzt: true, query: webQuery },
     };
   }
+  if (kenntnis) {
+    entscheidung.audit.details = {
+      ...entscheidung.audit.details,
+      empfaenger_kenntnis: {
+        quelle: kenntnis.quelle,
+        cached: cacheVorhanden,
+      },
+    };
+  }
+  if (historie && historie.anzahl >= 2) {
+    entscheidung.audit.details = {
+      ...entscheidung.audit.details,
+      historie: {
+        anzahl: historie.anzahl,
+        haeufigste_kategorie_id: historie.haeufigste_kategorie_id,
+      },
+    };
+  }
+
   return entscheidung;
 }
 
-/** Heuristik: ist das LLM-Ergebnis unsicher genug für einen Web-Retry? */
-function istUnsicher(llm: LlmErgebnis, config: PipelineConfig): boolean {
-  return (
-    llm.konfidenz < config.konfidenz_schwellwert ||
-    llm.klassifikation === "unklar" ||
-    llm.kategorie_id === null
-  );
-}
+/**
+ * Fuehrt eine Web-Recherche fuer einen unbekannten Empfaenger durch und
+ * legt das Ergebnis (auch leeres Ergebnis als Cooldown) im Cache ab.
+ * Liefert die geschriebene Kenntnis zurueck — oder null, falls Recherche
+ * gar nicht moeglich war (kein API-Key, Timeout, ...).
+ *
+ * Bei Recherche-Fehler/leerer Antwort wird trotzdem ein Cooldown-Eintrag
+ * (`recherche_versucht=true`, leere Snippets) geschrieben, damit derselbe
+ * Empfaenger im selben Lauf nicht 50x erneut Firecrawl belaestigt.
+ */
+async function recherchiereUndUpserte(
+  supabase: SupabaseClient,
+  ownerId: string,
+  norm: string,
+  rohwert: string | null,
+  rechercheFn: RechercheFn,
+): Promise<EmpfaengerKenntnis | null> {
+  const ergebnis = await rechercheFn(rohwert);
+  const snippets = ergebnis?.treffer ?? null;
 
-/** True, wenn der zweite Versuch echt besser ist als der erste. */
-function istBesser(neu: LlmErgebnis, alt: LlmErgebnis): boolean {
-  // Spezifischer (Kategorie vorhanden, vorher nicht) → besser.
-  if (neu.kategorie_id !== null && alt.kategorie_id === null) return true;
-  // Klassifikation eindeutiger geworden → besser.
-  if (alt.klassifikation === "unklar" && neu.klassifikation !== "unklar") {
-    return true;
-  }
-  // Sonst muss die Konfidenz spürbar steigen (mind. +0.05).
-  return neu.konfidenz >= alt.konfidenz + 0.05;
+  await upsertKenntnis(supabase, {
+    owner_id: ownerId,
+    empfaenger_norm: norm,
+    rohwert_beispiel: rohwert,
+    quelle: "web",
+    recherche_versucht: true,
+    web_snippets: snippets,
+    ttl_tage: defaultTtl("web"),
+  });
+
+  // Frischen Eintrag zurueckholen — vereinfacht die Konsumenten.
+  return await holeKenntnis(supabase, ownerId, norm);
 }

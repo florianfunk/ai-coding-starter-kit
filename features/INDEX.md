@@ -28,7 +28,8 @@
 | PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Approved | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
 | PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
 | PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | Approved | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
+| PROJ-15 | Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | In Progress | [Spec](PROJ-15-klassifizierung-pro.md) | 2026-05-20 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-15
+## Next Available ID: PROJ-16

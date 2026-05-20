@@ -19,6 +19,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { kontoMappingSchema } from "@/lib/validation/konto";
 import { parseKontoauszug } from "@/lib/importer/parser";
+import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
 import type { KontoMapping } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -239,6 +240,10 @@ export async function POST(request: Request) {
       betrag: z.betrag,
       verwendungszweck: z.verwendungszweck,
       empfaenger: z.empfaenger,
+      // PROJ-15: stabilen Vergleichs-/Cache-Schluessel direkt mitschreiben,
+      // damit nachgelagerte Stufen (Regeln, Empfaenger-Kenntnis, Historie)
+      // ab dem ersten Import treffen.
+      empfaenger_normalisiert: normalisiereEmpfaenger(z.empfaenger),
       waehrung: z.waehrung,
       duplikat_hash: z.duplikat_hash,
       import_quelle: file.name,

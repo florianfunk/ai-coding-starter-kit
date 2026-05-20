@@ -21,6 +21,7 @@ import { z } from "zod";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { KLASSIFIKATIONEN } from "@/lib/validation/regel";
+import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
 import type { Buchung, Klassifikation } from "@/lib/types";
 
 const ustSchema = z
@@ -149,6 +150,11 @@ export async function POST(request: Request) {
     const betragA = Number((f.betrag * anteilA).toFixed(2));
     const betragB = Number((f.betrag - betragA).toFixed(2));
 
+    // PROJ-15: Kind-Buchungen erben den Empfaenger 1:1 von der Klammer und
+    // bekommen damit denselben normalisierten Schluessel — wichtig fuer
+    // Cache-/Historie-Lookups.
+    const empfaengerNorm = normalisiereEmpfaenger(f.empfaenger);
+
     const kinder = [
       {
         owner_id: user.id,
@@ -157,6 +163,7 @@ export async function POST(request: Request) {
         betrag: betragA,
         verwendungszweck: f.verwendungszweck,
         empfaenger: f.empfaenger,
+        empfaenger_normalisiert: empfaengerNorm,
         waehrung: f.waehrung,
         duplikat_hash: `${f.duplikat_hash}#split-a`,
         import_quelle: "split",
@@ -179,6 +186,7 @@ export async function POST(request: Request) {
         betrag: betragB,
         verwendungszweck: f.verwendungszweck,
         empfaenger: f.empfaenger,
+        empfaenger_normalisiert: empfaengerNorm,
         waehrung: f.waehrung,
         duplikat_hash: `${f.duplikat_hash}#split-b`,
         import_quelle: "split",

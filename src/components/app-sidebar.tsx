@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/buchungen", label: "Buchungen" },
+  { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
   { href: "/pruefliste", label: "Prüfliste" },
   { href: "/abgleich", label: "Beleg-Abgleich" },
   { href: "/belege", label: "Belege" },

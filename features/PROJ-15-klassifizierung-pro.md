@@ -375,6 +375,116 @@ nutzen statischen Linter, um Vercel-Runtime-Kompatibilität zu garantieren.
   Supabase-Client den Select-String nicht statisch in den Zieltyp
   aufloesen kann (Returnform `GenericStringError | T`).
 
+### 2026-05-20 — normalize.ts-Verfeinerung nach Backfill-Dry-Run
+
+Hintergrund: Der erste Backfill gegen 425 reale Buchungen zeigte in der
+Top-10-Verteilung mehrere unsaubere Normalisierungen — vor allem PayPal
+mit voller Luxemburger Anschrift, alle Amazon-Tochterentities und
+Adress-/PLZ-Reste am Ende der Strings.
+
+Geaendert: `src/lib/classifier/normalize.ts` + `normalize.test.ts`.
+
+- **Neue Rechtsformen** (Reihenfolge: laengere Varianten zuerst):
+  - Aktiengesellschaft (ausgeschriebenes AG-Synonym, taucht in
+    Skandia/enercity-Eintraegen auf).
+  - FR/LU-Formen: `S.a.r.l. et Cie`, `S.A.R.L. et Cie`,
+    `S.a r.l. et Cie` (PayPal-Variante ohne Punkt zwischen `a` und
+    `r`), `S.A.R.L`, `S.a.r.l`, `S.a r.l`, `SARL`, `Sarl`, `et Cie`.
+  - `S.C.A`, `SCA`, `S.A.S`, `SAS` (PayPal/Amazon).
+  - `AB` (Klarna, schwedische Aktiengesellschaft).
+  - Der bestehende Regex `(^|[\\s,])${literal}\\.?(?=\\s|$|,)` kommt
+    mit Multi-Punkt-Tokens wie `S.C.A.` klar, weil `regexEscape` die
+    Punkte literal macht und `\\.?` am Ende den optionalen Trailing-
+    Punkt erlaubt. Verifiziert per Probe-Run.
+- **`entferneAdresseAmEnde()`** — neue Funktion, iterativ (max. 5):
+  1. Komma-getrennte End-Adresse (`, 22-24 Boulevard Royal, 2449 Luxembourg`).
+  2. PLZ + Ort am Ende.
+  3. Hausnummer (auch `22-24` mit Bindestrich, `12a` mit Buchstabe) +
+     adress-typisches Folgewort (Strasse/Boulevard/...) + weitere Tokens.
+  4. Strassenname-Token am Ende (DE-Suffix-Liste: strasse, straße,
+     str., str, weg, platz, allee, gasse, ring, damm, boulevard).
+  5. Hausnummer am Ende ohne Strassennachbarwort.
+- **`entferneLaendercodeSuffix()`** — entfernt `DE`/`EU`/`INT`/
+  `INTERNATIONAL` am Ende, NUR wenn davor noch mindestens ein Wort
+  steht. Damit faellt `acme de` → `acme`, ein einzelnes `de` bleibt.
+  **Bewusster Bruch der alten Auslegung** (Notiz vom 2026-05-20 oben,
+  „DE bleibt erhalten") — Backfill hat gezeigt, dass `Amazon Payments
+  Europe S.C.A. DE` und `Amazon Payments Europe S.C.A.` dieselbe Firma
+  sind und denselben Schluessel ergeben muessen. Bestehender Test
+  `"ACME LTD DE" → "acme de"` umgeschrieben zu `→ "acme"`, plus neuer
+  Test fuer einzelnes `DE`/`EU` als ganzen Empfaenger (bleibt erhalten).
+- **`verdichteKonzern()`** — Markennamen-Verdichtung. Liste:
+  `american express`, `amazon`, `google`, `apple`, `microsoft`,
+  `paypal`, `skandia`, `strato`, `klarna`, `enercity`. Wenn der
+  normalisierte String mit einem Marker + Whitespace beginnt (Wortgrenze
+  schuetzt „amazonas reisen"), wird er auf den Marker reduziert.
+  Aggressive Verdichtung war die User-Entscheidung — alle Amazon-Tochter-
+  entities werden auf `amazon` zusammengezogen.
+- **`reduziereSlashDuplikat()`** — `enercity / enercity Aktiengesellschaft`
+  → bei identischem Wort vor und nach dem Slash wird das Wort einmal
+  behalten. Schliesst die Luecke fuer Self-Referenz-Eintraege.
+- **PayPal-Sonderfall (Markennamen-Fallback)** — `entferneEinenPayment
+  Praefix` liefert jetzt zusaetzlich den gestrippten Praefix-Token
+  zurueck. Wir merken uns den ERSTEN gestrippten Praefix und mappen ihn
+  ueber `PAYMENT_PRAEFIX_MARKENNAME` auf einen Marken-Schluessel
+  (`PADDLE.NET`/`PADDLE` → `paddle`, `STRIPE` → `stripe`, `PAYPAL` →
+  `paypal`; `SP`/`SQ`/`PP`/`IZ` → `null`, weil reine Acquirer-Codes
+  ohne stehende Marke). Wenn am Ende der Pipeline der Rest leer ist
+  oder rein generisch (`europe`, `international`, `germany`,
+  `deutschland`, `eu`, `de`, `ireland`, `uk`, `usa`, oder eine Folge
+  aus diesen Tokens + `payments`/`services`/`holdings`/`global`/
+  `world`), wird der Marken-Name als Endwert gesetzt. So wird
+  `PayPal Europe S.a.r.l. et Cie S.C.A 22-24 Boulevard Royal, 2449
+  Luxembourg` zu `paypal`, ohne dass `PAYPAL *NETFLIX` → `netflix`
+  bricht (dort ist `netflix` kein generischer Rest).
+- **Reihenfolge in der Pipeline** (jetzt 13 Schritte): Praefixe →
+  End-Klammern → Rand-Bereinigung → Rechtsformen → End-Klammern →
+  Adresse → Rechtsformen (zweiter Pass, weil Adress-Entfernung neue
+  End-Tokens freilegen kann) → Rand-Bereinigung → Slash-Duplikat →
+  lowercase → Laendercode-Suffix → Konzern-Verdichtung → Marken-
+  Fallback. Idempotenz haendisch fuer alle realen Cases + via
+  Mulberry32-Property-Test (10 Pseudo-Random-Inputs) geprueft.
+
+Neue Tests in `normalize.test.ts`:
+- Neuer `describe`-Block „Reale Daten aus dem Backfill (2026-05-20)"
+  mit 13 `it.each`-Cases (1:1 die Top-10 + Klarna/American Express/
+  enercity) + 1 Idempotenz-Test ueber dieselbe Liste.
+- Bestehender Test fuer DE-Erhalt umgeschrieben + neuer Test fuer
+  einzelnes `DE`/`EU` als Empfaenger.
+
+Tests: 449 passed (vorher 434 — +15 neue, alle bestehenden Snapshot-Tests
+unveraendert gruen, inkl. `STRIPE*ACME LTD → acme` und
+`Mueller-Luedenscheidt GmbH → mueller-luedenscheidt`).
+
+Lint: 0 Errors, 2 unveraenderte Warnings (`ki-panel.tsx`, `use-toast.ts`
+— beides Bestand).
+
+Build: ✓ erfolgreich, kein zusaetzlicher Compile-Aufwand.
+
+Offen / bewusste Annahmen:
+- **Stripe/PayPal als ECHTE Firma vs. Durchlauf** — ein eigenstaendiges
+  `Stripe` ohne `*`-Trenner (z. B. `Stripe Payments UK`) wird heute durch
+  den Praefix-Stripper geschluckt und ueber den Marken-Fallback wieder
+  hergestellt, weil `payments uk` generisch ist. Wenn ein Test-Datensatz
+  auftaucht, in dem nach Stripe noch ECHTE Inhalte stehen (`Stripe
+  Acme Acquisitions`), wuerde das zu `acme acquisitions` werden, nicht
+  zu `stripe acme acquisitions`. Wenn das ein Problem wird, muessen wir
+  den Praefix-Strip nur fuer `*`-Trenner aktivieren oder den Marken-Name
+  immer voranstellen. Bisher kein realer Case dafuer beobachtet.
+- **Skandia/Strato/Klarna/enercity** sind hartcodiert in der Konzern-
+  Marker-Liste. Wenn die Liste waechst, sollte das aus einem
+  Konfigurationspunkt kommen (z. B. `empfaenger_kenntnis` mit
+  `markenname` als kanonischer Cache-Schluessel). Fuer den aktuellen
+  Backfill ist die statische Liste pragmatisch und ausreichend.
+- **Strassennamen-Suffix-Liste** ist DE-zentriert. Schwedische
+  (`vagen`/`vägen`), franzoesische (`rue`, `avenue`) und englische
+  (`street`, `road`) sind nicht explizit drin — sie werden nur indirekt
+  ueber Hausnummer-Pattern + Konzern-Marker gefangen. `Klarna Bank AB
+  Sveavagen 46` funktioniert NUR weil `Klarna` Konzern-Marker ist;
+  ohne den Marker waere `bank sveavagen` uebrig. Erweiterung der
+  Strassen-Suffix-Liste wird empfohlen, sobald skandinavische/
+  franzoesische Adressen haeufiger auftauchen.
+
 ## QA Test Results
 _To be added by /qa_
 

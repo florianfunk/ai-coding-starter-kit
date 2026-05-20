@@ -136,9 +136,18 @@ describe("normalisiereEmpfaenger — Rechtsformen", () => {
     expect(normalisiereEmpfaenger("Acme, GmbH, USA")).toBe("acme, , usa");
   });
 
-  it("laesst 'DE' als Laenderkode stehen (KEINE Rechtsform)", () => {
-    // Wichtig: laut Brief darf "DE" nicht entfernt werden.
-    expect(normalisiereEmpfaenger("ACME LTD DE")).toBe("acme de");
+  it("entfernt 'DE' als Laendercode-Suffix, wenn davor noch ein Wort steht", () => {
+    // PROJ-15 (2026-05-20, Backfill-Verfeinerung): "DE" am Ende wird ab
+    // jetzt als Laendercode entfernt, sofern davor noch mindestens ein
+    // Wort steht. Vorherige Auslegung ("acme de" bleibt) ist aufgehoben.
+    expect(normalisiereEmpfaenger("ACME LTD DE")).toBe("acme");
+  });
+
+  it("laesst einzelnes 'DE' / 'EU' als Empfaengernamen unangetastet", () => {
+    // Wenn der gesamte Empfaenger nur aus dem Code besteht, wird er nicht
+    // verschluckt — `\S+\s+CODE$` greift nicht, weil davor kein Wort steht.
+    expect(normalisiereEmpfaenger("DE")).toBe("de");
+    expect(normalisiereEmpfaenger("EU")).toBe("eu");
   });
 });
 
@@ -253,6 +262,69 @@ describe("normalisiereEmpfaenger — Edge Cases", () => {
     expect(normalisiereEmpfaenger(42)).toBe("");
     // @ts-expect-error — defensiver Laufzeit-Test
     expect(normalisiereEmpfaenger({})).toBe("");
+  });
+});
+
+describe("Reale Daten aus dem Backfill (2026-05-20)", () => {
+  // Diese Cases stammen aus dem ersten Dry-Run gegen 425 reale Buchungen.
+  // Top-10-Aufkommen + zwei kuratierte Edge-Cases (Klarna, American Express,
+  // enercity). Erwartungen wurden vom Inhaber abgesegnet.
+  //
+  // Offene Entscheidungen / Annahmen:
+  // - American Express: Konzern-Marker. "Europe" am Ende ist generisch und
+  //   wuerde auch durch Laendercode-/Adress-Logik allein nicht weichen
+  //   (kein DE/EU-Token). Daher Verdichtung auf "american express".
+  // - Skandia/Strato/Klarna/enercity: aufgenommen in KONZERN_MARKER, weil
+  //   nach Rechtsform-/Adress-Entfernung haeufig Branchenklartext
+  //   ("Lebensversicherung", "Bank") oder restliche Adress-Reste
+  //   uebrig bleiben, die wir aggressiv kuerzen wollen.
+  // - "Aktiengesellschaft" als ausgeschriebenes Synonym fuer "AG" jetzt in
+  //   der RECHTSFORMEN-Liste.
+  it.each([
+    [
+      "PayPal Europe S.a.r.l. et Cie S.C.A 22-24 Boulevard Royal, 2449 Luxembourg",
+      "paypal",
+    ],
+    ["PayPal (Europe) S.a r.l. et Cie, S.C.A.", "paypal"],
+    ["Amazon Payments Europe S.C.A.", "amazon"],
+    ["Amazon Payments Europe S.C.A. DE", "amazon"],
+    ["Amazon Business EU Sarl", "amazon"],
+    ["Amazon Business EU Sarl DE", "amazon"],
+    ["Amazon Digital Germany GmbH", "amazon"],
+    ["Amazon Digital Germany Gmbh", "amazon"],
+    [
+      "Skandia Lebensversicherung Aktiengesellschaft Dornhofstr. 36",
+      "skandia",
+    ],
+    ["Strato GmbH Otto-Ostrowski-Strase 7, 10249 Berlin", "strato"],
+    ["Klarna Bank AB Sveavagen 46", "klarna"],
+    ["American Express Europe", "american express"],
+    ["enercity / enercity Aktiengesellschaft Ihmeplatz 2", "enercity"],
+  ])("normalisiert %s zu %s", (input, erwartet) => {
+    expect(normalisiereEmpfaenger(input)).toBe(erwartet);
+  });
+
+  it("ist idempotent fuer alle realen Backfill-Cases", () => {
+    const cases = [
+      "PayPal Europe S.a.r.l. et Cie S.C.A 22-24 Boulevard Royal, 2449 Luxembourg",
+      "PayPal (Europe) S.a r.l. et Cie, S.C.A.",
+      "Amazon Payments Europe S.C.A.",
+      "Amazon Payments Europe S.C.A. DE",
+      "Amazon Business EU Sarl",
+      "Amazon Business EU Sarl DE",
+      "Amazon Digital Germany GmbH",
+      "Amazon Digital Germany Gmbh",
+      "Skandia Lebensversicherung Aktiengesellschaft Dornhofstr. 36",
+      "Strato GmbH Otto-Ostrowski-Strase 7, 10249 Berlin",
+      "Klarna Bank AB Sveavagen 46",
+      "American Express Europe",
+      "enercity / enercity Aktiengesellschaft Ihmeplatz 2",
+    ];
+    for (const c of cases) {
+      const ein = normalisiereEmpfaenger(c);
+      const zwei = normalisiereEmpfaenger(ein);
+      expect(zwei).toBe(ein);
+    }
   });
 });
 

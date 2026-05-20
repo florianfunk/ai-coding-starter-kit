@@ -38,6 +38,77 @@ export function BenutzerPanel({ benutzer }: { benutzer: BenutzerInfo }) {
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // E-Mail-Wechsel — eigene States, damit Passwort-Flow nicht kollidiert.
+  const [emailAktuelles, setEmailAktuelles] = useState("");
+  const [neueEmail, setNeueEmail] = useState("");
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [emailFehler, setEmailFehler] = useState<string | null>(null);
+  const [emailErfolg, setEmailErfolg] = useState<{
+    pending_email: string;
+    info: string;
+    allow_list_warnung: string | null;
+  } | null>(null);
+
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setEmailFehler(null);
+    setEmailErfolg(null);
+
+    if (emailAktuelles.length < 1) {
+      setEmailFehler("Bitte das aktuelle Passwort eingeben.");
+      return;
+    }
+    const trimmed = neueEmail.trim().toLowerCase();
+    if (!trimmed.includes("@") || trimmed.length < 5) {
+      setEmailFehler("Bitte eine gültige E-Mail-Adresse eingeben.");
+      return;
+    }
+    if (trimmed === benutzer.email.toLowerCase()) {
+      setEmailFehler("Die neue E-Mail ist identisch mit der aktuellen.");
+      return;
+    }
+
+    setEmailBusy(true);
+    try {
+      const res = await fetch("/api/admin/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aktuelles_passwort: emailAktuelles,
+          neue_email: trimmed,
+        }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+        pending_email?: string;
+        info?: string;
+        allow_list_warnung?: string | null;
+      } | null;
+
+      if (!res.ok || !json?.ok) {
+        const msg = json?.error ?? "E-Mail konnte nicht geändert werden.";
+        setEmailFehler(msg);
+        toast.error(msg);
+        return;
+      }
+      setEmailErfolg({
+        pending_email: json.pending_email ?? trimmed,
+        info: json.info ?? "Bestätigungslink versendet.",
+        allow_list_warnung: json.allow_list_warnung ?? null,
+      });
+      setEmailAktuelles("");
+      setNeueEmail("");
+      toast.success("Bestätigungs-Mail versendet.");
+    } catch {
+      const msg = "Netzwerkfehler. Bitte erneut versuchen.";
+      setEmailFehler(msg);
+      toast.error(msg);
+    } finally {
+      setEmailBusy(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFehler(null);
@@ -110,6 +181,79 @@ export function BenutzerPanel({ benutzer }: { benutzer: BenutzerInfo }) {
               disabled
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>E-Mail-Adresse ändern</CardTitle>
+          <CardDescription>
+            Supabase verschickt einen Bestätigungslink an die neue Adresse.
+            Die Login-E-Mail wird erst nach Klick auf den Link umgestellt —
+            bis dahin kannst du dich weiter mit der bisherigen anmelden.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {emailFehler && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{emailFehler}</AlertDescription>
+            </Alert>
+          )}
+          {emailErfolg && (
+            <Alert className="mb-4">
+              <AlertDescription className="space-y-1.5">
+                <div>
+                  {emailErfolg.info}
+                  <br />
+                  Neue Adresse:{" "}
+                  <span className="font-mono">{emailErfolg.pending_email}</span>
+                </div>
+                {emailErfolg.allow_list_warnung && (
+                  <div className="text-destructive font-medium">
+                    ⚠ {emailErfolg.allow_list_warnung}
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+          <form
+            onSubmit={handleEmailSubmit}
+            className="space-y-4"
+            noValidate
+          >
+            <div className="space-y-1">
+              <Label htmlFor="email-neu">Neue E-Mail-Adresse</Label>
+              <Input
+                id="email-neu"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                value={neueEmail}
+                onChange={(e) => setNeueEmail(e.target.value)}
+                placeholder="neue@adresse.de"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="email-pw">Aktuelles Passwort</Label>
+              <Input
+                id="email-pw"
+                type="password"
+                autoComplete="current-password"
+                value={emailAktuelles}
+                onChange={(e) => setEmailAktuelles(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Schutz gegen ungewollte Übernahme — wird serverseitig
+                gegen dein bestehendes Konto geprüft.
+              </p>
+            </div>
+            <Button type="submit" disabled={emailBusy}>
+              {emailBusy ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Bestätigungs-Mail versenden
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

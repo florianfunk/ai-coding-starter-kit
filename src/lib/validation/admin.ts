@@ -45,6 +45,26 @@ export const passwortAendernSchema = z.object({
 export type PasswortAendernInput = z.input<typeof passwortAendernSchema>;
 export type PasswortAendernParsed = z.output<typeof passwortAendernSchema>;
 
+/**
+ * E-Mail-Änderung: aktuelles Passwort (für Re-Auth) + neue E-Mail.
+ * Die tatsächliche Umstellung passiert erst nach Klick auf den
+ * Bestätigungslink, den Supabase an die neue Adresse schickt.
+ */
+export const emailAendernSchema = z.object({
+  aktuelles_passwort: z
+    .string()
+    .min(1, "Aktuelles Passwort ist erforderlich")
+    .max(200, "Passwort ist zu lang (max. 200 Zeichen)"),
+  neue_email: z
+    .email("Bitte eine gültige E-Mail-Adresse eingeben")
+    .trim()
+    .toLowerCase()
+    .max(254, "E-Mail-Adresse ist zu lang (max. 254 Zeichen)"),
+});
+
+export type EmailAendernInput = z.input<typeof emailAendernSchema>;
+export type EmailAendernParsed = z.output<typeof emailAendernSchema>;
+
 /** Erlaubte Wartungsaktionen (owner-scoped, irreversibel). */
 export const WARTUNG_AKTIONEN = [
   "buchungen_reset",

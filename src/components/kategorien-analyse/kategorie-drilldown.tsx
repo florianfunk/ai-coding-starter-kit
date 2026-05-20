@@ -62,14 +62,16 @@ function deDate(iso: string): string {
 
 export function KategorieDrilldown({
   kategorie,
-  jahr,
+  von,
+  bis,
   kontoId,
   nurSteuerrelevant,
   onClose,
   onMutiert,
 }: {
   kategorie: KategorieAggregat | null;
-  jahr: string | null;
+  von: string | null;
+  bis: string | null;
   kontoId: string | null;
   nurSteuerrelevant: boolean;
   onClose: () => void;
@@ -88,7 +90,8 @@ export function KategorieDrilldown({
     const params = new URLSearchParams();
     if (kategorie.kategorie_id) params.set("kategorie_id", kategorie.kategorie_id);
     else params.set("kategorie_id", "ohne");
-    if (jahr) params.set("jahr", jahr);
+    if (von) params.set("von", von);
+    if (bis) params.set("bis", bis);
     if (kontoId) params.set("konto_id", kontoId);
     if (nurSteuerrelevant) params.set("nur_steuerrelevant", "true");
 
@@ -108,7 +111,7 @@ export function KategorieDrilldown({
         setLadeFehler(e instanceof Error ? e.message : "Unbekannter Fehler");
       }
     });
-  }, [kategorie, jahr, kontoId, nurSteuerrelevant]);
+  }, [kategorie, von, bis, kontoId, nurSteuerrelevant]);
 
   async function aendereKategorie(buchung: Buchung, neueKategorieId: string) {
     if (neueKategorieId === buchung.kategorie_id) return;

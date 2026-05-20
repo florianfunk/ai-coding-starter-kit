@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { analyseFilterSchema } from "@/lib/validation/kategorien-analyse";
+import { istImBereich } from "@/lib/finanzen/bereich-filter";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungRow {
@@ -58,6 +59,12 @@ export interface AnalyseResponse {
     auto_verbucht: number;
     zur_pruefung: number;
     manuell_bestaetigt: number;
+    /** Summe aller Buchungen mit Kategorie-Typ "einnahme" (positiver Geldeingang). */
+    summe_einnahmen: number;
+    /** Absolutbetrag aller Buchungen mit Kategorie-Typ "ausgabe". */
+    summe_ausgaben: number;
+    /** summe_einnahmen − summe_ausgaben. */
+    saldo: number;
   };
 }
 
@@ -70,7 +77,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const parsed = analyseFilterSchema.safeParse({
     jahr: url.searchParams.get("jahr") ?? undefined,
+    von: url.searchParams.get("von") ?? undefined,
+    bis: url.searchParams.get("bis") ?? undefined,
     konto_id: url.searchParams.get("konto_id") ?? undefined,
+    bereich: url.searchParams.get("bereich") ?? undefined,
     nur_steuerrelevant: url.searchParams.get("nur_steuerrelevant") ?? undefined,
   });
   if (!parsed.success) {
@@ -91,12 +101,12 @@ export async function GET(request: Request) {
     )
     .eq("owner_id", user.id)
     .limit(20000);
-  if (filter.jahr) {
-    q = q.gte("buchung_datum", `${filter.jahr}-01-01`).lte(
-      "buchung_datum",
-      `${filter.jahr}-12-31`,
-    );
-  }
+  // `von`/`bis` haben Vorrang vor `jahr` — wenn der Nutzer explizit einen
+  // Datumsbereich gewählt hat, ignorieren wir den Jahres-Quickfilter.
+  const von = filter.von ?? (filter.jahr ? `${filter.jahr}-01-01` : null);
+  const bis = filter.bis ?? (filter.jahr ? `${filter.jahr}-12-31` : null);
+  if (von) q = q.gte("buchung_datum", von);
+  if (bis) q = q.lte("buchung_datum", bis);
   if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
   if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
 
@@ -107,7 +117,6 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
-  const buchungen = (bData ?? []) as BuchungRow[];
 
   const { data: kData, error: kErr } = await supabase
     .from("kategorie")
@@ -122,6 +131,21 @@ export async function GET(request: Request) {
   }
   const kategorien = (kData ?? []) as KategorieRow[];
   const katMap = new Map(kategorien.map((k) => [k.id, k]));
+
+  // Bereichs-Filter erst hier in JS — 'privat' geht serverseitig nicht
+  // sauber, und 'geschaeft' filtern wir auch hier nach (Konsistenz),
+  // damit wir das Kategorie-Typ-Fallback aus istImBereich nutzen.
+  const buchungen = ((bData ?? []) as BuchungRow[]).filter((b) =>
+    istImBereich(
+      {
+        klassifikation: b.klassifikation,
+        kategorieTyp: b.kategorie_id
+          ? (katMap.get(b.kategorie_id)?.typ ?? null)
+          : null,
+      },
+      filter.bereich,
+    ),
+  );
 
   // Aggregation
   const acc = new Map<string, KategorieAggregat>();
@@ -232,7 +256,20 @@ export async function GET(request: Request) {
     return Math.abs(b.summe) - Math.abs(a.summe);
   });
 
-  // Gesamtsummen
+  // Gesamtsummen — Einnahmen/Ausgaben anhand des Kategorie-Typs (nicht Vorzeichen),
+  // damit Erstattungen/Stornos nicht das Bild verfälschen. Buchungen ohne
+  // Kategorie zählen nur in die Bruttosumme, nicht in Einnahmen/Ausgaben.
+  let summeEinnahmen = 0;
+  let summeAusgaben = 0;
+  for (const b of buchungen) {
+    const betrag = Number(b.betrag) || 0;
+    const typ = b.kategorie_id ? katMap.get(b.kategorie_id)?.typ : undefined;
+    if (typ === "einnahme") summeEinnahmen += betrag;
+    else if (typ === "ausgabe") summeAusgaben += Math.abs(betrag);
+  }
+  summeEinnahmen = Math.round(summeEinnahmen * 100) / 100;
+  summeAusgaben = Math.round(summeAusgaben * 100) / 100;
+
   const gesamt = {
     buchungen: buchungen.length,
     summe:
@@ -242,6 +279,9 @@ export async function GET(request: Request) {
     zur_pruefung: buchungen.filter((b) => b.status === "zur_pruefung").length,
     manuell_bestaetigt: buchungen.filter((b) => b.status === "manuell_bestaetigt")
       .length,
+    summe_einnahmen: summeEinnahmen,
+    summe_ausgaben: summeAusgaben,
+    saldo: Math.round((summeEinnahmen - summeAusgaben) * 100) / 100,
   };
 
   const payload: AnalyseResponse = { kategorien: result, gesamt };

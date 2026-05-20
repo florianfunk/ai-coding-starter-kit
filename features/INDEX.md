@@ -27,7 +27,7 @@
 | PROJ-11 | Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved | [Spec](PROJ-11-export.md) | 2026-05-15 |
 | PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Approved | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
 | PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
-| PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | In Progress | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
+| PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | Approved | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
 
 <!-- Add features above this line -->
 

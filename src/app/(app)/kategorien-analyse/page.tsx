@@ -1,7 +1,7 @@
 // PROJ-14: Kategorien-Analyse — Übersicht & Inline-Bearbeitung.
-// Server Component: lädt nur Filter-Stammdaten (Konten + Jahre); die
-// eigentlichen Aggregat-Daten holt die Client-Komponente per fetch
-// (damit Filter-Wechsel ohne Page-Reload funktionieren).
+// Server Component: lädt nur Filter-Stammdaten (Konten); Aggregat-Daten
+// und Drill-Down holt die Client-Komponente per fetch (damit Filter-
+// Wechsel ohne Page-Reload funktionieren).
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
@@ -17,28 +17,12 @@ export default async function KategorienAnalysePage() {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [{ data: konten }, { data: jahreData }] = await Promise.all([
-    supabase
-      .from("konto")
-      .select("id, bezeichnung, typ")
-      .eq("owner_id", user.id)
-      .order("bezeichnung")
-      .limit(50),
-    supabase
-      .from("buchung")
-      .select("buchung_datum")
-      .eq("owner_id", user.id)
-      .order("buchung_datum", { ascending: false })
-      .limit(10000),
-  ]);
-
-  const jahre = Array.from(
-    new Set(
-      ((jahreData ?? []) as Array<{ buchung_datum: string }>).map(
-        (r) => Number(r.buchung_datum.slice(0, 4)),
-      ),
-    ),
-  ).sort((a, b) => b - a);
+  const { data: konten } = await supabase
+    .from("konto")
+    .select("id, bezeichnung, typ")
+    .eq("owner_id", user.id)
+    .order("bezeichnung")
+    .limit(50);
 
   return (
     <div className="space-y-6">
@@ -58,7 +42,6 @@ export default async function KategorienAnalysePage() {
           bezeichnung: string;
           typ: "bank" | "paypal" | "kreditkarte";
         }>}
-        jahre={jahre}
       />
     </div>
   );

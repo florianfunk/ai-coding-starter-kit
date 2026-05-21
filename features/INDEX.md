@@ -31,7 +31,7 @@
 | PROJ-15 | Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | In Progress | [Spec](PROJ-15-klassifizierung-pro.md) | 2026-05-20 |
 | PROJ-16 | Mein Profil — persönliche Stammdaten als LLM-Kontext | Planned | [Spec](PROJ-16-mein-profil-stammdaten.md) | 2026-05-21 |
 | PROJ-17 | KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | In Review | [Spec](PROJ-17-ki-chat-finanzen.md) | 2026-05-21 |
-| PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | Planned | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
+| PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | In Progress | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
 
 <!-- Add features above this line -->
 

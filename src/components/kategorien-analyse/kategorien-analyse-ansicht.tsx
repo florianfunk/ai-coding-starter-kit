@@ -30,6 +30,7 @@ import {
 import { FinanzenCockpit } from "@/components/kategorien-analyse/finanzen-cockpit";
 import { GeldbewegungenAnsicht } from "@/components/kategorien-analyse/geldbewegungen-ansicht";
 import { AboRadarTab } from "@/components/kategorien-analyse/abo-radar-tab";
+import { LieferantenTab } from "@/components/kategorien-analyse/lieferanten-tab";
 import type { Bereich } from "@/lib/validation/kategorien-analyse";
 
 interface Konto {
@@ -44,7 +45,13 @@ function defaultZeitraum(): Zeitraum {
   return { von: `${y}-01-01`, bis: `${y}-12-31` };
 }
 
-type Tab = "geschaeft" | "privat" | "bewegungen" | "abos" | "cockpit";
+type Tab =
+  | "geschaeft"
+  | "privat"
+  | "bewegungen"
+  | "abos"
+  | "lieferanten"
+  | "cockpit";
 
 export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
   const [zeitraum, setZeitraum] = useState<Zeitraum>(defaultZeitraum);
@@ -58,7 +65,10 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
   const bereich: Bereich =
     tab === "geschaeft" ? "geschaeft" : tab === "privat" ? "privat" : "alle";
   const istKontoSicht =
-    tab === "cockpit" || tab === "bewegungen" || tab === "abos";
+    tab === "cockpit" ||
+    tab === "bewegungen" ||
+    tab === "abos" ||
+    tab === "lieferanten";
 
   const kategorienFilter: KategorienFilter = {
     von: zeitraum.von,
@@ -121,6 +131,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
           <TabsTrigger value="privat">Privat</TabsTrigger>
           <TabsTrigger value="bewegungen">Geldbewegungen</TabsTrigger>
           <TabsTrigger value="abos">Abo-Radar</TabsTrigger>
+          <TabsTrigger value="lieferanten">Lieferanten</TabsTrigger>
           <TabsTrigger value="cockpit">Gesamt-Cockpit</TabsTrigger>
         </TabsList>
 
@@ -147,6 +158,17 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               bis: zeitraum.bis,
               kontoId: kontoId === "alle" ? null : kontoId,
               bereich: "alle",
+            }}
+          />
+        </TabsContent>
+        <TabsContent value="lieferanten" className="mt-6">
+          <LieferantenTab
+            filter={{
+              von: zeitraum.von,
+              bis: zeitraum.bis,
+              kontoId: kontoId === "alle" ? null : kontoId,
+              bereich: "alle",
+              nurSteuerrelevant,
             }}
           />
         </TabsContent>

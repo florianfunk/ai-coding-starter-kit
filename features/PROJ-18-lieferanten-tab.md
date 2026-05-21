@@ -1,6 +1,6 @@
 # PROJ-18: Lieferanten-Tab (wiederkehrende Empfänger ohne Abo)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-21
 

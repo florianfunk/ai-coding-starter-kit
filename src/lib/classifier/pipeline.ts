@@ -48,6 +48,10 @@ import {
   type HistorieSummary,
 } from "@/lib/classifier/historie";
 import {
+  istArbeitgeber,
+  type MeinProfil,
+} from "@/lib/classifier/profil";
+import {
   extrahiereBrancheUndLeistung,
   formatiereRechercheKontext,
   rechercheEmpfaenger,
@@ -123,6 +127,12 @@ export type BuchungFuerPipeline = Pick<
    * Optional, weil Altdaten ohne Backfill diese Spalte noch leer haben.
    */
   empfaenger_normalisiert?: string | null;
+  /**
+   * Optionales Buchungsdatum — wird fuer Arbeitgeber-Zeitraumpruefung
+   * (`aktiv_von`/`aktiv_bis`) genutzt. Bei fehlendem Datum gilt: ein Match
+   * auf den Arbeitgebernamen ist ausreichend.
+   */
+  buchung_datum?: string | null;
 };
 
 /** Wird geworfen, wenn eine bereits manuell bestätigte Buchung übergeben wird. */
@@ -352,6 +362,14 @@ export interface PipelineKontext {
   supabase?: SupabaseClient;
   /** Owner-ID, fuer DB-Calls nach Cache und Historie. */
   ownerId?: string;
+  /**
+   * PROJ-16: Persoenliche Stammdaten ("Mein Profil"). Wird vom API-Route
+   * EINMAL pro Job geladen und hier durchgereicht. Steuert:
+   *  - LLM-Prompt-Block (Arbeitgeber/Familie/Wohnort/eigene Konten)
+   *  - Familien-Empfaenger werden NICHT in den Web-Cache geschickt (DSGVO)
+   *  - Arbeitgeber-Match (Lohn/Gehalt) erhaelt explizites Pre-Hint
+   */
+  mein_profil?: MeinProfil | null;
 }
 
 type LlmFn = (
@@ -419,7 +437,13 @@ export async function klassifiziereBuchung(
   // + ctx.ownerId; ohne diese Felder ist die Pipeline cache-blind (z. B.
   // im Unit-Test).
   const norm = (buchung.empfaenger_normalisiert ?? "").trim();
-  const kandidat = istRechercheKandidat(buchung.empfaenger, norm);
+  // PROJ-16: Familienmitglieder werden hart aus dem Recherche-Pool
+  // ausgeschlossen — auch wenn ihr Name >=3 Wortteile haette.
+  const kandidat = istRechercheKandidat(
+    buchung.empfaenger,
+    norm,
+    ctx.mein_profil?.familie,
+  );
 
   let kenntnis: EmpfaengerKenntnis | null = null;
   let webGenutzt = false;
@@ -491,6 +515,13 @@ export async function klassifiziereBuchung(
     });
   }
 
+  // PROJ-16: Profil-Hinweis ableiten. Wenn das Profil im Kontext steht und
+  // der normalisierte Empfaenger eindeutig in den Stammdaten auftaucht,
+  // liefern wir dem LLM eine kurze Klartext-Anweisung mit. Das LLM bleibt
+  // weiterhin entscheidungsfaehig — wir geben nur das Signal vor, das es
+  // sonst aus dem Profil-Block selbst rekonstruieren muesste.
+  const profilHinweis = leiteProfilHinweisAb(buchung, ctx.mein_profil);
+
   // (4) LLM-Aufruf mit allem Kontext.
   let llm: LlmErgebnis | null = null;
   let llmFehler: string | null = null;
@@ -504,6 +535,8 @@ export async function klassifiziereBuchung(
         web_kontext: webKontext,
         empfaenger_kenntnis: kenntnis,
         historie,
+        mein_profil: ctx.mein_profil ?? null,
+        profil_hinweis: profilHinweis,
       },
       kategorien,
     );
@@ -619,8 +652,72 @@ export async function klassifiziereBuchung(
       },
     };
   }
+  if (profilHinweis) {
+    entscheidung.audit.details = {
+      ...entscheidung.audit.details,
+      profil_hinweis: profilHinweis,
+    };
+  }
 
   return entscheidung;
+}
+
+/**
+ * PROJ-16 — leitet aus dem Profil + der Buchung einen kurzen Klartext-Hinweis
+ * fuer das LLM ab. Drei Faelle in dieser Reihenfolge:
+ *  1. Empfaenger ist ein aktiver Arbeitgeber UND Verwendungszweck enthaelt
+ *     Lohn/Gehalt/Bezüge → "Privat-Gehalt".
+ *  2. Empfaenger ist ein Familienmitglied (und NICHT explizit auch
+ *     Geschaeftspartner) → "Privatentnahme/Privateinlage".
+ *  3. Keine Treffer → null (kein Hinweis).
+ *
+ * Reine Funktion. Tests gegen `leiteProfilHinweisAb` ueber das Modul
+ * exportiert? Nein — bewusst nur intern, das Verhalten wird ueber
+ * `klassifiziereBuchung` getestet.
+ */
+function leiteProfilHinweisAb(
+  buchung: BuchungFuerPipeline,
+  profil: MeinProfil | null | undefined,
+): string | null {
+  if (!profil) return null;
+  const norm = (buchung.empfaenger_normalisiert ?? "").trim();
+  if (norm.length === 0) return null;
+
+  // 1) Arbeitgeber + Lohn/Gehalt-Zweck → Privat-Gehalt.
+  const zweckLower = (buchung.verwendungszweck ?? "").toLowerCase();
+  const istLohnZweck =
+    /\b(lohn|gehalt|bezuege|bezüge|verguetung|vergütung|tantieme|sold)\b/u.test(
+      zweckLower,
+    );
+  if (
+    istArbeitgeber(profil, norm, buchung.buchung_datum ?? undefined) &&
+    istLohnZweck
+  ) {
+    return "Empfänger ist ein eingetragener Arbeitgeber des Inhabers und der Verwendungszweck deutet auf Lohn/Gehalt — als Privatentnahme/Lohn klassifizieren (klassifikation 'privat').";
+  }
+
+  // 2) Familienmitglied (nicht zusaetzlich Geschaeftspartner).
+  const familieTreffer = profil.familie.find(
+    (f) =>
+      f.name_normalisiert.trim().toLowerCase() === norm.toLowerCase() &&
+      !f.auch_geschaeftspartner,
+  );
+  if (familieTreffer) {
+    return `Empfänger '${familieTreffer.name}' ist Familienmitglied (${familieTreffer.rolle}) — Privatentnahme/Privateinlage, keine USt.`;
+  }
+
+  return null;
+}
+
+/**
+ * Test-exportierter Helper. Dient ausschliesslich der Tests in
+ * pipeline.test.ts und ist NICHT Teil der oeffentlichen API.
+ */
+export function _leiteProfilHinweisAbFuerTest(
+  buchung: BuchungFuerPipeline,
+  profil: MeinProfil | null | undefined,
+): string | null {
+  return leiteProfilHinweisAb(buchung, profil);
 }
 
 /**

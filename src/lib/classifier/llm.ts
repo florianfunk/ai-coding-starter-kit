@@ -23,6 +23,10 @@ import type { Klassifikation } from "@/lib/types";
 import { ladeAiKey } from "@/lib/admin/ai-key";
 import type { EmpfaengerKenntnis } from "@/lib/classifier/empfaenger-cache";
 import type { HistorieSummary } from "@/lib/classifier/historie";
+import {
+  formatiereProfilFuerLlm,
+  type MeinProfil,
+} from "@/lib/classifier/profil";
 
 /** Definierter Fehler bei LLM-Ausfall — kein Raten, sauberer Fallback. */
 export class LlmKlassifiziererError extends Error {
@@ -131,6 +135,21 @@ export interface LlmEingabe {
    * Wird nur eingeblendet, wenn anzahl >= 2 (sonst keine Aussagekraft).
    */
   historie?: HistorieSummary | null;
+  /**
+   * PROJ-16: Persoenliche Stammdaten ("Mein Profil") als zusaetzlicher
+   * Kontext-Block. Wird vor Empfaenger-Hintergrund und Historie eingespielt,
+   * weil Profil-Treffer (Arbeitgeber/Familie/eigene Konten) die staerksten
+   * Signale fuer die korrekte Klassifikation sind.
+   */
+  mein_profil?: MeinProfil | null;
+  /**
+   * PROJ-16: Vorab vom Pipeline-Wiring berechnete Hinweise, die die
+   * Profil-Logik schon ausgewertet hat (Arbeitgeber-Match mit Lohn/Gehalt-
+   * Zweck, Familienmitglied, eigenes Konto). Optional — das LLM bekommt
+   * den Hinweis als kurzen Klartext-Block, damit es das Profil-Signal
+   * nicht erst selbst rekonstruieren muss.
+   */
+  profil_hinweis?: string | null;
 }
 
 /** Eine wählbare Zielkategorie (nur ID + Bezeichnung + Typ ans LLM). */
@@ -404,6 +423,15 @@ export async function klassifiziereMitLlm(
 
   const kenntnisBlock = baueKenntnisBlock(eingabe.empfaenger_kenntnis);
   const historieBlock = baueHistorieBlock(eingabe.historie, kategorien);
+  // PROJ-16: Persoenliche Stammdaten — Block kommt VOR Kenntnis/Historie,
+  // weil Profil-Treffer (Arbeitgeber/Familie/eigene Konten) die staerksten
+  // Signale sind.
+  const profilText = formatiereProfilFuerLlm(eingabe.mein_profil);
+  const profilBlock = profilText.length > 0 ? `\n\n${profilText}` : "";
+  const profilHinweisBlock =
+    eingabe.profil_hinweis && eingabe.profil_hinweis.trim().length > 0
+      ? `\n\nProfil-Hinweis für genau diese Buchung: ${eingabe.profil_hinweis.trim()}`
+      : "";
 
   const prompt =
     `Buchung:\n` +
@@ -411,7 +439,7 @@ export async function klassifiziereMitLlm(
     `Empfänger: ${eingabe.empfaenger ?? "(leer)"}\n` +
     `Betrag: ${eingabe.betrag.toFixed(2)} EUR ` +
     `(${eingabe.betrag < 0 ? "Ausgabe" : "Einnahme/Zugang"})` +
-    `${stichworte}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
+    `${stichworte}${profilBlock}${profilHinweisBlock}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
   let letzterFehler: unknown = null;

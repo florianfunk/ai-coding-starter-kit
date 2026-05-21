@@ -136,17 +136,36 @@ export function istAbgelaufen(
  * Privatpersonen wie "Max Mustermann" (2 Wortteile, keine Rechtsform) sind
  * ausgeschlossen.
  *
- * @param roh           Rohwert vor Normalisierung (fuer Rechtsform-Check
- *                       inkl. moeglicher Sonderzeichen wie "GmbH & Co. KG").
- * @param normalisiert  Bereits normalisierter Empfaenger (lowercase, ohne
- *                       Rechtsform — fuer Wortteil-Zaehlung).
+ * PROJ-16: zusaetzlich werden Familienmitglieder aus "Mein Profil" hart
+ * ausgeschlossen — egal wieviele Wortteile ihr Name hat. So landet ein
+ * Familienmitglied mit Mittel- oder Doppelnamen ("Anna Maria Schmidt") nie
+ * im Web-Lookup.
+ *
+ * @param roh             Rohwert vor Normalisierung (fuer Rechtsform-Check
+ *                         inkl. moeglicher Sonderzeichen wie "GmbH & Co. KG").
+ * @param normalisiert    Bereits normalisierter Empfaenger (lowercase, ohne
+ *                         Rechtsform — fuer Wortteil-Zaehlung).
+ * @param familie         Optionale Liste der Familienmitglieder mit ihrem
+ *                         `name_normalisiert`. Wenn der normalisierte
+ *                         Empfaenger exakt matcht → false (kein Web-Lookup).
  */
 export function istRechercheKandidat(
   roh: string | null | undefined,
   normalisiert: string | null | undefined,
+  familie?: ReadonlyArray<{ name_normalisiert: string }>,
 ): boolean {
   const norm = (normalisiert ?? "").trim();
   if (norm.length === 0) return false;
+
+  // PROJ-16: Familienmitglieder-Negativliste (DSGVO — keine PII zu Firecrawl).
+  if (familie && familie.length > 0) {
+    const normLower = norm.toLowerCase();
+    for (const f of familie) {
+      if (f.name_normalisiert.trim().toLowerCase() === normLower) {
+        return false;
+      }
+    }
+  }
 
   // Rechtsform-Indikator im Rohwert (case-insensitive, an Wortgrenzen).
   const rohLower = (roh ?? "").toLowerCase();

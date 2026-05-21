@@ -18,6 +18,7 @@ const NAV = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/buchungen", label: "Buchungen" },
   { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
+  { href: "/kuendigungen", label: "Kündigungen" },
   { href: "/pruefliste", label: "Prüfliste" },
   { href: "/abgleich", label: "Beleg-Abgleich" },
   { href: "/belege", label: "Belege" },
@@ -28,6 +29,7 @@ const NAV = [
 ];
 
 const SETTINGS = [
+  { href: "/profil", label: "Mein Profil" },
   { href: "/einstellungen/firma", label: "Firma & Steuerprofil" },
   { href: "/einstellungen/kontenrahmen", label: "Kontenrahmen" },
   { href: "/einstellungen/konten", label: "Bankkonten" },

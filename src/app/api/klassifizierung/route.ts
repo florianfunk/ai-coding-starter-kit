@@ -27,6 +27,7 @@ import { wendeKonsistenzPassAn } from "@/lib/classifier/konsistenz-pass";
 import type { KonsistenzPassResultat } from "@/lib/classifier/konsistenz-pass";
 import type { KategorieOption } from "@/lib/classifier/llm";
 import type { Lernregel } from "@/lib/types";
+import { holeProfil, profilHatInhalt } from "@/lib/classifier/profil";
 
 export const runtime = "nodejs";
 // Massen-Klassifizierung mit LLM-Aufrufen kann dauern.
@@ -37,8 +38,10 @@ const SELECT_JOB =
 
 // PROJ-15: `empfaenger_normalisiert` wird mitgeladen, damit Cache/Historie
 // owner-scoped pro normalisiertem Empfaenger nachschlagen koennen.
+// PROJ-16: `buchung_datum` zusaetzlich, damit Arbeitgeber-Zeitraeume
+// (aktiv_von/bis) gepruft werden koennen.
 const SELECT_BUCHUNG =
-  "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, status";
+  "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, buchung_datum, status";
 
 interface Klassifikationsergebnis {
   verarbeitet: number;
@@ -54,6 +57,12 @@ interface Klassifikationsergebnis {
    * oder die Hauptphase frueh abgebrochen wurde.
    */
   konsistenz_pass?: KonsistenzPassResultat | null;
+  /**
+   * PROJ-16: True, wenn das Mein-Profil mindestens einen Eintrag hat und
+   * der Pipeline durchgereicht wurde. UI-Hinweis, damit der Nutzer sieht,
+   * dass der LLM-Kontext mit Stammdaten angereichert war.
+   */
+  mein_profil_geladen?: boolean;
 }
 
 export async function GET() {
@@ -243,6 +252,13 @@ export async function POST(request: Request) {
   }
   const jobId = (jobRow as { id: string }).id;
 
+  // PROJ-16: Mein Profil EINMAL pro Job laden und in den PipelineKontext
+  // haengen. Pipeline benutzt es als LLM-Kontext-Block, filtert Familien-
+  // Empfaenger aus dem Web-Lookup und leitet einen Profil-Hinweis fuer
+  // klare Arbeitgeber-Lohn-Buchungen ab.
+  const meinProfil = await holeProfil(supabase, user.id);
+  const profilGeladen = profilHatInhalt(meinProfil);
+
   const ergebnis: Klassifikationsergebnis = {
     verarbeitet: 0,
     auto_verbucht: 0,
@@ -252,6 +268,7 @@ export async function POST(request: Request) {
     uebersprungen_manuell: 0,
     fehler: [],
     konsistenz_pass: null,
+    mein_profil_geladen: profilGeladen,
   };
   // Trefferzähler je angewandter Regel (am Ende gebündelt erhöhen).
   const regelTreffer = new Map<string, number>();

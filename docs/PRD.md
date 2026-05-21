@@ -30,6 +30,10 @@ Single-Tenant: keine Mandanten-, Kanzlei- oder Mehrbenutzerverwaltung.
 | P1 | PROJ-11 — Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved |
 | P2 | PROJ-12 — Dashboard & Buchungsstatus-Übersicht | Approved |
 | P2 | PROJ-13 — Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved |
+| P2 | PROJ-14 — Kategorien-Analyse & Inline-Bearbeitung | Approved |
+| P2 | PROJ-15 — Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | In Progress |
+| P2 | PROJ-16 — Mein Profil — persönliche Stammdaten als LLM-Kontext | Planned |
+| P2 | PROJ-17 — KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Planned |
 
 ## Success Metrics
 - **Automatisierungsgrad:** ≥ 85 % aller Kontobuchungen werden vom Agenten ohne Nachfrage korrekt klassifiziert (geschäftlich/privat + EÜR-Kategorie)

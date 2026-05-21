@@ -750,7 +750,113 @@ Migration noch nicht in der Remote-Datenbank angewendet — manueller
 Schritt vor dem ersten Deploy.
 
 ## QA Test Results
-_To be added by /qa_
+
+### 2026-05-21 — Code-Audit + Sicherheits-Review (statisch, keine Browser-Klicks)
+
+**Methodik:** Vollstaendige Code-Inspektion aller PROJ-17-Dateien gegen
+die 36 P0-Acceptance-Criteria + 12 Edge Cases + 8 Sicherheits-Dimensionen.
+Browser-Klick-Tests stehen aus (vom Owner manuell zu fahren, sobald
+Migration `0009_chat.sql` auf der Remote-DB angewendet ist).
+
+**Ergebnis:**
+- Acceptance Criteria: **28/36** vollstaendig umgesetzt, 6 teilweise, 2
+  blockiert durch fehlende Migration-Anwendung.
+- Sicherheits-Funde: **0 Critical, 2 High, 3 Medium, 3 Low**.
+- Automatisierte Tests: **586/586 gruen** (`npm test`), Lint sauber,
+  Build erfolgreich, alle 5 `/api/chat/*`-Routen registriert.
+- **Production-Ready: NEIN** — zwei HIGH-Bugs blockieren Deploy.
+
+#### HIGH-Bugs (Deploy-blockierend)
+
+**H1 — `erneutVersuchen` bricht Idempotenz-Garantie**
+- Dateien: [aktions-karte.tsx:109](src/components/chat/aktions-karte.tsx),
+  [aktion-ausfuehren.ts:839](src/lib/chat/aktion-ausfuehren.ts)
+- `erneutVersuchen()` setzt nur lokalen React-State, ohne DB-Update.
+  `fuehreAktionAus()` sperrt bei `status='error'` NICHT. Folge: eine
+  fehlgeschlagene Aktion kann durch UI-Reset + Bestaetigen-Klick erneut
+  ausgefuehrt werden. Bei destruktiven Aktionen (z. B.
+  `loesche_kategorie`) entstehen unerwartete Wiederholungen.
+
+**H2 — Kein `maxTokens` Output-Limit gesetzt**
+- Datei: [api/chat/[konversation_id]/nachricht/route.ts:202](src/app/api/chat/[konversation_id]/nachricht/route.ts)
+- `streamText()` ohne `maxTokens`. Spec fordert 4k Output-Tokens. Folge:
+  unkontrollierte Kosten bei langen Antworten + Risiko abgebrochener
+  Streams bei Vercel Serverless 10-s-Timeout (Assistant-Nachricht bleibt
+  als leerer Stub in DB).
+
+#### MEDIUM-Bugs (sollten im naechsten Sprint adressiert werden)
+
+**M1 — Partial-Failure bei Bulk-Umbuchungen ohne Rollback**
+- Datei: [aktion-ausfuehren.ts:437](src/lib/chat/aktion-ausfuehren.ts)
+- 50er-Batches sequentiell; bei Fehler in Batch 2 sind Batch 1-Buchungen
+  bereits umgebucht, aber kein Audit geschrieben. Inkonsistenter
+  DB-State moeglich.
+
+**M2 — `setzeStatus()` fehlt expliziter `owner_id`-Filter**
+- Datei: [aktion-ausfuehren.ts:108](src/lib/chat/aktion-ausfuehren.ts)
+- RLS deckt es ab, aber inkonsistent mit Defense-in-Depth-Pattern im
+  Rest des Services.
+
+**M3 — Mehrere Aktionen pro Nachricht: nur letzte wird angezeigt**
+- Datei: [api.ts:256](src/lib/chat/api.ts)
+- `aktionenJeNachricht.set(...)` ueberschreibt. Falls LLM mehrere
+  Schreib-Tools in einer Antwort aufruft, gehen alle ausser der letzten
+  Confirm-Karte verloren.
+
+#### LOW-Bugs
+
+- **L1** Duplizierter `waehleProvider()`-Code in
+  [nachricht/route.ts:54](src/app/api/chat/[konversation_id]/nachricht/route.ts)
+  und [konversation.ts:383](src/lib/chat/konversation.ts).
+- **L2** Auto-Titel-Funktion macht redundante `ladeAiKey()`-Abfrage
+  ([konversation.ts:357](src/lib/chat/konversation.ts)).
+- **L3** `kategorie_bezeichnung`-Filter wird POST-Load gefiltert; bei
+  gesetztem Limit (default 50) koennen Treffer unterschlagen werden
+  ([tools-lese.ts:171](src/lib/chat/tools-lese.ts)).
+
+#### Sicherheits-Audit-Ergebnis
+
+- **Auth + Owner-Scoping:** ✓ Alle Routen via `getApiUser()`, RLS aktiv.
+  Kein `service_role` im Chat-Pfad.
+- **Confirm-Flow-Integritaet:** ✓ Vorschlag aus DB geladen (nicht aus
+  Request-Body). Replay-Schutz durch 409 bei `confirmed`. Lost-Update-
+  Schutz pro Tool implementiert.
+- **Prompt-Injection-Resilienz:** ✓ Confirm-Flow als Gegenmassnahme
+  korrekt. Tools-Allowlist hartkodiert, kein dynamisches Discovery.
+- **Service-Role / Secret-Leaks:** ✓ Keine.
+- **Input-Validierung:** ✓ Zod ueberall, UUID-Regex auf IDs.
+- **DSGVO:** ✓ Kaskaden korrekt, Audit-Eintraege bleiben (gewollt).
+- **Rate-Limiting:** ✗ Keines vorhanden. In Single-Tenant-Kontext
+  akzeptabel, aber dokumentationspflichtig.
+- **SQL-Injection:** ✓ Supabase-Client parametrisiert sauber.
+
+#### Offene Fragen an Owner
+
+1. Soll "Erneut versuchen" eine Aktion tatsaechlich nochmals ausfuehren
+   koennen (Fehler-Retry), oder einen neuen Vorschlag erfordern?
+2. `maxTokens` Output-Limit: Spec sagt 4k — soll das gesetzt werden?
+3. Rate-Limiting auf `/api/chat/[id]/nachricht` gewuenscht?
+4. Migration-Deploy: Wann wird `0009_chat.sql` angewendet?
+5. Partial-Failure bei Bulk-Umbuchung: vollstaendige Transaktion oder
+   partieller Erfolg akzeptabel?
+
+#### Was QA manuell pruefen sollte (Browser-Klick-Liste)
+
+- [ ] Migration `0009_chat.sql` angewendet, drei Tabellen verifiziert
+- [ ] `/chat`-Seite laedt nach `npm run dev`
+- [ ] Sidebar-Eintrag "KI-Chat" anklickbar
+- [ ] Neue Konversation per Button anlegen
+- [ ] Beispielfrage-Bubble klickt ins Eingabefeld
+- [ ] Lese-Anfrage ("Wieviel habe ich diesen Monat ausgegeben?") streamt Antwort live
+- [ ] Tool-Badge unter Antwort, Klick oeffnet Popover
+- [ ] Schreib-Anweisung ("Lege Kategorie 'Test-X' an") erzeugt Aktions-Karte
+- [ ] Bestaetigen → Kategorie wird in DB angelegt, Audit-Eintrag mit `quelle='chat'`
+- [ ] Abbrechen → keine Aenderung, Karte zeigt "Abgebrochen"-Badge
+- [ ] Konversation umbenennen via Drei-Punkte-Menue
+- [ ] Konversation loeschen → AlertDialog-Confirm → weg
+- [ ] Reload-Test: Konversationen bleiben erhalten
+- [ ] Mobile (375 px) und Tablet (768 px) Layout testen
+- [ ] Cross-Browser (Chrome, Firefox, Safari)
 
 ## Deployment
 _To be added by /deploy_

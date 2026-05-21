@@ -11,21 +11,26 @@
 //   - Optional: Detail-Sheet pro Buchung (BuchungDetailSheet)
 
 import {
-  Fragment,
   useEffect,
   useState,
   useTransition,
 } from "react";
 import { toast } from "sonner";
 import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Ban,
   CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Circle,
+  CircleDot,
   Eye,
   Loader2,
+  XCircle,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +61,7 @@ import type {
 } from "@/app/api/finanzen/wiederkehrend/route";
 import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
 import type { KategorieTyp } from "@/lib/types";
+import { lerneRegelFuer, regelToast } from "@/lib/finanzen/regel-helper";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
 
 interface KategorieOption {
@@ -115,6 +121,13 @@ export function AboRadar({
   const [kategorien, setKategorien] = useState<KategorieOption[]>([]);
   const [aufgeklappt, setAufgeklappt] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [bestaetigteAusblenden, setBestaetigteAusblenden] = useState(false);
+  // Sektion-Aufklappstatus: Offen offen, Rest zu (Workflow-Fokus).
+  const [sektionOffen, setSektionOffen] = useState<{
+    offen: boolean;
+    bestaetigt: boolean;
+    beendet: boolean;
+  }>({ offen: true, bestaetigt: false, beendet: false });
 
   // Kategorien einmalig für die Selects laden
   useEffect(() => {
@@ -131,8 +144,37 @@ export function AboRadar({
     })();
   }, []);
 
-  const aktiv = abos.items.filter((i) => i.noch_aktiv);
-  const inaktiv = abos.items.filter((i) => !i.noch_aktiv);
+  // Filter: Gruppen, in denen JEDE Buchung bereits manuell bestaetigt ist,
+  // werden ausgeblendet — typischer Workflow-Wunsch nach "Alle bestaetigen
+  // & Regel lernen".
+  const sichtbareItems = bestaetigteAusblenden
+    ? abos.items.filter(
+        (i) =>
+          !i.buchungen.every((b) => b.status === "manuell_bestaetigt"),
+      )
+    : abos.items;
+  const ausgeblendetAnzahl = abos.items.length - sichtbareItems.length;
+  const aktiv = sichtbareItems.filter((i) => i.noch_aktiv);
+  const inaktiv = sichtbareItems.filter((i) => !i.noch_aktiv);
+
+  // Sektionen: Offen → Bestätigt → Beendet.
+  //   - Offen:    Mind. 1 Buchung nicht bestaetigt UND nicht 'beendet'-markiert
+  //   - Bestätigt: ALLE Buchungen bestaetigt UND nicht 'beendet'-markiert
+  //   - Beendet:  Kuendigung-Status === 'beendet'
+  function bucketFuer(
+    i: WiederkehrendItem,
+  ): "offen" | "bestaetigt" | "beendet" {
+    if (i.kuendigung_status === "beendet") return "beendet";
+    const alleBestaetigt =
+      i.buchungen.length > 0 &&
+      i.buchungen.every((b) => b.status === "manuell_bestaetigt");
+    return alleBestaetigt ? "bestaetigt" : "offen";
+  }
+  const sektion = {
+    offen: sichtbareItems.filter((i) => bucketFuer(i) === "offen"),
+    bestaetigt: sichtbareItems.filter((i) => bucketFuer(i) === "bestaetigt"),
+    beendet: sichtbareItems.filter((i) => bucketFuer(i) === "beendet"),
+  };
 
   function itemKey(i: WiederkehrendItem): string {
     return `${i.empfaenger}__${i.intervall}`;
@@ -149,13 +191,14 @@ export function AboRadar({
   }
 
   const alleAufgeklappt =
-    abos.items.length > 0 && aufgeklappt.size === abos.items.length;
+    sichtbareItems.length > 0 &&
+    sichtbareItems.every((i) => aufgeklappt.has(itemKey(i)));
 
   function toggleAlle() {
     if (alleAufgeklappt) {
       setAufgeklappt(new Set());
     } else {
-      setAufgeklappt(new Set(abos.items.map(itemKey)));
+      setAufgeklappt(new Set(sichtbareItems.map(itemKey)));
     }
   }
 
@@ -174,25 +217,42 @@ export function AboRadar({
           </p>
         </div>
         {abos.items.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={toggleAlle}
-            className="h-8 shrink-0 gap-1.5 text-xs"
-            title={
-              alleAufgeklappt
-                ? "Alle Buchungslisten zuklappen"
-                : "Alle Buchungslisten aufklappen"
-            }
-          >
-            {alleAufgeklappt ? (
-              <ChevronsDownUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronsUpDown className="h-3.5 w-3.5" />
-            )}
-            {alleAufgeklappt ? "Alle zuklappen" : "Alle aufklappen"}
-          </Button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs">
+              <input
+                type="checkbox"
+                checked={bestaetigteAusblenden}
+                onChange={(e) => setBestaetigteAusblenden(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              <span>Bestätigte ausblenden</span>
+              {ausgeblendetAnzahl > 0 ? (
+                <Badge variant="secondary" className="ml-1 text-[10px]">
+                  {ausgeblendetAnzahl}
+                </Badge>
+              ) : null}
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={toggleAlle}
+              disabled={sichtbareItems.length === 0}
+              className="h-8 gap-1.5 text-xs"
+              title={
+                alleAufgeklappt
+                  ? "Alle Buchungslisten zuklappen"
+                  : "Alle Buchungslisten aufklappen"
+              }
+            >
+              {alleAufgeklappt ? (
+                <ChevronsDownUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              )}
+              {alleAufgeklappt ? "Alle zuklappen" : "Alle aufklappen"}
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -202,151 +262,143 @@ export function AboRadar({
             Zahlungen mit ≥ 3 Buchungen, stabilem Betrag (±30 %) und
             regelmäßigem Abstand. Einzelne Ausreißer werden toleriert.
           </p>
+        ) : sichtbareItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Alle erkannten Wiederkehr-Items sind bereits manuell bestätigt.{" "}
+            <button
+              type="button"
+              className="text-primary underline-offset-2 hover:underline"
+              onClick={() => setBestaetigteAusblenden(false)}
+            >
+              Bestätigte wieder einblenden
+            </button>
+          </p>
         ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-2 rounded-md bg-muted/40 p-3 text-sm sm:grid-cols-2">
-              <div>
-                <span className="text-muted-foreground">
-                  Aktive Ausgaben / Jahr:
-                </span>{" "}
-                <span className="font-semibold text-destructive tabular-nums">
-                  {eur(abos.jahresbelastung_ausgaben_aktiv)}
-                </span>
+          <div className="space-y-5">
+            {/* Summary-Header: zwei grosse Zahlen, kein Kasten — editorial. */}
+            <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3 border-b pb-4">
+              <div className="flex flex-wrap gap-x-8 gap-y-3">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Aktive Ausgaben / Jahr
+                  </div>
+                  <div className="mt-1 font-mono text-xl font-semibold text-destructive tabular-nums">
+                    {eur(abos.jahresbelastung_ausgaben_aktiv)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Aktive Einnahmen / Jahr
+                  </div>
+                  <div className="mt-1 font-mono text-xl font-semibold text-income-strong dark:text-income tabular-nums">
+                    {eur(abos.jahresbelastung_einnahmen_aktiv)}
+                  </div>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">
-                  Aktive Einnahmen / Jahr:
-                </span>{" "}
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                  {eur(abos.jahresbelastung_einnahmen_aktiv)}
-                </span>
-              </div>
-              <div className="sm:col-span-2 text-xs text-muted-foreground">
+              <div className="text-xs text-muted-foreground">
                 {aktiv.length} aktiv · {inaktiv.length} inaktiv/gekündigt
               </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[28px]"></TableHead>
-                  <TableHead>Empfänger</TableHead>
-                  <TableHead>Richtung</TableHead>
-                  <TableHead>Intervall</TableHead>
-                  <TableHead className="text-right">Anzahl</TableHead>
-                  <TableHead className="text-right">Pro Zahlung</TableHead>
-                  <TableHead className="text-right">Jahresvolumen</TableHead>
-                  <TableHead>Letzte</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Konf.</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {abos.items.map((i) => {
-                  const k = itemKey(i);
-                  const expanded = aufgeklappt.has(k);
-                  return (
-                    <Fragment key={k}>
-                      <TableRow
-                        className={
-                          "cursor-pointer hover:bg-muted/40 " +
-                          (!i.noch_aktiv ? "opacity-60" : "")
-                        }
-                        onClick={() => toggle(i)}
-                      >
-                        <TableCell className="p-0 pl-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggle(i);
-                            }}
-                            aria-label={
-                              expanded ? "Zuklappen" : "Buchungen anzeigen"
-                            }
-                            className="flex h-8 w-8 items-center justify-center rounded hover:bg-muted"
-                          >
-                            {expanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </button>
-                        </TableCell>
-                        <TableCell className="max-w-[240px] truncate font-medium">
-                          {i.empfaenger}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              i.richtung === "einnahme" ? "default" : "secondary"
-                            }
-                            className={
-                              "text-xs " +
-                              (i.richtung === "einnahme"
-                                ? "bg-emerald-600 hover:bg-emerald-600 text-white"
-                                : "")
-                            }
-                          >
-                            {RICHTUNG_LABEL[i.richtung]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {INTERVALL_LABEL[i.intervall]} (~{i.intervall_tage} T)
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">
-                          {i.anzahl}×
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {eur(i.durchschnitt)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-mono">
-                          {eur(i.jahresbelastung)}
-                        </TableCell>
-                        <TableCell className="tabular-nums text-xs text-muted-foreground">
-                          {deDate(i.letzte)}
-                        </TableCell>
-                        <TableCell>
-                          {i.noch_aktiv ? (
-                            <Badge variant="default" className="text-xs">
-                              aktiv
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">
-                              gekündigt?
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">
-                          {Math.round(i.konfidenz * 100)} %
-                        </TableCell>
-                      </TableRow>
-                      {expanded ? (
-                        <TableRow className="bg-muted/30 hover:bg-muted/30">
-                          <TableCell />
-                          <TableCell colSpan={9} className="py-3">
-                            <ItemDrilldown
-                              item={i}
-                              kategorien={kategorien}
-                              onOpenSheet={(id) => setDetailId(id)}
-                              onMutiert={onMutiert}
-                              onZuklappen={() => {
-                                setAufgeklappt((s) => {
-                                  const n = new Set(s);
-                                  n.delete(k);
-                                  return n;
-                                });
-                              }}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </TableBody>
-            </Table>
+
+            {/* Drei Sektionen */}
+            <SektionBlock
+              titel="Offen"
+              count={sektion.offen.length}
+              expanded={sektionOffen.offen}
+              onToggle={() =>
+                setSektionOffen((s) => ({ ...s, offen: !s.offen }))
+              }
+              tone="default"
+            >
+              {sektion.offen.map((i) => (
+                <AboItemRow
+                  key={itemKey(i)}
+                  item={i}
+                  kategorien={kategorien}
+                  expanded={aufgeklappt.has(itemKey(i))}
+                  onToggle={() => toggle(i)}
+                  onOpenSheet={(id) => setDetailId(id)}
+                  onMutiert={onMutiert}
+                  onZuklappen={() => {
+                    const k = itemKey(i);
+                    setAufgeklappt((s) => {
+                      const n = new Set(s);
+                      n.delete(k);
+                      return n;
+                    });
+                  }}
+                />
+              ))}
+              {sektion.offen.length === 0 ? (
+                <SektionLeer text="Nichts mehr offen — sauber!" />
+              ) : null}
+            </SektionBlock>
+
+            <SektionBlock
+              titel="Bestätigt"
+              count={sektion.bestaetigt.length}
+              expanded={sektionOffen.bestaetigt}
+              onToggle={() =>
+                setSektionOffen((s) => ({ ...s, bestaetigt: !s.bestaetigt }))
+              }
+              tone="success"
+            >
+              {sektion.bestaetigt.map((i) => (
+                <AboItemRow
+                  key={itemKey(i)}
+                  item={i}
+                  kategorien={kategorien}
+                  expanded={aufgeklappt.has(itemKey(i))}
+                  onToggle={() => toggle(i)}
+                  onOpenSheet={(id) => setDetailId(id)}
+                  onMutiert={onMutiert}
+                  onZuklappen={() => {
+                    const k = itemKey(i);
+                    setAufgeklappt((s) => {
+                      const n = new Set(s);
+                      n.delete(k);
+                      return n;
+                    });
+                  }}
+                />
+              ))}
+              {sektion.bestaetigt.length === 0 ? (
+                <SektionLeer text="Noch nichts vollständig bestätigt." />
+              ) : null}
+            </SektionBlock>
+
+            <SektionBlock
+              titel="Beendet"
+              count={sektion.beendet.length}
+              expanded={sektionOffen.beendet}
+              onToggle={() =>
+                setSektionOffen((s) => ({ ...s, beendet: !s.beendet }))
+              }
+              tone="muted"
+            >
+              {sektion.beendet.map((i) => (
+                <AboItemRow
+                  key={itemKey(i)}
+                  item={i}
+                  kategorien={kategorien}
+                  expanded={aufgeklappt.has(itemKey(i))}
+                  onToggle={() => toggle(i)}
+                  onOpenSheet={(id) => setDetailId(id)}
+                  onMutiert={onMutiert}
+                  onZuklappen={() => {
+                    const k = itemKey(i);
+                    setAufgeklappt((s) => {
+                      const n = new Set(s);
+                      n.delete(k);
+                      return n;
+                    });
+                  }}
+                />
+              ))}
+              {sektion.beendet.length === 0 ? (
+                <SektionLeer text="Keine beendeten Abos." />
+              ) : null}
+            </SektionBlock>
           </div>
         )}
       </CardContent>
@@ -358,6 +410,282 @@ export function AboRadar({
         onMutiert={() => onMutiert?.()}
       />
     </Card>
+  );
+}
+
+// -----------------------------------------------------------------------
+// Editorial-Layout: Sektionen + Item-Zeile
+// -----------------------------------------------------------------------
+
+type Tone = "default" | "success" | "muted";
+
+const TONE_DOT: Record<Tone, string> = {
+  default: "bg-foreground/70",
+  success: "bg-income-strong",
+  muted: "bg-muted-foreground/40",
+};
+
+function SektionBlock({
+  titel,
+  count,
+  expanded,
+  onToggle,
+  tone,
+  children,
+}: {
+  titel: string;
+  count: number;
+  expanded: boolean;
+  onToggle: () => void;
+  tone: Tone;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-2 border-b py-2 text-left transition-colors hover:bg-muted/30"
+        aria-expanded={expanded}
+      >
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${TONE_DOT[tone]}`}
+          aria-hidden
+        />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em]">
+          {titel}
+        </span>
+        <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
+          {count}
+        </span>
+        <span className="flex-1" />
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </button>
+      {expanded ? <div className="divide-y">{children}</div> : null}
+    </section>
+  );
+}
+
+function SektionLeer({ text }: { text: string }) {
+  return (
+    <div className="px-2 py-5 text-center text-xs text-muted-foreground">
+      {text}
+    </div>
+  );
+}
+
+function BestaetigtIndikator({
+  bestaetigt,
+  gesamt,
+}: {
+  bestaetigt: number;
+  gesamt: number;
+}) {
+  if (gesamt === 0)
+    return (
+      <Circle
+        className="h-4 w-4 text-muted-foreground/40"
+        aria-label="Keine Buchungen"
+      />
+    );
+  if (bestaetigt === gesamt)
+    return (
+      <CheckCircle2
+        className="h-4 w-4 text-income-strong"
+        aria-label={`Alle ${gesamt} Buchungen bestätigt`}
+      />
+    );
+  if (bestaetigt > 0)
+    return (
+      <CircleDot
+        className="h-4 w-4 text-highlight"
+        aria-label={`${bestaetigt} von ${gesamt} Buchungen bestätigt`}
+      />
+    );
+  return (
+    <Circle
+      className="h-4 w-4 text-muted-foreground/40"
+      aria-label="Nicht bestätigt"
+    />
+  );
+}
+
+function KuendigungChip({
+  status,
+}: {
+  status: "offen" | "gekuendigt" | "beendet";
+}) {
+  const label =
+    status === "offen"
+      ? "zur Kündigung"
+      : status === "gekuendigt"
+        ? "gekündigt"
+        : "beendet";
+  const cls =
+    status === "beendet"
+      ? "text-muted-foreground border-muted-foreground/30"
+      : "text-destructive border-destructive/40";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0 text-[10px] font-medium ${cls}`}
+    >
+      <Ban className="h-2.5 w-2.5" />
+      {label}
+    </span>
+  );
+}
+
+function AboItemRow({
+  item,
+  kategorien,
+  expanded,
+  onToggle,
+  onOpenSheet,
+  onMutiert,
+  onZuklappen,
+}: {
+  item: WiederkehrendItem;
+  kategorien: KategorieOption[];
+  expanded: boolean;
+  onToggle: () => void;
+  onOpenSheet: (id: string) => void;
+  onMutiert?: () => void;
+  onZuklappen?: () => void;
+}) {
+  const bestaetigt = item.buchungen.filter(
+    (b) => b.status === "manuell_bestaetigt",
+  ).length;
+  const gesamt = item.buchungen.length;
+  const bisherSumme = item.buchungen.reduce(
+    (s, b) => s + Math.abs(b.betrag),
+    0,
+  );
+  const richtungFarbe =
+    item.richtung === "einnahme"
+      ? "text-income-strong dark:text-income"
+      : "text-destructive";
+  const akzentFarbe =
+    item.richtung === "einnahme"
+      ? "bg-income/80"
+      : "bg-destructive/60";
+
+  // Tint pro Zeile — Einnahme = Cyan, Ausgabe = Cerise.
+  // Kuendigung-Markierungen ueberschreiben mit Yellow (Hinweis-Charakter).
+  const tintHintergrund = item.kuendigung_status && item.kuendigung_status !== "beendet"
+    ? "bg-tint-yellow"
+    : item.richtung === "einnahme"
+      ? "bg-tint-cyan"
+      : "bg-tint-cerise";
+
+  return (
+    <div
+      className={
+        "group relative " +
+        (!item.noch_aktiv ? "opacity-70" : "")
+      }
+    >
+      {/* Header-Zeile (klickbar zum Aufklappen) — mit Tint-Hintergrund */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className={`flex w-full items-center gap-3 py-3 pl-3 pr-2 text-left transition-all hover:brightness-95 ${tintHintergrund}`}
+      >
+        {/* Linker Akzent-Streifen (Richtung) */}
+        <span
+          className={`absolute left-0 top-2 bottom-2 w-[2px] rounded-r ${akzentFarbe}`}
+          aria-hidden
+        />
+
+        {/* Bestätigt-Indikator */}
+        <span className="shrink-0">
+          <BestaetigtIndikator bestaetigt={bestaetigt} gesamt={gesamt} />
+        </span>
+
+        {/* Empfänger + Subzeile */}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">
+              {item.empfaenger}
+            </span>
+            {item.kuendigung_status ? (
+              <KuendigungChip status={item.kuendigung_status} />
+            ) : null}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            {item.richtung === "einnahme" ? (
+              <ArrowUpRight className="h-3 w-3 text-income-strong" />
+            ) : (
+              <ArrowDownRight className="h-3 w-3 text-destructive" />
+            )}
+            <span>
+              {RICHTUNG_LABEL[item.richtung]} ·{" "}
+              {INTERVALL_LABEL[item.intervall]} (~{item.intervall_tage} T) ·{" "}
+              {item.anzahl}× erfasst
+            </span>
+            {!item.noch_aktiv ? (
+              <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] font-medium text-muted-foreground">
+                gekündigt?
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Zahlen-Block: Bisher / Jahr */}
+        <div className="hidden shrink-0 items-baseline gap-6 text-right sm:flex">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Bisher
+            </div>
+            <div className="font-mono text-sm tabular-nums">
+              {eur(bisherSumme)}
+            </div>
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              {item.anzahl} × {eur(item.durchschnitt)}
+            </div>
+          </div>
+          <div className="min-w-[110px]">
+            <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              Jahr
+            </div>
+            <div
+              className={`font-mono text-base font-semibold tabular-nums ${richtungFarbe}`}
+            >
+              {eur(item.jahresbelastung)}
+            </div>
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              letzte {deDate(item.letzte)} · {Math.round(item.konfidenz * 100)} %
+            </div>
+          </div>
+        </div>
+
+        {/* Aufklapp-Chevron */}
+        <span className="shrink-0 text-muted-foreground transition-transform group-hover:text-foreground">
+          {expanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </span>
+      </button>
+
+      {/* Drilldown */}
+      {expanded ? (
+        <div className="border-t bg-muted/20 px-2 py-3">
+          <ItemDrilldown
+            item={item}
+            kategorien={kategorien}
+            onOpenSheet={onOpenSheet}
+            onMutiert={onMutiert}
+            onZuklappen={onZuklappen}
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -386,6 +714,13 @@ function ItemDrilldown({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [bestaetigeId, setBestaetigeId] = useState<string | null>(null);
   const [bulkBusy, startBulk] = useTransition();
+  const [kuendigungStatus, setKuendigungStatus] = useState<
+    "offen" | "gekuendigt" | "beendet" | null
+  >(item.kuendigung_status ?? null);
+  const [kuendigungBusy, setKuendigungBusy] = useState(false);
+  useEffect(() => {
+    setKuendigungStatus(item.kuendigung_status ?? null);
+  }, [item.kuendigung_status]);
 
   const distinct = new Set(buchungen.map((b) => b.kategorie_id ?? "__none__"));
   const alleGleicheKategorie = distinct.size === 1;
@@ -430,76 +765,45 @@ function ItemDrilldown({
     }
   }
 
-  /**
-   * Legt eine Lernregel für `item.empfaenger → kategorie_id` an. Idempotent:
-   * existiert bereits eine aktive Regel mit demselben Muster + derselben
-   * Kategorie, wird sie nicht erneut angelegt. Liefert ein Status-Flag, damit
-   * der Aufrufer den passenden Toast zeigen kann.
-   */
-  async function lerneRegelFuer(
-    kategorieId: string,
-    kategorieTyp: KategorieTyp | null,
-  ): Promise<"angelegt" | "vorhanden" | "fehler" | "uebersprungen"> {
-    const muster = item.empfaenger.trim();
-    if (muster.length < 2) return "uebersprungen";
-
-    const klassifikation: "privat" | "geschaeftlich" | "neutral" =
-      kategorieTyp === "privat"
-        ? "privat"
-        : kategorieTyp === "neutral"
-          ? "neutral"
-          : "geschaeftlich";
-
-    const rg = await fetch("/api/regeln");
-    if (rg.ok) {
-      const jr = (await rg.json()) as {
-        data: Array<{
-          bedingung: { empfaenger_muster?: string | null } | null;
-          aktion: { kategorie_id?: string | null } | null;
-          aktiv: boolean;
-        }>;
-      };
-      const norm = muster.toLowerCase();
-      const bestehtSchon = (jr.data ?? []).some(
-        (re) =>
-          re.aktiv &&
-          (re.bedingung?.empfaenger_muster ?? "").toLowerCase().trim() ===
-            norm &&
-          re.aktion?.kategorie_id === kategorieId,
+  async function toggleKuendigung() {
+    if (kuendigungBusy) return;
+    setKuendigungBusy(true);
+    const norm = item.empfaenger_norm;
+    try {
+      if (kuendigungStatus === null) {
+        // hinzufuegen
+        const r = await fetch("/api/kuendigungen", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ empfaenger: item.empfaenger }),
+        });
+        if (!r.ok) {
+          const e = (await r.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(e?.error ?? `HTTP ${r.status}`);
+        }
+        setKuendigungStatus("offen");
+        toast.success(`"${item.empfaenger}" zur Kuendigungsliste hinzugefuegt`);
+      } else {
+        // entfernen
+        const r = await fetch(
+          `/api/kuendigungen/${encodeURIComponent(norm)}`,
+          { method: "DELETE" },
+        );
+        if (!r.ok) {
+          const e = (await r.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(e?.error ?? `HTTP ${r.status}`);
+        }
+        setKuendigungStatus(null);
+        toast.success(`Markierung fuer "${item.empfaenger}" entfernt`);
+      }
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "Markierung fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
       );
-      if (bestehtSchon) return "vorhanden";
-    }
-
-    const reg = await fetch("/api/regeln", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bezeichnung: `Empfänger: ${muster}`.slice(0, 120),
-        bedingung: { empfaenger_muster: muster },
-        aktion: { kategorie_id: kategorieId, klassifikation },
-        prioritaet: 100,
-        aktiv: true,
-      }),
-    });
-    if (reg.ok) return "angelegt";
-    const e = (await reg.json().catch(() => null)) as { error?: string } | null;
-    toast.warning(
-      "Regel konnte nicht angelegt werden: " +
-        (e?.error ?? `HTTP ${reg.status}`),
-    );
-    return "fehler";
-  }
-
-  function regelToast(
-    status: "angelegt" | "vorhanden" | "fehler" | "uebersprungen",
-    fallback: string,
-  ) {
-    if (status === "angelegt") {
-      toast.success(`${fallback} — Regel für "${item.empfaenger}" gelernt`);
-    } else if (status === "vorhanden") {
-      toast.success(`${fallback} — passende Regel ist bereits aktiv`);
-    } else {
-      toast.success(fallback);
+    } finally {
+      setKuendigungBusy(false);
     }
   }
 
@@ -520,14 +824,18 @@ function ItemDrilldown({
         throw new Error(e?.error ?? `HTTP ${r.status}`);
       }
 
-      const regelStatus = await lerneRegelFuer(b.kategorie_id, b.kategorie_typ);
+      const regelStatus = await lerneRegelFuer(
+        item.empfaenger,
+        b.kategorie_id,
+        b.kategorie_typ,
+      );
 
       setBuchungen((bs) =>
         bs.map((x) =>
           x.id === b.id ? { ...x, status: "manuell_bestaetigt" } : x,
         ),
       );
-      regelToast(regelStatus, "Buchung bestätigt");
+      regelToast(regelStatus, item.empfaenger, "Buchung bestätigt");
       onMutiert?.();
     } catch (e) {
       toast.error(
@@ -571,9 +879,14 @@ function ItemDrilldown({
         })),
       );
 
-      const regelStatus = await lerneRegelFuer(j.kategorie.id, j.kategorie.typ);
+      const regelStatus = await lerneRegelFuer(
+        item.empfaenger,
+        j.kategorie.id,
+        j.kategorie.typ,
+      );
       regelToast(
         regelStatus,
+        item.empfaenger,
         `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} auf "${j.kategorie.bezeichnung}" gesetzt`,
       );
       onMutiert?.();
@@ -622,9 +935,14 @@ function ItemDrilldown({
           })),
         );
 
-        const regelStatus = await lerneRegelFuer(j.kategorie.id, j.kategorie.typ);
+        const regelStatus = await lerneRegelFuer(
+          item.empfaenger,
+          j.kategorie.id,
+          j.kategorie.typ,
+        );
         regelToast(
           regelStatus,
+          item.empfaenger,
           `Alle ${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} bestätigt`,
         );
         onMutiert?.();
@@ -683,8 +1001,52 @@ function ItemDrilldown({
     });
   }
 
+  const kuendigungLabel: Record<"offen" | "gekuendigt" | "beendet", string> = {
+    offen: "Zur Kuendigung markiert",
+    gekuendigt: "Kuendigung verschickt",
+    beendet: "Beendet",
+  };
+
   return (
     <div className="space-y-3 px-2">
+      {/* Kuendigungs-Aktion */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background p-3">
+        <div className="flex items-center gap-2 text-sm">
+          <Ban className="h-4 w-4 text-muted-foreground" />
+          {kuendigungStatus === null ? (
+            <span className="text-muted-foreground">
+              Nicht zur Kuendigung markiert
+            </span>
+          ) : (
+            <Badge
+              variant={
+                kuendigungStatus === "beendet" ? "secondary" : "destructive"
+              }
+              className="text-xs"
+            >
+              {kuendigungLabel[kuendigungStatus]}
+            </Badge>
+          )}
+        </div>
+        <Button
+          size="sm"
+          variant={kuendigungStatus === null ? "destructive" : "outline"}
+          onClick={toggleKuendigung}
+          disabled={kuendigungBusy}
+        >
+          {kuendigungBusy ? (
+            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+          ) : kuendigungStatus === null ? (
+            <Ban className="mr-1.5 h-3.5 w-3.5" />
+          ) : (
+            <XCircle className="mr-1.5 h-3.5 w-3.5" />
+          )}
+          {kuendigungStatus === null
+            ? "Zur Kuendigung markieren"
+            : "Markierung entfernen"}
+        </Button>
+      </div>
+
       {/* Bulk-Aktion */}
       <div className="flex flex-wrap items-end gap-3 rounded-md border bg-background p-3">
         <div className="space-y-1">
@@ -761,7 +1123,7 @@ function ItemDrilldown({
           {buchungen.map((b) => (
             <TableRow
               key={b.id}
-              className={b.ausreisser ? "bg-amber-50/40 dark:bg-amber-950/20" : ""}
+              className={b.ausreisser ? "bg-highlight-soft/40 dark:bg-highlight-strong/10" : ""}
             >
               <TableCell className="tabular-nums text-sm">
                 <div className="flex items-center gap-1.5">
@@ -769,7 +1131,7 @@ function ItemDrilldown({
                   {b.ausreisser ? (
                     <Badge
                       variant="outline"
-                      className="border-amber-500 text-[10px] text-amber-700 dark:text-amber-400"
+                      className="border-highlight text-[10px] text-highlight-strong dark:text-highlight"
                       title="Weicht stark vom Cluster-Median ab"
                     >
                       Ausreißer
@@ -784,10 +1146,10 @@ function ItemDrilldown({
                 className={
                   "text-right tabular-nums font-mono text-sm " +
                   (b.ausreisser
-                    ? "text-amber-700 dark:text-amber-400"
+                    ? "text-highlight-strong dark:text-highlight"
                     : b.betrag < 0
                       ? "text-destructive"
-                      : "text-emerald-600 dark:text-emerald-400")
+                      : "text-income-strong dark:text-income")
                 }
               >
                 {eur(b.betrag)}

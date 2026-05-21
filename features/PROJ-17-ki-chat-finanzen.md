@@ -1,6 +1,6 @@
 # PROJ-17: KI-Chat zu Buchungen & Finanzdaten
 
-## Status: Planned
+## Status: Architected
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-21
 
@@ -398,6 +398,205 @@ lib/chat/
 Alle Tools sind owner-scoped. Das LLM hat **keinen Zugriff auf
 Service-Role-Credentials**. Tool-Calling läuft über die normale
 App-Auth-Schiene.
+
+---
+
+## Tech Design (Solution Architect)
+
+> Stand: 2026-05-21. PM-lesbares Architekturbild. Keine Implementierungs-
+> details — das Backend-/Frontend-Team setzt das anhand der Specs um.
+
+### Was wir bauen — in einem Satz
+Einen vollwertigen Chat-Bereich im Tool, der dem Inhaber Antworten zu
+seinen Buchungen gibt und auf klare Anweisung auch Pflege-Aufgaben
+(Kategorien, Umbuchungen, Lernregeln) durchführt — jede Datenänderung
+mit einem manuellen Bestätigungs-Klick abgesichert.
+
+### Komponentenstruktur (UI-Bauplan)
+
+```
+/chat  (neue Seite, Sidebar-Eintrag "KI-Chat")
++-- Chat-Layout (zwei Spalten)
+|   +-- Linke Spalte: Konversationsliste
+|   |   +-- "Neuer Chat"-Button (oben)
+|   |   +-- Suchfeld (nur P1)
+|   |   +-- Liste der Konversationen (Titel + letzte Aktivitaet)
+|   |       +-- Aktiver Eintrag visuell hervorgehoben
+|   |       +-- Hover-Aktionen: Umbenennen / Loeschen
+|   |
+|   +-- Rechte Spalte: aktive Konversation
+|       +-- Header: Konversations-Titel + Loeschen-Icon
+|       +-- Nachrichten-Verlauf (scrollbar)
+|       |   +-- User-Bubble (rechts ausgerichtet)
+|       |   +-- Assistant-Bubble (links, Markdown-gerendert)
+|       |   +-- Tool-Badge unter Assistant-Bubble
+|       |   |   "Genutzt: suche_buchungen, aggregat_kategorien"
+|       |   +-- Aktions-Karte (nur bei Schreib-Aktionen)
+|       |       +-- Aktions-Titel ("3 Buchungen umbuchen")
+|       |       +-- Klartext-Vorschau
+|       |       +-- Tabelle Vorher/Nachher
+|       |       +-- "Bestaetigen" (primary) / "Abbrechen" (ghost)
+|       |       +-- Nach Bestaetigung: gruener Haken + Audit-Link
+|       +-- Eingabe-Bereich (unten, sticky)
+|           +-- Mehrzeiliges Textfeld
+|           +-- Senden-Button (deaktiviert waehrend Stream)
+|           +-- Beispielfragen-Bubbles (nur bei leerer Konversation)
+```
+
+### Datenmodell (Klartext)
+
+**Konversation** — ein Chat-Faden:
+- Eindeutige ID, Owner, Titel (vom LLM vorgeschlagen oder manuell)
+- Zeitstempel: erstellt, zuletzt aktualisiert
+
+**Nachricht** — ein einzelner Beitrag in der Konversation:
+- Eindeutige ID, gehoert zu einer Konversation
+- Rolle: Nutzer / Assistent / Tool-Ergebnis
+- Inhalt als Text (Markdown bei Assistent)
+- Tool-Aufrufe + deren Rohergebnisse (fuer Debug + Audit)
+- Token-Verbrauch (Input/Output) fuer spaetere Kostenauswertung
+- Zeitstempel
+
+**Aktions-Vorschlag** — die zweite Stufe vom Confirm-Flow:
+- Eindeutige ID, gehoert zu einer Konversation + Nachricht
+- Aktions-Name (z. B. "bucheBuchungenUm")
+- Parameter (z. B. Buchungs-IDs + Ziel-Kategorie)
+- Klartext-Vorschau ("3 Buchungen umbuchen auf …")
+- Status: wartet auf Bestaetigung / bestaetigt / abgebrochen / Fehler
+- Bei Bestaetigung: Referenz auf den entstandenen Audit-Eintrag
+- Zeitstempel
+
+**Gespeichert in:** Supabase Postgres (gleiche DB wie alle anderen
+Tool-Daten). RLS-Policy: jeder sieht nur seine eigenen Konversationen
+und Aktionen.
+
+### Wie eine Anfrage durch das System läuft
+
+#### Fall A — Lese-Frage ("Wieviel habe ich diesen Monat für Software ausgegeben?")
+1. Browser sendet die Frage an unsere Chat-API
+2. Backend laedt: System-Prompt + Profil + bisheriger Konversations-Verlauf
+3. Backend ruft das LLM auf, gibt ihm die Lese-Tools mit
+4. LLM entscheidet: "Ich brauche suche_buchungen oder aggregat_kategorien"
+5. Backend fuehrt Tool-Aufruf aus → liest aus der DB (mit Auth-Cookie, RLS aktiv)
+6. LLM bekommt das Ergebnis, formuliert eine Antwort
+7. Antwort wird **Token-fuer-Token** zurueck in den Browser gestreamt
+8. Browser zeigt die Antwort live an
+9. Am Ende: Browser zeigt unten die Tool-Badges ("Genutzt: …")
+
+#### Fall B — Schreib-Anweisung ("Buche alle Accenture-Buchungen auf 'Privat: Lohn/Gehalt'")
+1. Schritte 1-4 wie oben
+2. LLM ruft erst Lese-Tools auf, um die Buchungen zu finden (suche_buchungen)
+3. LLM ruft dann **bucheBuchungenUm** auf
+4. Wichtig: Das Tool **fuehrt NICHTS aus**. Es legt einen
+   Aktions-Vorschlag in der DB an (Status "wartet auf Bestaetigung")
+   und gibt die Vorschau zurueck
+5. LLM antwortet im Chat: "Ich wuerde 3 Buchungen umbuchen — bitte bestaetigen"
+6. Browser zeigt **Aktions-Karte** mit Vorher/Nachher und zwei Buttons
+7. User klickt "Bestaetigen" → Browser sendet an separate Confirm-API
+8. Confirm-API laedt den Vorschlag aus der DB (nicht aus dem Request),
+   prueft Owner, fuehrt die Mutation aus, schreibt Audit-Eintrag
+9. Aktions-Karte zeigt gruenen Haken + Bestaetigungsnachricht erscheint im Chat
+
+#### Sicherheits-Eigenschaften dieser Architektur
+- **Das LLM kann nichts veraendern** — es kann nur Vorschlaege machen
+- **Der Confirm-Schritt erzwingt einen menschlichen Klick** vor jeder Aenderung
+- **Prompt-Injection ist neutralisiert**: selbst wenn jemand "lösche alles"
+  in einen Verwendungszweck schreibt, der vom LLM gelesen wird, kommt
+  das nicht weiter als ein Vorschlag, den der User ablehnen kann
+- **Replay-Schutz**: ein bereits bestaetigter Vorschlag laesst sich nicht
+  doppelt ausfuehren
+- **Lost-Update-Schutz**: zwischen Vorschlag und Bestaetigung wird die
+  DB nochmal gepruft — wenn Buchungen geaendert wurden, Abbruch
+- **RLS bleibt aktiv**: alle Tool-Aufrufe nutzen den Auth-Cookie, kein
+  Service-Role
+
+### Tech-Entscheidungen (warum so?)
+
+**Vercel AI SDK v6 mit `streamText`+Tools** statt eigener Stream-Lösung.
+*Warum:* Im Projekt schon eingebaut (Klassifizierung nutzt `generateObject`
+aus derselben Bibliothek). Tool-Calling, Streaming und Token-Tracking
+out-of-the-box. Kein eigener Code für Server-Sent-Events nötig.
+
+**Tools rufen interne Service-Funktionen direkt auf** statt HTTP-Aufrufe
+gegen die eigenen API-Routen.
+*Warum:* Schneller (kein HTTP-Round-trip im Server-Prozess), einfacher
+zu testen, gleiche Auth-Kontext-Übergabe. Falls eine Funktionalität
+heute nur in einer API-Route liegt, wird die Logik in ein
+`lib/services/*.ts`-Modul refactored und die Route nutzt sie ebenfalls.
+Die externe API bleibt unverändert.
+
+**Schreib-Tools als zweistufiger Flow** statt direkter Ausführung.
+*Warum:* Kontrolle vor Geschwindigkeit. Buchhaltung verzeiht keine
+versehentlichen Massen-Mutationen. Der eine zusätzliche Klick ist
+deutlich besser als ein Undo-Mechanismus, der nie alle Edge-Cases
+abdeckt. Außerdem schließt das den größten LLM-Sicherheitsrisikofaktor
+(Prompt-Injection) komplett aus.
+
+**Schreib-Tools sind eine fixe Allowlist** statt parametrisierbare
+„mach was ich sage"-Tools.
+*Warum:* Was nicht in der Allowlist steht, kann das LLM nicht. Konten,
+Profil-Stammdaten, Importe und DSGVO-Aktionen sind bewusst **nicht**
+in der Allowlist, weil sie eigene UI-Workflows haben und für den
+Chat zu riskant sind.
+
+**Persistenz in Supabase** statt Browser-LocalStorage.
+*Warum:* Konversationen sollen auch nach Browser-Wechsel verfügbar
+sein. RLS schützt sie auf DB-Ebene. Token-Verbrauch wird zentral
+sichtbar (spätere Auswertung).
+
+**Markdown-Rendering der Antworten** mit `react-markdown` + `remark-gfm`.
+*Warum:* Das LLM antwortet ohnehin häufig mit Tabellen und Listen.
+Schöner gerendert wirkt es ruhiger. GFM für GitHub-Flavored-Markdown
+(Tabellen).
+
+**Modell-Wahl: gleicher LLM wie die Klassifizierung** (über `STEUERAGENT_LLM_MODEL`).
+*Warum:* Ein Modell weniger zu konfigurieren. Wenn der Adminbereich
+(PROJ-13) später ein separates Chat-Modell ermöglichen will, kann
+das als zusätzliche Env-Variable kommen — kein architektonischer
+Umbau nötig.
+
+**Auto-Titel über separaten kurzen LLM-Aufruf** statt erste User-Nachricht
+verwenden.
+*Warum:* "Wie viel hab ich diesen Monat ausgegeben?" als Titel ist
+schlechter als "Software-Ausgaben Mai 2026". Der zusätzliche Mini-Call
+ist günstig und macht die linke Konversationsliste sofort scanbar.
+
+### Dependencies (neue Pakete)
+
+- **`react-markdown`** — Markdown-Rendering der Assistent-Antworten.
+- **`remark-gfm`** — GitHub-Flavored-Markdown-Erweiterung (Tabellen,
+  Strikethrough, Aufgabenlisten).
+
+Schon vorhanden und wiederverwendet:
+- `ai` (Vercel AI SDK v6) — Streaming + Tool-Calling
+- `@ai-sdk/anthropic` — Claude-Provider (gleiche Quelle wie
+  Klassifizierung)
+- `zod` — Tool-Parameter-Validierung
+- `sonner` — Toasts
+- shadcn/ui — alle UI-Bausteine (Card, Button, ScrollArea, Dialog,
+  Textarea, Skeleton)
+
+### Was im MVP NICHT drin ist (bewusst raus)
+
+- **Aktions-Tools für Konten, Profil, Importe** — eigene UIs sind besser.
+- **Sharable Read-only-Links** für den Steuerberater — kommt in P2.
+- **Sprachen-Schalter (DE/EN)** — Tool ist Single-User, DE reicht.
+- **Voice Input/Output** — nicht in der Vision verankert.
+- **Bilder/Belege im Chat-Stream** — Belege bleiben im Beleg-Detail.
+- **Mehrere parallele LLM-Modelle parallel** (Vergleich) — Komplexität
+  ohne Mehrwert.
+
+### Wie wir wissen, ob es funktioniert (Akzeptanz auf einen Blick)
+1. Eine Frage ("Wieviel habe ich für Software ausgegeben?") liefert
+   eine konkrete Zahl, die mit der Kategorien-Analyse-Tab-Ansicht
+   übereinstimmt.
+2. Eine Anweisung ("Buche XYZ um") führt **nicht** zur sofortigen
+   Mutation, sondern zu einer Confirm-Karte mit klarer Vorschau.
+3. Klick auf Bestätigen schreibt einen `audit_eintrag` mit
+   `quelle='chat'` — sichtbar in der Buchungs-Detail-Audit-Spur.
+4. Klick auf Abbrechen ändert nichts.
+5. Bei Browser-Reload sind alle Konversationen + Nachrichten +
+   Aktions-Karten noch da.
 
 ## Implementierungsnotizen
 _(wird beim Bau gefüllt)_

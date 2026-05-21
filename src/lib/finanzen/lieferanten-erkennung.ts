@@ -22,11 +22,7 @@ import {
   type Richtung,
 } from "./wiederkehrend-erkennung";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
-import type {
-  BuchungStatus,
-  KategorieTyp,
-  Klassifikation,
-} from "@/lib/types";
+import type { BuchungStatus, Klassifikation } from "@/lib/types";
 
 export const MIN_LIEFERANT_BUCHUNGEN = 3;
 /** Anteilsschwelle: ≥ 80% einer Klassifikation → diese ist dominant. */
@@ -121,3 +117,100 @@ export function bestimmeDominanteKategorie(
     anteil: bestAnzahl / kategorieIds.length,
   };
 }
+
+/** Ergebnis-Item für die UI / API-Response. */
+export interface LieferantItem {
+  /** Häufigste Original-Schreibweise des Empfängers im Cluster. */
+  empfaenger: string;
+  /** Normalisierter Schlüssel — Bridge zu Regeln/anderen Features. */
+  empfaenger_norm: string;
+  anzahl: number;
+  /** Summe ALLER Buchungen im Lookback (Absolutwert). */
+  gesamt_summe: number;
+  /** Hochgerechnet auf 365 Tage; bei Span < 365 entsprechend skaliert. */
+  jahresumsatz: number;
+  /** Mehrheits-Richtung über die Vorzeichen der Beträge. */
+  richtung: Richtung;
+  dominante_klassifikation: DominanteKlassifikation;
+  dominante_kategorie: DominanteKategorie | null;
+  /** ISO-Datum der ersten / letzten Buchung. */
+  erste: string;
+  letzte: string;
+  /** Volle Buchungsliste, chronologisch (aufsteigend) für Drill-Down. */
+  buchungen: LieferantenBuchung[];
+}
+
+/**
+ * Hauptfunktion: aus einer flachen Buchungsliste die Lieferanten-Items
+ * berechnen. Abos werden ausgeschlossen, indem `erkenneCluster()` für
+ * jede Gruppe aufgerufen wird — gibt es ein Cluster, ist es ein Abo
+ * und wandert NICHT in die Lieferanten-Liste.
+ */
+export function erkenneLieferanten(
+  buchungen: LieferantenBuchung[],
+): LieferantItem[] {
+  const gruppen = gruppiereNachEmpfaenger(buchungen);
+  const items: LieferantItem[] = [];
+
+  for (const [empfaengerNorm, gruppe] of gruppen) {
+    if (gruppe.length < MIN_LIEFERANT_BUCHUNGEN) continue;
+
+    // Chronologisch sortieren — sowohl für erkenneCluster() als auch
+    // für die Span-Berechnung notwendig.
+    gruppe.sort((a, b) => a.buchung_datum.localeCompare(b.buchung_datum));
+
+    // Abo-Ausschluss: wenn erkenneCluster() ein Cluster zurückgibt,
+    // ist es ein Abo (lebt im Abo-Radar) und gehört NICHT hierher.
+    const cluster = erkenneCluster(gruppe);
+    if (cluster) continue;
+
+    const anzahl = gruppe.length;
+    const gesamtSumme = gruppe.reduce(
+      (s, b) => s + Math.abs(Number(b.betrag) || 0),
+      0,
+    );
+    const erste = gruppe[0].buchung_datum;
+    const letzte = gruppe[anzahl - 1].buchung_datum;
+    const spanTage = Math.max(1, tageZwischen(erste, letzte));
+    // Hochrechnung auf 365 Tage; bei sehr kurzem Span begrenzen wir
+    // den Skalierfaktor, damit "3 Buchungen in 7 Tagen" nicht
+    // unrealistisch hochgerechnet werden.
+    const skalierung = Math.min(365 / spanTage, 12);
+    const jahresumsatz = Math.round(gesamtSumme * skalierung * 100) / 100;
+
+    const positive = gruppe.filter((b) => Number(b.betrag) > 0).length;
+    const richtung: Richtung =
+      positive > anzahl / 2 ? "einnahme" : "ausgabe";
+
+    const dominanteKlassifikation = bestimmeDominanteKlassifikation(
+      gruppe.map((b) => b.klassifikation),
+    );
+    const dominanteKategorie = bestimmeDominanteKategorie(
+      gruppe.map((b) => b.kategorie_id),
+    );
+
+    const anzeigeEmpfaenger =
+      modusEmpfaenger(gruppe.map((b) => b.empfaenger)) || "—";
+
+    items.push({
+      empfaenger: anzeigeEmpfaenger,
+      empfaenger_norm: empfaengerNorm,
+      anzahl,
+      gesamt_summe: Math.round(gesamtSumme * 100) / 100,
+      jahresumsatz,
+      richtung,
+      dominante_klassifikation: dominanteKlassifikation,
+      dominante_kategorie: dominanteKategorie,
+      erste,
+      letzte,
+      buchungen: gruppe,
+    });
+  }
+
+  // Sortierung: nach Jahresumsatz absteigend. Sektionierung passiert im UI.
+  items.sort((a, b) => b.jahresumsatz - a.jahresumsatz);
+  return items;
+}
+
+// Re-export, damit die API-Route nur aus einer Datei importieren muss.
+export { MIN_BUCHUNGEN };

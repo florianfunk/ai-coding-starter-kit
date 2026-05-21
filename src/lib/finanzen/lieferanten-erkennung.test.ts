@@ -2,9 +2,11 @@
 // wiederkehrend-erkennung.test.ts: kein Supabase, deterministisch.
 
 import { describe, it, expect } from "vitest";
+import type { Klassifikation } from "@/lib/types";
 import {
   bestimmeDominanteKategorie,
   bestimmeDominanteKlassifikation,
+  erkenneLieferanten,
   gruppiereNachEmpfaenger,
   type LieferantenBuchung,
 } from "./lieferanten-erkennung";
@@ -125,5 +127,116 @@ describe("bestimmeDominanteKategorie", () => {
   });
   it("leere Liste → null", () => {
     expect(bestimmeDominanteKategorie([])).toBeNull();
+  });
+});
+
+function buFull(
+  id: string,
+  empfaenger_normalisiert: string,
+  empfaenger: string,
+  buchung_datum: string,
+  betrag: number,
+  klassifikation: Klassifikation | null = null,
+  kategorie_id: string | null = null,
+): LieferantenBuchung {
+  return {
+    id,
+    empfaenger_normalisiert,
+    empfaenger,
+    buchung_datum,
+    betrag,
+    klassifikation,
+    kategorie_id,
+    konto_id: "k1",
+    status: "auto_verbucht",
+  };
+}
+
+describe("erkenneLieferanten", () => {
+  it("Aldi mit 5 schwankenden Beträgen → Lieferant", () => {
+    const buchungen = [
+      buFull("1", "aldi", "ALDI SUED", "2026-01-03", -23.5),
+      buFull("2", "aldi", "ALDI SUED", "2026-01-19", -41.2),
+      buFull("3", "aldi", "ALDI Süd", "2026-02-04", -18.0),
+      buFull("4", "aldi", "ALDI", "2026-02-22", -67.4),
+      buFull("5", "aldi", "ALDI SÜD", "2026-03-09", -29.9),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items.length).toBe(1);
+    expect(items[0].empfaenger_norm).toBe("aldi");
+    expect(items[0].anzahl).toBe(5);
+    expect(items[0].richtung).toBe("ausgabe");
+  });
+
+  it("Netflix monatlich gleicher Betrag → NICHT als Lieferant (ist Abo)", () => {
+    const buchungen = [
+      buFull("1", "netflix", "NETFLIX", "2026-01-15", -12.99),
+      buFull("2", "netflix", "NETFLIX", "2026-02-15", -12.99),
+      buFull("3", "netflix", "NETFLIX", "2026-03-15", -12.99),
+      buFull("4", "netflix", "NETFLIX", "2026-04-15", -12.99),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items.length).toBe(0);
+  });
+
+  it("MediaMarkt mit 2 Buchungen → unter Schwelle, NICHT als Lieferant", () => {
+    const buchungen = [
+      buFull("1", "mediamarkt", "MediaMarkt", "2026-01-03", -899),
+      buFull("2", "mediamarkt", "MediaMarkt", "2026-04-19", -1499),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items.length).toBe(0);
+  });
+
+  it("dominante Klassifikation aus Buchungen ableiten", () => {
+    const buchungen = [
+      buFull("1", "aldi", "ALDI", "2026-01-03", -23.5, "privat"),
+      buFull("2", "aldi", "ALDI", "2026-01-19", -41.2, "privat"),
+      buFull("3", "aldi", "ALDI", "2026-02-04", -18.0, "privat"),
+      buFull("4", "aldi", "ALDI", "2026-02-22", -67.4, "privat"),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items[0].dominante_klassifikation).toBe("privat");
+  });
+
+  it("gemischte Klassifikation < 80% → unklar", () => {
+    const buchungen = [
+      buFull("1", "aldi", "ALDI", "2026-01-03", -23.5, "privat"),
+      buFull("2", "aldi", "ALDI", "2026-01-19", -41.2, "geschaeftlich"),
+      buFull("3", "aldi", "ALDI", "2026-02-04", -18.0, "privat"),
+      buFull("4", "aldi", "ALDI", "2026-02-22", -67.4, "geschaeftlich"),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items[0].dominante_klassifikation).toBe("unklar");
+  });
+
+  it("Jahresumsatz wird hochgerechnet bei Span < 365 Tagen", () => {
+    // 4 Buchungen über ~60 Tage, Gesamtsumme 150 EUR
+    // Span ≈ 60, hochgerechnet ≈ 150 * 365 / 60 ≈ 912
+    const buchungen = [
+      buFull("1", "aldi", "ALDI", "2026-01-01", -30),
+      buFull("2", "aldi", "ALDI", "2026-01-20", -50),
+      buFull("3", "aldi", "ALDI", "2026-02-10", -20),
+      buFull("4", "aldi", "ALDI", "2026-03-02", -50),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items[0].gesamt_summe).toBe(150);
+    expect(items[0].jahresumsatz).toBeGreaterThan(150);
+    expect(items[0].jahresumsatz).toBeLessThan(1100);
+  });
+
+  it("Jahresumsatz wird NICHT unter Gesamtsumme gekappt", () => {
+    // Span > 365 Tage → jahresumsatz darf < gesamt_summe sein (proportional)
+    const buchungen = [
+      buFull("1", "aldi", "ALDI", "2024-01-01", -100),
+      buFull("2", "aldi", "ALDI", "2024-06-01", -100),
+      buFull("3", "aldi", "ALDI", "2025-06-01", -100),
+      buFull("4", "aldi", "ALDI", "2026-01-01", -100),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items[0].gesamt_summe).toBe(400);
+    // Span ~730 Tage, also jahresumsatz ~200
+    expect(items[0].jahresumsatz).toBeLessThan(400);
+    expect(items[0].jahresumsatz).toBeGreaterThan(100);
   });
 });

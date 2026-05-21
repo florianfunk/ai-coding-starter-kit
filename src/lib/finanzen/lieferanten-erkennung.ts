@@ -62,3 +62,62 @@ export function gruppiereNachEmpfaenger(
   }
   return gruppen;
 }
+
+/**
+ * Mehrheitsentscheidung über `klassifikation`. Nur `privat` und
+ * `geschaeftlich` zählen — null/unklar/neutral werden ignoriert.
+ * Bei ≥ KLASSIFIKATION_DOMINANT_SCHWELLE (80%) Anteil einer Seite über
+ * die gesamte Buchungsmenge gilt sie als dominant. Sonst `unklar`.
+ */
+export function bestimmeDominanteKlassifikation(
+  klassifikationen: Array<Klassifikation | null>,
+): DominanteKlassifikation {
+  if (klassifikationen.length === 0) return "unklar";
+  const gesamt = klassifikationen.length;
+  let privat = 0;
+  let geschaeftlich = 0;
+  for (const k of klassifikationen) {
+    if (k === "privat") privat++;
+    else if (k === "geschaeftlich") geschaeftlich++;
+  }
+  if (privat / gesamt >= KLASSIFIKATION_DOMINANT_SCHWELLE) return "privat";
+  if (geschaeftlich / gesamt >= KLASSIFIKATION_DOMINANT_SCHWELLE)
+    return "geschaeftlich";
+  return "unklar";
+}
+
+export interface DominanteKategorie {
+  id: string;
+  anzahl: number;
+  /** Anteil 0..1 über die GESAMTE Buchungsmenge des Lieferanten. */
+  anteil: number;
+}
+
+/**
+ * Häufigste `kategorie_id` (NULL ausgeschlossen) mit Anteil. Bei
+ * Gleichstand entscheidet die erste Vorkommen-Reihenfolge. NULL wenn
+ * alle Buchungen ohne Kategorie sind.
+ */
+export function bestimmeDominanteKategorie(
+  kategorieIds: Array<string | null>,
+): DominanteKategorie | null {
+  if (kategorieIds.length === 0) return null;
+  const zaehler = new Map<string, number>();
+  let bestId: string | null = null;
+  let bestAnzahl = 0;
+  for (const id of kategorieIds) {
+    if (!id) continue;
+    const next = (zaehler.get(id) ?? 0) + 1;
+    zaehler.set(id, next);
+    if (next > bestAnzahl) {
+      bestAnzahl = next;
+      bestId = id;
+    }
+  }
+  if (!bestId) return null;
+  return {
+    id: bestId,
+    anzahl: bestAnzahl,
+    anteil: bestAnzahl / kategorieIds.length,
+  };
+}

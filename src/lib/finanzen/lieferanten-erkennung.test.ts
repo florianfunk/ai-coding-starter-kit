@@ -3,6 +3,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  bestimmeDominanteKategorie,
+  bestimmeDominanteKlassifikation,
   gruppiereNachEmpfaenger,
   type LieferantenBuchung,
 } from "./lieferanten-erkennung";
@@ -58,5 +60,70 @@ describe("gruppiereNachEmpfaenger", () => {
       bu("2", "", "", "2026-01-15", -12),
     ]);
     expect(result.size).toBe(0);
+  });
+});
+
+describe("bestimmeDominanteKlassifikation", () => {
+  it("alle privat → privat", () => {
+    expect(bestimmeDominanteKlassifikation(["privat", "privat", "privat"])).toBe(
+      "privat",
+    );
+  });
+  it("alle geschäftlich → geschäftlich", () => {
+    expect(
+      bestimmeDominanteKlassifikation([
+        "geschaeftlich",
+        "geschaeftlich",
+        "geschaeftlich",
+      ]),
+    ).toBe("geschaeftlich");
+  });
+  it("≥ 80% privat → privat", () => {
+    expect(
+      bestimmeDominanteKlassifikation([
+        "privat",
+        "privat",
+        "privat",
+        "privat",
+        "geschaeftlich",
+      ]),
+    ).toBe("privat");
+  });
+  it("Mischverhältnis < 80% → unklar", () => {
+    expect(
+      bestimmeDominanteKlassifikation([
+        "privat",
+        "privat",
+        "geschaeftlich",
+        "geschaeftlich",
+      ]),
+    ).toBe("unklar");
+  });
+  it("null/unklar/neutral zählen nicht für die Mehrheit", () => {
+    expect(
+      bestimmeDominanteKlassifikation([null, "unklar", "neutral", "privat"]),
+    ).toBe("unklar");
+  });
+  it("leere Liste → unklar", () => {
+    expect(bestimmeDominanteKlassifikation([])).toBe("unklar");
+  });
+});
+
+describe("bestimmeDominanteKategorie", () => {
+  it("häufigste kategorie_id mit Anteil", () => {
+    const result = bestimmeDominanteKategorie([
+      "kat-a",
+      "kat-a",
+      "kat-a",
+      "kat-b",
+      null,
+    ]);
+    expect(result).toEqual({ id: "kat-a", anzahl: 3, anteil: 0.6 });
+  });
+  it("alle null → null", () => {
+    expect(bestimmeDominanteKategorie([null, null, null])).toBeNull();
+  });
+  it("leere Liste → null", () => {
+    expect(bestimmeDominanteKategorie([])).toBeNull();
   });
 });

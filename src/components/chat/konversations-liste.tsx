@@ -40,7 +40,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+// ScrollArea (Radix) ersetzt durch native overflow-y-auto:
+// Radix-ScrollArea hat in Next.js 16 / React 19 / Turbopack einen
+// Resize-Observer-Loop ("Maximum update depth exceeded") wenn der
+// Container in einem Flex-Layout mit dynamischer Hoehe sitzt. Native
+// overflow-y-auto verhaelt sich identisch fuer unsere Bedarfe (vertikales
+// Scrollen der Konversationsliste) und ist loop-frei.
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { relativesDatum } from "@/lib/chat/datum";
@@ -123,7 +128,7 @@ export function KonversationsListe({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="p-2">
           {laedt ? (
             <SkeletonListe />
@@ -148,7 +153,7 @@ export function KonversationsListe({
             </ul>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Umbenennen-Dialog */}
       <Dialog

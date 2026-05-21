@@ -176,19 +176,17 @@ export default async function ChatPage() {
   }
 
   return (
-    <div className="-mx-6 -my-8 h-[calc(100vh-56px)] md:-mx-8 md:-my-8 md:h-[calc(100vh-56px)]">
-      {/*
-        Volle Hoehe fuer den Chat — wir kompensieren das Standard-Padding
-        des AppLayouts (px-6 py-8 / md:px-8) und rechnen die Topbar (56 px)
-        raus, damit das Chat-Panel exakt den Viewport ausfuellt.
-      */}
-      <div className="h-full px-4 py-4 md:px-6 md:py-6">
-        <ChatPageInhalt
-          initialKonversationen={konversationen}
-          initialAktiveId={aktiveId}
-          initialNachrichten={nachrichten}
-        />
-      </div>
+    // Hoehe des Chat-Panels exakt berechnen, damit ScrollArea-Resize-Loop
+    // (Maximum-update-depth-Exceeded) ausbleibt.
+    //   Topbar (56) + AppLayout py-8 oben (32) + pb-8/pb-14 unten (32/56)
+    //   = 120 px mobile / 144 px ≥ md
+    // Min-Hoehe als Sicherheitsnetz fuer sehr kleine Viewports.
+    <div className="h-[calc(100vh-120px)] min-h-[600px] md:h-[calc(100vh-144px)]">
+      <ChatPageInhalt
+        initialKonversationen={konversationen}
+        initialAktiveId={aktiveId}
+        initialNachrichten={nachrichten}
+      />
     </div>
   );
 }

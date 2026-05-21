@@ -7,7 +7,7 @@
 // dem Backend, Tool-Badges + Aktions-Vorschlaege werden nach Stream-Ende
 // per GET nachgeladen.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   holeNachrichtenApi,
@@ -54,17 +54,21 @@ export function ChatPageInhalt({
   );
 
   // Bei Wechsel der aktiven Konversation: Nachrichten vom Backend laden.
+  //
+  // BUG-FIX: `nachrichten` NICHT in den Deps — sonst lost-update-Loop
+  // (setNachrichten → Render → Effect → setNachrichten → ...).
+  //
+  // SSR-Optimierung: Der erste Mount mit gesetzter aktiveId kommt mit
+  // initialNachrichten vom Server. Diesen einen Skip merken wir via Ref,
+  // damit es nicht zum redundanten API-Call kommt.
+  const initialerLoadSkipRef = useRef(initialAktiveId !== null);
   useEffect(() => {
     if (!aktiveId) {
-      setNachrichten([]);
+      setNachrichten((prev) => (prev.length === 0 ? prev : []));
       return;
     }
-    // Wenn die geladenen Nachrichten schon zur aktiven Konv gehoeren,
-    // nichts tun.
-    if (
-      nachrichten.length > 0 &&
-      nachrichten[0].konversation_id === aktiveId
-    ) {
+    if (initialerLoadSkipRef.current) {
+      initialerLoadSkipRef.current = false;
       return;
     }
     let abgebrochen = false;
@@ -84,7 +88,7 @@ export function ChatPageInhalt({
     return () => {
       abgebrochen = true;
     };
-  }, [aktiveId, nachrichten]);
+  }, [aktiveId]);
 
   const onWaehlen = useCallback((id: string) => {
     setAktiveId(id);

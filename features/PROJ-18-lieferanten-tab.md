@@ -1,6 +1,6 @@
 # PROJ-18: Lieferanten-Tab (wiederkehrende Empfänger ohne Abo)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-21
 
@@ -130,7 +130,12 @@ Keine neuen.
 - Kein Export — die bestehende Export-Funktion (PROJ-11) deckt das ab
 
 ## Implementierungsnotizen
-_Wird beim Build befüllt._
+- API + UI implementiert wie geplant; keine DB-Migration
+- `lerneRegelFuer` aus `abo-radar.tsx` in `src/lib/finanzen/regel-helper.ts` extrahiert und um `lerneKlassifikationsRegel` (für "Immer privat / Immer geschäftlich") ergänzt — Abo-Radar nutzt jetzt denselben Helper
+- Bulk-Klassifikation als eigener Endpoint `POST /api/buchungen/bulk-klassifikation` (Schema in `src/lib/validation/buchungen-klassifikation-bulk.ts`), Status wird auf `manuell_bestaetigt` gesetzt + Audit-Eintrag
+- 19 Unit-Tests in `src/lib/finanzen/lieferanten-erkennung.test.ts` decken Aggregation ab: Gruppierung, dominante Klassifikation (80%-Schwelle), dominante Kategorie mit Anteil, Abo-Ausschluss via `erkenneCluster()`, Jahresumsatz-Hochrechnung
+- Schwelle `MIN_LIEFERANT_BUCHUNGEN = 3` als Konstante in `lieferanten-erkennung.ts`
+- Spec-Erkenntnis während der Implementierung: `BuchungStatus` heißt `auto_verbucht` (nicht wie in einer früheren Spec-Variante `klassifiziert_auto`) — Tests-Fixtures entsprechend angepasst
 
 ## Test Plan
 - API:

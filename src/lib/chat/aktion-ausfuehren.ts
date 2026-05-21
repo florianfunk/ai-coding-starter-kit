@@ -98,6 +98,7 @@ async function ladeAktion(
 
 async function setzeStatus(
   supabase: SupabaseClient,
+  ownerId: string,
   aktion_id: string,
   patch: Partial<{
     status: AktionRow["status"];
@@ -105,7 +106,11 @@ async function setzeStatus(
     fehler_text: string | null;
   }>,
 ): Promise<void> {
-  await supabase.from("chat_aktion").update(patch).eq("id", aktion_id);
+  await supabase
+    .from("chat_aktion")
+    .update(patch)
+    .eq("owner_id", ownerId)
+    .eq("id", aktion_id);
 }
 
 async function schreibeAudit(
@@ -371,13 +376,21 @@ async function fuehre_bucheBuchungenUm(
     };
   }
 
-  // Lost-Update: Wenn ein Datensatz seit Vorschlag manuell_bestaetigt wurde
-  // UND auf eine andere Kategorie zeigt → ueberspringen statt ueberschreiben.
-  // Wir matchen die im Vorschlag aufgelisteten IDs und nehmen nur die
-  // weiter, die NICHT bereits final auf einer anderen Kategorie sitzen.
+  // ---------- PRE-FLIGHT-VALIDIERUNG ----------
+  // Statt mid-batch-Rollback machen wir eine vollstaendige Vor-Pruefung
+  // ALLER Buchungen, bevor wir das erste UPDATE absetzen. Wenn auch nur eine
+  // Buchung die Pruefung nicht besteht → kein Update, status='error'.
+  //
+  // Pruefungen:
+  //   1) existiert + owner_id passt (in() ist owner-gefiltert → impliziert)
+  //   2) status != 'manuell_bestaetigt' (wir ueberschreiben keinen Final-State)
+  //   3) Lost-Update: kategorie_bezeichnung im Snapshot (vorher_nachher.vorher)
+  //      stimmt noch mit der aktuellen Kategorie-Bezeichnung ueberein.
   const { data: vorher, error: vErr } = await supabase
     .from("buchung")
-    .select("id, kategorie_id, status")
+    .select(
+      "id, kategorie_id, status, kategorie:kategorie(bezeichnung)",
+    )
     .eq("owner_id", ownerId)
     .in("id", p.buchung_ids);
   if (vErr) {
@@ -387,32 +400,75 @@ async function fuehre_bucheBuchungenUm(
     id: string;
     kategorie_id: string | null;
     status: BuchungStatus;
+    kategorie: { bezeichnung: string } | Array<{ bezeichnung: string }> | null;
   };
   const liste = (vorher ?? []) as Vorher[];
 
-  // Schutz vor versehentlichem Ueberschreiben manuell_bestaetigter
-  // Buchungen, die NICHT teil des urspruenglichen Vorschlags-Snapshots waren.
-  // Wir lassen sie aus dem Update raus.
-  const targetIds = liste
-    .filter((b) => {
-      // wenn schon korrekt zugeordnet, ist Update unnoetig, aber kein Schaden.
-      if (b.kategorie_id === p.neue_kategorie_id) return true;
-      // manuell_bestaetigt auf andere Kategorie → Lost-Update, ueberspringen.
-      if (b.status === "manuell_bestaetigt" && b.kategorie_id) return false;
-      return true;
-    })
-    .map((b) => b.id);
-  const uebersprungen = liste.length - targetIds.length;
+  // Snapshot-Map aus dem urspruenglichen Vorschlag.
+  type SnapshotZeile = { id: string; vorher: string };
+  const vnArr = Array.isArray(aktion.vorher_nachher)
+    ? (aktion.vorher_nachher as SnapshotZeile[])
+    : [];
+  const snapshotJeId = new Map<string, string>();
+  for (const z of vnArr) {
+    if (z && typeof z.id === "string" && typeof z.vorher === "string") {
+      snapshotJeId.set(z.id, z.vorher);
+    }
+  }
 
-  if (targetIds.length === 0) {
+  // 1) Fehlende IDs (DB-Treffer < angeforderte IDs).
+  const gefundene = new Set(liste.map((b) => b.id));
+  const fehlend = p.buchung_ids.filter((id) => !gefundene.has(id));
+  if (fehlend.length > 0) {
     return {
       ok: false,
       code: "lost_update",
-      message:
-        "Alle ausgewaehlten Buchungen wurden zwischenzeitlich manuell bestaetigt und sind geschuetzt.",
+      message: `${fehlend.length} Buchung(en) existieren nicht mehr. Bitte einen neuen Vorschlag erzeugen.`,
       status: 409,
     };
   }
+
+  // 2) Manuell_bestaetigt + andere Kategorie → blockieren (kein Final-State
+  //    ueberschreiben).
+  const blockiert = liste.filter(
+    (b) =>
+      b.status === "manuell_bestaetigt" &&
+      b.kategorie_id !== p.neue_kategorie_id,
+  );
+  if (blockiert.length > 0) {
+    return {
+      ok: false,
+      code: "lost_update",
+      message: `${blockiert.length} Buchung(en) wurden zwischenzeitlich manuell bestaetigt und sind geschuetzt. Bitte einen neuen Vorschlag erzeugen.`,
+      status: 409,
+    };
+  }
+
+  // 3) Snapshot-Vergleich: aktuelle kategorie_bezeichnung muss zum
+  //    vorher-Eintrag des Vorschlags passen (sofern Snapshot vorhanden).
+  if (snapshotJeId.size > 0) {
+    const veraendert: string[] = [];
+    for (const b of liste) {
+      const snap = snapshotJeId.get(b.id);
+      if (snap === undefined) continue;
+      const aktuell = (() => {
+        const k = Array.isArray(b.kategorie) ? b.kategorie[0] : b.kategorie;
+        return k?.bezeichnung ?? "— ohne Kategorie —";
+      })();
+      if (aktuell !== snap) veraendert.push(b.id);
+    }
+    if (veraendert.length > 0) {
+      return {
+        ok: false,
+        code: "lost_update",
+        message: `${veraendert.length} Buchung(en) wurden seit dem Vorschlag einer anderen Kategorie zugeordnet. Bitte einen neuen Vorschlag erzeugen.`,
+        status: 409,
+      };
+    }
+  }
+
+  // Alle Pruefungen bestanden — Ziel-Liste = vollstaendige Eingabe.
+  const targetIds = liste.map((b) => b.id);
 
   // Klassifikation aus Kategorie-Typ ableiten, wenn nicht explizit gesetzt.
   let klass: Klassifikation;
@@ -436,6 +492,7 @@ async function fuehre_bucheBuchungenUm(
   // In Batches von 50 (siehe Spec — Edge-Case "grosser Batch").
   const batchSize = 50;
   let aktualisiert = 0;
+  const erfolgreicheBatches: string[][] = [];
   for (let i = 0; i < targetIds.length; i += batchSize) {
     const slice = targetIds.slice(i, i + batchSize);
     const { data, error } = await supabase
@@ -445,15 +502,23 @@ async function fuehre_bucheBuchungenUm(
       .in("id", slice)
       .select("id");
     if (error) {
+      // Partial-Failure-Recovery: Pre-Flight ist sauber gelaufen, aber zur
+      // Laufzeit ist ein Batch gescheitert. Wir koennen nicht zurueckrollen
+      // (Postgres-Transaktion ueber mehrere Supabase-Calls geht nicht), also
+      // dokumentieren wir klar, was erfolgreich war und was nicht.
+      const fertig = erfolgreicheBatches.length;
+      const gesamt = Math.ceil(targetIds.length / batchSize);
       return {
         ok: false,
         code: "db_error",
-        message: error.message,
+        message: `${fertig} von ${gesamt} Batch(es) abgeschlossen (${aktualisiert} Buchungen umgebucht), dann Fehler: ${error.message}. Manuelle Pruefung noetig.`,
         status: 500,
       };
     }
+    erfolgreicheBatches.push(slice);
     aktualisiert += (data ?? []).length;
   }
+  const uebersprungen = 0;
 
   // Audit-Eintrag pro Buchung (oder ein Sammel-Eintrag — wir machen 1 Sammel-
   // Eintrag mit Liste, ergaenzt um Einzel-Audits pro Batch fuer Detail-Sicht).
@@ -506,15 +571,36 @@ async function fuehre_manuell_bestaetige_buchungen(
 ): Promise<AusfuehrErgebnis> {
   const p = aktion.parameter as { buchung_ids: string[] };
 
-  // Nur Buchungen, die noch nicht manuell_bestaetigt sind, anfassen.
-  const { data: vorher } = await supabase
+  // ---------- PRE-FLIGHT-VALIDIERUNG ----------
+  // Alle Buchungen laden und pruefen:
+  //   1) existieren + Owner passt
+  //   2) bereits manuell_bestaetigte werden uebersprungen (kein Fehler — die
+  //      User-Intention ist „bestaetigen", und das sind sie schon)
+  const { data: vorher, error: vErr } = await supabase
     .from("buchung")
     .select("id, status")
     .eq("owner_id", ownerId)
     .in("id", p.buchung_ids);
+  if (vErr) {
+    return { ok: false, code: "db_error", message: vErr.message, status: 500 };
+  }
   type V = { id: string; status: BuchungStatus };
   const liste = (vorher ?? []) as V[];
-  const offen = liste.filter((b) => b.status !== "manuell_bestaetigt").map((b) => b.id);
+
+  const gefundene = new Set(liste.map((b) => b.id));
+  const fehlend = p.buchung_ids.filter((id) => !gefundene.has(id));
+  if (fehlend.length > 0) {
+    return {
+      ok: false,
+      code: "lost_update",
+      message: `${fehlend.length} Buchung(en) existieren nicht mehr. Bitte einen neuen Vorschlag erzeugen.`,
+      status: 409,
+    };
+  }
+
+  const offen = liste
+    .filter((b) => b.status !== "manuell_bestaetigt")
+    .map((b) => b.id);
   if (offen.length === 0) {
     return {
       ok: true,
@@ -526,6 +612,7 @@ async function fuehre_manuell_bestaetige_buchungen(
     };
   }
   let aktualisiert = 0;
+  const erfolgreicheBatches: string[][] = [];
   for (let i = 0; i < offen.length; i += 50) {
     const slice = offen.slice(i, i + 50);
     const { data, error } = await supabase
@@ -539,8 +626,16 @@ async function fuehre_manuell_bestaetige_buchungen(
       .in("id", slice)
       .select("id");
     if (error) {
-      return { ok: false, code: "db_error", message: error.message, status: 500 };
+      const fertig = erfolgreicheBatches.length;
+      const gesamt = Math.ceil(offen.length / 50);
+      return {
+        ok: false,
+        code: "db_error",
+        message: `${fertig} von ${gesamt} Batch(es) abgeschlossen (${aktualisiert} Buchungen bestaetigt), dann Fehler: ${error.message}. Manuelle Pruefung noetig.`,
+        status: 500,
+      };
     }
+    erfolgreicheBatches.push(slice);
     aktualisiert += (data ?? []).length;
   }
   const auditId = await schreibeAudit(
@@ -836,19 +931,22 @@ export async function fuehreAktionAus(
       status: 404,
     };
   }
-  if (aktion.status === "confirmed") {
+  // Strikter Status-Check: nur pending_confirm darf ausgefuehrt werden.
+  // confirmed / cancelled / error sind alle Endzustaende — ein einzelner
+  // Vorschlag ist ein einmaliger Vorgang. "Erneut versuchen" geht ueber den
+  // separaten /neuer-vorschlag-Endpoint, der einen frischen chat_aktion-
+  // Eintrag erzeugt.
+  if (aktion.status !== "pending_confirm") {
+    const grund =
+      aktion.status === "confirmed"
+        ? "Aktion wurde bereits bestaetigt."
+        : aktion.status === "cancelled"
+          ? "Aktion wurde abgebrochen."
+          : "Aktion ist im Fehler-Zustand. Bitte einen neuen Vorschlag erzeugen.";
     return {
       ok: false,
       code: "conflict",
-      message: "Aktion wurde bereits bestaetigt.",
-      status: 409,
-    };
-  }
-  if (aktion.status === "cancelled") {
-    return {
-      ok: false,
-      code: "conflict",
-      message: "Aktion wurde abgebrochen.",
+      message: grund,
       status: 409,
     };
   }
@@ -909,7 +1007,7 @@ export async function fuehreAktionAus(
   }
 
   if (ergebnis.ok) {
-    await setzeStatus(supabase, aktion_id, {
+    await setzeStatus(supabase, ownerId, aktion_id, {
       status: "confirmed",
       audit_eintrag_id: ergebnis.audit_eintrag_id,
       fehler_text: null,
@@ -929,12 +1027,276 @@ export async function fuehreAktionAus(
       .eq("owner_id", ownerId)
       .eq("id", aktion.konversation_id);
   } else {
-    await setzeStatus(supabase, aktion_id, {
+    await setzeStatus(supabase, ownerId, aktion_id, {
       status: "error",
       fehler_text: ergebnis.message,
     });
   }
   return ergebnis;
+}
+
+/**
+ * Erzeugt einen neuen `chat_aktion`-Eintrag aus einer fehlgeschlagenen
+ * Aktion ("Neuen Vorschlag generieren"). Wird vom UI aufgerufen, wenn der
+ * Nutzer auf einem error-Vorschlag auf "Neuen Vorschlag generieren" klickt.
+ *
+ * Verhalten:
+ *   1) Aktion laden, Owner verifizieren.
+ *   2) Status MUSS 'error' sein (sonst 409 — fuer pending bestaetigt man,
+ *      fuer confirmed/cancelled ist der Fall final).
+ *   3) Lost-Update-Recheck pro Tool (z. B. bei bucheBuchungenUm: existieren
+ *      die Buchungen noch und sind nicht manuell_bestaetigt?).
+ *   4) Neuer `chat_aktion`-Eintrag mit identischen Parametern, neuer ID,
+ *      status='pending_confirm', verlinkt auf eine NEU angelegte
+ *      Assistant-Nachricht ("Ich habe einen neuen Vorschlag erstellt …").
+ */
+export async function legeNeuenVorschlagAn(
+  supabase: SupabaseClient,
+  ownerId: string,
+  aktion_id: string,
+): Promise<
+  | {
+      ok: true;
+      neue_aktion_id: string;
+      neue_nachricht_id: string;
+    }
+  | AusfuehrFehler
+> {
+  const alt = await ladeAktion(supabase, ownerId, aktion_id);
+  if (!alt) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "Aktion nicht gefunden.",
+      status: 404,
+    };
+  }
+  if (alt.owner_id !== ownerId) {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "Zugriff verweigert.",
+      status: 404,
+    };
+  }
+  if (alt.status !== "error") {
+    return {
+      ok: false,
+      code: "conflict",
+      message:
+        "Nur Vorschlaege im Fehler-Zustand koennen neu erzeugt werden.",
+      status: 409,
+    };
+  }
+  if (!istSchreibToolName(alt.aktion)) {
+    return {
+      ok: false,
+      code: "validation",
+      message: `Unbekanntes Tool "${alt.aktion}".`,
+      status: 422,
+    };
+  }
+
+  // Lost-Update-Recheck: passt der alte Parameter-Satz noch zur aktuellen
+  // DB-Lage? Wir rufen dieselben Vor-Pruefungen auf wie das Tool selbst.
+  // Falls nicht, wird der Vorschlag NICHT erzeugt — User muss die LLM-
+  // Anfrage neu formulieren.
+  const recheck = await rechecheVorschlag(supabase, ownerId, alt);
+  if (!recheck.ok) return recheck;
+
+  // Neue Assistant-Nachricht ankuendigen.
+  const ankuendigung = `Ich habe einen neuen Vorschlag erstellt — bitte pruefen.\n\n${alt.vorschau}`;
+  const { data: nachrInsRaw, error: nachrErr } = await supabase
+    .from("chat_nachricht")
+    .insert({
+      owner_id: ownerId,
+      konversation_id: alt.konversation_id,
+      rolle: "assistant",
+      inhalt: ankuendigung,
+    })
+    .select("id")
+    .single();
+  if (nachrErr || !nachrInsRaw) {
+    return {
+      ok: false,
+      code: "db_error",
+      message:
+        nachrErr?.message ?? "Neue Assistant-Nachricht konnte nicht angelegt werden.",
+      status: 500,
+    };
+  }
+  const neueNachrichtId = (nachrInsRaw as { id: string }).id;
+
+  // Neuer chat_aktion-Eintrag, identische Parameter + vorher_nachher.
+  const { data: neuRaw, error: neuErr } = await supabase
+    .from("chat_aktion")
+    .insert({
+      owner_id: ownerId,
+      konversation_id: alt.konversation_id,
+      nachricht_id: neueNachrichtId,
+      aktion: alt.aktion,
+      parameter: alt.parameter,
+      vorschau: alt.vorschau,
+      vorher_nachher: alt.vorher_nachher ?? null,
+      status: "pending_confirm",
+    })
+    .select("id")
+    .single();
+  if (neuErr || !neuRaw) {
+    return {
+      ok: false,
+      code: "db_error",
+      message: neuErr?.message ?? "Neuer Vorschlag konnte nicht erzeugt werden.",
+      status: 500,
+    };
+  }
+
+  // updated_at der Konversation anstupsen.
+  await supabase
+    .from("chat_konversation")
+    .update({ updated_at: jetzt() })
+    .eq("owner_id", ownerId)
+    .eq("id", alt.konversation_id);
+
+  return {
+    ok: true,
+    neue_aktion_id: (neuRaw as { id: string }).id,
+    neue_nachricht_id: neueNachrichtId,
+  };
+}
+
+/**
+ * Pre-flight-Recheck fuer den /neuer-vorschlag-Endpoint: ruft pro Tool die
+ * gleiche Vor-Validation auf wie der Ausfuehrer selbst — wenn die DB-Lage
+ * heute nicht mehr passt, brechen wir hier ab statt einen toten Vorschlag
+ * anzulegen.
+ */
+async function rechecheVorschlag(
+  supabase: SupabaseClient,
+  ownerId: string,
+  alt: AktionRow,
+): Promise<{ ok: true } | AusfuehrFehler> {
+  switch (alt.aktion as SchreibToolName) {
+    case "bucheBuchungenUm": {
+      const p = alt.parameter as {
+        buchung_ids: string[];
+        neue_kategorie_id: string;
+      };
+      // Ziel-Kategorie noch da?
+      const { data: kat } = await supabase
+        .from("kategorie")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("id", p.neue_kategorie_id)
+        .maybeSingle();
+      if (!kat) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message:
+            "Ziel-Kategorie existiert nicht mehr. Bitte LLM-Anfrage neu formulieren.",
+          status: 409,
+        };
+      }
+      // Sind die Buchungen noch da + nicht final auf andere Kategorie?
+      const { data: buchRaw } = await supabase
+        .from("buchung")
+        .select("id, kategorie_id, status")
+        .eq("owner_id", ownerId)
+        .in("id", p.buchung_ids);
+      const buch = (buchRaw ?? []) as Array<{
+        id: string;
+        kategorie_id: string | null;
+        status: BuchungStatus;
+      }>;
+      const gefundene = new Set(buch.map((b) => b.id));
+      const fehlend = p.buchung_ids.filter((id) => !gefundene.has(id));
+      if (fehlend.length > 0) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message: `${fehlend.length} Buchung(en) existieren nicht mehr.`,
+          status: 409,
+        };
+      }
+      const blockiert = buch.filter(
+        (b) =>
+          b.status === "manuell_bestaetigt" &&
+          b.kategorie_id !== p.neue_kategorie_id,
+      );
+      if (blockiert.length > 0) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message: `${blockiert.length} Buchung(en) wurden zwischenzeitlich manuell bestaetigt.`,
+          status: 409,
+        };
+      }
+      return { ok: true };
+    }
+    case "aendere_kategorie":
+    case "loesche_kategorie": {
+      const p = alt.parameter as { kategorie_id: string };
+      const { data } = await supabase
+        .from("kategorie")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("id", p.kategorie_id)
+        .maybeSingle();
+      if (!data) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message: "Kategorie existiert nicht mehr.",
+          status: 409,
+        };
+      }
+      return { ok: true };
+    }
+    case "aendere_lernregel":
+    case "loesche_lernregel": {
+      const p = alt.parameter as { regel_id: string };
+      const { data } = await supabase
+        .from("lernregel")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("id", p.regel_id)
+        .maybeSingle();
+      if (!data) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message: "Lernregel existiert nicht mehr.",
+          status: 409,
+        };
+      }
+      return { ok: true };
+    }
+    case "lege_kategorie_an": {
+      const p = alt.parameter as { bezeichnung: string };
+      const { data } = await supabase
+        .from("kategorie")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("bezeichnung", p.bezeichnung)
+        .maybeSingle();
+      if (data) {
+        return {
+          ok: false,
+          code: "lost_update",
+          message:
+            "Eine Kategorie mit dieser Bezeichnung existiert inzwischen bereits.",
+          status: 409,
+        };
+      }
+      return { ok: true };
+    }
+    // Tools ohne harten Lost-Update-Check (manuell_bestaetige_buchungen,
+    // lege_lernregel_an, setze_/loesche_empfaenger_kenntnis): wir verlassen
+    // uns auf die normale Vor-Pruefung beim spaeteren Confirm.
+    default:
+      return { ok: true };
+  }
 }
 
 /**
@@ -972,7 +1334,7 @@ export async function brecheAktionAb(
       ausgefuehrt_am: jetzt(),
     };
   }
-  await setzeStatus(supabase, aktion_id, {
+  await setzeStatus(supabase, ownerId, aktion_id, {
     status: "cancelled",
     fehler_text: null,
   });

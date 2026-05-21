@@ -32,6 +32,7 @@ interface BackendAktion {
   vorschau: string;
   vorher_nachher: unknown;
   status: ChatAktion["status"];
+  erstellt_am: string;
   aktualisiert_am: string;
   fehler_text: string | null;
 }
@@ -147,9 +148,15 @@ export default async function ChatPage() {
   if (aktiveId) {
     const detail = await holeKonversation(supabase, user.id, aktiveId);
     if (detail) {
-      const aktionenJeNachricht = new Map<string, BackendAktion>();
-      for (const a of detail.aktionen) {
-        aktionenJeNachricht.set(a.nachricht_id, a as BackendAktion);
+      // Mehrere Aktionen pro Nachricht sammeln (chronologisch).
+      const aktionenJeNachricht = new Map<string, BackendAktion[]>();
+      const sortAktionen = [...detail.aktionen].sort((a, b) =>
+        (a.erstellt_am ?? "").localeCompare(b.erstellt_am ?? ""),
+      );
+      for (const a of sortAktionen) {
+        const arr = aktionenJeNachricht.get(a.nachricht_id) ?? [];
+        arr.push(a as BackendAktion);
+        aktionenJeNachricht.set(a.nachricht_id, arr);
       }
       nachrichten = detail.nachrichten
         .filter((n) => n.rolle === "user" || n.rolle === "assistant" || n.rolle === "tool")
@@ -162,9 +169,7 @@ export default async function ChatPage() {
             n.rolle === "assistant"
               ? (kurzZusammen(n.tool_calls, n.tool_results) as ChatNachricht["tools"])
               : [],
-          aktion: aktionenJeNachricht.has(n.id)
-            ? mapAktion(aktionenJeNachricht.get(n.id) as BackendAktion)
-            : null,
+          aktionen: (aktionenJeNachricht.get(n.id) ?? []).map(mapAktion),
           erstellt_am: n.erstellt_am,
         }));
     }

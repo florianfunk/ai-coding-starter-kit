@@ -32,6 +32,7 @@ interface Props {
     nachrichtId: string,
     nextAktion: ChatAktion,
   ) => void;
+  onNeuerVorschlag?: (nachrichtId: string, alteAktionId: string) => void;
 }
 
 export function NachrichtenListe({
@@ -39,6 +40,7 @@ export function NachrichtenListe({
   konversationId,
   streamendeId,
   onAktionStatusChange,
+  onNeuerVorschlag,
 }: Props) {
   return (
     <div className="mx-auto w-full max-w-3xl space-y-5 px-3 py-6 sm:px-4">
@@ -52,13 +54,19 @@ export function NachrichtenListe({
               streamt={n.id === streamendeId}
             />
           )}
-          {n.aktion ? (
+          {n.aktionen.map((a) => (
             <AktionsKarte
-              aktion={n.aktion}
+              key={a.id}
+              aktion={a}
               konversationId={konversationId}
               onStatusChange={(next) => onAktionStatusChange(n.id, next)}
+              onNeuerVorschlag={
+                onNeuerVorschlag
+                  ? () => onNeuerVorschlag(n.id, a.id)
+                  : undefined
+              }
             />
-          ) : null}
+          ))}
         </div>
       ))}
     </div>

@@ -177,7 +177,7 @@ export function ChatPageInhalt({
       rolle: "user",
       inhalt: text,
       tools: [],
-      aktion: null,
+      aktionen: [],
       erstellt_am: new Date().toISOString(),
     };
     const assistantTempId = `n-asst-temp-${Date.now()}`;
@@ -187,7 +187,7 @@ export function ChatPageInhalt({
       rolle: "assistant",
       inhalt: "",
       tools: [],
-      aktion: null,
+      aktionen: [],
       erstellt_am: new Date().toISOString(),
     };
 
@@ -263,12 +263,35 @@ export function ChatPageInhalt({
     (nachrichtId: string, nextAktion: ChatAktion) => {
       setNachrichten((prev) =>
         prev.map((n) =>
-          n.id === nachrichtId ? { ...n, aktion: nextAktion } : n,
+          n.id === nachrichtId
+            ? {
+                ...n,
+                aktionen: n.aktionen.map((a) =>
+                  a.id === nextAktion.id ? nextAktion : a,
+                ),
+              }
+            : n,
         ),
       );
     },
     [],
   );
+
+  // "Neuen Vorschlag generieren" — Backend hat schon einen neuen
+  // chat_aktion + eine neue Assistant-Nachricht angelegt. Wir laden die
+  // komplette Nachrichten-Liste nach, damit die UI synchron ist.
+  const onNeuerVorschlag = useCallback(async () => {
+    if (!aktiveId) return;
+    try {
+      const list = await holeNachrichtenApi(aktiveId);
+      setNachrichten(list);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Ladefehler";
+      toast.error(
+        `Nach 'Neuer Vorschlag': Nachrichten konnten nicht neu geladen werden: ${msg}`,
+      );
+    }
+  }, [aktiveId]);
 
   return (
     <ChatLayout
@@ -298,6 +321,7 @@ export function ChatPageInhalt({
             if (aktiveKonversation) await onLoeschen(aktiveKonversation.id);
           }}
           onAktionStatusChange={onAktionStatusChange}
+          onNeuerVorschlag={onNeuerVorschlag}
           mobilZurueckButton={mobilZurueckButton}
         />
       )}

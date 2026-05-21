@@ -41,6 +41,12 @@ interface Props {
     nachrichtId: string,
     nextAktion: ChatAktion,
   ) => void;
+  /**
+   * "Neuen Vorschlag generieren" — Backend hat einen neuen chat_aktion +
+   * eine neue Assistant-Nachricht angelegt; der Parent laedt die komplette
+   * Nachrichten-Liste neu.
+   */
+  onNeuerVorschlag?: (nachrichtId: string, alteAktionId: string) => void;
   /** Mobil: Toggle, um zur Konversationsliste zurueckzukehren. */
   mobilZurueckButton?: React.ReactNode;
 }
@@ -55,6 +61,7 @@ export function KonversationsAnsicht({
   onSenden,
   onLoeschen,
   onAktionStatusChange,
+  onNeuerVorschlag,
   mobilZurueckButton,
 }: Props) {
   const [loeschenOffen, setLoeschenOffen] = useState(false);
@@ -116,6 +123,7 @@ export function KonversationsAnsicht({
             konversationId={konversation.id}
             streamendeId={streamendeId}
             onAktionStatusChange={onAktionStatusChange}
+            onNeuerVorschlag={onNeuerVorschlag}
           />
         )}
       </div>

@@ -253,10 +253,17 @@ export async function holeNachrichtenApi(
     nachrichten: BackendNachricht[];
     aktionen: BackendAktion[];
   };
-  const aktionenJeNachricht = new Map<string, BackendAktion>();
-  for (const a of json.aktionen ?? []) {
-    // Letzte Aktion je Nachricht (eine pro Vorschlag).
-    aktionenJeNachricht.set(a.nachricht_id, a);
+  // Mehrere Aktionen pro Nachricht moeglich — das LLM kann in einer
+  // Antwort mehrere Schreib-Tools aufrufen. Wir sammeln pro nachricht_id
+  // alle und sortieren chronologisch (erstellt_am aufsteigend).
+  const aktionenJeNachricht = new Map<string, BackendAktion[]>();
+  const sortiert = [...(json.aktionen ?? [])].sort((a, b) =>
+    (a.erstellt_am ?? "").localeCompare(b.erstellt_am ?? ""),
+  );
+  for (const a of sortiert) {
+    const liste = aktionenJeNachricht.get(a.nachricht_id) ?? [];
+    liste.push(a);
+    aktionenJeNachricht.set(a.nachricht_id, liste);
   }
   return (json.nachrichten ?? [])
     .filter((n): n is BackendNachricht =>
@@ -271,9 +278,7 @@ export async function holeNachrichtenApi(
         n.rolle === "assistant"
           ? mapToolBadges(n.tool_calls, n.tool_results)
           : [],
-      aktion: aktionenJeNachricht.has(n.id)
-        ? mapAktion(aktionenJeNachricht.get(n.id) as BackendAktion)
-        : null,
+      aktionen: (aktionenJeNachricht.get(n.id) ?? []).map(mapAktion),
       erstellt_am: n.erstellt_am,
     }));
 }
@@ -360,6 +365,45 @@ export async function abrecheAktionApi(
     return { ok: false, fehler: msg };
   }
   return { ok: true };
+}
+
+/**
+ * "Neuen Vorschlag generieren" — wird vom UI aufgerufen, wenn der Nutzer auf
+ * einem error-Vorschlag den Button klickt. Legt einen frischen chat_aktion-
+ * Eintrag (status='pending_confirm') + eine neue Assistant-Nachricht an.
+ *
+ * Achtung: Der alte error-Vorschlag bleibt erhalten (Audit-Spur).
+ */
+export async function aktionNeuerVorschlagApi(
+  konversation_id: string,
+  aktion_id: string,
+): Promise<
+  | { ok: true; neue_aktion_id: string; neue_nachricht_id: string }
+  | { ok: false; fehler: string }
+> {
+  const res = await fetch(
+    `/api/chat/${konversation_id}/aktion/${aktion_id}/neuer-vorschlag`,
+    { method: "POST" },
+  );
+  if (!res.ok) {
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body?.error) msg = body.error;
+    } catch {
+      // ignore
+    }
+    return { ok: false, fehler: msg };
+  }
+  const json = (await res.json()) as {
+    neue_aktion_id: string;
+    neue_nachricht_id: string;
+  };
+  return {
+    ok: true,
+    neue_aktion_id: json.neue_aktion_id,
+    neue_nachricht_id: json.neue_nachricht_id,
+  };
 }
 
 // ---------------------------------------------------------------------------

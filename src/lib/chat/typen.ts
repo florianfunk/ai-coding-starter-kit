@@ -57,8 +57,13 @@ export interface ChatNachricht {
   rolle: ChatNachrichtRolle;
   inhalt: string;
   tools: ToolBadge[];
-  /** Optionaler Aktions-Vorschlag, der unter der Nachricht angezeigt wird. */
-  aktion: ChatAktion | null;
+  /**
+   * Alle Aktions-Vorschlaege, die unter dieser Nachricht angezeigt werden
+   * (chronologisch sortiert). Das LLM kann mehrere Schreib-Tools in einer
+   * Antwort aufrufen — jeder Aufruf erzeugt einen eigenen `chat_aktion`-
+   * Eintrag, und wir rendern alle Karten untereinander.
+   */
+  aktionen: ChatAktion[];
   erstellt_am: string;
 }
 

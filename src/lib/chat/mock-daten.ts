@@ -47,7 +47,7 @@ export async function mockNachrichtenNachtrag(
   konversation_id: string,
 ): Promise<{
   tools: ToolBadge[];
-  aktion: ChatAktion | null;
+  aktionen: ChatAktion[];
   inhalt: string | null;
   id: string | null;
 }> {
@@ -57,11 +57,11 @@ export async function mockNachrichtenNachtrag(
     .reverse()
     .find((n) => n.rolle === "assistant");
   if (!letzte) {
-    return { tools: [], aktion: null, inhalt: null, id: null };
+    return { tools: [], aktionen: [], inhalt: null, id: null };
   }
   return {
     tools: letzte.tools,
-    aktion: letzte.aktion,
+    aktionen: letzte.aktionen,
     inhalt: letzte.inhalt,
     id: letzte.id,
   };

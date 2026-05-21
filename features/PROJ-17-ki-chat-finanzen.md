@@ -766,7 +766,35 @@ Migration `0009_chat.sql` auf der Remote-DB angewendet ist).
   Build erfolgreich, alle 5 `/api/chat/*`-Routen registriert.
 - **Production-Ready: NEIN** — zwei HIGH-Bugs blockieren Deploy.
 
-#### HIGH-Bugs (Deploy-blockierend)
+### 2026-05-21 — Bug-Fix-Iteration (H1+H2+M1+M2+M3 behoben)
+
+Alle 5 priorisierten Bugs aus dem QA-Review wurden adressiert:
+
+- **H1 ✓** `fuehreAktionAus()` sperrt jetzt bei jedem Status ungleich
+  `pending_confirm` (also auch `error`). UI-Button heisst neu „Neuen
+  Vorschlag generieren" und ruft die neue Route
+  `POST /api/chat/[konversation_id]/aktion/[aktion_id]/neuer-vorschlag`,
+  die einen frischen `chat_aktion`-Eintrag mit Lost-Update-Vorpruefung
+  anlegt.
+- **H2 ✓** `streamText()` hat jetzt `maxOutputTokens: 4096` (Konstante
+  `MAX_OUTPUT_TOKENS` in `nachricht/route.ts`).
+- **M1 ✓** `fuehre_bucheBuchungenUm()` und `manuell_bestaetige_buchungen()`
+  haben jetzt Pre-flight-Validierung: alle betroffenen Buchungen werden
+  vorab in einem SELECT geladen und gegen den Vorschlag-Snapshot
+  geprueft. Bei auch nur einer Abweichung: keine Updates, status='error'.
+- **M2 ✓** `setzeStatus()` hat jetzt expliziten `owner_id`-Filter
+  (zusaetzlich zu RLS).
+- **M3 ✓** Frontend rendert jetzt mehrere `aktionen` pro Nachricht
+  (`Nachricht.aktionen?: Aktion[]`). API-Loader sammelt sie chronologisch.
+
+Tests: 586/586 gruen (Mock-Anpassung wegen neuem `.eq().eq()`-Chain in
+`setzeStatus`). Build erfolgreich, alle 6 `/api/chat/*`-Routen registriert
+(inkl. neuer-vorschlag).
+
+Status bleibt 'In Review' bis Owner die Migration anwendet und manuell
+durchklickt.
+
+#### HIGH-Bugs (Deploy-blockierend) — alle behoben in dieser Iteration
 
 **H1 — `erneutVersuchen` bricht Idempotenz-Garantie**
 - Dateien: [aktions-karte.tsx:109](src/components/chat/aktions-karte.tsx),

@@ -65,8 +65,13 @@ function makeSupabase(opts: {
   }
   function chatAktionUpdate(patch: Record<string, unknown>) {
     updates.push(patch);
+    // M2-Fix: setzeStatus() chained jetzt .eq("owner_id").eq("id") fuer
+    // Defense-in-Depth. Mock muss daher chainbar sein.
+    const finalThenable = vi
+      .fn()
+      .mockResolvedValue(opts.updateResult ?? { data: null, error: null });
     return {
-      eq: vi.fn().mockResolvedValue(opts.updateResult ?? { data: null, error: null }),
+      eq: vi.fn(() => ({ eq: finalThenable })),
     };
   }
   function generischeChain(tabelle: string) {

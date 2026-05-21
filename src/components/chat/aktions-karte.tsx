@@ -3,12 +3,14 @@
 // PROJ-17 — Aktions-Karte (Confirm-Flow fuer Schreib-Tools).
 //
 // Wird zwischen den Nachrichten gerendert, wenn eine Assistant-Nachricht
-// ein `aktion`-Objekt mitbringt. Status-abhaengig:
+// einen `chat_aktion`-Eintrag mitbringt (mehrere moeglich). Status-abhaengig:
 //
 //  - pending_confirm: "Bestaetigen" + "Abbrechen"
 //  - confirmed:       gruener Haken + Zeitpunkt
 //  - cancelled:       graues "Abgebrochen"-Badge + Zeitpunkt
-//  - error:           Alert + "Erneut versuchen"
+//  - error:           Alert + "Neuen Vorschlag generieren"
+//                     (legt einen frischen chat_aktion-Eintrag an — der
+//                      Idempotenz-Check im Backend sperrt error-Vorschlaege.)
 //
 // Optimistic Update: beim Klick auf Bestaetigen sofort Loader anzeigen,
 // dann auf das Promise-Ergebnis warten.
@@ -41,6 +43,7 @@ import {
 import { formatTimestamp } from "@/lib/chat/datum";
 import {
   abrecheAktionApi,
+  aktionNeuerVorschlagApi,
   bestaetigeAktionApi,
 } from "@/lib/chat/api";
 import type { ChatAktion } from "@/lib/chat/typen";
@@ -49,6 +52,13 @@ interface Props {
   aktion: ChatAktion;
   konversationId: string;
   onStatusChange: (next: ChatAktion) => void;
+  /**
+   * Callback, wenn der Nutzer "Neuen Vorschlag generieren" klickt. Der
+   * Parent-State sollte daraufhin die Nachrichten neu laden (damit der
+   * frische chat_aktion-Eintrag + die neue Assistant-Nachricht im UI
+   * erscheinen). Optional — wenn nicht gesetzt, wird der Button ausgeblendet.
+   */
+  onNeuerVorschlag?: () => void | Promise<void>;
 }
 
 function aktionsIcon(name: string) {
@@ -59,7 +69,12 @@ function aktionsIcon(name: string) {
   return <Pencil className="h-4 w-4" />;
 }
 
-export function AktionsKarte({ aktion, konversationId, onStatusChange }: Props) {
+export function AktionsKarte({
+  aktion,
+  konversationId,
+  onStatusChange,
+  onNeuerVorschlag,
+}: Props) {
   const [busy, setBusy] = useState(false);
 
   async function bestaetigen() {
@@ -106,12 +121,21 @@ export function AktionsKarte({ aktion, konversationId, onStatusChange }: Props) 
     }
   }
 
-  async function erneutVersuchen() {
-    onStatusChange({
-      ...aktion,
-      status: "pending_confirm",
-      fehler_text: null,
-    });
+  async function neuerVorschlag() {
+    setBusy(true);
+    try {
+      const res = await aktionNeuerVorschlagApi(konversationId, aktion.id);
+      if (!res.ok) {
+        toast.error(`Neuer Vorschlag fehlgeschlagen: ${res.fehler}`);
+        return;
+      }
+      toast.success("Neuer Vorschlag erstellt.");
+      // Parent laedt Nachrichten neu — dadurch erscheinen die neue
+      // Assistant-Nachricht + die neue Aktions-Karte automatisch.
+      if (onNeuerVorschlag) await onNeuerVorschlag();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -201,15 +225,22 @@ export function AktionsKarte({ aktion, konversationId, onStatusChange }: Props) 
                 {aktion.fehler_text ?? "Unbekannter Fehler."}
               </AlertDescription>
             </Alert>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={erneutVersuchen}
-              className="mt-2"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Erneut versuchen
-            </Button>
+            {onNeuerVorschlag ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={neuerVorschlag}
+                disabled={busy}
+                className="mt-2"
+              >
+                {busy ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                )}
+                Neuen Vorschlag generieren
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </CardContent>

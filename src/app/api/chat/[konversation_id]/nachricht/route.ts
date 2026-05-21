@@ -51,6 +51,15 @@ const HISTORIE_LIMIT = 8;
 /** Max. Tool-Roundtrips pro Antwort. */
 const MAX_STEPS = 6;
 
+/**
+ * Maximale Anzahl Output-Tokens pro Antwort (Spec PROJ-17, Token-Budgets).
+ *
+ * Begrenzt die Kosten pro Antwort und verhindert, dass eine ueberlange
+ * Antwort am Vercel-Serverless-10-s-Timeout abreisst und die Assistant-
+ * Nachricht als leerer Stub in der DB stehen bleibt.
+ */
+const MAX_OUTPUT_TOKENS = 4096;
+
 function waehleProvider(key: string, modell: string): LanguageModel {
   if (key.startsWith("sk-ant-")) {
     const anthropic = createAnthropic({ apiKey: key });
@@ -205,6 +214,7 @@ export async function POST(
     messages,
     tools,
     stopWhen: stepCountIs(MAX_STEPS),
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
     onFinish: async (event) => {
       // event hat: text, toolCalls, toolResults, finishReason, usage, ...
       const text = typeof event.text === "string" ? event.text : "";

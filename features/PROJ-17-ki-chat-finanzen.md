@@ -654,6 +654,101 @@ Pakete neu: `react-markdown`, `remark-gfm` (per `npm install`).
 - In `mock-daten.ts` jede `mock*`-Funktion durch echten `fetch()`-Call
   ersetzen — die UI-Komponenten ändern sich dafür nicht.
 
+### 2026-05-21 — Backend-Initial: API-Routen + LLM-Tools + Confirm-Flow
+
+Backend zu PROJ-17 steht. Migration, API-Routen, Tool-Bibliothek,
+System-Prompt und Aktions-Ausfuehrer sind implementiert; Frontend ist
+auf die echten Endpoints umgestellt.
+
+Neu angelegt (Backend):
+- `supabase/migrations/0009_chat.sql` — drei Tabellen
+  (`chat_konversation`, `chat_nachricht`, `chat_aktion`) mit RLS,
+  Indizes, `set_updated_at`-Trigger, ON DELETE CASCADE auf den Owner.
+- `src/app/api/chat/konversationen/route.ts` — GET (Liste mit Vorschau)
+  + POST (Neuanlage, Default-Titel "Neuer Chat").
+- `src/app/api/chat/[konversation_id]/route.ts` — GET (Konversation +
+  Nachrichten + Aktionen), PATCH (Titel), DELETE (Kaskade).
+- `src/app/api/chat/[konversation_id]/nachricht/route.ts` — POST mit
+  Plain-Text-Stream (`result.toTextStreamResponse()` aus AI SDK v6).
+  User-Nachricht wird vor dem Stream persistiert; Assistant-Stub wird
+  angelegt, damit Schreib-Tools eine `nachricht_id` referenzieren
+  koennen; `onFinish` aktualisiert Assistant-Inhalt + tool_calls +
+  Token-Counts + ggf. Auto-Titel.
+- `src/app/api/chat/[konversation_id]/aktion/[aktion_id]/bestaetigen/route.ts`
+  + `.../abbrechen/route.ts` — duenne Wrapper um den Service.
+- `src/lib/chat/konversation.ts` — Service-Schicht fuer Konversationen
+  + Nachrichten + Auto-Titel-LLM-Call (kurzer `generateText`).
+- `src/lib/chat/system-prompt.ts` — Prompt-Builder: heutiges Datum,
+  Tool-Klassen-Trennung, Halluzinations-Schutz, Profil-Block.
+- `src/lib/chat/tool-context.ts` — gemeinsamer Context fuer Lese-/
+  Schreib-Tools (Supabase, ownerId, konversationId, nachricht_id-Ref).
+- `src/lib/chat/tools-lese.ts` — 11 Lese-Tools: `suche_buchungen`,
+  `aggregat_kategorien`, `cockpit_kennzahlen`,
+  `wiederkehrende_buchungen`, `pruefliste`, `umsatzsteuer_stand`,
+  `buchung_details`, `empfaenger_kenntnis_lookup`, `lernregeln_liste`,
+  `mein_profil_kontext`, `kategorien_liste`. Owner-scoped + RLS.
+- `src/lib/chat/tools-schreib.ts` — 10 Schreib-Tools (Allowlist).
+  Tools fuehren NIE direkt aus, sondern legen einen
+  `chat_aktion`-Vorschlag mit `status='pending_confirm'` an und
+  liefern `{aktion_id, vorschau}` zurueck.
+- `src/lib/chat/aktion-ausfuehren.ts` — Confirm-Endpoint-Service.
+  Idempotenz (Status-Check), Owner-Verifizierung, Lost-Update-Schutz
+  pro Tool (Bezeichnungs-Duplikate fuer Kategorien, manuell_bestaetigte
+  Buchungen vor Bulk-Umbuch geschuetzt, Vorher-Snapshot-Vergleich fuer
+  Kategorie-Aenderungen). Audit-Eintraege mit `quelle='chat'`.
+- `src/lib/chat/api.ts` — Echter HTTP-Client (ersetzt Mock-Inhalte).
+  Streaming via `fetch().body.getReader()` + TextDecoder.
+
+Geaendert (Frontend):
+- `src/lib/chat/mock-daten.ts` — vollstaendig auf die echten API-Aufrufe
+  in `api.ts` umgebogen. Funktions-Signaturen erhalten; UI-Komponenten
+  bleiben unangefasst.
+- `src/components/chat/chat-page-inhalt.tsx` — nutzt
+  `holeNachrichtenApi`, `legeKonversationApi`, `sendeNachrichtStream`
+  etc. Nach Stream-Ende werden Nachrichten neu geladen, damit
+  Tool-Badges + Aktions-Vorschlaege erscheinen und die echten DB-IDs
+  ankommen (statt "temp-..."-IDs).
+- `src/components/chat/aktions-karte.tsx` — ruft echte
+  `bestaetigeAktionApi` / `abrecheAktionApi` auf.
+- `src/app/(app)/chat/page.tsx` — Server-Component laedt Initial-Daten
+  jetzt direkt aus `holeKonversationen` / `holeKonversation` statt aus
+  Mocks; mapped die Backend-Form auf die Frontend-Typen.
+
+Designentscheidungen:
+- **Stream-Format:** `result.toTextStreamResponse()` (Plain-Text), nicht
+  Data-Stream. Reason: das Frontend hatte schon einen einfachen
+  AsyncIterable-Stream-Reader; Tool-Badges + Aktions-Vorschlaege werden
+  bewusst NICHT im Stream uebertragen, sondern nach Stream-Ende per
+  GET `/api/chat/[id]` nachgeladen. Vorteile: Reload-Robustheit (alle
+  UI-Elemente kommen aus der DB), einfacheres Fehler-Handling, kleinere
+  Wire-Payload.
+- **nachricht_id vor Stream:** wir legen den Assistant-Stub VOR dem
+  Streaming an. So koennen Schreib-Tools beim `execute()` die
+  `chat_aktion`-Eintraege bereits an die richtige Nachricht haengen.
+- **Race-Schutz:** Schreib-Tool-`execute` prueft per `nachrichtIdRef`,
+  ob die Assistant-Nachricht schon in der DB liegt — sonst Fehler
+  zurueck ans LLM (kein Throw).
+- **Lost-Update-Schutz:** pro Tool im Aktions-Ausfuehrer
+  implementiert. Bsp. `bucheBuchungenUm` ueberspringt Buchungen, die
+  zwischenzeitlich auf eine ANDERE Kategorie manuell_bestaetigt wurden;
+  `aendere_kategorie` vergleicht Vorher-Snapshot.
+- **Audit:** jede ausgefuehrte Aktion erzeugt einen `audit_eintrag` mit
+  `quelle='chat'`. Bulk-Umbuchungen erzeugen Sammel- + Einzel-Audits.
+- **Auto-Titel:** separater kurzer `generateText`-Call nach
+  Stream-Ende, damit der Nutzer den eigentlichen Stream nicht gebremst
+  fuehlt.
+
+Test- und Build-Status:
+- `npm test` — 586 Tests in 31 Dateien gruen (vorher 570/29). Neu:
+  `src/lib/chat/system-prompt.test.ts` + `aktion-ausfuehren.test.ts`
+  (Idempotenz + Status-Wechsel + Owner-Check).
+- `npm run lint` — 0 Errors, 2 Warnings (beide Bestand).
+- `npm run build` — erfolgreich; alle 5 `/api/chat/*`-Routen in der
+  Route-Liste.
+
+Migration noch nicht in der Remote-Datenbank angewendet — manueller
+Schritt vor dem ersten Deploy.
+
 ## QA Test Results
 _To be added by /qa_
 

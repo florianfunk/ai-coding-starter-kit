@@ -2,30 +2,20 @@
 
 // PROJ-17 — Top-Level-Client-Component fuer /chat.
 //
-// State-Container:
-//  - Konversationsliste (mockKonversationen)
-//  - Aktive Konversation + Nachrichten
-//  - Streaming-Status (welche Assistant-Nachricht-Id streamt gerade?)
-//  - Eingabefeld-Wert
-//
-// Orchestriert die drei UI-Bausteine: ChatLayout / KonversationsListe /
-// KonversationsAnsicht.
-//
-// TODO Backend (durchgehend): jede Mock-Funktion ist in
-// /lib/chat/mock-daten.ts markiert. Wenn die echten Endpoints existieren,
-// ersetzt man dort die Bodies durch `fetch()`-Aufrufe — die hier
-// aufrufenden Stellen koennen unveraendert bleiben.
+// State-Container, der die echten API-Endpoints aus `@/lib/chat/api` und
+// `@/lib/chat/mock-daten` (jetzt ein Wrapper) nutzt. Token-Stream kommt aus
+// dem Backend, Tool-Badges + Aktions-Vorschlaege werden nach Stream-Ende
+// per GET nachgeladen.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  mockAntwortStream,
-  mockKonversationLoeschen,
-  mockKonversationUmbenennen,
-  mockNachrichten,
-  mockNachrichtenNachtrag,
-  mockNeueKonversation,
-} from "@/lib/chat/mock-daten";
+  holeNachrichtenApi,
+  legeKonversationApi,
+  loescheKonversationApi,
+  sendeNachrichtStream,
+  umbenenneKonversationApi,
+} from "@/lib/chat/api";
 import type {
   ChatAktion,
   ChatKonversation,
@@ -63,27 +53,37 @@ export function ChatPageInhalt({
     [konversationen, aktiveId],
   );
 
-  // Bei Wechsel der aktiven Konversation: Nachrichten neu laden.
+  // Bei Wechsel der aktiven Konversation: Nachrichten vom Backend laden.
   useEffect(() => {
     if (!aktiveId) {
       setNachrichten([]);
       return;
     }
-    // Wenn wir gerade gestreamt haben oder mock-initialisiert sind und der
-    // State schon zu dieser Konv passt, nichts tun.
+    // Wenn die geladenen Nachrichten schon zur aktiven Konv gehoeren,
+    // nichts tun.
     if (
       nachrichten.length > 0 &&
       nachrichten[0].konversation_id === aktiveId
     ) {
       return;
     }
+    let abgebrochen = false;
     setLaedtNachrichten(true);
-    // Mock laeuft synchron, aber wir setzen das laedt-Flag fuer UX-Konsistenz
-    // und um den Skeleton-Pfad real durchzuspielen.
-    // TODO Backend: ersetze durch fetch(`/api/chat/${aktiveId}`)
-    const list = mockNachrichten(aktiveId);
-    setNachrichten(list);
-    setLaedtNachrichten(false);
+    holeNachrichtenApi(aktiveId)
+      .then((list) => {
+        if (abgebrochen) return;
+        setNachrichten(list);
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : "Ladefehler";
+        toast.error(`Nachrichten konnten nicht geladen werden: ${msg}`);
+      })
+      .finally(() => {
+        if (!abgebrochen) setLaedtNachrichten(false);
+      });
+    return () => {
+      abgebrochen = true;
+    };
   }, [aktiveId, nachrichten]);
 
   const onWaehlen = useCallback((id: string) => {
@@ -92,49 +92,58 @@ export function ChatPageInhalt({
   }, []);
 
   const onNeu = useCallback(async () => {
-    // TODO Backend: ersetze durch
-    //   const res = await fetch("/api/chat/konversationen", { method: "POST" });
-    //   const json = await res.json();
-    //   const neue = json.konversation as ChatKonversation;
-    const neue = mockNeueKonversation();
-    setKonversationen((prev) => [neue, ...prev]);
-    setAktiveId(neue.id);
-    setNachrichten([]);
-    setEingabe("");
-    setMobilAnsicht("ansicht");
+    try {
+      const neue = await legeKonversationApi();
+      setKonversationen((prev) => [neue, ...prev]);
+      setAktiveId(neue.id);
+      setNachrichten([]);
+      setEingabe("");
+      setMobilAnsicht("ansicht");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Fehler";
+      toast.error(`Neue Konversation fehlgeschlagen: ${msg}`);
+    }
   }, []);
 
   const onUmbenennen = useCallback(
     async (id: string, neuerTitel: string) => {
-      // TODO Backend: ersetze durch PATCH /api/chat/[id] mit { titel }
-      const aktualisiert = mockKonversationUmbenennen(id, neuerTitel);
-      if (!aktualisiert) {
-        toast.error("Konversation nicht gefunden.");
-        return;
+      try {
+        await umbenenneKonversationApi(id, neuerTitel);
+        setKonversationen((prev) =>
+          prev.map((k) =>
+            k.id === id
+              ? {
+                  ...k,
+                  titel: neuerTitel,
+                  aktualisiert_am: new Date().toISOString(),
+                }
+              : k,
+          ),
+        );
+        toast.success("Chat umbenannt.");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Fehler";
+        toast.error(`Umbenennen fehlgeschlagen: ${msg}`);
       }
-      setKonversationen((prev) =>
-        prev.map((k) => (k.id === id ? aktualisiert : k)),
-      );
-      toast.success("Chat umbenannt.");
     },
     [],
   );
 
   const onLoeschen = useCallback(
     async (id: string) => {
-      // TODO Backend: ersetze durch DELETE /api/chat/[id]
-      const ok = mockKonversationLoeschen(id);
-      if (!ok) {
-        toast.error("Löschen fehlgeschlagen.");
-        return;
+      try {
+        await loescheKonversationApi(id);
+        setKonversationen((prev) => prev.filter((k) => k.id !== id));
+        if (aktiveId === id) {
+          setAktiveId(null);
+          setNachrichten([]);
+          setMobilAnsicht("liste");
+        }
+        toast.success("Chat gelöscht.");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Fehler";
+        toast.error(`Löschen fehlgeschlagen: ${msg}`);
       }
-      setKonversationen((prev) => prev.filter((k) => k.id !== id));
-      if (aktiveId === id) {
-        setAktiveId(null);
-        setNachrichten([]);
-        setMobilAnsicht("liste");
-      }
-      toast.success("Chat gelöscht.");
     },
     [aktiveId],
   );
@@ -143,26 +152,27 @@ export function ChatPageInhalt({
     const text = eingabe.trim();
     if (!text || streamendeId !== null) return;
     if (!aktiveId) {
-      // Wenn noch keine Konversation aktiv ist, eine neue anlegen und
-      // direkt die Nachricht reinschicken.
-      const neue = mockNeueKonversation();
-      setKonversationen((prev) => [neue, ...prev]);
-      setAktiveId(neue.id);
-      setMobilAnsicht("ansicht");
-      await sendInKonversation(neue.id, text);
+      // Erst eine Konversation anlegen.
+      try {
+        const neue = await legeKonversationApi();
+        setKonversationen((prev) => [neue, ...prev]);
+        setAktiveId(neue.id);
+        setMobilAnsicht("ansicht");
+        await sendInKonversation(neue.id, text);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Fehler";
+        toast.error(`Senden fehlgeschlagen: ${msg}`);
+      }
       return;
     }
     await sendInKonversation(aktiveId, text);
-    // sendInKonversation ist hier eine closure ueber die State-Setter.
-    // Aufruf-Logik: erst User-Nachricht append, dann Assistant-Stub,
-    // dann Stream-Tokens anhaengen, am Ende Tools + ggf. Aktion ergaenzen.
   }, [eingabe, streamendeId, aktiveId]);
 
-  // Hilfsfunktion: User-Nachricht + Streaming-Assistant-Antwort fuer eine
-  // konkrete Konversation.
+  // Sendet User-Nachricht + streamt Antwort + laedt Tool-Calls/Aktion nach.
   async function sendInKonversation(konversationId: string, text: string) {
+    // Optimistische User-Nachricht.
     const userNachricht: ChatNachricht = {
-      id: `n-user-${Date.now()}`,
+      id: `n-user-temp-${Date.now()}`,
       konversation_id: konversationId,
       rolle: "user",
       inhalt: text,
@@ -170,9 +180,9 @@ export function ChatPageInhalt({
       aktion: null,
       erstellt_am: new Date().toISOString(),
     };
-    const assistantId = `n-asst-${Date.now()}`;
+    const assistantTempId = `n-asst-temp-${Date.now()}`;
     const assistantStub: ChatNachricht = {
-      id: assistantId,
+      id: assistantTempId,
       konversation_id: konversationId,
       rolle: "assistant",
       inhalt: "",
@@ -183,9 +193,9 @@ export function ChatPageInhalt({
 
     setEingabe("");
     setNachrichten((prev) => [...prev, userNachricht, assistantStub]);
-    setStreamendeId(assistantId);
+    setStreamendeId(assistantTempId);
 
-    // Konversations-Vorschau in der Liste aktualisieren
+    // Sidebar-Eintrag: Vorschau + Auto-Titel-Vorschlag aktualisieren.
     setKonversationen((prev) =>
       prev.map((k) =>
         k.id === konversationId
@@ -203,33 +213,38 @@ export function ChatPageInhalt({
     );
 
     try {
-      // TODO Backend: ersetze durch echten Stream aus
-      //   POST /api/chat/[konversationId]/nachricht
-      // via Vercel AI SDK v6 (`useChat`-Hook oder `streamText`).
-      for await (const chunk of mockAntwortStream(text)) {
+      // Token-Stream konsumieren.
+      for await (const chunk of sendeNachrichtStream(konversationId, text)) {
         setNachrichten((prev) =>
           prev.map((n) =>
-            n.id === assistantId
+            n.id === assistantTempId
               ? { ...n, inhalt: n.inhalt + chunk }
               : n,
           ),
         );
       }
-      // Stream fertig — Tools + ggf. Aktions-Vorschlag ergaenzen.
-      const nachtrag = mockNachrichtenNachtrag(text);
-      setNachrichten((prev) =>
-        prev.map((n) =>
-          n.id === assistantId
-            ? { ...n, tools: nachtrag.tools, aktion: nachtrag.aktion }
-            : n,
-        ),
-      );
+      // Stream fertig — komplette Nachrichten-Liste neu laden, damit
+      // Tool-Badges + ggf. Aktions-Vorschlag erscheinen und die echten DB-IDs
+      // ankommen (statt der temporaeren "temp-…"-IDs).
+      const echteListe = await holeNachrichtenApi(konversationId);
+      setNachrichten(echteListe);
+      // Aktualisiere die Konversations-Liste — Backend hat ggf. einen
+      // Auto-Titel gesetzt.
+      try {
+        const res = await fetch("/api/chat/konversationen");
+        if (res.ok) {
+          const json = (await res.json()) as { konversationen: ChatKonversation[] };
+          setKonversationen(json.konversationen);
+        }
+      } catch {
+        // Best-effort — bestehende Liste reicht.
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Unbekannter Fehler";
       toast.error(`Antwort fehlgeschlagen: ${msg}`);
       setNachrichten((prev) =>
         prev.map((n) =>
-          n.id === assistantId
+          n.id === assistantTempId
             ? {
                 ...n,
                 inhalt:

@@ -40,9 +40,9 @@ import {
 } from "@/components/ui/table";
 import { formatTimestamp } from "@/lib/chat/datum";
 import {
-  mockAktionAbbrechen,
-  mockAktionBestaetigen,
-} from "@/lib/chat/mock-daten";
+  abrecheAktionApi,
+  bestaetigeAktionApi,
+} from "@/lib/chat/api";
 import type { ChatAktion } from "@/lib/chat/typen";
 
 interface Props {
@@ -64,14 +64,8 @@ export function AktionsKarte({ aktion, konversationId, onStatusChange }: Props) 
 
   async function bestaetigen() {
     setBusy(true);
-    // Optimistic: kurzfristig auf "confirmed" stellen waere falsch — wir
-    // zeigen den Loader, bis das Backend antwortet.
     try {
-      // TODO Backend: ersetze durch
-      //   await fetch(`/api/chat/${konversationId}/aktion/${aktion.id}/bestaetigen`, { method: "POST" })
-      // Die `konversationId` wird hier durchgereicht, damit der echte
-      // Endpoint sie direkt nutzen kann.
-      const ergebnis = await mockAktionBestaetigen(aktion.id);
+      const ergebnis = await bestaetigeAktionApi(konversationId, aktion.id);
       if (!ergebnis.ok) {
         onStatusChange({
           ...aktion,
@@ -91,16 +85,16 @@ export function AktionsKarte({ aktion, konversationId, onStatusChange }: Props) 
     } finally {
       setBusy(false);
     }
-    // konversationId ist im echten Backend-Flow noetig, hier ungenutzt:
-    void konversationId;
   }
 
   async function abbrechen() {
     setBusy(true);
     try {
-      // TODO Backend: ersetze durch
-      //   await fetch(`/api/chat/${konversationId}/aktion/${aktion.id}/abbrechen`, { method: "POST" })
-      await mockAktionAbbrechen(aktion.id);
+      const ergebnis = await abrecheAktionApi(konversationId, aktion.id);
+      if (!ergebnis.ok) {
+        toast.error(`Abbrechen fehlgeschlagen: ${ergebnis.fehler}`);
+        return;
+      }
       onStatusChange({
         ...aktion,
         status: "cancelled",

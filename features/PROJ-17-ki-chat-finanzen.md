@@ -1,6 +1,6 @@
 # PROJ-17: KI-Chat zu Buchungen & Finanzdaten
 
-## Status: Architected
+## Status: In Progress
 **Created:** 2026-05-21
 **Last Updated:** 2026-05-21
 
@@ -599,7 +599,60 @@ Schon vorhanden und wiederverwendet:
    Aktions-Karten noch da.
 
 ## Implementierungsnotizen
-_(wird beim Bau gefüllt)_
+
+### 2026-05-21 — Frontend-Initial: UI gegen Mock-Daten
+
+Komplette UI gebaut, vorerst gegen `src/lib/chat/mock-daten.ts` (Promise-
+basierte Attrappen + AsyncIterable für den Stream). Keine echten API-
+Routen, keine Migration — beides folgt im Backend-Schritt.
+
+Neu angelegt:
+- `src/lib/chat/typen.ts` — Frontend-Typen (Konversation, Nachricht,
+  Aktion, ToolBadge).
+- `src/lib/chat/mock-daten.ts` — drei Beispiel-Konversationen, simulierter
+  Token-Stream (40-60 ms Pause), Heuristik für Tool-Badges +
+  Aktions-Vorschläge bei Schreib-Anweisungen.
+- `src/lib/chat/datum.ts` (+ Test) — relativ-Datum-Helfer für die Liste.
+- `src/components/chat/chat-layout.tsx` — Zwei-Spalten-Layout (Desktop)
+  bzw. Mobile-Schichtung mit Toggle (Liste ↔ Ansicht).
+- `src/components/chat/konversations-liste.tsx` — Liste + Empty-/
+  Loading-State, Drei-Punkte-Menü mit Umbenennen + Löschen.
+- `src/components/chat/konversations-ansicht.tsx` — Header, Scroll-
+  Bereich, Sticky-Eingabe, Empty-State mit Beispielfragen.
+- `src/components/chat/nachrichten-liste.tsx` — User-/Assistant-
+  Bubbles, Markdown-Rendering (`react-markdown` + `remark-gfm`),
+  Tool-Badges mit Popover-Inspektor, Streaming-Cursor, Copy-Button.
+- `src/components/chat/aktions-karte.tsx` — Confirm-Flow-Karte mit
+  Vorher/Nachher-Tabelle, allen vier Statusvarianten und optimistic-
+  Loader.
+- `src/components/chat/eingabe-feld.tsx` — Auto-Resize-Textarea,
+  Enter/Shift+Enter, Senden-Button mit Stream-Indikator.
+- `src/components/chat/beispielfragen-bubbles.tsx` — 6 Bubbles für den
+  Leerzustand.
+- `src/components/chat/chat-page-inhalt.tsx` — Top-Level-State-Container.
+- `src/app/(app)/chat/page.tsx` — Server-Component (laedt Initial-Daten
+  aus den Mocks).
+
+Sidebar-Eintrag „KI-Chat" wurde in `NAV_HEUTE` direkt nach „Dashboard"
+eingehängt — der Chat ist die zentrale Interaktion, daher prominent.
+
+Pakete neu: `react-markdown`, `remark-gfm` (per `npm install`).
+
+`npm run lint` läuft mit 0 Errors. `npm run build` ist erfolgreich;
+`/chat` taucht in der Route-Liste auf.
+
+**Was noch zu tun ist (Backend-Schritt):**
+- Migration `0009_chat.sql` mit `chat_konversation`, `chat_nachricht`,
+  `chat_aktion`.
+- API-Routen: `GET/POST /api/chat/konversationen`,
+  `GET/PATCH/DELETE /api/chat/[id]`,
+  `POST /api/chat/[id]/nachricht` (Stream via Vercel AI SDK v6),
+  `POST /api/chat/[id]/aktion/[aktion_id]/bestaetigen|abbrechen`.
+- Tool-Bibliothek (Lese + Schreib) in `lib/chat/tools-*.ts`.
+- System-Prompt-Builder mit Profil-Einbettung.
+- Auto-Titel-Generator nach der ersten Antwort.
+- In `mock-daten.ts` jede `mock*`-Funktion durch echten `fetch()`-Call
+  ersetzen — die UI-Komponenten ändern sich dafür nicht.
 
 ## QA Test Results
 _To be added by /qa_

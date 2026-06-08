@@ -1,0 +1,135 @@
+{
+  "Common": {
+    "appName": "RiskGuard",
+    "appTagline": "Supply Chain Risk Management",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "submit": "Submit",
+    "back": "Back",
+    "email": "Email",
+    "password": "Password",
+    "actions": "Actions",
+    "comingSoon": "Coming soon"
+  },
+  "Auth": {
+    "emailPlaceholder": "name@company.com",
+    "passwordPlaceholder": "••••••••"
+  },
+  "Login": {
+    "title": "Sign in",
+    "subtitle": "Welcome back to RiskGuard.",
+    "tabPassword": "Password",
+    "tabMagicLink": "Magic Link",
+    "signIn": "Sign in",
+    "sendMagicLink": "Send magic link",
+    "magicLinkSent": "We sent a sign-in link to {email}. Check your inbox.",
+    "forgotPassword": "Forgot password?",
+    "invalidCredentials": "Incorrect email or password.",
+    "genericError": "Sign-in failed. Please try again."
+  },
+  "ResetPassword": {
+    "title": "Reset password",
+    "subtitle": "We'll send you a reset link.",
+    "sendLink": "Send reset link",
+    "linkSent": "If an account exists, we've sent a reset link to {email}.",
+    "backToLogin": "Back to sign in"
+  },
+  "UpdatePassword": {
+    "title": "Set a new password",
+    "subtitle": "Choose a secure password.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "update": "Save password",
+    "mismatch": "Passwords do not match.",
+    "tooShort": "Password must be at least 8 characters.",
+    "success": "Password updated. Redirecting…",
+    "genericError": "Could not update the password."
+  },
+  "AcceptInvite": {
+    "title": "Accept invitation",
+    "subtitle": "You've been invited to RiskGuard.",
+    "accept": "Accept invitation",
+    "needLogin": "Please sign in with the invited email address to accept the invitation.",
+    "sendLoginLink": "Send sign-in link",
+    "loginLinkSent": "Sign-in link sent to {email}. After signing in you can accept the invitation.",
+    "accepted": "Invitation accepted.",
+    "invalidToken": "This invitation is invalid or has expired.",
+    "requestNew": "Ask an administrator for a new invitation."
+  },
+  "Nav": {
+    "dashboard": "Dashboard",
+    "members": "Members",
+    "settings": "Settings",
+    "platform": "Platform"
+  },
+  "Header": {
+    "switchOrg": "Switch organization",
+    "noOtherOrgs": "No other organizations",
+    "account": "Account",
+    "profile": "Profile",
+    "logout": "Sign out"
+  },
+  "Roles": {
+    "admin": "Administrator",
+    "analyst": "Analyst",
+    "viewer": "Viewer"
+  },
+  "Members": {
+    "title": "Members",
+    "description": "Manage your organization's users and roles.",
+    "invite": "Invite member",
+    "inviteTitle": "Invite member",
+    "inviteDescription": "Send an email invitation and assign a role.",
+    "role": "Role",
+    "status": "Status",
+    "name": "Name",
+    "sendInvite": "Send invitation",
+    "statusActive": "Active",
+    "statusDeactivated": "Deactivated",
+    "statusPending": "Invited",
+    "changeRole": "Change role",
+    "deactivate": "Deactivate",
+    "reactivate": "Reactivate",
+    "remove": "Remove",
+    "revokeInvite": "Revoke invitation",
+    "empty": "No members yet. Invite your team.",
+    "pendingInvites": "Pending invitations",
+    "onlyAdmin": "Only administrators can manage members.",
+    "lastAdmin": "The last administrator cannot be removed.",
+    "inviteSent": "Invitation sent to {email}.",
+    "you": "You",
+    "actionPending": "This action will be wired up in the backend step (PROJ-1 /backend).",
+    "membersHeading": "Team members",
+    "invalidEmail": "Please enter a valid email address.",
+    "updated": "Updated.",
+    "actionError": "Action failed.",
+    "errorLastAdmin": "The last administrator cannot be removed or demoted.",
+    "alreadyInvited": "A pending invitation already exists for this email."
+  },
+  "Dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome to RiskGuard",
+    "placeholder": "The salient-risk register and risk heatmaps will appear here (PROJ-8)."
+  },
+  "NoOrg": {
+    "title": "No organization",
+    "description": "Your account does not belong to an organization yet. You can wait for an invitation or create your own organization.",
+    "createTitle": "Create organization",
+    "orgNameLabel": "Organization name",
+    "orgNamePlaceholder": "e.g. Example Trading Ltd",
+    "create": "Create organization",
+    "createError": "Could not create the organization."
+  },
+  "Theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "Languages": {
+    "switch": "Language",
+    "de": "Deutsch",
+    "en": "English"
+  }
+}

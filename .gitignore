@@ -37,3 +37,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Source material & extracted documents — large binaries (>100MB) and confidential
+# client material. Kept local; the distilled analysis lives in docs/research/.
+/data/
+
+# Playwright
+/test-results/
+/playwright-report/

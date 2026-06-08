@@ -351,4 +351,20 @@ Keine Critical/High-Bugs. BUG-1 (Medium) wurde behoben (Migration `0004`, verifi
 - E2E: `tests/PROJ-1-auth-multi-tenant.spec.ts`
 
 ## Deployment
-_To be added by /deploy_
+
+**Methode:** GitHub-Auto-Deploy. **PR:** [#1](https://github.com/florianfunk/ai-coding-starter-kit/pull/1)
+auf Branch `feat/proj-1-auth-multi-tenant`. **Pre-Deploy:** Build grün, QA Approved, Migrationen
+0001–0004 angewendet, Security-Header gesetzt, Secrets/`data/` gitignored.
+
+**Vom Nutzer auszuführen (Go-Live):**
+1. Repo in Vercel verbinden (Framework Next.js, auto-erkannt) → Branch = Preview, `main` = Production.
+2. Env-Vars (Production + Preview): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `NEXT_PUBLIC_SITE_URL` (= Deployment-URL); optional `RESEND_API_KEY` + `RESEND_FROM`.
+3. Supabase → Authentication → URL Configuration → Redirect URLs: Deployment-URL ergänzen
+   (`https://<app>.vercel.app/**`) — sonst scheitern Magic-Link/Einladung in Produktion.
+4. (Optional) Vercel Workflow „world" aktivieren für den durable Invitation-Workflow; sonst wird der
+   Einladungslink nur geloggt (nicht blockierend).
+5. PR nach `main` mergen → Production-Deploy. Danach Bookkeeping: Status → **Deployed**, Git-Tag
+   `v1.1.0-PROJ-1`.
+
+**Status:** Deployment vorbereitet (PR offen); wird auf **Deployed** gesetzt, sobald Production live + verifiziert ist.

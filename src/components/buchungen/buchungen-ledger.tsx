@@ -203,6 +203,10 @@ export function BuchungenLedger({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
   const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
   const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");
+  // Betrag-Bereich (signiert): z. B. 1…1000 für Einnahmen, −500…−10 für
+  // Ausgaben. Von/Bis-Reihenfolge egal — wird beim Filtern sortiert.
+  const [betragVon, setBetragVon] = useState("");
+  const [betragBis, setBetragBis] = useState("");
   const [sortFeld, setSortFeld] = useState<SortFeld>("datum");
   const [sortRichtung, setSortRichtung] = useState<SortRichtung>("desc");
 
@@ -214,8 +218,18 @@ export function BuchungenLedger({
     return m;
   }, [kategorien]);
 
-  // Filter anwenden (Status, Klassifikation, Kategorie).
+  // Filter anwenden (Status, Klassifikation, Kategorie, Betrag-Bereich).
   const gefiltert = useMemo(() => {
+    // Betrag-Grenzen parsen; Von/Bis bei Bedarf tauschen (signiert).
+    let bMin = betragVon.trim() === "" ? null : Number(betragVon);
+    let bMax = betragBis.trim() === "" ? null : Number(betragBis);
+    if (bMin !== null && Number.isNaN(bMin)) bMin = null;
+    if (bMax !== null && Number.isNaN(bMax)) bMax = null;
+    if (bMin !== null && bMax !== null && bMin > bMax) {
+      const t = bMin;
+      bMin = bMax;
+      bMax = t;
+    }
     return buchungen.filter((b) => {
       if (statusFilter !== "alle" && b.status !== statusFilter) return false;
       if (klassFilter !== "alle" && b.klassifikation !== klassFilter) return false;
@@ -224,9 +238,11 @@ export function BuchungenLedger({
       } else if (kategorieFilter !== "alle") {
         if (b.kategorie_id !== kategorieFilter) return false;
       }
+      if (bMin !== null && b.betrag < bMin) return false;
+      if (bMax !== null && b.betrag > bMax) return false;
       return true;
     });
-  }, [buchungen, statusFilter, klassFilter, kategorieFilter]);
+  }, [buchungen, statusFilter, klassFilter, kategorieFilter, betragVon, betragBis]);
 
   // Sortieren (auf Kopie, damit Props unverändert bleiben).
   const sortiert = useMemo(() => {
@@ -303,6 +319,8 @@ export function BuchungenLedger({
     setStatusFilter("alle");
     setKlassFilter("alle");
     setKategorieFilter("alle");
+    setBetragVon("");
+    setBetragBis("");
     setSortFeld("datum");
     setSortRichtung("desc");
     router.push("/buchungen");
@@ -330,6 +348,8 @@ export function BuchungenLedger({
     statusFilter !== "alle" ||
     klassFilter !== "alle" ||
     kategorieFilter !== "alle" ||
+    betragVon !== "" ||
+    betragBis !== "" ||
     sortFeld !== "datum" ||
     sortRichtung !== "desc";
 
@@ -589,6 +609,54 @@ export function BuchungenLedger({
               })}
             </div>
           </div>
+        </div>
+
+        {/* Betrag-Bereich (client-seitig, signiert: + = Einnahmen, − = Ausgaben) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+          <div className="space-y-1.5">
+            <Label htmlFor="f-betrag-von" className="text-xs text-muted-foreground">
+              Betrag von (€)
+            </Label>
+            <Input
+              id="f-betrag-von"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              placeholder="z. B. −500 oder 1"
+              value={betragVon}
+              onChange={(e) => setBetragVon(e.target.value)}
+              className="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="f-betrag-bis" className="text-xs text-muted-foreground">
+              Betrag bis (€)
+            </Label>
+            <Input
+              id="f-betrag-bis"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              placeholder="z. B. −10 oder 1.000"
+              value={betragBis}
+              onChange={(e) => setBetragBis(e.target.value)}
+              className="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)]"
+            />
+          </div>
+          {betragVon !== "" || betragBis !== "" ? (
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setBetragVon("");
+                  setBetragBis("");
+                }}
+                className="inline-flex h-10 items-center gap-1 rounded-[var(--radius-inner)] px-3 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-[color:var(--surface-2)] hover:text-destructive"
+              >
+                <X className="h-3.5 w-3.5" /> Betrag löschen
+              </button>
+            </div>
+          ) : null}
         </div>
       </section>
 

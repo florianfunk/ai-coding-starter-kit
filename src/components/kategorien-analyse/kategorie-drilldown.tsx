@@ -4,9 +4,9 @@
 // (Kategorie ändern, bestätigen). Lädt die Buchungen via /api/.../buchungen,
 // PATCH geht an /api/buchungen/[id].
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, CheckCheck } from "lucide-react";
 
 import {
   Sheet,
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ import {
 
 import type { Buchung, KategorieTyp } from "@/lib/types";
 import type { KategorieAggregat } from "@/app/api/kategorien-analyse/route";
+import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
 
 interface KategorieOption {
   id: string;
@@ -83,6 +85,17 @@ export function KategorieDrilldown({
   const [ladeFehler, setLadeFehler] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [savingId, setSavingId] = useState<string | null>(null);
+  // Mehrfachauswahl + Bulk-Bestätigung.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [zielKat, setZielKat] = useState<string>("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const unbestaetigt = useMemo(
+    () => buchungen.filter((b) => b.status !== "manuell_bestaetigt"),
+    [buchungen],
+  );
+  const alleSichtbarGewaehlt =
+    buchungen.length > 0 && selected.size === buchungen.length;
 
   useEffect(() => {
     if (!kategorie) return;
@@ -107,6 +120,7 @@ export function KategorieDrilldown({
         const kj = (await kRes.json()) as { data: KategorieOption[] };
         setBuchungen(bj.buchungen);
         setKategorien(kj.data.filter((k) => k.aktiv));
+        setSelected(new Set());
       } catch (e) {
         setLadeFehler(e instanceof Error ? e.message : "Unbekannter Fehler");
       }
@@ -166,6 +180,80 @@ export function KategorieDrilldown({
     }
   }
 
+  function toggleZeile(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAlle() {
+    setSelected((s) =>
+      s.size === buchungen.length
+        ? new Set()
+        : new Set(buchungen.map((b) => b.id)),
+    );
+  }
+
+  /**
+   * Setzt für viele Buchungen die Zielkategorie + status=manuell_bestaetigt
+   * (ein Request an /api/buchungen/bulk-kategorie). Bleibt die Kategorie
+   * gleich, werden die Zeilen nur als bestätigt markiert; bei Wechsel in eine
+   * andere Kategorie verschwinden sie aus dieser Ansicht.
+   */
+  async function bulkSetzen(ids: string[], zielKategorieId: string) {
+    if (ids.length === 0 || !zielKategorieId) return;
+    setBulkBusy(true);
+    try {
+      const r = await fetch("/api/buchungen/bulk-kategorie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, kategorie_id: zielKategorieId }),
+      });
+      if (!r.ok) {
+        const e = (await r.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(e?.error ?? `HTTP ${r.status}`);
+      }
+      const j = (await r.json()) as BulkKategorieResponse;
+      const idSet = new Set(ids);
+      const gleicheKategorie = zielKategorieId === kategorie?.kategorie_id;
+      setBuchungen((bs) =>
+        gleicheKategorie
+          ? bs.map((b) =>
+              idSet.has(b.id) ? { ...b, status: "manuell_bestaetigt" } : b,
+            )
+          : bs.filter((b) => !idSet.has(b.id)),
+      );
+      setSelected(new Set());
+      toast.success(
+        `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} bestätigt` +
+          (gleicheKategorie ? "" : ` → ${j.kategorie.bezeichnung}`),
+      );
+      onMutiert();
+    } catch (e) {
+      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
+  // „Alle bestätigen": alle noch nicht bestätigten Zeilen in DIESER Kategorie.
+  function alleBestaetigen() {
+    if (!kategorie?.kategorie_id) return;
+    bulkSetzen(
+      unbestaetigt.map((b) => b.id),
+      kategorie.kategorie_id,
+    );
+  }
+
+  // „Übernehmen & bestätigen": markierte Zeilen in die gewählte Kategorie.
+  function auswahlUebernehmen() {
+    const ziel = zielKat || kategorie?.kategorie_id || "";
+    bulkSetzen(Array.from(selected), ziel);
+  }
+
   return (
     <Sheet open={offen} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-[1100px] sm:w-[90vw]">
@@ -184,6 +272,57 @@ export function KategorieDrilldown({
           </SheetDescription>
         </SheetHeader>
 
+        {offen && buchungen.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-b pb-3">
+            <Button
+              size="sm"
+              onClick={alleBestaetigen}
+              disabled={
+                bulkBusy ||
+                unbestaetigt.length === 0 ||
+                !kategorie?.kategorie_id
+              }
+            >
+              {bulkBusy ? (
+                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCheck className="mr-1 h-3.5 w-3.5" />
+              )}
+              Alle bestätigen ({unbestaetigt.length})
+            </Button>
+
+            {selected.size > 0 && (
+              <>
+                <span className="ml-1 text-sm text-muted-foreground">
+                  {selected.size} ausgewählt
+                </span>
+                <Select value={zielKat} onValueChange={setZielKat}>
+                  <SelectTrigger className="h-8 w-[240px] text-xs">
+                    <SelectValue placeholder="Zielkategorie (optional)…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <KategorieGruppen kategorien={kategorien} />
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={auswahlUebernehmen} disabled={bulkBusy}>
+                  {bulkBusy ? (
+                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  {zielKat ? "Übernehmen & bestätigen" : "Auswahl bestätigen"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelected(new Set())}
+                  disabled={bulkBusy}
+                >
+                  Auswahl aufheben
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 max-h-[80vh] overflow-y-auto">
           {isPending && buchungen.length === 0 ? (
             <p className="text-sm text-muted-foreground">Lade Buchungen…</p>
@@ -197,6 +336,13 @@ export function KategorieDrilldown({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[36px]">
+                    <Checkbox
+                      checked={alleSichtbarGewaehlt}
+                      onCheckedChange={toggleAlle}
+                      aria-label="Alle auswählen"
+                    />
+                  </TableHead>
                   <TableHead className="w-[100px]">Datum</TableHead>
                   <TableHead>Empfänger</TableHead>
                   <TableHead>Zweck</TableHead>
@@ -209,7 +355,17 @@ export function KategorieDrilldown({
               </TableHeader>
               <TableBody>
                 {buchungen.map((b) => (
-                  <TableRow key={b.id}>
+                  <TableRow
+                    key={b.id}
+                    data-state={selected.has(b.id) ? "selected" : undefined}
+                  >
+                    <TableCell>
+                      <Checkbox
+                        checked={selected.has(b.id)}
+                        onCheckedChange={() => toggleZeile(b.id)}
+                        aria-label="Zeile auswählen"
+                      />
+                    </TableCell>
                     <TableCell className="tabular-nums">
                       {deDate(b.buchung_datum)}
                     </TableCell>

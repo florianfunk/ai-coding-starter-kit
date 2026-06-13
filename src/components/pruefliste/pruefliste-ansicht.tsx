@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Layers,
   Loader2,
+  X,
 } from "lucide-react";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -66,6 +67,7 @@ export function PrueflisteAnsicht({
   const [konto, setKonto] = useState("alle");
   const [grund, setGrund] = useState("alle");
   const [sort, setSort] = useState<"datum" | "betrag">("datum");
+  const [empfaengerFilter, setEmpfaengerFilter] = useState<string | null>(null);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [dialogFaelle, setDialogFaelle] = useState<Buchung[] | null>(null);
   const [reloading, setReloading] = useState(false);
@@ -85,7 +87,10 @@ export function PrueflisteAnsicht({
     return Array.from(s).sort();
   }, [faelle]);
 
-  const gefiltert = useMemo(() => {
+  // Basis = Konto-/Grund-Filter + Sortierung. Die Mustergruppen werden hieraus
+  // gebildet, damit alle Empfänger-Chips sichtbar bleiben, auch wenn unten
+  // bereits auf einen Empfänger gefiltert ist.
+  const basis = useMemo(() => {
     let liste = faelle.slice();
     if (konto !== "alle") liste = liste.filter((f) => f.konto_id === konto);
     if (grund !== "alle") {
@@ -101,7 +106,7 @@ export function PrueflisteAnsicht({
 
   const gruppen = useMemo<Mustergruppe[]>(() => {
     const map = new Map<string, Mustergruppe>();
-    for (const f of gefiltert) {
+    for (const f of basis) {
       const key = normEmpfaenger(f.empfaenger);
       if (!key) continue;
       const g = map.get(key);
@@ -116,7 +121,17 @@ export function PrueflisteAnsicht({
     return Array.from(map.values())
       .filter((g) => g.buchung_ids.length >= 2)
       .sort((a, b) => b.buchung_ids.length - a.buchung_ids.length);
-  }, [gefiltert]);
+  }, [basis]);
+
+  // Liste unten = Basis, zusätzlich auf den gewählten Empfänger gefiltert.
+  const gefiltert = useMemo(() => {
+    if (!empfaengerFilter) return basis;
+    return basis.filter((f) => normEmpfaenger(f.empfaenger) === empfaengerFilter);
+  }, [basis, empfaengerFilter]);
+
+  const aktiveGruppe = empfaengerFilter
+    ? gruppen.find((g) => g.schluessel === empfaengerFilter) ?? null
+    : null;
 
   async function reload(): Promise<Buchung[]> {
     setReloading(true);
@@ -127,6 +142,7 @@ export function PrueflisteAnsicht({
         const neu = (json.data ?? []) as Buchung[];
         setFaelle(neu);
         setAuswahl(new Set());
+        setEmpfaengerFilter(null);
         router.refresh();
         return neu;
       }
@@ -152,10 +168,25 @@ export function PrueflisteAnsicht({
   }
 
   function gruppeWaehlen(g: Mustergruppe) {
+    if (empfaengerFilter === g.schluessel) {
+      // Aktiven Filter wieder aufheben.
+      setEmpfaengerFilter(null);
+      setAuswahl(new Set());
+      return;
+    }
+    // Liste auf diesen Empfänger filtern und alle Fälle direkt vorauswählen,
+    // damit sowohl das Prüfen im Detail als auch die Bulk-Entscheidung möglich
+    // bleiben.
+    setEmpfaengerFilter(g.schluessel);
     setAuswahl(new Set(g.buchung_ids));
     toast.success(
-      `${g.buchung_ids.length} Fälle von „${g.empfaenger}" ausgewählt.`,
+      `Gefiltert auf „${g.empfaenger}" — ${g.buchung_ids.length} Fälle.`,
     );
+  }
+
+  function empfaengerFilterAufheben() {
+    setEmpfaengerFilter(null);
+    setAuswahl(new Set());
   }
 
   function oeffneEinzeln(f: Buchung) {
@@ -222,23 +253,39 @@ export function PrueflisteAnsicht({
             <Layers className="h-4 w-4 text-brand-violet" />
             <div className="text-[13px] font-semibold">Mustergruppen</div>
             <div className="text-[12px] text-muted-foreground">
-              Gleicher Empfänger — Bulk-Auswahl
+              Gleicher Empfänger — antippen, um die Liste zu filtern
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {gruppen.map((g) => (
-              <button
-                key={g.schluessel}
-                type="button"
-                onClick={() => gruppeWaehlen(g)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--surface-2)] px-3 py-1 text-[12.5px] font-medium text-foreground transition-colors hover:bg-tint-violet"
-              >
-                <span className="truncate max-w-[180px]">{g.empfaenger}</span>
-                <span className="rounded-full bg-brand-violet px-1.5 py-0 font-mono text-[10px] font-bold text-white">
-                  {g.buchung_ids.length}
-                </span>
-              </button>
-            ))}
+            {gruppen.map((g) => {
+              const aktiv = empfaengerFilter === g.schluessel;
+              return (
+                <button
+                  key={g.schluessel}
+                  type="button"
+                  onClick={() => gruppeWaehlen(g)}
+                  aria-pressed={aktiv}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors",
+                    aktiv
+                      ? "bg-brand-violet text-white"
+                      : "bg-[color:var(--surface-2)] text-foreground hover:bg-tint-violet",
+                  )}
+                >
+                  <span className="truncate max-w-[180px]">{g.empfaenger}</span>
+                  <span
+                    className={cn(
+                      "rounded-full px-1.5 py-0 font-mono text-[10px] font-bold",
+                      aktiv
+                        ? "bg-white/25 text-white"
+                        : "bg-brand-violet text-white",
+                    )}
+                  >
+                    {g.buchung_ids.length}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -257,6 +304,16 @@ export function PrueflisteAnsicht({
                 ? "Alles erledigt — der Agent meldet sich, sobald wieder etwas Unsicheres reinkommt."
                 : "Filtere und entscheide einzeln oder als Bulk."}
             </div>
+            {empfaengerFilter && (
+              <button
+                type="button"
+                onClick={empfaengerFilterAufheben}
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-tint-violet px-2.5 py-1 text-[12px] font-medium text-brand-violet transition-colors hover:bg-brand-violet hover:text-white"
+              >
+                Empfänger: {aktiveGruppe?.empfaenger ?? empfaengerFilter}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Select value={konto} onValueChange={setKonto}>

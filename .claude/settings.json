@@ -18,5 +18,23 @@
       "Bash(ls:*)",
       "Bash(cat:*)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-dev": true,
+    "frontend-design@aws-claude-code-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-dev": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers"
+      }
+    },
+    "aws-claude-code-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "aws-solutions-library-samples/guidance-for-claude-code-with-amazon-bedrock"
+      }
+    }
   }
 }

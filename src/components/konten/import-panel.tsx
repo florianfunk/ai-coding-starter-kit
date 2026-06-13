@@ -9,7 +9,6 @@ import type { Konto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -323,9 +322,13 @@ export function ImportPanel({ konten }: { konten: Konto[] }) {
                       >
                         <TableCell>
                           {z.duplikat ? (
-                            <Badge variant="outline">Duplikat</Badge>
+                            <span className="inline-flex rounded-full bg-[color:var(--surface-2)] px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                              Duplikat
+                            </span>
                           ) : (
-                            <Badge variant="default">Neu</Badge>
+                            <span className="inline-flex rounded-full bg-tint-cyan px-2 py-0.5 text-[10px] font-semibold text-income-strong">
+                              Neu
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>{z.buchung_datum}</TableCell>

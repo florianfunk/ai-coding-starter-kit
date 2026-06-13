@@ -14,6 +14,7 @@
 //
 // Auth Pflicht (getApiUser → 401). Alles owner-scoped + RLS.
 
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
@@ -219,7 +220,10 @@ export async function POST(request: Request) {
     });
   }
 
-  // job_lauf anlegen (Protokoll-Eintrag).
+  // job_lauf anlegen (Protokoll-Eintrag mit Datei-Metadaten, damit die
+  // Import-Historie spaeter "diesen Import rueckgaengig machen" anbieten
+  // kann — die Buchungen werden ueber import_lauf_id verknuepft).
+  const dateiHash = createHash("sha256").update(buffer).digest("hex");
   const { data: job } = await supabase
     .from("job_lauf")
     .insert({
@@ -227,6 +231,10 @@ export async function POST(request: Request) {
       art: "konto_import",
       status: "laeuft",
       gesamt: vorschau.length,
+      konto_id: konto.id,
+      dateiname: file.name,
+      dateigroesse: file.size,
+      datei_hash: dateiHash,
     })
     .select("id")
     .single();
@@ -247,6 +255,7 @@ export async function POST(request: Request) {
       waehrung: z.waehrung,
       duplikat_hash: z.duplikat_hash,
       import_quelle: file.name,
+      import_lauf_id: job?.id ?? null,
       status: "offen",
     }));
 

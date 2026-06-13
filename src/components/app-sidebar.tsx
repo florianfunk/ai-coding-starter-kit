@@ -52,6 +52,16 @@ const SETTINGS = [
   { href: "/einstellungen/admin", label: "Admin" },
 ];
 
+// Block-Reihenfolge der Sidebar. Titel + zugehörige Einträge werden je
+// als eigener Container gerendert — so bleibt der Abstand zwischen den
+// Blöcken groß, die Einträge innerhalb eines Blocks aber eng zusammen.
+const NAV_SEKTIONEN = [
+  { titel: "Heute", eintraege: NAV_HEUTE },
+  { titel: "Bücher", eintraege: NAV_BUECHER },
+  { titel: "Steuer", eintraege: NAV_STEUER },
+  { titel: "Setup", eintraege: SETTINGS },
+];
+
 function NavLink({
   href,
   label,
@@ -90,7 +100,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   const color = SECTION_COLORS[key] ?? "var(--text-subtle)";
   return (
     <div
-      className="mt-5 mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] first:mt-1"
+      className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em]"
       style={{ color }}
     >
       {children}
@@ -130,46 +140,22 @@ export function AppSidebar() {
         </div>
       </div>
 
-      {/* Navigation — vier Bereiche mit Editorial-Eyebrows */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-0">
-        <SectionTitle>Heute</SectionTitle>
-        {NAV_HEUTE.map((item) => (
-          <NavLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={istAktiv(item.href)}
-          />
-        ))}
-
-        <SectionTitle>Bücher</SectionTitle>
-        {NAV_BUECHER.map((item) => (
-          <NavLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={istAktiv(item.href)}
-          />
-        ))}
-
-        <SectionTitle>Steuer</SectionTitle>
-        {NAV_STEUER.map((item) => (
-          <NavLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={istAktiv(item.href)}
-          />
-        ))}
-
-        <SectionTitle>Setup</SectionTitle>
-        {SETTINGS.map((item) => (
-          <NavLink
-            key={item.href}
-            href={item.href}
-            label={item.label}
-            active={istAktiv(item.href)}
-          />
+      {/* Navigation — vier Bereiche mit Editorial-Eyebrows.
+          Großer Abstand zwischen den Blöcken (space-y-7), Einträge
+          innerhalb eines Blocks eng beieinander (space-y-0.5). */}
+      <nav className="flex-1 space-y-7 overflow-y-auto px-0">
+        {NAV_SEKTIONEN.map((sektion) => (
+          <div key={sektion.titel} className="space-y-0.5">
+            <SectionTitle>{sektion.titel}</SectionTitle>
+            {sektion.eintraege.map((item) => (
+              <NavLink
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                active={istAktiv(item.href)}
+              />
+            ))}
+          </div>
         ))}
       </nav>
 

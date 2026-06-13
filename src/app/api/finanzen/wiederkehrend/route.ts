@@ -65,6 +65,10 @@ export type { Intervall, Richtung };
 
 export interface WiederkehrendItem {
   empfaenger: string;
+  /** Normalisierter Schluessel — Bruecke zu empfaenger_kuendigung. */
+  empfaenger_norm: string;
+  /** Aktueller Kuendigungs-Status, sofern markiert. NULL → nicht markiert. */
+  kuendigung_status: "offen" | "gekuendigt" | "beendet" | null;
   intervall: Intervall;
   /** Median-Abstand in Tagen — vor allem für Debug-Sicht. */
   intervall_tage: number;
@@ -228,10 +232,30 @@ export async function GET(request: Request) {
     gruppen.set(key, arr);
   }
 
+  // Kuendigungs-Markierungen aller relevanten Empfaenger in einem Schwung
+  // laden — fuer die Anreicherung des UI (Badge + Toggle-Button).
+  const kuendigungStatus = new Map<
+    string,
+    "offen" | "gekuendigt" | "beendet"
+  >();
+  if (gruppen.size > 0) {
+    const { data: ks } = await supabase
+      .from("empfaenger_kuendigung")
+      .select("empfaenger_norm, status")
+      .eq("owner_id", user.id)
+      .in("empfaenger_norm", Array.from(gruppen.keys()));
+    for (const row of (ks ?? []) as Array<{
+      empfaenger_norm: string;
+      status: "offen" | "gekuendigt" | "beendet";
+    }>) {
+      kuendigungStatus.set(row.empfaenger_norm, row.status);
+    }
+  }
+
   const items: WiederkehrendItem[] = [];
   const heute = new Date();
 
-  for (const [, buchungen] of gruppen) {
+  for (const [empfaengerNorm, buchungen] of gruppen) {
     if (buchungen.length < MIN_BUCHUNGEN) continue;
     buchungen.sort((a, b) => a.buchung_datum.localeCompare(b.buchung_datum));
 
@@ -269,6 +293,8 @@ export async function GET(request: Request) {
 
     items.push({
       empfaenger: anzeigeEmpfaenger,
+      empfaenger_norm: empfaengerNorm,
+      kuendigung_status: kuendigungStatus.get(empfaengerNorm) ?? null,
       intervall: cluster.intervall,
       intervall_tage: cluster.intervall_tage,
       durchschnitt: round2(cluster.betrag_median),

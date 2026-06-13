@@ -9,6 +9,7 @@ import type { Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ImportPanel } from "@/components/konten/import-panel";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Kontoauszug-Import · STEUERAGENT",
@@ -29,22 +30,17 @@ export default async function KontoImportPage() {
   const konten = (data ?? []) as Konto[];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Kontoauszug-Import
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Lade eine Excel- (.xlsx) oder CSV-Datei hoch. Zuerst wird eine
-            Vorschau erzeugt (mit Duplikatmarkierung), erst danach werden die
-            Buchungen übernommen.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/einstellungen/konten">Zu den Konten</Link>
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Setup"
+        titel="Kontoauszug-Import"
+        beschreibung="Lade eine Excel- (.xlsx) oder CSV-Datei hoch. Zuerst wird eine Vorschau erzeugt (mit Duplikatmarkierung), erst danach werden die Buchungen übernommen."
+        actions={
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href="/einstellungen/konten">Zu den Konten</Link>
+          </Button>
+        }
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -70,6 +66,6 @@ export default async function KontoImportPage() {
       ) : (
         <ImportPanel konten={konten} />
       )}
-    </div>
+    </PageShell>
   );
 }

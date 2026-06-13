@@ -210,7 +210,7 @@ function KopfBetrag({ daten }: { daten: BuchungDetail }) {
               "text-3xl font-bold tabular-nums " +
               (daten.betrag < 0
                 ? "text-destructive"
-                : "text-emerald-600 dark:text-emerald-400")
+                : "text-income-strong dark:text-income")
             }
           >
             {eur(daten.betrag)}{" "}

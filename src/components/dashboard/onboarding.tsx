@@ -81,8 +81,16 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle>Willkommen beim STEUERAGENT</CardTitle>
-            <Badge variant={erledigt === gesamt ? "default" : "secondary"}>
-              {erledigt} / {gesamt} Schritten erledigt
+            <Badge
+              variant="secondary"
+              className={
+                "rounded-full " +
+                (erledigt === gesamt
+                  ? "bg-tint-cyan text-income-strong"
+                  : "bg-tint-yellow text-highlight-strong")
+              }
+            >
+              {erledigt} / {gesamt} Schritte erledigt
             </Badge>
           </div>
           <CardDescription>
@@ -100,18 +108,18 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                 <li
                   key={s.key}
                   className={[
-                    "flex flex-col rounded-md border p-4",
+                    "flex flex-col rounded-[var(--radius-inner)] p-4 ring-1 transition-colors",
                     fertig
-                      ? "border-emerald-500/40 bg-emerald-500/5"
+                      ? "bg-tint-cyan/60 ring-tint-cyan-border"
                       : aktuell
-                        ? "border-primary ring-1 ring-primary/30"
-                        : "",
+                        ? "bg-tint-violet/60 ring-tint-violet-border"
+                        : "bg-[color:var(--surface-2)] ring-line",
                   ].join(" ")}
                 >
                   <div className="flex items-start gap-2">
                     {fertig ? (
                       <CheckCircle2
-                        className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-income-strong"
                         aria-hidden
                       />
                     ) : (
@@ -120,14 +128,14 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                         aria-hidden
                       />
                     )}
-                    <h3 className="text-sm font-semibold">{s.titel}</h3>
+                    <h3 className="text-[13.5px] font-semibold">{s.titel}</h3>
                   </div>
-                  <p className="mt-1 flex-1 text-sm text-muted-foreground">
+                  <p className="mt-1 flex-1 text-[12.5px] text-muted-foreground">
                     {s.text}
                   </p>
                   <div className="mt-3 flex items-center gap-2">
                     {fertig ? (
-                      <span className="inline-flex items-center text-xs font-medium text-emerald-700">
+                      <span className="inline-flex items-center text-[11px] font-semibold text-income-strong">
                         Erledigt
                       </span>
                     ) : null}
@@ -135,7 +143,12 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                       asChild
                       variant={aktuell ? "default" : "outline"}
                       size="sm"
-                      className="ml-auto"
+                      className={
+                        "ml-auto rounded-full " +
+                        (aktuell
+                          ? "bg-brand-violet text-white hover:bg-[color:var(--accent-hover)]"
+                          : "")
+                      }
                     >
                       <Link href={s.href}>
                         {fertig ? "Ansehen" : s.cta}

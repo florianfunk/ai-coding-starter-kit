@@ -183,7 +183,7 @@ function Kennzahlen({ daten }: { daten: CockpitResponse }) {
               className={
                 "mt-1 text-xl font-semibold tabular-nums " +
                 (i.akzent === "positiv"
-                  ? "text-emerald-600 dark:text-emerald-400"
+                  ? "text-income-strong dark:text-income"
                   : i.akzent === "negativ"
                     ? "text-destructive"
                     : "")

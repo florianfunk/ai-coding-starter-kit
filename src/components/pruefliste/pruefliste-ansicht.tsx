@@ -8,26 +8,16 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Layers, Loader2 } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ChevronRight,
+  Layers,
+  Loader2,
+} from "lucide-react";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -35,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -223,200 +214,155 @@ export function PrueflisteAnsicht({
     gefiltert.length > 0 && gefiltert.every((f) => auswahl.has(f.id));
 
   return (
-    <>
+    <div className="space-y-5">
+      {/* Mustergruppen — iOS-Pill-Reihe */}
       {gruppen.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Layers className="h-4 w-4" />
-              Mustergruppen
-            </CardTitle>
-            <CardDescription>
-              Gleicher Empfänger – in einem Schritt als Bulk auswählen.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
+        <section className="rounded-[var(--radius)] bg-card p-4 shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <div className="mb-3 flex items-center gap-2">
+            <Layers className="h-4 w-4 text-brand-violet" />
+            <div className="text-[13px] font-semibold">Mustergruppen</div>
+            <div className="text-[12px] text-muted-foreground">
+              Gleicher Empfänger — Bulk-Auswahl
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {gruppen.map((g) => (
-              <Button
+              <button
                 key={g.schluessel}
-                variant="outline"
-                size="sm"
+                type="button"
                 onClick={() => gruppeWaehlen(g)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--surface-2)] px-3 py-1 text-[12.5px] font-medium text-foreground transition-colors hover:bg-tint-violet"
               >
-                {g.empfaenger}
-                <Badge variant="secondary" className="ml-2">
+                <span className="truncate max-w-[180px]">{g.empfaenger}</span>
+                <span className="rounded-full bg-brand-violet px-1.5 py-0 font-mono text-[10px] font-bold text-white">
                   {g.buchung_ids.length}
-                </Badge>
-              </Button>
+                </span>
+              </button>
             ))}
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <CardTitle>Offene Prüffälle</CardTitle>
-            <CardDescription>
+      {/* Toolbar: Filter + Bulk-Aktion */}
+      <section className="space-y-3 rounded-[var(--radius)] bg-card p-4 shadow-[var(--shadow-1)] ring-1 ring-line/60">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[13px] font-semibold">
               {istLeer
-                ? "Keine offenen Ausnahmen – alles erledigt."
-                : `${gefiltert.length} von ${faelle.length} Fall/Fällen angezeigt.`}
-            </CardDescription>
+                ? "Keine offenen Fälle"
+                : `${gefiltert.length} von ${faelle.length} Fällen`}
+            </div>
+            <div className="text-[12px] text-muted-foreground">
+              {istLeer
+                ? "Alles erledigt — der Agent meldet sich, sobald wieder etwas Unsicheres reinkommt."
+                : "Filtere und entscheide einzeln oder als Bulk."}
+            </div>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <div className="w-40">
-              <Select value={konto} onValueChange={setKonto}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Konto" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="alle">Alle Konten</SelectItem>
-                  {konten.map((k) => (
-                    <SelectItem key={k.id} value={k.id}>
-                      {k.bezeichnung}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-44">
-              <Select value={grund} onValueChange={setGrund}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Grund" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="alle">Alle Gründe</SelectItem>
-                  {verfuegbareGruende.map((g) => (
-                    <SelectItem key={g} value={g}>
-                      {grundLabel(g)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-36">
-              <Select
-                value={sort}
-                onValueChange={(v) => setSort(v as "datum" | "betrag")}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="datum">Nach Datum</SelectItem>
-                  <SelectItem value="betrag">Nach Betrag</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={konto} onValueChange={setKonto}>
+              <SelectTrigger className="h-9 w-44 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
+                <SelectValue placeholder="Konto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Alle Konten</SelectItem>
+                {konten.map((k) => (
+                  <SelectItem key={k.id} value={k.id}>
+                    {k.bezeichnung}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={grund} onValueChange={setGrund}>
+              <SelectTrigger className="h-9 w-44 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
+                <SelectValue placeholder="Grund" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Alle Gründe</SelectItem>
+                {verfuegbareGruende.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {grundLabel(g)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={sort}
+              onValueChange={(v) => setSort(v as "datum" | "betrag")}
+            >
+              <SelectTrigger className="h-9 w-36 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="datum">Nach Datum</SelectItem>
+                <SelectItem value="betrag">Nach Betrag</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               onClick={oeffneBulk}
               disabled={auswahl.size === 0}
+              className="h-9 rounded-full bg-brand-violet font-semibold text-white hover:bg-[color:var(--accent-hover)]"
             >
               {auswahl.size > 0
                 ? `${auswahl.size} entscheiden`
                 : "Auswahl entscheiden"}
             </Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          {istLeer ? (
-            <div className="rounded-md border border-dashed p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                Die Prüfliste ist leer. Sobald der Agent unsichere Fälle
-                findet, erscheinen sie hier.
-              </p>
-            </div>
-          ) : gefiltert.length === 0 ? (
-            <div className="rounded-md border border-dashed p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                Kein Fall für die aktuelle Filterauswahl.
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={alleGewaehlt}
-                        onCheckedChange={(v) =>
-                          alleSichtbarenWaehlen(Boolean(v))
-                        }
-                        aria-label="Alle sichtbaren auswählen"
-                      />
-                    </TableHead>
-                    <TableHead>Datum</TableHead>
-                    <TableHead>Empfänger</TableHead>
-                    <TableHead>Zweck</TableHead>
-                    <TableHead className="text-right">Betrag</TableHead>
-                    <TableHead>Konto</TableHead>
-                    <TableHead>Grund</TableHead>
-                    <TableHead className="text-right">Aktion</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {gefiltert.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={auswahl.has(f.id)}
-                          onCheckedChange={() => toggle(f.id)}
-                          aria-label={`Fall ${
-                            f.empfaenger ?? f.id
-                          } auswählen`}
-                        />
-                      </TableCell>
-                      <TableCell>{formatDatum(f.buchung_datum)}</TableCell>
-                      <TableCell className="max-w-[180px] truncate font-medium">
-                        {f.empfaenger ?? "—"}
-                      </TableCell>
-                      <TableCell className="max-w-[220px] truncate text-sm text-muted-foreground">
-                        {f.verwendungszweck ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatBetrag(f.betrag)} {f.waehrung}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {kontoName(f.konto_id)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {gruendeListe(f.pruef_grund).map((g) => (
-                            <Badge key={g} variant="destructive">
-                              {grundLabel(g)}
-                            </Badge>
-                          ))}
-                          {gruendeListe(f.pruef_grund).length === 0 && (
-                            <span className="text-sm text-muted-foreground">
-                              —
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => oeffneEinzeln(f)}
-                        >
-                          Entscheiden
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-          {reloading && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Aktualisiere…
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
+
+      {/* Liste */}
+      {istLeer ? (
+        <section className="rounded-[var(--radius)] bg-card px-8 py-16 text-center shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-tint-cyan text-income-strong">
+            ✓
+          </div>
+          <h2 className="mt-4 font-display text-xl font-bold tracking-[-0.012em]">
+            Prüfliste ist leer
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-sm text-[13.5px] text-muted-foreground">
+            Sobald der Agent unsichere Fälle findet, erscheinen sie hier.
+          </p>
+        </section>
+      ) : gefiltert.length === 0 ? (
+        <section className="rounded-[var(--radius)] bg-card px-6 py-12 text-center shadow-[var(--shadow-1)] ring-1 ring-line/60 text-[13px] text-muted-foreground">
+          Kein Fall für die aktuelle Filterauswahl.
+        </section>
+      ) : (
+        <section className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          {/* Select-all-Bar */}
+          <div className="flex items-center gap-3 border-b border-line-hair px-4 py-2.5">
+            <Checkbox
+              checked={alleGewaehlt}
+              onCheckedChange={(v) => alleSichtbarenWaehlen(Boolean(v))}
+              aria-label="Alle sichtbaren auswählen"
+            />
+            <span className="text-[12px] text-muted-foreground">
+              {auswahl.size > 0
+                ? `${auswahl.size} ausgewählt`
+                : "Alle auswählen"}
+            </span>
+          </div>
+          <ul role="list" className="divide-y divide-line-hair">
+            {gefiltert.map((f) => (
+              <PrueflisteZeile
+                key={f.id}
+                fall={f}
+                kontoName={kontoName(f.konto_id)}
+                ausgewaehlt={auswahl.has(f.id)}
+                onToggle={() => toggle(f.id)}
+                onEntscheiden={() => oeffneEinzeln(f)}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {reloading && (
+        <div className="flex items-center gap-2 px-2 text-[12px] text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Aktualisiere…
+        </div>
+      )}
 
       {dialogFaelle && (
         <EntscheidungsDialog
@@ -454,6 +400,103 @@ export function PrueflisteAnsicht({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PrueflisteZeile — iOS-Listen-Eintrag pro Fall
+// ---------------------------------------------------------------------------
+
+function PrueflisteZeile({
+  fall: f,
+  kontoName,
+  ausgewaehlt,
+  onToggle,
+  onEntscheiden,
+}: {
+  fall: Buchung;
+  kontoName: string;
+  ausgewaehlt: boolean;
+  onToggle: () => void;
+  onEntscheiden: () => void;
+}) {
+  const ausgabe = f.betrag < 0;
+  const gruende = gruendeListe(f.pruef_grund);
+  return (
+    <li
+      className={cn(
+        "group relative flex items-center gap-3 px-4 py-3 transition-colors",
+        ausgewaehlt ? "bg-tint-violet/40" : "hover:bg-[color:var(--surface-2)]",
+      )}
+    >
+      <Checkbox
+        checked={ausgewaehlt}
+        onCheckedChange={onToggle}
+        aria-label={`Fall ${f.empfaenger ?? f.id} auswählen`}
+      />
+      {/* Vorzeichen-Icon */}
+      <div
+        className={cn(
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]",
+          ausgabe
+            ? "bg-tint-cerise text-destructive"
+            : "bg-tint-cyan text-income-strong",
+        )}
+        aria-hidden
+      >
+        {ausgabe ? (
+          <ArrowDownLeft className="h-4 w-4" />
+        ) : (
+          <ArrowUpRight className="h-4 w-4" />
+        )}
+      </div>
+      {/* Empfänger + Zweck */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="truncate text-[14px] font-semibold leading-tight">
+            {f.empfaenger ?? "—"}
+          </span>
+          {gruende.map((g) => (
+            <span
+              key={g}
+              className="inline-flex items-center rounded-full bg-tint-cerise px-2 py-0 text-[10px] font-semibold text-destructive"
+            >
+              {grundLabel(g)}
+            </span>
+          ))}
+        </div>
+        <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+          <span>{formatDatum(f.buchung_datum)}</span>
+          <span className="text-line-strong">·</span>
+          <span className="truncate">{f.verwendungszweck ?? kontoName}</span>
+        </div>
+      </div>
+      {/* Betrag */}
+      <div className="shrink-0 text-right">
+        <div
+          className={cn(
+            "font-mono text-[15px] font-bold tabular-nums leading-tight",
+            ausgabe ? "text-destructive" : "text-income-strong",
+          )}
+        >
+          {ausgabe ? "−" : "+"}
+          {formatBetrag(Math.abs(f.betrag))}
+        </div>
+        <div className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+          {f.waehrung} · {kontoName}
+        </div>
+      </div>
+      {/* Aktion */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onEntscheiden}
+        className="h-8 shrink-0 rounded-full text-[12.5px] font-semibold text-brand-violet hover:bg-tint-violet hover:text-brand-violet"
+      >
+        Entscheiden
+        <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+      </Button>
+    </li>
   );
 }

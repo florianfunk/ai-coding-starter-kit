@@ -9,9 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ladeDashboardAggregat } from "@/lib/dashboard/load";
 import { onboardingVollstaendig } from "@/lib/dashboard/aggregate";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { DashboardGrid } from "@/components/dashboard/dashboard-grid";
+import { DashboardEditorial } from "@/components/dashboard/dashboard-editorial";
 import { Onboarding } from "@/components/dashboard/onboarding";
 import { formatZeitpunkt } from "@/components/dashboard/format";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Dashboard · STEUERAGENT",
@@ -33,14 +34,19 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Buchhaltungsstand auf einen Blick. Jede Kachel führt direkt zur
-          zugehörigen Ansicht.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Übersicht"
+        titel="Dashboard"
+        beschreibung="Was Aufmerksamkeit braucht, wo dein Jahr steht und wann zuletzt etwas importiert wurde."
+        actions={
+          aggregat && !ladeFehler ? (
+            <span className="text-xs text-muted-foreground">
+              Stand: {formatZeitpunkt(aggregat.stand)}
+            </span>
+          ) : undefined
+        }
+      />
 
       {ladeFehler || !aggregat ? (
         <Alert variant="destructive">
@@ -53,23 +59,11 @@ export default async function DashboardPage() {
       ) : !onboardingVollstaendig(aggregat.onboarding) ? (
         <>
           <Onboarding status={aggregat.onboarding} />
-          {!aggregat.ist_leer && (
-            <>
-              <p className="text-xs text-muted-foreground">
-                Stand: {formatZeitpunkt(aggregat.stand)}
-              </p>
-              <DashboardGrid data={aggregat} />
-            </>
-          )}
+          {!aggregat.ist_leer && <DashboardEditorial data={aggregat} />}
         </>
       ) : (
-        <>
-          <p className="text-xs text-muted-foreground">
-            Stand: {formatZeitpunkt(aggregat.stand)}
-          </p>
-          <DashboardGrid data={aggregat} />
-        </>
+        <DashboardEditorial data={aggregat} />
       )}
-    </div>
+    </PageShell>
   );
 }

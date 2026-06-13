@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Kategorie, Konto, Lernregel } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RegelnTabelle } from "@/components/regeln/regeln-tabelle";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Lernregeln · STEUERAGENT",
@@ -44,15 +45,12 @@ export default async function RegelnPage() {
     .limit(1000);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Lernregeln</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Deterministische Regeln mit Vorrang vor der KI. Höhere Priorität
-          gewinnt; widersprechen sich Regeln gleicher Priorität, landet der
-          Fall in der Prüfliste.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Setup"
+        titel="Lernregeln"
+        beschreibung="Deterministische Regeln mit Vorrang vor der KI. Höhere Priorität gewinnt; widersprechen sich Regeln gleicher Priorität, landet der Fall in der Prüfliste."
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -69,6 +67,6 @@ export default async function RegelnPage() {
           kategorien={kategorien}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

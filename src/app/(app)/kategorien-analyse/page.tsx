@@ -6,6 +6,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { KategorienAnalyseAnsicht } from "@/components/kategorien-analyse/kategorien-analyse-ansicht";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +26,12 @@ export default async function KategorienAnalysePage() {
     .limit(50);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Kategorien-Analyse
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Buchungen je EÜR-Kategorie mit Summen und Konfidenz. Klick auf eine
-          Kategorie öffnet die Liste — Korrekturen direkt inline.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Bücher"
+        titel="Kategorien-Analyse"
+        beschreibung="Buchungen je EÜR-Kategorie mit Summen und Konfidenz. Klick auf eine Kategorie öffnet die Liste — Korrekturen direkt inline."
+      />
 
       <KategorienAnalyseAnsicht
         konten={(konten ?? []) as Array<{
@@ -43,6 +40,6 @@ export default async function KategorienAnalysePage() {
           typ: "bank" | "paypal" | "kreditkarte";
         }>}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -7,6 +7,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { EstAnsicht } from "@/components/est/est-ansicht";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Einkommensteuer · STEUERAGENT",
@@ -56,20 +57,14 @@ export default async function EinkommensteuerPage({
       : (jahre[0] ?? heute);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Einkommensteuer-Vorschau &amp; Privatentnahmen
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Grobe ESt-Schätzung auf Basis des EÜR-Gewinns (deterministisch,
-          §32a EStG) sowie die vollständige Aufstellung aller privaten
-          Entnahmen. Beides reproduzierbar je Jahr mit Drill-down. Die
-          Schätzung ist ausdrücklich unverbindlich.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Steuer"
+        titel="Einkommensteuer"
+        beschreibung="Grobe ESt-Schätzung auf Basis des EÜR-Gewinns (deterministisch, §32a EStG) sowie die vollständige Aufstellung aller privaten Entnahmen. Reproduzierbar je Jahr mit Drill-down. Schätzung ausdrücklich unverbindlich."
+      />
 
       <EstAnsicht jahre={jahre} jahrInitial={vorgewaehlt} />
-    </div>
+    </PageShell>
   );
 }

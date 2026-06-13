@@ -126,7 +126,7 @@ function KennCard({
             (akzent === "negativ"
               ? "text-destructive"
               : akzent === "positiv"
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-income-strong dark:text-income"
                 : "")
           }
         >

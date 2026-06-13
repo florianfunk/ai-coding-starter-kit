@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import type { Buchung, JobLauf, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { BuchungenAnsicht } from "@/components/buchungen/buchungen-ansicht";
+import { BuchungenLedger } from "@/components/buchungen/buchungen-ledger";
 import { KlassifizierungPanel } from "@/components/buchungen/klassifizierung-panel";
 
 export const metadata = {
@@ -89,18 +89,7 @@ export default async function BuchungenPage({
   const { data, error } = await query;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Buchungen</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Alle importierten Kontobewegungen. Der Agent klassifiziert sie
-          autonom (privat/geschäftlich, Steuerrelevanz, EÜR-Kategorie). Klicke
-          eine Zeile für Begründung und Audit-Trail.
-        </p>
-      </div>
-
-      <KlassifizierungPanel initialJob={letzterJob} />
-
+    <div className="space-y-8">
       {error ? (
         <Alert variant="destructive">
           <AlertTitle>Fehler beim Laden</AlertTitle>
@@ -110,13 +99,17 @@ export default async function BuchungenPage({
           </AlertDescription>
         </Alert>
       ) : (
-        <BuchungenAnsicht
+        <BuchungenLedger
           buchungen={(data ?? []) as Buchung[]}
           konten={konten}
           kategorien={kategorien}
           filter={filter}
         />
       )}
+
+      {/* Klassifizierungs-Panel bleibt unter dem Ledger — wirkt wie ein
+          "Tools"-Bereich nach der Hauptansicht. */}
+      <KlassifizierungPanel initialJob={letzterJob} />
     </div>
   );
 }

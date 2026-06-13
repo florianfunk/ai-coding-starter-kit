@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BelegTabelle } from "@/components/belege/beleg-tabelle";
 import type { BelegListItem } from "@/components/belege/beleg-tabelle";
+import { EmptyState, PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Belege · STEUERAGENT",
@@ -28,14 +29,12 @@ export default async function BelegePage() {
     .limit(1000);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Belege</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Aus Paperless importierte Dokumente inkl. OCR-Text. Grundlage für
-          Klassifizierung und Beleg-Abgleich.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Bücher"
+        titel="Belege"
+        beschreibung="Aus Paperless importierte Dokumente inkl. OCR-Text. Grundlage für Klassifizierung und Beleg-Abgleich."
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -45,20 +44,18 @@ export default async function BelegePage() {
           </AlertDescription>
         </Alert>
       ) : (data ?? []).length === 0 ? (
-        <div className="rounded-md border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Noch keine Belege importiert.
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Richte die Paperless-Verbindung ein und starte einen Sync.
-          </p>
-          <Button asChild className="mt-4" variant="outline">
-            <Link href="/einstellungen/paperless">Zu Paperless</Link>
-          </Button>
-        </div>
+        <EmptyState
+          titel="Noch keine Belege importiert"
+          beschreibung="Richte die Paperless-Verbindung ein und starte einen Sync."
+          action={
+            <Button asChild variant="default">
+              <Link href="/einstellungen/paperless">Zu Paperless</Link>
+            </Button>
+          }
+        />
       ) : (
         <BelegTabelle belege={(data ?? []) as BelegListItem[]} />
       )}
-    </div>
+    </PageShell>
   );
 }

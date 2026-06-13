@@ -14,14 +14,28 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV = [
+// Bereichs-Trennung mit klarem Workflow-Fokus:
+//   Heute   — taeglich/woechentlich angefasste Ansichten
+//   Buecher — Buchhaltung: Buchungen, Belege, Analyse
+//   Steuer  — Steuer-Endprodukte
+//   Setup   — Stammdaten + System-Konfiguration
+const NAV_HEUTE = [
   { href: "/dashboard", label: "Dashboard" },
+  // PROJ-17 — KI-Chat: prominenter Einstiegspunkt im Bereich "Heute",
+  // weil die taegliche Interaktion mit dem Agenten ueber den Chat laeuft.
+  { href: "/chat", label: "KI-Chat" },
+  { href: "/pruefliste", label: "Prüfliste" },
+  { href: "/kuendigungen", label: "Kündigungen" },
+];
+
+const NAV_BUECHER = [
   { href: "/buchungen", label: "Buchungen" },
   { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
-  { href: "/kuendigungen", label: "Kündigungen" },
-  { href: "/pruefliste", label: "Prüfliste" },
   { href: "/abgleich", label: "Beleg-Abgleich" },
   { href: "/belege", label: "Belege" },
+];
+
+const NAV_STEUER = [
   { href: "/ust-voranmeldung", label: "USt-Voranmeldung" },
   { href: "/euer", label: "EÜR" },
   { href: "/einkommensteuer", label: "Einkommensteuer" },
@@ -53,8 +67,8 @@ function NavLink({
       aria-current={active ? "page" : undefined}
       className={
         active
-          ? "flex items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-[13.5px] font-medium tracking-[-0.005em] bg-primary text-primary-foreground"
-          : "flex items-center gap-2 rounded-[4px] px-2.5 py-1.5 text-[13.5px] font-normal tracking-[-0.005em] text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+          ? "flex items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[13.5px] font-semibold tracking-[-0.005em] bg-brand-violet text-white"
+          : "flex items-center gap-2 rounded-[8px] px-2.5 py-1.5 text-[13.5px] font-medium tracking-[-0.005em] text-foreground/75 hover:bg-[color:var(--surface-2)] hover:text-foreground transition-colors"
       }
     >
       <span className="truncate">{label}</span>
@@ -62,9 +76,23 @@ function NavLink({
   );
 }
 
+// Pro Bereich eine eigene Akzentfarbe — macht die Sidebar-Navigation auf
+// einen Blick scanbar und greift die Marken-Palette aus globals.css auf.
+const SECTION_COLORS: Record<string, string> = {
+  Heute: "var(--brand-violet)",
+  "Bücher": "var(--brand-cyan)",
+  Steuer: "var(--brand-cerise)",
+  Setup: "var(--brand-shaft)",
+};
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
+  const key = typeof children === "string" ? children : "";
+  const color = SECTION_COLORS[key] ?? "var(--text-subtle)";
   return (
-    <div className="px-2.5 pb-1.5 pt-3.5 text-[9.5px] font-semibold uppercase tracking-[0.16em] text-[color:var(--text-subtle)]">
+    <div
+      className="mt-5 mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.06em] first:mt-1"
+      style={{ color }}
+    >
       {children}
     </div>
   );
@@ -80,32 +108,32 @@ export function AppSidebar() {
       className="sticky top-0 hidden h-screen w-[232px] shrink-0 flex-col border-r p-3 md:flex"
       style={{ background: "var(--surface-sunk)", borderColor: "var(--line)" }}
     >
-      {/* Markenkopf */}
+      {/* Markenkopf — iOS-typisch: gerundete Quadrat-App-Icon */}
       <div className="mb-5 flex items-center gap-2.5 px-2 pt-1">
         <div
-          className="grid h-[30px] w-[30px] place-items-center rounded-md font-display text-[19px] italic font-semibold leading-none tracking-[-0.02em]"
+          className="grid h-[32px] w-[32px] place-items-center rounded-[8px] font-display text-[16px] font-bold leading-none tracking-[-0.02em]"
           style={{
             background: "var(--accent-color)",
             color: "var(--accent-fg)",
-            boxShadow: "0 2px 8px var(--accent-ring)",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.10)",
           }}
         >
           S
         </div>
         <div className="min-w-0">
-          <div className="font-display text-[17px] leading-none tracking-[-0.01em]">
-            STEUERAGENT
+          <div className="font-display text-[15px] font-bold leading-none tracking-[-0.015em]">
+            Steueragent
           </div>
-          <div className="mt-1 text-[9.5px] font-semibold uppercase tracking-[0.18em] text-[color:var(--text-subtle)]">
+          <div className="mt-1 text-[11px] font-medium text-[color:var(--text-subtle)]">
             Autonome Buchhaltung
           </div>
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — vier Bereiche mit Editorial-Eyebrows */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-0">
-        <SectionTitle>Arbeit</SectionTitle>
-        {NAV.map((item) => (
+        <SectionTitle>Heute</SectionTitle>
+        {NAV_HEUTE.map((item) => (
           <NavLink
             key={item.href}
             href={item.href}
@@ -114,7 +142,27 @@ export function AppSidebar() {
           />
         ))}
 
-        <SectionTitle>Einstellungen</SectionTitle>
+        <SectionTitle>Bücher</SectionTitle>
+        {NAV_BUECHER.map((item) => (
+          <NavLink
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            active={istAktiv(item.href)}
+          />
+        ))}
+
+        <SectionTitle>Steuer</SectionTitle>
+        {NAV_STEUER.map((item) => (
+          <NavLink
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            active={istAktiv(item.href)}
+          />
+        ))}
+
+        <SectionTitle>Setup</SectionTitle>
         {SETTINGS.map((item) => (
           <NavLink
             key={item.href}

@@ -11,6 +11,7 @@ import { ArbeitgeberKarte } from "@/components/profil/arbeitgeber-karte";
 import { AdresseKarte } from "@/components/profil/adresse-karte";
 import { FamilieKarte } from "@/components/profil/familie-karte";
 import { KontenKarte } from "@/components/profil/konten-karte";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const dynamic = "force-dynamic";
 
@@ -70,16 +71,12 @@ export default async function ProfilPage() {
   }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Mein Profil</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Persönliche Stammdaten, die der Agent bei der Klassifizierung nutzt.
-          Arbeitgeber, Wohnort, Familienmitglieder und eigene Bankkonten
-          helfen der Pipeline, Privat-Buchungen sauber von geschäftlichen zu
-          trennen.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Setup"
+        titel="Mein Profil"
+        beschreibung="Persönliche Stammdaten, die der Agent bei der Klassifizierung nutzt. Arbeitgeber, Wohnort, Familienmitglieder und eigene Bankkonten helfen der Pipeline, Privat-Buchungen sauber von geschäftlichen zu trennen."
+      />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <ArbeitgeberKarte initial={arbRes.data ?? []} />
@@ -87,6 +84,6 @@ export default async function ProfilPage() {
         <FamilieKarte initial={famRes.data ?? []} />
         <KontenKarte initial={konten} />
       </div>
-    </div>
+    </PageShell>
   );
 }

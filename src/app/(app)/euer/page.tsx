@@ -7,6 +7,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { EuerAnsicht } from "@/components/euer/euer-ansicht";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Jahres-EÜR · STEUERAGENT",
@@ -67,24 +68,18 @@ export default async function EuerPage({
       : (jahre[0] ?? heute);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Jahres-EÜR (§4 Abs.3 EStG)
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Betriebseinnahmen minus Betriebsausgaben je EÜR-Kategorie nach
-          striktem Zufluss-/Abflussprinzip. Deterministisch berechnet, keine
-          KI in den Summen. Klicke eine Position für den Drill-down auf die
-          einzelnen Buchungen.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Steuer"
+        titel="Jahres-EÜR"
+        beschreibung="§4 Abs.3 EStG — Betriebseinnahmen minus Betriebsausgaben je EÜR-Kategorie nach striktem Zufluss-/Abflussprinzip. Deterministisch berechnet, keine KI in den Summen. Klicke eine Position für den Drill-down auf die einzelnen Buchungen."
+      />
 
       <EuerAnsicht
         jahre={jahre}
         jahrInitial={vorgewaehlt}
         wjBeginn={wjBeginn}
       />
-    </div>
+    </PageShell>
   );
 }

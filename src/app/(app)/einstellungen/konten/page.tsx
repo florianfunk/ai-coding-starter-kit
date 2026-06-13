@@ -9,6 +9,7 @@ import type { Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { KontenTabelle } from "@/components/konten/konten-tabelle";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Bankkonten · STEUERAGENT",
@@ -27,20 +28,22 @@ export default async function KontenPage() {
     .limit(100);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Bankkonten</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Lege deine Konten an (Bank, PayPal, Kreditkarte) und konfiguriere
-            pro Konto eine wiederverwendbare Spalten-Mapping-Vorlage für den
-            Excel/CSV-Import.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/einstellungen/konten/import">Kontoauszug importieren</Link>
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Setup"
+        titel="Bankkonten"
+        beschreibung="Lege deine Konten an (Bank, PayPal, Kreditkarte) und konfiguriere pro Konto eine wiederverwendbare Spalten-Mapping-Vorlage für den Excel/CSV-Import."
+        actions={
+          <>
+            <Button asChild variant="outline" className="rounded-full">
+              <Link href="/einstellungen/konten/importe">Import-Historie</Link>
+            </Button>
+            <Button asChild className="rounded-full">
+              <Link href="/einstellungen/konten/import">Kontoauszug importieren</Link>
+            </Button>
+          </>
+        }
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -52,6 +55,6 @@ export default async function KontenPage() {
       ) : (
         <KontenTabelle initialKonten={(data ?? []) as Konto[]} />
       )}
-    </div>
+    </PageShell>
   );
 }

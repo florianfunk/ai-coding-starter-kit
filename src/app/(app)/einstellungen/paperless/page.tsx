@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PaperlessPanel } from "@/components/paperless/paperless-panel";
 import type { JobLauf } from "@/lib/types";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Paperless · STEUERAGENT",
@@ -51,15 +52,12 @@ export default async function PaperlessPage() {
     .maybeSingle();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Paperless</h1>
-        <p className="text-sm text-muted-foreground">
-          Verbinde STEUERAGENT mit deiner Paperless-ngx-Instanz und importiere
-          Belege inkl. OCR-Text. Der API-Token wird verschlüsselt gespeichert
-          und nie im Klartext angezeigt.
-        </p>
-      </header>
+    <PageShell className="mx-auto max-w-3xl">
+      <PageHeader
+        eyebrow="Setup"
+        titel="Paperless"
+        beschreibung="Verbinde STEUERAGENT mit deiner Paperless-ngx-Instanz und importiere Belege inkl. OCR-Text. Der API-Token wird verschlüsselt gespeichert und nie im Klartext angezeigt."
+      />
 
       {verbError && (
         <Alert variant="destructive">
@@ -75,6 +73,6 @@ export default async function PaperlessPage() {
         initialVerbindung={verbindung}
         initialJob={(jobRow as JobLauf | null) ?? null}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -476,7 +476,7 @@ export function GeldbewegungenAnsicht({
                             "text-right tabular-nums font-mono " +
                             (z.betrag < 0
                               ? "text-destructive"
-                              : "text-emerald-600 dark:text-emerald-400")
+                              : "text-income-strong dark:text-income")
                           }
                         >
                           {eur(z.betrag)}
@@ -789,7 +789,7 @@ function KennCard({
           className={
             "mt-1 text-xl font-semibold tabular-nums " +
             (akzent === "positiv"
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? "text-income-strong dark:text-income"
               : "text-destructive")
           }
         >

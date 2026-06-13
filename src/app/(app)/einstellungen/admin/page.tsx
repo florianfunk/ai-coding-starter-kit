@@ -5,6 +5,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { AdminTabs } from "@/components/admin/admin-tabs";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Admin · STEUERAGENT",
@@ -48,17 +49,14 @@ export default async function AdminPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
-        <p className="text-sm text-muted-foreground">
-          Systemkonfiguration: KI-Zugang, eigene Zugangsdaten, System-Status
-          und Daten-Wartung. Secrets werden verschlüsselt gespeichert und nie
-          im Klartext angezeigt.
-        </p>
-      </header>
+    <PageShell className="mx-auto max-w-3xl">
+      <PageHeader
+        eyebrow="Setup"
+        titel="Admin"
+        beschreibung="Systemkonfiguration: KI-Zugang, eigene Zugangsdaten, System-Status und Daten-Wartung. Secrets werden verschlüsselt gespeichert und nie im Klartext angezeigt."
+      />
 
       <AdminTabs initialKi={kiStatus} benutzer={benutzer} />
-    </div>
+    </PageShell>
   );
 }

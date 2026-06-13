@@ -275,10 +275,22 @@ function renderGruppiert(
     const anzahl = kats.reduce((s, k) => s + k.anzahl, 0);
     const summeRaw = kats.reduce((s, k) => s + k.summe, 0);
     const summe = typ === "ausgabe" ? -Math.abs(summeRaw) : summeRaw;
+    const clusterBg =
+      typ === "einnahme"
+        ? "bg-tint-cyan/60 hover:bg-tint-cyan"
+        : typ === "ausgabe"
+          ? "bg-rose-50/80 hover:bg-rose-50 dark:bg-rose-950/30 dark:hover:bg-rose-950/40"
+          : "bg-muted/40 hover:bg-muted/50";
+    const clusterAccent =
+      typ === "einnahme"
+        ? "border-l-4 border-l-emerald-500"
+        : typ === "ausgabe"
+          ? "border-l-4 border-l-rose-500"
+          : "border-l-4 border-l-muted-foreground/40";
     rows.push(
       <TableRow
         key={`subtotal-${typ}`}
-        className="border-t-2 bg-muted/30 font-semibold hover:bg-muted/40"
+        className={`border-t-2 font-semibold ${clusterBg} ${clusterAccent}`}
       >
         <TableCell colSpan={3} className="text-xs uppercase tracking-wide">
           Σ {TYP_GRUPPEN_LABEL[typ] ?? typ}
@@ -288,9 +300,9 @@ function renderGruppiert(
           className={
             "text-right tabular-nums font-mono " +
             (typ === "einnahme"
-              ? "text-emerald-600 dark:text-emerald-400"
+              ? "text-income-strong dark:text-income"
               : typ === "ausgabe"
-                ? "text-destructive"
+                ? "text-rose-700 dark:text-rose-300"
                 : "")
           }
         >
@@ -314,7 +326,7 @@ function Kennzahl({
 }) {
   const klasse =
     akzent === "positiv"
-      ? "text-emerald-600 dark:text-emerald-400"
+      ? "text-income-strong dark:text-income"
       : akzent === "negativ"
         ? "text-destructive"
         : "";

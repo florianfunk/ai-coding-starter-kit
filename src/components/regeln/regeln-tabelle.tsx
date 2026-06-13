@@ -7,25 +7,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import type { Kategorie, Konto, Lernregel } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
@@ -152,107 +136,110 @@ export function RegelnTabelle({
   const istLeer = regeln.length === 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <CardTitle>Lernregeln</CardTitle>
-          <CardDescription>
+          <div className="text-[13px] font-semibold">Lernregeln</div>
+          <p className="text-[12px] text-muted-foreground">
             Regeln mit Vorrang vor der KI. Änderungen wirken nur auf künftige
-            bzw. offene Fälle – bestätigte Buchungen bleiben unverändert.
-          </CardDescription>
+            bzw. offene Fälle.
+          </p>
         </div>
         <Button
           onClick={() => {
             setBearbeiten(null);
             setDialogOpen(true);
           }}
+          className="h-9 rounded-full bg-brand-violet font-semibold text-white hover:bg-[color:var(--accent-hover)]"
         >
-          <Plus className="mr-2 h-4 w-4" />
+          <Plus className="mr-1.5 h-4 w-4" />
           Regel
         </Button>
-      </CardHeader>
-      <CardContent>
-        {istLeer ? (
-          <div className="rounded-md border border-dashed p-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              Noch keine Lernregeln. Lege eine an oder erzeuge eine aus einer
-              Entscheidung in der Prüfliste.
-            </p>
+      </div>
+
+      {istLeer ? (
+        <div className="rounded-[var(--radius)] bg-card px-8 py-16 text-center shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-tint-violet text-brand-violet">
+            <Sparkles className="h-6 w-6" />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bezeichnung</TableHead>
-                  <TableHead>Bedingung</TableHead>
-                  <TableHead>Aktion</TableHead>
-                  <TableHead className="text-center">Priorität</TableHead>
-                  <TableHead className="text-center">Treffer</TableHead>
-                  <TableHead className="text-center">Aktiv</TableHead>
-                  <TableHead className="text-right">Aktion</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {regeln.map((r) => (
-                  <TableRow key={r.id} className={r.aktiv ? "" : "opacity-60"}>
-                    <TableCell className="font-medium">
+          <h2 className="mt-4 font-display text-xl font-bold tracking-[-0.012em]">
+            Noch keine Lernregeln
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-sm text-[13.5px] text-muted-foreground">
+            Lege eine an oder erzeuge eine aus einer Entscheidung in der
+            Prüfliste.
+          </p>
+        </div>
+      ) : (
+        <section className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <ul role="list" className="divide-y divide-line-hair">
+            {regeln.map((r) => (
+              <li
+                key={r.id}
+                className={
+                  "flex items-center gap-3 px-4 py-3 " +
+                  (r.aktiv ? "" : "opacity-60")
+                }
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-tint-violet font-mono text-[12px] font-bold text-brand-violet">
+                  {r.prioritaet}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-[14px] font-semibold leading-tight">
                       {r.bezeichnung}
-                    </TableCell>
-                    <TableCell className="max-w-[260px] text-sm text-muted-foreground">
+                    </span>
+                    {r.treffer_zaehler > 0 ? (
+                      <span className="inline-flex items-center rounded-full bg-tint-cyan px-2 py-0 font-mono text-[10px] font-semibold text-income-strong">
+                        {r.treffer_zaehler} ×
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-0.5 line-clamp-1 text-[12px] text-muted-foreground">
+                    <span className="font-medium text-foreground/80">
                       {bedingungText(r, kontoName)}
-                    </TableCell>
-                    <TableCell className="max-w-[220px] text-sm text-muted-foreground">
-                      {aktionText(r, kategorieName)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline">{r.prioritaet}</Badge>
-                    </TableCell>
-                    <TableCell className="text-center tabular-nums">
-                      {r.treffer_zaehler}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Switch
-                        checked={r.aktiv}
-                        disabled={busyId === r.id}
-                        onCheckedChange={(v) => toggleAktiv(r, v)}
-                        aria-label={
-                          r.aktiv
-                            ? `${r.bezeichnung} deaktivieren`
-                            : `${r.bezeichnung} aktivieren`
-                        }
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setBearbeiten(r);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="mr-1 h-4 w-4" />
-                          Bearbeiten
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={busyId === r.id}
-                          onClick={() => setLoeschen(r)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
+                    </span>
+                    <span className="mx-1.5 text-line-strong">→</span>
+                    <span>{aktionText(r, kategorieName)}</span>
+                  </div>
+                </div>
+                <Switch
+                  checked={r.aktiv}
+                  disabled={busyId === r.id}
+                  onCheckedChange={(v) => toggleAktiv(r, v)}
+                  aria-label={
+                    r.aktiv
+                      ? `${r.bezeichnung} deaktivieren`
+                      : `${r.bezeichnung} aktivieren`
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+                  onClick={() => {
+                    setBearbeiten(r);
+                    setDialogOpen(true);
+                  }}
+                  title="Bearbeiten"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-cerise hover:text-destructive"
+                  disabled={busyId === r.id}
+                  onClick={() => setLoeschen(r)}
+                  title="Löschen"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <RegelDialog
         open={dialogOpen}
@@ -285,6 +272,6 @@ export function RegelnTabelle({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PrueflisteAnsicht } from "@/components/pruefliste/pruefliste-ansicht";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Prüfliste · STEUERAGENT",
@@ -47,15 +48,12 @@ export default async function PrueflistePage() {
     .limit(1000);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Prüfliste</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Nur die Fälle, die der Agent nicht sicher entscheiden konnte.
-          Entscheide schnell – optional als Lernregel speichern, damit
-          gleichartige Buchungen künftig automatisch laufen.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Heute"
+        titel="Prüfliste"
+        beschreibung="Nur die Fälle, die der Agent nicht sicher entscheiden konnte. Entscheide schnell – optional als Lernregel speichern, damit gleichartige Buchungen künftig automatisch laufen."
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -72,6 +70,6 @@ export default async function PrueflistePage() {
           kategorien={kategorien}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

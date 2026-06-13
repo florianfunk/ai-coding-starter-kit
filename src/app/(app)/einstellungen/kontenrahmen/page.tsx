@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { Kategorie } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { KontenrahmenTabelle } from "@/components/kontenrahmen/kontenrahmen-tabelle";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Kontenrahmen · STEUERAGENT",
@@ -23,16 +24,12 @@ export default async function KontenrahmenPage() {
     .limit(500);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Kontenrahmen
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Definiere die EÜR-Zielsystematik: Kategorien mit Typ, USt-Satz und
-          ELSTER-Zuordnung. Diese Kategorien nutzen alle weiteren Module.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Setup"
+        titel="Kontenrahmen"
+        beschreibung="Definiere die EÜR-Zielsystematik: Kategorien mit Typ, USt-Satz und ELSTER-Zuordnung. Diese Kategorien nutzen alle weiteren Module."
+      />
 
       {error ? (
         <Alert variant="destructive">
@@ -47,6 +44,6 @@ export default async function KontenrahmenPage() {
           initialKategorien={(data ?? []) as Kategorie[]}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

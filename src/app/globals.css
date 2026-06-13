@@ -3,180 +3,230 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   STEUERAGENT — „Cobalt" Mono-Tint Designsystem
-   Übernommen aus dem Claude-Design-Bundle (Editorial Ledger v3, Cobalt).
-   Eine einzige Hue (--H) tönt die komplette UI — Flächen, Linien, Schrift.
-   Für die bestehenden shadcn/ui-Komponenten gibt es parallel HSL-Tokens, die
-   visuell denselben Look erzeugen → kein Komponenten-Rewrite nötig.
+   STEUERAGENT — Marken-Palette (2026)
+   School Bus Yellow · White · Mine Shaft · Cyan · Hollywood Cerise ·
+   Dusty Gray · Electric Violet.
+
+   Semantik:
+     Primary    = Electric Violet  #7C3AED  (Brand, Buttons, Active)
+     Highlight  = School Bus Yellow #FFD900 (Akzent, Badges, Warn-Marker)
+     Income     = Cyan              #00D3FF (Einnahmen, Info, Erfolg)
+     Destruct.  = Hollywood Cerise  #F5009B (Ausgaben, Fehler, Stop)
+     Foreground = Mine Shaft        #333333 (Text)
+     Muted      = Dusty Gray        #999898 (Subtext)
+     Background = White             #FFFFFF
 ───────────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root,
   .theme-light {
-    /* ── Mono-Tint Steuerung ───────────────────────────────────────────── */
-    --H: 255;            /* Hue: Cobalt-Blau */
-    --Cmax: 0.26;        /* Max-Chroma für Akzent */
-    --Cmid: 0.06;        /* Mid-Chroma für weiche Flächen */
-    --Clow: 0.018;       /* Low-Chroma für Backgrounds */
+    /* ── Marken-Hex (Single Source of Truth) ─────────────────────────────── */
+    --brand-yellow:  #FFD900;
+    --brand-white:   #FFFFFF;
+    --brand-shaft:   #333333;
+    --brand-cyan:    #00D3FF;
+    --brand-cerise:  #F5009B;
+    --brand-gray:    #999898;
+    --brand-violet:  #7C3AED;
 
-    /* ── Native Design-Tokens (OKLCH) ───────────────────────────────────── */
-    --bg:           oklch(0.985 var(--Clow) var(--H));
-    --surface:      oklch(0.999 var(--Clow) var(--H));
-    --surface-2:    oklch(0.955 calc(var(--Clow) * 1.6) var(--H));
-    --surface-sunk: oklch(0.935 calc(var(--Clow) * 1.8) var(--H));
+    /* ── Semantische Aliase — iOS 17 Settings ───────────────────────────────
+       Page-Background ist ein sehr helles Grau (System-Group), Karten sind
+       reines Weiss. Schafft die typische "schwebende Karten"-Optik. */
+    --bg:           #F2F2F7;             /* iOS Group-Background */
+    --surface:      var(--brand-white);  /* Karten in reinem Weiss */
+    --surface-2:    #F9F9FB;             /* leicht abgesetzte Innen-Flaeche */
+    --surface-sunk: #EBEBF0;             /* Sidebar-Hintergrund (iOS Sidebar) */
 
-    --text:         oklch(0.16 0.085 var(--H));
-    --text-muted:   oklch(0.42 0.060 var(--H));
-    --text-subtle:  oklch(0.58 0.040 var(--H));
-    --text-faint:   oklch(0.74 0.025 var(--H));
+    --text:         var(--brand-shaft);
+    --text-muted:   #6E6E73;             /* iOS Secondary Label */
+    --text-subtle:  var(--brand-gray);
+    --text-faint:   #C8C8C8;
 
-    --line:         oklch(0.88 0.030 var(--H));
-    --line-strong:  oklch(0.74 0.045 var(--H));
-    --line-hair:    oklch(0.93 0.022 var(--H));
+    --line:         #E5E5EA;             /* iOS Separator (default) */
+    --line-strong:  #D1D1D6;             /* iOS Opaque Separator */
+    --line-hair:    #F2F2F4;             /* sehr fein, innerhalb von Karten */
 
-    --accent-color:  oklch(0.54 var(--Cmax) var(--H));
-    --accent-hover:  oklch(0.48 var(--Cmax) var(--H));
-    --accent-soft:   oklch(0.92 var(--Cmid) var(--H));
-    --accent-fg:     oklch(0.995 0.005 var(--H));
-    --accent-ring:   oklch(0.54 var(--Cmax) var(--H) / 0.32);
+    --accent-color:  var(--brand-violet);
+    --accent-hover:  #6B2BD8;
+    --accent-soft:   #EFE6FE;            /* helles Violett für Hover-Fläche */
+    --accent-fg:     var(--brand-white);
+    --accent-ring:   rgba(124, 58, 237, 0.32);
 
-    --positive:    oklch(0.58 0.180 148);
-    --positive-bg: oklch(0.94 0.080 148);
-    --warning:     oklch(0.72 0.180 75);
-    --warning-bg:  oklch(0.95 0.090 80);
-    --danger-color: oklch(0.58 0.230 28);
-    --danger-bg:    oklch(0.94 0.080 28);
-    --info:        oklch(0.58 0.180 235);
-    --info-bg:     oklch(0.94 0.080 235);
+    /* Semantische Statusfarben aus der Palette */
+    --positive:     var(--brand-cyan);
+    --positive-bg:  #DFF7FE;             /* Cyan 12% */
+    --warning:      var(--brand-yellow);
+    --warning-bg:   #FFF6CC;             /* Yellow 20% */
+    --danger-color: var(--brand-cerise);
+    --danger-bg:    #FDE0F1;             /* Cerise 15% */
+    --info:         var(--brand-cyan);
+    --info-bg:      #DFF7FE;
 
-    /* ── shadcn HSL-Tokens (visuell äquivalent zum OKLCH-Schema) ───────── */
-    /* Cobalt = ca. HSL 232 — eine Hue für die ganze App, Sättigung pro Schicht */
-    --background:           232 50% 98%;
-    --foreground:           232 35% 12%;
-    --card:                 232 60% 100%;
-    --card-foreground:      232 35% 12%;
-    --popover:              232 60% 100%;
-    --popover-foreground:   232 35% 12%;
-    --primary:              232 90% 55%;     /* Cobalt-Akzent */
-    --primary-foreground:   232 100% 99%;
-    --secondary:            232 30% 94%;
-    --secondary-foreground: 232 35% 18%;
-    --muted:                232 30% 94%;
-    --muted-foreground:     232 15% 42%;
-    --accent:               232 70% 92%;
-    --accent-foreground:    232 90% 32%;
-    --destructive:          12 78% 50%;
+    /* ── Tints (~22-25%) — Sektions-Hintergruende und KPI-Bloecke ─────────
+       Hellgenug fuer dunklen Text drueber, kraeftig genug fuer Plakat-Optik. */
+    --tint-violet:  #D9C6FA;
+    --tint-yellow:  #FFF1A6;
+    --tint-cyan:    #BCEEFC;
+    --tint-cerise:  #FCD2E8;
+    --tint-gray:    #E8E8E8;
+
+    /* Mittel-Stufen fuer Borders / Akzente innerhalb der Tints */
+    --tint-violet-border: #B98EF5;
+    --tint-yellow-border: #FFE05C;
+    --tint-cyan-border:   #6BDFFA;
+    --tint-cerise-border: #F88AC4;
+
+    /* ── shadcn HSL-Tokens (visuell auf neue Palette gemappt) ────────────── */
+    --background:           240 6% 96%;        /* iOS Group-Background */
+    --foreground:           0 0% 20%;          /* Mine Shaft */
+    --card:                 0 0% 100%;          /* Reines Weiss fuer Karten */
+    --card-foreground:      0 0% 20%;
+    --popover:              0 0% 100%;
+    --popover-foreground:   0 0% 20%;
+    --primary:              263 83% 58%;       /* Electric Violet */
+    --primary-foreground:   0 0% 100%;
+    --secondary:            0 0% 96%;          /* sehr helles Grau */
+    --secondary-foreground: 0 0% 20%;
+    --muted:                0 0% 96%;
+    --muted-foreground:     60 1% 40%;         /* Dusty Gray etwas dunkler */
+    --accent:               263 90% 95%;       /* Violet 5% */
+    --accent-foreground:    263 83% 38%;
+    --destructive:          322 100% 48%;      /* Hollywood Cerise */
     --destructive-foreground: 0 0% 100%;
-    --border:               232 20% 88%;
-    --input:                232 20% 86%;
-    --ring:                 232 90% 55%;
+    --border:               0 0% 90%;
+    --input:                0 0% 88%;
+    --ring:                 263 83% 58%;       /* Violet */
 
-    /* Editorial: kleinere, härtere Radien */
-    --radius: 0.5rem;     /* 8px — passt zu --radius-lg im Design (10px) */
+    /* iOS-typische Radien: Karten 14px, Innen-Elemente 10px, Pills 999px. */
+    --radius: 0.875rem;            /* 14px */
+    --radius-inner: 0.625rem;      /* 10px */
 
-    --chart-1: 232 90% 55%;
-    --chart-2: 148 60% 42%;
-    --chart-3: 28 85% 52%;
-    --chart-4: 340 80% 55%;
-    --chart-5: 165 60% 42%;
+    --chart-1: 263 83% 58%;   /* Violet */
+    --chart-2: 191 100% 50%;  /* Cyan */
+    --chart-3: 51 100% 50%;   /* Yellow */
+    --chart-4: 322 100% 48%;  /* Cerise */
+    --chart-5: 60 1% 60%;     /* Dusty Gray */
 
-    --sidebar-background:        232 40% 95%;
-    --sidebar-foreground:        232 25% 32%;
-    --sidebar-primary:           232 90% 55%;
-    --sidebar-primary-foreground: 232 100% 99%;
-    --sidebar-accent:            232 70% 90%;
-    --sidebar-accent-foreground: 232 90% 30%;
-    --sidebar-border:            232 20% 86%;
-    --sidebar-ring:              232 90% 55%;
+    --sidebar-background:        0 0% 96%;
+    --sidebar-foreground:        0 0% 30%;
+    --sidebar-primary:           263 83% 58%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent:            263 90% 95%;
+    --sidebar-accent-foreground: 263 83% 38%;
+    --sidebar-border:            0 0% 88%;
+    --sidebar-ring:              263 83% 58%;
 
-    /* Cobalt-getönte Schatten */
-    --shadow-1:   0 1px 0 oklch(0.20 0.10 var(--H) / 0.04), 0 1px 2px oklch(0.20 0.10 var(--H) / 0.06);
-    --shadow-2:   0 1px 0 oklch(0.20 0.10 var(--H) / 0.04), 0 6px 18px oklch(0.20 0.10 var(--H) / 0.10);
-    --shadow-pop: 0 14px 40px oklch(0.20 0.10 var(--H) / 0.18), 0 2px 8px oklch(0.20 0.10 var(--H) / 0.10);
+    /* iOS-weiche Schatten — kaum sichtbar, gerade genug um Karten vom
+       hellgrauen Background abzuheben. */
+    --shadow-1:   0 1px 2px rgba(0,0,0,0.03), 0 1px 1px rgba(0,0,0,0.02);
+    --shadow-2:   0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-pop: 0 20px 50px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.05);
 
     --sidebar-w: 232px;
 
-    /* Editorial-Typografie — verbindet sich mit next/font im Root-Layout */
-    --font-display: var(--font-source-serif), Georgia, serif;
-    --font-ui:      var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-    --font-mono:    var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
-    --display-weight: 400;
-    --display-tracking: -0.01em;
+    /* Typografie — iOS 17 / Sonoma:
+       Inter        → UI + Display (Bold/ExtraBold ist nah an SF Pro Display)
+       JetBrains M. → Zahlen */
+    --font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-ui:      var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    --font-mono:    var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+    --display-weight: 700;
+    --display-tracking: -0.024em;
 
     color-scheme: light;
   }
 
   .dark,
   .theme-dark {
-    /* OKLCH dark */
-    --bg:           oklch(0.135 0.045 var(--H));
-    --surface:      oklch(0.175 0.055 var(--H));
-    --surface-2:    oklch(0.215 0.065 var(--H));
-    --surface-sunk: oklch(0.110 0.040 var(--H));
+    /* Dark-Theme nutzt dieselbe Marken-Palette, nur invertiert. */
+    --brand-yellow:  #FFD900;
+    --brand-white:   #FFFFFF;
+    --brand-shaft:   #333333;
+    --brand-cyan:    #00D3FF;
+    --brand-cerise:  #F5009B;
+    --brand-gray:    #999898;
+    --brand-violet:  #9B6CFF;            /* etwas heller fuer dark mode */
 
-    --text:         oklch(0.97 0.020 var(--H));
-    --text-muted:   oklch(0.74 0.040 var(--H));
-    --text-subtle:  oklch(0.58 0.050 var(--H));
-    --text-faint:   oklch(0.42 0.045 var(--H));
+    --bg:           #141414;
+    --surface:      #1A1A1A;
+    --surface-2:    #222222;
+    --surface-sunk: #0F0F0F;
 
-    --line:         oklch(0.295 0.075 var(--H));
-    --line-strong:  oklch(0.395 0.090 var(--H));
-    --line-hair:    oklch(0.245 0.065 var(--H));
+    --text:         #F0F0F0;
+    --text-muted:   #B8B8B8;
+    --text-subtle:  var(--brand-gray);
+    --text-faint:   #707070;
 
-    --accent-color:  oklch(0.74 var(--Cmax) var(--H));
-    --accent-hover:  oklch(0.80 var(--Cmax) var(--H));
-    --accent-soft:   oklch(0.30 calc(var(--Cmax) * 0.55) var(--H));
-    --accent-fg:     oklch(0.10 0.04 var(--H));
-    --accent-ring:   oklch(0.74 var(--Cmax) var(--H) / 0.45);
+    --line:         #2D2D2D;
+    --line-strong:  #404040;
+    --line-hair:    #232323;
 
-    --positive:    oklch(0.82 0.190 148);
-    --positive-bg: oklch(0.30 0.110 148);
-    --warning:     oklch(0.85 0.180 78);
-    --warning-bg:  oklch(0.32 0.110 78);
-    --danger-color: oklch(0.74 0.220 28);
-    --danger-bg:    oklch(0.32 0.130 28);
-    --info:        oklch(0.80 0.180 235);
-    --info-bg:     oklch(0.30 0.100 235);
+    --accent-color:  var(--brand-violet);
+    --accent-hover:  #B187FF;
+    --accent-soft:   #2A1F4A;
+    --accent-fg:     var(--brand-white);
+    --accent-ring:   rgba(155, 108, 255, 0.45);
 
-    --shadow-1:   0 1px 0 oklch(1 0 0 / 0.04), 0 1px 2px oklch(0 0 0 / 0.40);
-    --shadow-2:   0 1px 0 oklch(1 0 0 / 0.04), 0 6px 16px oklch(0 0 0 / 0.50);
-    --shadow-pop: 0 14px 40px oklch(0 0 0 / 0.65), 0 2px 8px oklch(0 0 0 / 0.40);
+    --positive:     var(--brand-cyan);
+    --positive-bg:  #003D4A;
+    --warning:      var(--brand-yellow);
+    --warning-bg:   #3D3300;
+    --danger-color: var(--brand-cerise);
+    --danger-bg:    #3D0026;
+    --info:         var(--brand-cyan);
+    --info-bg:      #003D4A;
 
-    /* shadcn HSL dark (Cobalt) */
-    --background:           232 35% 8%;
-    --foreground:           232 18% 96%;
-    --card:                 232 30% 11%;
-    --card-foreground:      232 18% 96%;
-    --popover:              232 30% 12%;
-    --popover-foreground:   232 18% 96%;
-    --primary:              232 100% 72%;
-    --primary-foreground:   232 60% 10%;
-    --secondary:            232 25% 18%;
-    --secondary-foreground: 232 18% 96%;
-    --muted:                232 25% 16%;
-    --muted-foreground:     232 18% 72%;
-    --accent:               232 50% 22%;
-    --accent-foreground:    232 100% 80%;
-    --destructive:          12 80% 60%;
+    /* Dark-Tints — gesaettigt aber gedaempft, damit Text drueber lesbar */
+    --tint-violet:  #2A1A4D;
+    --tint-yellow:  #3D3300;
+    --tint-cyan:    #003D4A;
+    --tint-cerise:  #3D0026;
+    --tint-gray:    #1F1F1F;
+
+    --tint-violet-border: #4A2F75;
+    --tint-yellow-border: #6B5A00;
+    --tint-cyan-border:   #006B82;
+    --tint-cerise-border: #6B0044;
+
+    --shadow-1:   0 1px 0 rgba(255,255,255,0.04), 0 1px 2px rgba(0,0,0,0.40);
+    --shadow-2:   0 1px 0 rgba(255,255,255,0.04), 0 6px 16px rgba(0,0,0,0.50);
+    --shadow-pop: 0 14px 40px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.40);
+
+    /* shadcn HSL dark */
+    --background:           0 0% 8%;
+    --foreground:           0 0% 94%;
+    --card:                 0 0% 11%;
+    --card-foreground:      0 0% 94%;
+    --popover:              0 0% 12%;
+    --popover-foreground:   0 0% 94%;
+    --primary:              263 100% 72%;
+    --primary-foreground:   263 50% 10%;
+    --secondary:            0 0% 18%;
+    --secondary-foreground: 0 0% 94%;
+    --muted:                0 0% 16%;
+    --muted-foreground:     60 1% 70%;
+    --accent:               263 50% 25%;
+    --accent-foreground:    263 100% 85%;
+    --destructive:          322 100% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border:               232 25% 20%;
-    --input:                232 25% 22%;
-    --ring:                 232 100% 72%;
+    --border:               0 0% 22%;
+    --input:                0 0% 24%;
+    --ring:                 263 100% 72%;
 
-    --chart-1: 232 100% 72%;
-    --chart-2: 148 65% 55%;
-    --chart-3: 28 85% 62%;
-    --chart-4: 340 80% 65%;
-    --chart-5: 165 60% 55%;
+    --chart-1: 263 100% 72%;
+    --chart-2: 191 100% 60%;
+    --chart-3: 51 100% 60%;
+    --chart-4: 322 100% 60%;
+    --chart-5: 60 1% 60%;
 
-    --sidebar-background:        232 35% 9%;
-    --sidebar-foreground:        232 18% 80%;
-    --sidebar-primary:           232 100% 72%;
-    --sidebar-primary-foreground: 232 60% 10%;
-    --sidebar-accent:            232 50% 22%;
-    --sidebar-accent-foreground: 232 100% 80%;
-    --sidebar-border:            232 25% 20%;
-    --sidebar-ring:              232 100% 72%;
+    --sidebar-background:        0 0% 9%;
+    --sidebar-foreground:        0 0% 80%;
+    --sidebar-primary:           263 100% 72%;
+    --sidebar-primary-foreground: 263 50% 10%;
+    --sidebar-accent:            263 50% 22%;
+    --sidebar-accent-foreground: 263 100% 85%;
+    --sidebar-border:            0 0% 22%;
+    --sidebar-ring:              263 100% 72%;
 
     color-scheme: dark;
   }
@@ -190,38 +240,65 @@
     color: var(--text, hsl(var(--foreground)));
     font-family: var(--font-ui);
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Inter Stylistic Sets: ss01 (curved 1, curly r), cv11 (one-storey 'a') —
+       waehlt eine kraeftig-modere Variante der Inter-Buchstaben. */
     font-feature-settings: "ss01", "cv11";
   }
-  ::selection { background: var(--accent-soft); color: var(--text); }
+  ::selection { background: var(--accent-soft); color: var(--accent-color); }
 }
 
 @layer utilities {
-  /* Editorial Schatten (überschreiben shadcn-Defaults) */
+  /* Schatten (überschreiben shadcn-Defaults) */
   .shadow-sm { box-shadow: var(--shadow-1); }
   .shadow,
   .shadow-md { box-shadow: var(--shadow-2); }
   .shadow-lg,
   .shadow-xl { box-shadow: var(--shadow-pop); }
 
-  /* Tabellarische Mono-Ziffern — kritisch in der Steuer-App */
+  /* Tabellarische Mono-Ziffern */
   .num, .ng-num, .tabular-nums { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
 
-  /* Display-Headlines im Editorial-Stil */
+  /* Display-Headlines — kraeftiges Inter Bold/Black */
   .font-display {
     font-family: var(--font-display);
     font-weight: var(--display-weight);
     letter-spacing: var(--display-tracking);
   }
 
-  /* Eyebrow-Mini-Label (über Page-Titeln, Card-Headern) */
+  /* Eyebrow-Mini-Label (ueber Page-Titeln, Card-Headern) */
   .eyebrow {
     font-size: 10.5px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    font-weight: 600;
+    font-weight: 800;             /* extra-bold fuer Knaller-Wirkung */
     color: var(--text-subtle);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Ledger-spezifische Keyframes — Stagger-Reveal beim Page-Load
+───────────────────────────────────────────────────────────────────────── */
+@keyframes ledgerIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }

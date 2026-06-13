@@ -3,25 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Building2, CreditCard, Wallet } from "lucide-react";
 import type { Konto, KontoTyp } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,13 +24,15 @@ const TYP_LABELS: Record<KontoTyp, string> = {
   kreditkarte: "Kreditkarte",
 };
 
-const TYP_VARIANT: Record<
-  KontoTyp,
-  "default" | "secondary" | "outline" | "destructive"
-> = {
-  bank: "default",
-  paypal: "secondary",
-  kreditkarte: "outline",
+const TYP_ICON_BG: Record<KontoTyp, string> = {
+  bank: "bg-tint-violet text-brand-violet",
+  paypal: "bg-tint-cyan text-income-strong",
+  kreditkarte: "bg-tint-yellow text-highlight-strong",
+};
+const TYP_ICON: Record<KontoTyp, typeof Building2> = {
+  bank: Building2,
+  paypal: Wallet,
+  kreditkarte: CreditCard,
 };
 
 export function KontenTabelle({
@@ -96,113 +82,124 @@ export function KontenTabelle({
   const istLeer = konten.length === 0;
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle>Konten</CardTitle>
-          <CardDescription>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[13px] font-semibold">Konten</div>
+          <p className="text-[12px] text-muted-foreground">
             Bank-, PayPal- und Kreditkartenkonten mit gespeicherter
-            Spalten-Mapping-Vorlage. Das Mapping wird bei jedem weiteren Import
-            desselben Kontos automatisch wiederverwendet.
-          </CardDescription>
+            Spalten-Mapping-Vorlage.
+          </p>
         </div>
         <Button
           onClick={() => {
             setBearbeiten(null);
             setDialogOpen(true);
           }}
+          className="h-9 rounded-full bg-brand-violet font-semibold text-white hover:bg-[color:var(--accent-hover)]"
         >
-          <Plus className="mr-2 h-4 w-4" />
-          Konto
+          <Plus className="mr-1.5 h-4 w-4" />
+          Konto anlegen
         </Button>
-      </CardHeader>
-      <CardContent>
-        {istLeer ? (
-          <div className="rounded-md border border-dashed p-10 text-center">
-            <p className="text-sm text-muted-foreground">
-              Noch keine Konten angelegt.
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Lege dein erstes Konto an (z. B. Geschäftskonto, PayPal,
-              Kreditkarte).
-            </p>
-            <Button
-              className="mt-4"
-              onClick={() => {
-                setBearbeiten(null);
-                setDialogOpen(true);
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Konto anlegen
-            </Button>
+      </div>
+
+      {istLeer ? (
+        <div className="rounded-[var(--radius)] bg-card px-8 py-16 text-center shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[14px] bg-tint-violet text-brand-violet">
+            <Building2 className="h-6 w-6" />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Bezeichnung</TableHead>
-                  <TableHead>Typ</TableHead>
-                  <TableHead>Mapping</TableHead>
-                  <TableHead className="text-right">Aktion</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {konten.map((k) => (
-                  <TableRow key={k.id}>
-                    <TableCell className="font-medium">
-                      {k.bezeichnung}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={TYP_VARIANT[k.typ]}>
+          <h2 className="mt-4 font-display text-xl font-bold tracking-[-0.012em]">
+            Noch keine Konten angelegt
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-sm text-[13.5px] text-muted-foreground">
+            Lege dein erstes Konto an (z. B. Geschäftskonto, PayPal,
+            Kreditkarte).
+          </p>
+          <Button
+            className="mt-4 rounded-full bg-brand-violet font-semibold text-white hover:bg-[color:var(--accent-hover)]"
+            onClick={() => {
+              setBearbeiten(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            Konto anlegen
+          </Button>
+        </div>
+      ) : (
+        <section className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <ul role="list" className="divide-y divide-line-hair">
+            {konten.map((k) => {
+              const Icon = TYP_ICON[k.typ];
+              return (
+                <li
+                  key={k.id}
+                  className="flex items-center gap-3 px-4 py-3"
+                >
+                  <div
+                    className={
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] " +
+                      TYP_ICON_BG[k.typ]
+                    }
+                  >
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[14px] font-semibold leading-tight">
+                        {k.bezeichnung}
+                      </span>
+                      <span className="rounded-full bg-[color:var(--surface-2)] px-2 py-0 text-[10px] font-medium text-muted-foreground">
                         {TYP_LABELS[k.typ]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[12px] text-muted-foreground">
                       {k.mapping ? (
-                        <Badge variant="outline">konfiguriert</Badge>
+                        <span className="inline-flex items-center gap-1 text-income-strong">
+                          ● Mapping konfiguriert
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground">
-                          noch nicht eingerichtet
+                        <span className="inline-flex items-center gap-1 text-highlight-strong">
+                          ○ Noch kein Mapping
                         </span>
                       )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busyId === k.id}
-                        onClick={() => {
-                          setBearbeiten(k);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-1 h-4 w-4" />
-                        Bearbeiten
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive hover:text-destructive"
-                        disabled={busyId === k.id}
-                        onClick={() => setLoeschen(k)}
-                      >
-                        {busyId === k.id ? (
-                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="mr-1 h-4 w-4" />
-                        )}
-                        Löschen
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      disabled={busyId === k.id}
+                      className="h-8 w-8 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+                      onClick={() => {
+                        setBearbeiten(k);
+                        setDialogOpen(true);
+                      }}
+                      title="Bearbeiten"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full text-muted-foreground hover:bg-tint-cerise hover:text-destructive"
+                      disabled={busyId === k.id}
+                      onClick={() => setLoeschen(k)}
+                      title="Löschen"
+                    >
+                      {busyId === k.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <KontoDialog
         open={dialogOpen}
@@ -237,6 +234,6 @@ export function KontenTabelle({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
   );
 }

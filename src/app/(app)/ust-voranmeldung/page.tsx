@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UstvaAnsicht } from "@/components/ustva/ustva-ansicht";
 import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
 import type { UstStatus } from "@/lib/types";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "USt-Voranmeldung · STEUERAGENT",
@@ -42,18 +43,12 @@ export default async function UstVoranmeldungPage() {
   const aktuellesJahr = new Date().getFullYear();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          USt-Voranmeldung
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Belastbarer USt-VA-Vorschlag je Voranmeldungszeitraum. Die Zahlen
-          werden rein rechnerisch aus den klassifizierten Buchungen gebildet
-          (keine KI in der Endsumme). Drill-down zeigt die einbezogenen
-          Buchungen je Kennzahl.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Steuer"
+        titel="USt-Voranmeldung"
+        beschreibung="Belastbarer USt-VA-Vorschlag je Voranmeldungszeitraum. Die Zahlen werden rein rechnerisch aus den klassifizierten Buchungen gebildet (keine KI in der Endsumme). Drill-down zeigt die einbezogenen Buchungen je Kennzahl."
+      />
 
       {!profil ? (
         <Alert variant="destructive">
@@ -73,6 +68,6 @@ export default async function UstVoranmeldungPage() {
           )}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

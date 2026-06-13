@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExportAuswahl } from "@/components/export/export-auswahl";
 import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Export · STEUERAGENT",
@@ -81,16 +82,12 @@ export default async function ExportPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Export</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          EÜR, USt-VA, Privatentnahmen, Buchungssätze (CSV/DATEV-ähnlich)
-          und ELSTER-Kennzahlen exportieren. Abgeschlossene Perioden nutzen
-          den unveränderlichen Snapshot; offene Zeiträume werden deutlich als
-          „vorläufig“ gekennzeichnet.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Steuer"
+        titel="Export"
+        beschreibung="EÜR, USt-VA, Privatentnahmen, Buchungssätze (CSV/DATEV-ähnlich) und ELSTER-Kennzahlen exportieren. Abgeschlossene Perioden nutzen den unveränderlichen Snapshot; offene Zeiträume werden deutlich als „vorläufig“ gekennzeichnet."
+      />
 
       {!profil ? (
         <Alert variant="destructive">
@@ -107,6 +104,6 @@ export default async function ExportPage() {
           periodenProJahr={periodenProJahr}
         />
       )}
-    </div>
+    </PageShell>
   );
 }

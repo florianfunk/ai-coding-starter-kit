@@ -3,18 +3,9 @@
 // PROJ-3: Beleg-Tabelle + Detail-Sheet (OCR-Text, Paperless-Link).
 
 import { useState } from "react";
-import { ExternalLink, FileText } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronRight, ExternalLink, FileText, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 export interface BelegListItem {
   id: string;
@@ -44,13 +36,10 @@ const STATUS_LABEL: Record<BelegListItem["status"], string> = {
   quelle_entfernt: "In Quelle entfernt",
 };
 
-const STATUS_VARIANT: Record<
-  BelegListItem["status"],
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  importiert: "default",
-  unvollstaendig: "secondary",
-  quelle_entfernt: "destructive",
+const STATUS_PILL: Record<BelegListItem["status"], string> = {
+  importiert: "bg-tint-cyan text-income-strong",
+  unvollstaendig: "bg-tint-yellow text-highlight-strong",
+  quelle_entfernt: "bg-tint-cerise text-destructive",
 };
 
 function formatDatum(iso: string | null): string {
@@ -85,90 +74,83 @@ export function BelegTabelle({ belege }: { belege: BelegListItem[] }) {
 
   return (
     <div className="space-y-4">
-      <Input
-        value={suche}
-        onChange={(e) => setSuche(e.target.value)}
-        placeholder="Suche nach Titel, Korrespondent oder Tag…"
-        className="sm:max-w-sm"
-        aria-label="Belege durchsuchen"
-      />
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={suche}
+          onChange={(e) => setSuche(e.target.value)}
+          placeholder="Suche nach Titel, Korrespondent oder Tag…"
+          className="rounded-full border-line bg-card pl-9"
+          aria-label="Belege durchsuchen"
+        />
+      </div>
 
       {gefiltert.length === 0 ? (
-        <div className="rounded-md border border-dashed p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Keine Belege passen zur Suche.
-          </p>
+        <div className="rounded-[var(--radius)] bg-card px-8 py-12 text-center shadow-[var(--shadow-1)] ring-1 ring-line/60 text-[13px] text-muted-foreground">
+          Keine Belege passen zur Suche.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Datum</TableHead>
-                <TableHead>Korrespondent</TableHead>
-                <TableHead>Titel</TableHead>
-                <TableHead className="text-right">Betrag</TableHead>
-                <TableHead>Tags</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Aktion</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {gefiltert.map((b) => (
-                <TableRow
-                  key={b.id}
-                  className={
-                    b.status === "quelle_entfernt" ? "opacity-60" : ""
-                  }
+        <section className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <ul role="list" className="divide-y divide-line-hair">
+            {gefiltert.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => setAktiv(b)}
+                  className={cn(
+                    "group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[color:var(--surface-2)]",
+                    b.status === "quelle_entfernt" && "opacity-60",
+                  )}
                 >
-                  <TableCell className="whitespace-nowrap">
-                    {formatDatum(b.beleg_datum)}
-                  </TableCell>
-                  <TableCell>{b.korrespondent ?? "–"}</TableCell>
-                  <TableCell className="max-w-[260px] truncate">
-                    {b.titel ?? "(ohne Titel)"}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-right">
-                    {formatBetrag(b.betrag)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {(b.tags ?? []).slice(0, 3).map((t) => (
-                        <Badge
-                          key={t}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {t}
-                        </Badge>
-                      ))}
-                      {(b.tags ?? []).length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{(b.tags ?? []).length - 3}
-                        </Badge>
-                      )}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-tint-violet text-brand-violet">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[14px] font-semibold leading-tight">
+                        {b.titel ?? "(ohne Titel)"}
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-full px-2 py-0 text-[10px] font-semibold",
+                          STATUS_PILL[b.status],
+                        )}
+                      >
+                        {STATUS_LABEL[b.status]}
+                      </span>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[b.status]}>
-                      {STATUS_LABEL[b.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAktiv(b)}
-                    >
-                      <FileText className="mr-1 h-4 w-4" />
-                      Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-[12px] text-muted-foreground">
+                      <span>{formatDatum(b.beleg_datum)}</span>
+                      {b.korrespondent ? (
+                        <>
+                          <span className="text-line-strong">·</span>
+                          <span className="truncate">{b.korrespondent}</span>
+                        </>
+                      ) : null}
+                      {(b.tags ?? []).length > 0 ? (
+                        <>
+                          <span className="text-line-strong">·</span>
+                          <span className="truncate text-[11px]">
+                            {(b.tags ?? []).slice(0, 3).join(" · ")}
+                            {(b.tags ?? []).length > 3
+                              ? ` +${(b.tags ?? []).length - 3}`
+                              : ""}
+                          </span>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-mono text-[14px] font-semibold tabular-nums">
+                      {formatBetrag(b.betrag)}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-line-strong transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <Sheet
@@ -198,18 +180,26 @@ export function BelegTabelle({ belege }: { belege: BelegListItem[] }) {
                 <dd>{aktiv.dokumenttyp ?? "–"}</dd>
                 <dt className="text-muted-foreground">Status</dt>
                 <dd>
-                  <Badge variant={STATUS_VARIANT[aktiv.status]}>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                      STATUS_PILL[aktiv.status],
+                    )}
+                  >
                     {STATUS_LABEL[aktiv.status]}
-                  </Badge>
+                  </span>
                 </dd>
               </dl>
 
               {(aktiv.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {(aktiv.tags ?? []).map((t) => (
-                    <Badge key={t} variant="outline">
+                    <span
+                      key={t}
+                      className="inline-flex rounded-full bg-[color:var(--surface-2)] px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+                    >
                       {t}
-                    </Badge>
+                    </span>
                   ))}
                 </div>
               )}

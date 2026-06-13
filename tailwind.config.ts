@@ -59,7 +59,48 @@ const config: Config = {
   				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
   				border: 'hsl(var(--sidebar-border))',
   				ring: 'hsl(var(--sidebar-ring))'
-  			}
+  			},
+  			// Marken-Palette aus den Hex-Werten — semantische Klassen wie
+  			//   bg-income, text-expense, border-highlight
+  			// Die jeweiligen Hex-Werte stehen auch in globals.css als
+  			// --brand-* zur direkten CSS-Nutzung.
+  			income: {
+  				DEFAULT: '#00D3FF',
+  				soft:    '#DFF7FE',
+  				strong:  '#00A8CC',
+  			},
+  			expense: {
+  				DEFAULT: '#F5009B',
+  				soft:    '#FDE0F1',
+  				strong:  '#C8007A',
+  			},
+  			highlight: {
+  				DEFAULT: '#FFD900',
+  				soft:    '#FFF6CC',
+  				strong:  '#CCAF00',
+  			},
+  			brand: {
+  				violet: '#7C3AED',
+  				yellow: '#FFD900',
+  				cyan:   '#00D3FF',
+  				cerise: '#F5009B',
+  				shaft:  '#333333',
+  				gray:   '#999898',
+  			},
+  			// Tints (~22-25%) — Sektions-Hintergruende, KPI-Bloecke, Card-Wash.
+  			// Werte lesen aus CSS-Variablen, damit Light/Dark automatisch
+  			// umschalten. Border-Stufen separat fuer praesente Kanten.
+  			tint: {
+  				violet: 'var(--tint-violet)',
+  				yellow: 'var(--tint-yellow)',
+  				cyan:   'var(--tint-cyan)',
+  				cerise: 'var(--tint-cerise)',
+  				gray:   'var(--tint-gray)',
+  				'violet-border': 'var(--tint-violet-border)',
+  				'yellow-border': 'var(--tint-yellow-border)',
+  				'cyan-border':   'var(--tint-cyan-border)',
+  				'cerise-border': 'var(--tint-cerise-border)',
+  			},
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -67,9 +108,9 @@ const config: Config = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		fontFamily: {
-  			sans: ['var(--font-plex-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-  			mono: ['var(--font-plex-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-  			display: ['var(--font-source-serif)', 'Georgia', 'serif']
+  			sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+  			mono: ['var(--font-jetbrains-mono)', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+  			display: ['var(--font-inter)', 'ui-sans-serif', 'system-ui', 'sans-serif']
   		},
   		keyframes: {
   			'accordion-down': {

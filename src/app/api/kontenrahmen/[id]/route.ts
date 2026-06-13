@@ -78,12 +78,22 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/kontenrahmen/[id] — KEIN Hard-Delete.
- * Im MVP wird ausschließlich soft-deaktiviert (aktiv = false), damit
- * historische Buchungen weiterhin auf die Kategorie verweisen können.
+ * DELETE /api/kontenrahmen/[id]
+ *
+ * Verhalten haengt vom Query-Parameter `hart` ab:
+ *
+ * - **Soft-Delete (Default, `?hart=false` oder ohne Parameter):** Setzt
+ *   `aktiv = false`. Historische Buchungen behalten ihre Referenz.
+ *   Sicher, immer erlaubt.
+ *
+ * - **Hard-Delete (`?hart=true`):** Loescht den Datensatz endgueltig.
+ *   Nur erlaubt, wenn KEINE Buchung mehr auf die Kategorie verweist.
+ *   Wird eine referenzierende Buchung gefunden, antwortet die Route mit
+ *   409 + Trefferzahl, damit der UI eine sprechende Fehlermeldung zeigen
+ *   kann ("X Buchungen verweisen darauf — bitte erst umbuchen").
  */
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getApiUser();
@@ -97,7 +107,59 @@ export async function DELETE(
     return NextResponse.json({ error: "Ungültige ID" }, { status: 400 });
   }
 
+  const url = new URL(request.url);
+  const hart = url.searchParams.get("hart") === "true";
+
   const supabase = await createClient();
+
+  if (hart) {
+    // 1. Zaehle referenzierende Buchungen (RLS-scoped auf den Owner).
+    const { count, error: cntErr } = await supabase
+      .from("buchung")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", user.id)
+      .eq("kategorie_id", idCheck.data);
+    if (cntErr) {
+      return NextResponse.json(
+        { error: "Vorpruefung fehlgeschlagen" },
+        { status: 500 },
+      );
+    }
+    if ((count ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          error: `Kategorie kann nicht gelöscht werden: ${count} Buchung(en) verweisen darauf. Bitte erst umbuchen oder deaktivieren.`,
+          buchungen_anzahl: count,
+        },
+        { status: 409 },
+      );
+    }
+
+    // 2. Hard-Delete.
+    const { error: delErr } = await supabase
+      .from("kategorie")
+      .delete()
+      .eq("id", idCheck.data)
+      .eq("owner_id", user.id);
+    if (delErr) {
+      if (delErr.code === "PGRST116") {
+        return NextResponse.json(
+          { error: "Kategorie nicht gefunden" },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json(
+        { error: "Kategorie konnte nicht gelöscht werden" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      message: "Kategorie endgültig gelöscht",
+    });
+  }
+
+  // Soft-Delete (Default): deaktivieren.
   const { data, error } = await supabase
     .from("kategorie")
     .update({ aktiv: false })

@@ -10,6 +10,7 @@ import type {
   BelegKurz,
   BuchungKurz,
 } from "@/components/abgleich/abgleich-typen";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Beleg-Abgleich · STEUERAGENT",
@@ -60,18 +61,12 @@ export default async function AbgleichPage() {
   const alleBuchungen = (buchungenData ?? []) as BuchungKurz[];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Beleg-Abgleich
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Jede geschäftliche Buchung wird automatisch einem Paperless-Beleg
-          zugeordnet (Betrag, Datum, Empfänger, Text). Eindeutige Treffer werden
-          verknüpft, unsichere zur Bestätigung gelistet. Manuelle Zuordnungen
-          sind vor erneutem Abgleich geschützt.
-        </p>
-      </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Bücher"
+        titel="Beleg-Abgleich"
+        beschreibung="Jede geschäftliche Buchung wird automatisch einem Paperless-Beleg zugeordnet (Betrag, Datum, Empfänger, Text). Eindeutige Treffer werden verknüpft, unsichere zur Bestätigung gelistet. Manuelle Zuordnungen sind vor erneutem Abgleich geschützt."
+      />
 
       <AbgleichAnsicht
         initialJob={letzterJob}
@@ -79,6 +74,6 @@ export default async function AbgleichPage() {
         alleBelege={alleBelege}
         alleBuchungen={alleBuchungen}
       />
-    </div>
+    </PageShell>
   );
 }

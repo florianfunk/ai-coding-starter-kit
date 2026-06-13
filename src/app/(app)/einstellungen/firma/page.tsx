@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { FirmaForm } from "@/components/firma/firma-form";
 import type { Firmenprofil } from "@/lib/types";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Firma & Steuerprofil — STEUERAGENT",
@@ -27,16 +28,12 @@ export default async function FirmaPage() {
   const profil = (data as Firmenprofil | null) ?? null;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Firma &amp; Steuerprofil
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Zentrale Stammdaten und Steuerprofil deiner Firma. Single Source of
-          Truth für alle weiteren Module.
-        </p>
-      </header>
+    <PageShell className="mx-auto max-w-3xl">
+      <PageHeader
+        eyebrow="Setup"
+        titel="Firma & Steuerprofil"
+        beschreibung="Zentrale Stammdaten und Steuerprofil deiner Firma. Single Source of Truth für alle weiteren Module."
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -48,6 +45,6 @@ export default async function FirmaPage() {
       )}
 
       <FirmaForm initialProfil={profil} />
-    </div>
+    </PageShell>
   );
 }

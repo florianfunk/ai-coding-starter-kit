@@ -251,7 +251,7 @@ export function AktionsKarte({
 function StatusBadge({ status }: { status: ChatAktion["status"] }) {
   if (status === "confirmed") {
     return (
-      <Badge className="shrink-0 bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300">
+      <Badge className="shrink-0 rounded-full bg-tint-cyan text-income-strong hover:bg-tint-cyan dark:text-income">
         Bestätigt
       </Badge>
     );
@@ -280,7 +280,7 @@ function StatusBadge({ status }: { status: ChatAktion["status"] }) {
 function StatusZeile({ aktion }: { aktion: ChatAktion }) {
   if (aktion.status === "confirmed" && aktion.ausgefuehrt_am) {
     return (
-      <p className="mt-3 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
+      <p className="mt-3 flex items-center gap-2 text-xs text-income-strong dark:text-income">
         <CheckCircle2 className="h-3.5 w-3.5" />
         Erledigt am {formatTimestamp(aktion.ausgefuehrt_am)}
       </p>

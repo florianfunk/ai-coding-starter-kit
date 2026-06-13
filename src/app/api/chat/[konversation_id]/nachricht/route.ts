@@ -216,11 +216,21 @@ export async function POST(
     stopWhen: stepCountIs(MAX_STEPS),
     maxOutputTokens: MAX_OUTPUT_TOKENS,
     onFinish: async (event) => {
-      // event hat: text, toolCalls, toolResults, finishReason, usage, ...
+      // event hat: text, toolCalls, toolResults, finishReason, usage, steps ...
       const text = typeof event.text === "string" ? event.text : "";
-      const toolCalls = event.toolCalls ?? [];
-      const toolResults =
-        ((event as unknown as { toolResults?: unknown }).toolResults ?? []) as unknown;
+
+      // BUG-FIX: event.toolCalls ist NUR der letzte Step.
+      // Tool-Calls werden im vorletzten Step gemacht, im letzten Step
+      // formuliert das LLM die Antwort. Wir sammeln daher ueber ALLE
+      // Steps hinweg, damit chat_nachricht.tool_calls die Wahrheit
+      // widerspiegelt (UI-Badges + spaetere Audit-Spur).
+      type StepLike = {
+        toolCalls?: unknown[];
+        toolResults?: unknown[];
+      };
+      const alleSteps = (event.steps ?? []) as StepLike[];
+      const toolCalls = alleSteps.flatMap((s) => s.toolCalls ?? []);
+      const toolResults = alleSteps.flatMap((s) => s.toolResults ?? []);
       const usage = event.usage as
         | { inputTokens?: number; outputTokens?: number; promptTokens?: number; completionTokens?: number }
         | undefined;
@@ -235,9 +245,7 @@ export async function POST(
         .update({
           inhalt: text,
           tool_calls: toolCalls.length > 0 ? toolCalls : null,
-          tool_results: Array.isArray(toolResults) && toolResults.length > 0
-            ? toolResults
-            : null,
+          tool_results: toolResults.length > 0 ? toolResults : null,
           tokens_in,
           tokens_out,
         })

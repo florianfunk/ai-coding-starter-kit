@@ -427,10 +427,11 @@ function UstvaDokument({
         </View>
         {berechnung.diagnostik.vorsteuer_ohne_beleg_anzahl > 0 ? (
           <Text style={[styles.untertitel, { marginTop: 14 }]}>
-            Hinweis: {berechnung.diagnostik.vorsteuer_ohne_beleg_anzahl}{" "}
-            Ausgabe(n) mit Vorsteuer-Potenzial ohne Beleg (
-            {euro(berechnung.diagnostik.vorsteuer_ohne_beleg_betrag)}) sind
-            mangels Beleg NICHT als Vorsteuer abgezogen.
+            Hinweis: In Kz 66 sind{" "}
+            {euro(berechnung.diagnostik.vorsteuer_ohne_beleg_betrag)} Vorsteuer
+            aus {berechnung.diagnostik.vorsteuer_ohne_beleg_anzahl} Ausgabe(n)
+            ohne Beleg vorläufig enthalten. Für die finale USt-VA müssen die
+            Belege nachgereicht werden, sonst ist dieser Anteil nicht abziehbar.
           </Text>
         ) : null}
         <Fuss erstelltAm={erstellt} />

@@ -9,9 +9,11 @@
 // - Es fließen NUR Buchungen mit klassifikation='geschaeftlich' UND
 //   steuerrelevant=true ein. privat/neutral/unklar werden ausgeschlossen.
 // - Einnahmen (Betrag > 0) → steuerpflichtiger Umsatz je USt-Satz (19/7/0).
-// - Ausgaben (Betrag < 0) → Vorsteuer NUR, wenn die Buchung per
-//   beleg_buchung belegt ist. Unbelegte Vorsteuer ist NICHT abziehbar und
-//   wird separat (Warnung) ausgewiesen.
+// - Ausgaben (Betrag < 0) → Vorsteuer wird auf Kz 66 voll angesetzt,
+//   unabhängig vom Belegstatus (vorläufige Sicht). Zusätzlich wird
+//   transparent ausgewiesen, welcher Anteil davon belegt bzw. unbelegt
+//   ist (vorsteuer_mit_beleg / vorsteuer_ohne_beleg) — die endgültige
+//   USt-VA benötigt Belege, daher bleibt das Diagnostik-Signal erhalten.
 // - Kleinunternehmer (firmenprofil.ust_status='kleinunternehmer') →
 //   Nullmeldung: keine USt, keine Vorsteuer.
 // - 0 % / Reverse-Charge → eigene Kennzahl, kein USt-Ausweis.
@@ -104,7 +106,12 @@ export interface UstBerechnung {
   summe: {
     umsatz_netto: number;
     umsatzsteuer: number;
+    /** Volle Vorsteuer (mit + ohne Beleg) — Wert, der in Kz 66 landet. */
     vorsteuer_abziehbar: number;
+    /** Davon: Vorsteuer aus belegten Ausgaben. */
+    vorsteuer_mit_beleg: number;
+    /** Davon: Vorsteuer aus unbelegten Ausgaben. */
+    vorsteuer_ohne_beleg: number;
     /** > 0 = Zahllast (an FA), < 0 = Erstattung. */
     zahllast: number;
   };
@@ -112,7 +119,7 @@ export interface UstBerechnung {
   diagnostik: {
     /** Anzahl Ausgabenbuchungen mit Vorsteuer-Potenzial ohne Beleg. */
     vorsteuer_ohne_beleg_anzahl: number;
-    /** Nicht abziehbarer Vorsteuerbetrag (Euro) mangels Beleg. */
+    /** Vorsteuerbetrag (Euro) aus unbelegten Ausgaben (= summe.vorsteuer_ohne_beleg). */
     vorsteuer_ohne_beleg_betrag: number;
     /** Buchungen ohne zuordenbaren USt-Satz (ausgeschlossen). */
     ohne_ust_satz_anzahl: number;
@@ -149,9 +156,11 @@ export function berechneUstVa(
   const umsatzNettoCent: Record<UstSatz, number> = { 0: 0, 7: 0, 19: 0 };
   const umsatzIds: Record<UstSatz, string[]> = { 0: [], 7: [], 19: [] };
   let umsatzsteuerCent = 0;
+  // Volle Vorsteuer (mit + ohne Beleg) — landet in Kz 66.
   let vorsteuerCent = 0;
   const vorsteuerIds: string[] = [];
-
+  // Aufteilung der Vorsteuer für Transparenz im UI.
+  let vorsteuerMitBelegCent = 0;
   let vorsteuerOhneBelegCent = 0;
   let vorsteuerOhneBelegAnzahl = 0;
   let ohneUstSatzAnzahl = 0;
@@ -183,15 +192,17 @@ export function berechneUstVa(
       if (kleinunternehmer) continue;
       umsatzsteuerCent += ustVonNettoCent(nettoCent, satz);
     } else if (betragCent < 0) {
-      // Ausgabe → Vorsteuer nur bei Beleg & nur bei Regelbesteuerung.
+      // Ausgabe → Vorsteuer wird voll angesetzt (Kz 66), egal ob belegt.
+      // Belegstatus wird transparent ausgewiesen (mit/ohne Beleg-Anteil).
       if (satz === 0) continue; // 0 % Eingang → keine Vorsteuer.
+      if (kleinunternehmer) continue; // keine Vorsteuer abziehbar.
       const ausgabeBruttoCent = -betragCent;
       const nettoCent = Math.round((ausgabeBruttoCent * 100) / (100 + satz));
       const vstCent = ausgabeBruttoCent - nettoCent;
-      if (kleinunternehmer) continue; // keine Vorsteuer abziehbar.
+      vorsteuerCent += vstCent;
+      vorsteuerIds.push(b.id);
       if (b.belegt) {
-        vorsteuerCent += vstCent;
-        vorsteuerIds.push(b.id);
+        vorsteuerMitBelegCent += vstCent;
       } else {
         vorsteuerOhneBelegCent += vstCent;
         vorsteuerOhneBelegAnzahl++;
@@ -258,6 +269,8 @@ export function berechneUstVa(
       umsatz_netto: centZuEuro(umsatzGesamtNettoCent),
       umsatzsteuer: centZuEuro(umsatzsteuerCent),
       vorsteuer_abziehbar: centZuEuro(vorsteuerCent),
+      vorsteuer_mit_beleg: centZuEuro(vorsteuerMitBelegCent),
+      vorsteuer_ohne_beleg: centZuEuro(vorsteuerOhneBelegCent),
       zahllast: centZuEuro(zahllastCent),
     },
     diagnostik: {

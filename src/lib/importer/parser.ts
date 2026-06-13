@@ -44,20 +44,131 @@ type RohMatrix = string[][];
 /**
  * Liest einen Datei-Buffer (xlsx ODER csv) in eine String-Matrix.
  * SheetJS erkennt CSV/Excel automatisch anhand des Inhalts.
+ *
+ * Datumszellen sind in Excel als Number gespeichert (Serial seit 1900-01-01
+ * bzw. 1904-01-01) mit einem `numFmt` wie `m/d/yy`. Wir konvertieren diese
+ * Datumszellen direkt aus dem Serial-Wert in ISO-Strings (`JJJJ-MM-TT`) —
+ * **ohne** das angezeigte `w`-Format zu vertrauen, das je nach Locale
+ * `3/10/26` (US) oder `10.03.26` (DE) sein kann und unseren Parser bei
+ * Tag ≤ 12 in die falsche Interpretation locken wuerde.
+ *
+ * `date1904`-Workbooks (Mac-Excel-Legacy) werden korrekt beruecksichtigt.
  */
 export function leseMatrix(buffer: ArrayBuffer | Uint8Array): RohMatrix {
-  const wb = XLSX.read(buffer, { type: "array", raw: false });
+  // Bei CSV duerfen wir SheetJS' Datums-Heuristik NICHT verwenden — sie
+  // versucht US-Format-Erkennung und macht aus "01.04.2026" intern den
+  // 4. Januar 2026. Excel-Binaerformate (.xls, .xlsx) haben explizite
+  // Typ-Metadaten und sollen weiterhin die Datums-Zellen-Erkennung nutzen.
+  const isBinary = istBinaerExcel(buffer);
+  // cellNF: true → cell.z (numFmt-String) ist befuellt, sonst koennen wir
+  // Datums-Zellen nicht von normalen Zahlen unterscheiden.
+  const opts: XLSX.ParsingOptions = isBinary
+    ? { type: "array", cellNF: true }
+    : { type: "array", raw: true };
+  const wb = XLSX.read(buffer, opts);
   const ersteName = wb.SheetNames[0];
   if (!ersteName) return [];
   const sheet = wb.Sheets[ersteName];
-  // header:1 → Array-of-Arrays; defval sorgt für gleichmäßige Spaltenzahl.
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-    header: 1,
-    defval: "",
-    blankrows: false,
-    raw: false,
-  });
-  return rows.map((r) => r.map((c) => (c == null ? "" : String(c).trim())));
+
+  const date1904: boolean =
+    (wb.Workbook?.WBProps as { date1904?: boolean } | undefined)?.date1904 ===
+    true;
+
+  const refStr = sheet["!ref"];
+  if (!refStr) return [];
+  const range = XLSX.utils.decode_range(refStr);
+
+  const matrix: RohMatrix = [];
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const row: string[] = [];
+    let alleLeer = true;
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = sheet[addr] as XLSX.CellObject | undefined;
+      const val = zelleZuString(cell, date1904);
+      if (val !== "") alleLeer = false;
+      row.push(val);
+    }
+    if (!alleLeer) matrix.push(row);
+  }
+  return matrix;
+}
+
+/**
+ * Pruefung anhand der ersten Bytes, ob der Buffer ein Binaer-Excel-Format
+ * (.xls / .xlsx) ist. Alles andere behandeln wir als CSV.
+ *  - .xlsx (ZIP): 0x50 0x4B  ("PK")
+ *  - .xls (OLE2): 0xD0 0xCF 0x11 0xE0
+ */
+function istBinaerExcel(buffer: ArrayBuffer | Uint8Array): boolean {
+  const u8 =
+    buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  if (u8.length < 4) return false;
+  if (u8[0] === 0x50 && u8[1] === 0x4b) return true; // PK
+  if (u8[0] === 0xd0 && u8[1] === 0xcf && u8[2] === 0x11 && u8[3] === 0xe0)
+    return true; // OLE2
+  return false;
+}
+
+/**
+ * Erkennt anhand des numFmt-Codes, ob eine numerische Zelle ein Datum
+ * darstellt. Datums-Formate enthalten typischerweise Buchstaben wie d, m,
+ * y, h, s — auf separate Strings normalisiert.
+ */
+function istDatumsFormat(z: string | undefined): boolean {
+  if (!z) return false;
+  // Locale-/Color-Praefixe wie [$-409] entfernen.
+  const sauber = z.replace(/\[[^\]]+\]/g, "");
+  // Mindestens ein 'd', 'm' oder 'y' (case-insensitive). Reine Zeitformate
+  // (nur h/m/s) zaehlen nicht als Datum.
+  return /[dmy]/i.test(sauber);
+}
+
+/** Konvertiert eine SheetJS-Zelle in einen String (Datum -> ISO). */
+function zelleZuString(
+  cell: XLSX.CellObject | undefined,
+  date1904: boolean,
+): string {
+  if (!cell || cell.v == null) return "";
+  // Datum: anhand des numFmt-Codes erkennen und aus dem Serial-Wert direkt
+  // in ISO umrechnen — unabhaengig von Locale/Anzeige-Format.
+  if (cell.t === "n" && istDatumsFormat(cell.z as string | undefined)) {
+    const iso = exceldatumZuIso(Number(cell.v), date1904);
+    if (iso) return iso;
+  }
+  if (cell.v instanceof Date) {
+    return isoAusDate(cell.v);
+  }
+  // Fuer alle anderen Zellen den formatierten Anzeige-String bevorzugen
+  // (cell.w). Das erhaelt locale-spezifische Schreibweisen wie "-12,34"
+  // (DE-Komma), die downstream `normalisiereBetrag` braucht. Fallback auf
+  // den rohen Wert, falls SheetJS keinen `w` gerendert hat.
+  if (typeof cell.w === "string") return cell.w.trim();
+  return String(cell.v).trim();
+}
+
+/**
+ * Rechnet einen Excel-Datums-Serial in einen ISO-String (`JJJJ-MM-TT`) um.
+ * Beruecksichtigt `date1904`: Mac-Legacy verwendet 1904-01-01 als Epoch
+ * (statt 1899-12-30) und hat keinen "Phantom-29.-Februar-1900".
+ */
+function exceldatumZuIso(serial: number, date1904: boolean): string | null {
+  if (!Number.isFinite(serial)) return null;
+  const epoch = date1904
+    ? Date.UTC(1904, 0, 1)
+    : Date.UTC(1899, 11, 30);
+  const ms = epoch + Math.round(serial) * 86400000;
+  const d = new Date(ms);
+  const jahr = d.getUTCFullYear();
+  if (jahr < 1900 || jahr > 2100) return null;
+  return isoAusDate(d);
+}
+
+function isoAusDate(d: Date): string {
+  const jahr = d.getUTCFullYear();
+  const monat = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const tag = String(d.getUTCDate()).padStart(2, "0");
+  return `${jahr}-${monat}-${tag}`;
 }
 
 /** True, wenn die Zeile keine verwertbaren Daten enthält. */

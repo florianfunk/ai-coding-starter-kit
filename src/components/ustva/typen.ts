@@ -20,6 +20,8 @@ export interface UstBerechnungDTO {
     umsatz_netto: number;
     umsatzsteuer: number;
     vorsteuer_abziehbar: number;
+    vorsteuer_mit_beleg: number;
+    vorsteuer_ohne_beleg: number;
     zahllast: number;
   };
   diagnostik: {

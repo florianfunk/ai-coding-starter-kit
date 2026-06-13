@@ -5,7 +5,7 @@
 // Kennzahl-Tabelle (ELSTER-Feldnr.), Drill-down je Kennzahl,
 // Warnpanel und "Periode als geprüft abschließen".
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import type { UstStatus } from "@/lib/types";
@@ -311,29 +311,64 @@ export function UstvaAnsicht({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {b.zeilen.map((z) => (
-                    <TableRow
-                      key={z.schluessel}
-                      className="cursor-pointer"
-                      onClick={() => oeffneDrilldown(z)}
-                    >
-                      <TableCell className="font-mono text-sm">
-                        {z.kennzahl}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {z.bezeichnung}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatEuro(z.betrag)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {z.steuer === null ? "—" : formatEuro(z.steuer)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                        {z.buchung_ids.length}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {b.zeilen.map((z) => {
+                    const istVorsteuer = z.schluessel === "vorsteuer";
+                    const zeigeAufteilung =
+                      istVorsteuer &&
+                      !b.kleinunternehmer &&
+                      (b.summe.vorsteuer_mit_beleg > 0 ||
+                        b.summe.vorsteuer_ohne_beleg > 0);
+                    return (
+                      <Fragment key={z.schluessel}>
+                        <TableRow
+                          className="cursor-pointer"
+                          onClick={() => oeffneDrilldown(z)}
+                        >
+                          <TableCell className="font-mono text-sm">
+                            {z.kennzahl}
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {z.bezeichnung}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatEuro(z.betrag)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {z.steuer === null ? "—" : formatEuro(z.steuer)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                            {z.buchung_ids.length}
+                          </TableCell>
+                        </TableRow>
+                        {zeigeAufteilung && (
+                          <>
+                            <TableRow className="border-t-0 text-muted-foreground hover:bg-transparent">
+                              <TableCell />
+                              <TableCell className="text-xs pl-6">
+                                davon mit Beleg
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-xs">
+                                {formatEuro(b.summe.vorsteuer_mit_beleg)}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                            <TableRow className="border-t-0 text-muted-foreground hover:bg-transparent">
+                              <TableCell />
+                              <TableCell className="text-xs pl-6">
+                                davon noch ohne Beleg
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-xs">
+                                {formatEuro(b.summe.vorsteuer_ohne_beleg)}
+                              </TableCell>
+                              <TableCell />
+                              <TableCell />
+                            </TableRow>
+                          </>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </Table>
 

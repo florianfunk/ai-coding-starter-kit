@@ -56,7 +56,7 @@ describe("berechneUstVa — Umsätze je Satz", () => {
 });
 
 describe("berechneUstVa — Vorsteuer", () => {
-  it("zieht Vorsteuer aus belegter Ausgabe ab", () => {
+  it("zieht Vorsteuer aus belegter Ausgabe ab und weist sie unter 'mit Beleg' aus", () => {
     const r = berechneUstVa(
       [b({ id: "a1", betrag: -119, ust_satz: 19, belegt: true })],
       2026,
@@ -64,20 +64,26 @@ describe("berechneUstVa — Vorsteuer", () => {
       "regelbesteuerung",
     );
     expect(r.summe.vorsteuer_abziehbar).toBe(19);
+    expect(r.summe.vorsteuer_mit_beleg).toBe(19);
+    expect(r.summe.vorsteuer_ohne_beleg).toBe(0);
     const zv = r.zeilen.find((z) => z.schluessel === "vorsteuer")!;
     expect(zv.buchung_ids).toEqual(["a1"]);
   });
 
-  it("Vorsteuer ohne Beleg ist NICHT abziehbar, wird separat ausgewiesen", () => {
+  it("Vorsteuer ohne Beleg wird voll in Kz 66 angesetzt und separat ausgewiesen", () => {
     const r = berechneUstVa(
       [b({ id: "a2", betrag: -119, ust_satz: 19, belegt: false })],
       2026,
       3,
       "regelbesteuerung",
     );
-    expect(r.summe.vorsteuer_abziehbar).toBe(0);
+    expect(r.summe.vorsteuer_abziehbar).toBe(19);
+    expect(r.summe.vorsteuer_mit_beleg).toBe(0);
+    expect(r.summe.vorsteuer_ohne_beleg).toBe(19);
     expect(r.diagnostik.vorsteuer_ohne_beleg_anzahl).toBe(1);
     expect(r.diagnostik.vorsteuer_ohne_beleg_betrag).toBe(19);
+    const zv = r.zeilen.find((z) => z.schluessel === "vorsteuer")!;
+    expect(zv.buchung_ids).toEqual(["a2"]);
   });
 });
 

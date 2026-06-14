@@ -364,6 +364,7 @@ export function RegelDialog({
                         vorabOptionen={[
                           { value: "none", label: "— nicht setzen —" },
                         ]}
+                        inDialog
                       />
                       <FormMessage />
                     </FormItem>

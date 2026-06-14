@@ -313,6 +313,7 @@ export function EntscheidungsDialog({
                     value={field.value || "none"}
                     onChange={(v) => field.onChange(v === "none" ? "" : v)}
                     vorabOptionen={[{ value: "none", label: "Keine Kategorie" }]}
+                    inDialog
                   />
                   <FormMessage />
                 </FormItem>

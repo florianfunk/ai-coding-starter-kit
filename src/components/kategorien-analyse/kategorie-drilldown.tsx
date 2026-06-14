@@ -295,6 +295,7 @@ export function KategorieDrilldown({
                   triggerClassName="h-8 w-[240px] text-xs"
                   placeholder="Zielkategorie (optional)…"
                   ariaLabel="Zielkategorie wählen"
+                  inDialog
                 />
                 <Button size="sm" onClick={auswahlUebernehmen} disabled={bulkBusy}>
                   {bulkBusy ? (
@@ -394,6 +395,7 @@ export function KategorieDrilldown({
                         triggerClassName="h-8 text-xs"
                         placeholder="Kategorie wählen…"
                         ariaLabel="Kategorie wählen"
+                        inDialog
                       />
                     </TableCell>
                     <TableCell>

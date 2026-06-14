@@ -75,6 +75,12 @@ interface KategorieComboboxProps {
   id?: string;
   disabled?: boolean;
   ariaLabel?: string;
+  /**
+   * Wird die Combobox innerhalb eines Dialogs verwendet, muss der Popover-Inhalt
+   * ohne Portal gerendert werden – sonst blockiert der Scroll-Lock des Dialogs
+   * das Scrollen in der Kategorieliste.
+   */
+  inDialog?: boolean;
 }
 
 export function KategorieCombobox({
@@ -91,6 +97,7 @@ export function KategorieCombobox({
   id,
   disabled,
   ariaLabel,
+  inDialog = false,
 }: KategorieComboboxProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -163,6 +170,7 @@ export function KategorieCombobox({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        portal={!inDialog}
         className="w-[var(--radix-popover-trigger-width)] min-w-[240px] p-0"
       >
         <Command>

@@ -337,6 +337,7 @@ function SteuerBlock({
             triggerClassName="h-9"
             placeholder={daten.kategorie_bezeichnung ?? "— ohne —"}
             ariaLabel="Kategorie wählen"
+            inDialog
           />
         </div>
 

@@ -18,6 +18,7 @@ import {
   ArrowUp,
   ChevronRight,
   HelpCircle,
+  Search,
   Sparkles,
   Tag,
   TrendingUp,
@@ -200,6 +201,7 @@ export function BuchungenLedger({
 
   // Client-side Filter & Sort (keine URL-Persistenz — Konto/Zeitraum macht
   // schon Server-Side-Filter; das hier verfeinert nur die geladene Menge).
+  const [suche, setSuche] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
   const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
   const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");
@@ -230,6 +232,7 @@ export function BuchungenLedger({
       bMin = bMax;
       bMax = t;
     }
+    const q = suche.trim().toLowerCase();
     return buchungen.filter((b) => {
       if (statusFilter !== "alle" && b.status !== statusFilter) return false;
       if (klassFilter !== "alle" && b.klassifikation !== klassFilter) return false;
@@ -240,9 +243,25 @@ export function BuchungenLedger({
       }
       if (bMin !== null && b.betrag < bMin) return false;
       if (bMax !== null && b.betrag > bMax) return false;
+      if (q) {
+        const katName = b.kategorie_id
+          ? (kategorieById.get(b.kategorie_id)?.bezeichnung ?? "")
+          : "";
+        const heuhaufen = `${b.empfaenger ?? ""} ${b.verwendungszweck ?? ""} ${katName}`.toLowerCase();
+        if (!heuhaufen.includes(q)) return false;
+      }
       return true;
     });
-  }, [buchungen, statusFilter, klassFilter, kategorieFilter, betragVon, betragBis]);
+  }, [
+    buchungen,
+    statusFilter,
+    klassFilter,
+    kategorieFilter,
+    betragVon,
+    betragBis,
+    suche,
+    kategorieById,
+  ]);
 
   // Sortieren (auf Kopie, damit Props unverändert bleiben).
   const sortiert = useMemo(() => {
@@ -316,6 +335,7 @@ export function BuchungenLedger({
     setKonto("alle");
     setVon("");
     setBis("");
+    setSuche("");
     setStatusFilter("alle");
     setKlassFilter("alle");
     setKategorieFilter("alle");
@@ -345,6 +365,7 @@ export function BuchungenLedger({
     konto !== "alle" ||
     von !== "" ||
     bis !== "" ||
+    suche !== "" ||
     statusFilter !== "alle" ||
     klassFilter !== "alle" ||
     kategorieFilter !== "alle" ||
@@ -415,6 +436,28 @@ export function BuchungenLedger({
 
       {/* ───────────────── FILTER-KARTE ───────────────── */}
       <section className="space-y-3 rounded-[var(--radius)] bg-card p-5 shadow-[var(--shadow-1)] ring-1 ring-line/60">
+        {/* Suchzeile — durchsucht Empfänger, Verwendungszweck, Kategorie */}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            value={suche}
+            onChange={(e) => setSuche(e.target.value)}
+            placeholder="Buchungen durchsuchen — Empfänger, Verwendungszweck, Kategorie…"
+            className="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] pl-9 pr-9"
+          />
+          {suche ? (
+            <button
+              type="button"
+              onClick={() => setSuche("")}
+              aria-label="Suche löschen"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:text-destructive"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+
         {/* Quick-Filter-Pills */}
         <div className="flex flex-wrap items-center gap-1.5">
           {QUICK_FILTER.map((q) => {

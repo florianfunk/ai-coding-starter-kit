@@ -1,22 +1,23 @@
-// PROJ-7: Prüfliste (Server Component).
-// Lädt alle offenen Ausnahmen (Buchungen mit status='zur_pruefung') des
-// Eigentümers samt Konten/Kategorien für die Schnellentscheidung.
+// PROJ-20: Merkliste (Server Component).
+// Lädt alle gemerkten Buchungen (gemerkt_am IS NOT NULL) des Eigentümers,
+// sortiert nach Merk-Zeitpunkt (zuletzt gemerkte oben), samt Konten/Kategorien
+// für das Detail-Sheet.
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PrueflisteAnsicht } from "@/components/pruefliste/pruefliste-ansicht";
+import { MerklisteAnsicht } from "@/components/merkliste/merkliste-ansicht";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
-  title: "Prüfliste · STEUERAGENT",
+  title: "Merkliste · STEUERAGENT",
 };
 
 const SELECT_FELDER =
   "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
 
-export default async function PrueflistePage() {
+export default async function MerklistePage() {
   const user = await requireUser();
   const supabase = await createClient();
 
@@ -34,7 +35,6 @@ export default async function PrueflistePage() {
       "id, bezeichnung, typ, ust_satz, euer_zeile, elster_kennzahl, aktiv, gueltig_ab",
     )
     .eq("owner_id", user.id)
-    .eq("aktiv", true)
     .order("bezeichnung", { ascending: true })
     .limit(500);
   const kategorien = (kategorienData ?? []) as Kategorie[];
@@ -43,29 +43,28 @@ export default async function PrueflistePage() {
     .from("buchung")
     .select(SELECT_FELDER)
     .eq("owner_id", user.id)
-    .eq("status", "zur_pruefung")
-    .order("buchung_datum", { ascending: false })
+    .not("gemerkt_am", "is", null)
+    .order("gemerkt_am", { ascending: false })
     .limit(1000);
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Heute"
-        titel="Prüfliste"
-        beschreibung="Nur die Fälle, die der Agent nicht sicher entscheiden konnte. Entscheide schnell – optional als Lernregel speichern, damit gleichartige Buchungen künftig automatisch laufen."
+        titel="Merkliste"
+        beschreibung="Buchungen, die du zum späteren Prüfen gemerkt hast. Tippe eine Zeile für die Details oder recherchiere in Ruhe — entferne den Stern, wenn der Fall geklärt ist."
       />
 
       {error ? (
         <Alert variant="destructive">
           <AlertTitle>Fehler beim Laden</AlertTitle>
           <AlertDescription>
-            Die Prüfliste konnte nicht geladen werden. Bitte lade die Seite
-            neu.
+            Die Merkliste konnte nicht geladen werden. Bitte lade die Seite neu.
           </AlertDescription>
         </Alert>
       ) : (
-        <PrueflisteAnsicht
-          initialFaelle={(data ?? []) as Buchung[]}
+        <MerklisteAnsicht
+          initialBuchungen={(data ?? []) as Buchung[]}
           konten={konten}
           kategorien={kategorien}
         />

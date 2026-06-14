@@ -35,6 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
+import { MerkenStern } from "@/components/merkliste/merken-stern";
+import { toggleMerken } from "@/lib/merken";
 
 import type {
   BuchungDetail,
@@ -113,6 +115,9 @@ export function BuchungDetailSheet({
   const [fehler, setFehler] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [saving, setSaving] = useState(false);
+  // PROJ-20: Merken-Status — lokal, seeded aus den geladenen Detaildaten.
+  const [gemerkt, setGemerkt] = useState(false);
+  const [merkenPending, setMerkenPending] = useState(false);
 
   useEffect(() => {
     if (!buchungId) {
@@ -134,6 +139,27 @@ export function BuchungDetailSheet({
       }
     });
   }, [buchungId]);
+
+  // Merken-Status aus den geladenen Daten übernehmen.
+  useEffect(() => {
+    setGemerkt(daten?.gemerkt_am != null);
+  }, [daten]);
+
+  async function toggleMerkenLokal() {
+    if (!buchungId || merkenPending) return;
+    const gewollt = !gemerkt;
+    setGemerkt(gewollt);
+    setMerkenPending(true);
+    const ok = await toggleMerken(buchungId, gewollt);
+    setMerkenPending(false);
+    if (!ok) {
+      setGemerkt(!gewollt);
+      toast.error("Merken fehlgeschlagen — bitte erneut versuchen.");
+    } else {
+      toast.success(gewollt ? "Gemerkt" : "Von Merkliste entfernt");
+      onMutiert();
+    }
+  }
 
   async function patch(body: Record<string, unknown>) {
     if (!buchungId) return;
@@ -164,14 +190,25 @@ export function BuchungDetailSheet({
     <Sheet open={offen} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-[680px] sm:w-[90vw]">
         <SheetHeader>
-          <SheetTitle>Buchungs-Details</SheetTitle>
-          <SheetDescription>
+          <div className="flex items-start justify-between gap-2 pr-6">
+            <div>
+              <SheetTitle>Buchungs-Details</SheetTitle>
+              <SheetDescription>
+                {daten ? (
+                  <>
+                    {deDate(daten.buchung_datum)} · {daten.konto_bezeichnung}
+                  </>
+                ) : null}
+              </SheetDescription>
+            </div>
             {daten ? (
-              <>
-                {deDate(daten.buchung_datum)} · {daten.konto_bezeichnung}
-              </>
+              <MerkenStern
+                gemerkt={gemerkt}
+                pending={merkenPending}
+                onToggle={toggleMerkenLokal}
+              />
             ) : null}
-          </SheetDescription>
+          </div>
         </SheetHeader>
 
         {fehler ? (

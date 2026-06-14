@@ -90,6 +90,9 @@ export interface Buchung {
   pruef_grund: string | null;
   parent_buchung_id: string | null;
   split_anteil: number | null;
+  // PROJ-20: Merkliste — Zeitpunkt, zu dem die Buchung gemerkt wurde
+  // (null = nicht gemerkt). Wird nur in den Stern-Oberflächen mitgeladen.
+  gemerkt_am: string | null;
 }
 
 export interface Beleg {

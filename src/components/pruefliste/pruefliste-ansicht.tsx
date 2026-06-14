@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
+import { MerkenStern } from "@/components/merkliste/merken-stern";
+import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -64,6 +66,11 @@ export function PrueflisteAnsicht({
 }) {
   const router = useRouter();
   const [faelle, setFaelle] = useState<Buchung[]>(initialFaelle);
+  // PROJ-20: Merken unabhängig vom Entscheiden — eine Buchung kann in der
+  // Prüfliste bleiben und trotzdem gemerkt sein.
+  const merk = useMerkSet(
+    initialFaelle.filter((f) => f.gemerkt_am !== null).map((f) => f.id),
+  );
   const [konto, setKonto] = useState("alle");
   const [grund, setGrund] = useState("alle");
   const [sort, setSort] = useState<"datum" | "betrag">("datum");
@@ -421,6 +428,9 @@ export function PrueflisteAnsicht({
                 ausgewaehlt={auswahl.has(f.id)}
                 onToggle={() => toggle(f.id)}
                 onEntscheiden={() => oeffneEinzeln(f)}
+                gemerkt={merk.istGemerkt(f.id)}
+                merkenPending={merk.istPending(f.id)}
+                onToggleMerken={() => merk.toggle(f.id)}
               />
             ))}
           </ul>
@@ -512,12 +522,18 @@ function PrueflisteZeile({
   ausgewaehlt,
   onToggle,
   onEntscheiden,
+  gemerkt,
+  merkenPending,
+  onToggleMerken,
 }: {
   fall: Buchung;
   kontoName: string;
   ausgewaehlt: boolean;
   onToggle: () => void;
   onEntscheiden: () => void;
+  gemerkt: boolean;
+  merkenPending: boolean;
+  onToggleMerken: () => void;
 }) {
   const ausgabe = f.betrag < 0;
   const gruende = gruendeListe(f.pruef_grund);
@@ -585,6 +601,13 @@ function PrueflisteZeile({
           {f.waehrung} · {kontoName}
         </div>
       </div>
+      {/* Merken */}
+      <MerkenStern
+        gemerkt={gemerkt}
+        pending={merkenPending}
+        onToggle={onToggleMerken}
+        size="sm"
+      />
       {/* Aktion */}
       <Button
         variant="ghost"

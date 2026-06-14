@@ -25,6 +25,7 @@ const NAV_HEUTE = [
   // weil die taegliche Interaktion mit dem Agenten ueber den Chat laeuft.
   { href: "/chat", label: "KI-Chat" },
   { href: "/pruefliste", label: "Prüfliste" },
+  { href: "/merkliste", label: "Merkliste" },
   { href: "/kuendigungen", label: "Kündigungen" },
 ];
 

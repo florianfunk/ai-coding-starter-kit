@@ -66,6 +66,7 @@ export interface BuchungDetail {
   pruef_grund: string | null;
   parent_buchung_id: string | null;
   split_anteil: number | null;
+  gemerkt_am: string | null;
   created_at: string;
   updated_at: string;
   belege: BelegLink[];
@@ -91,7 +92,7 @@ export async function GET(
   const { data: bData, error: bErr } = await supabase
     .from("buchung")
     .select(
-      "id, konto_id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, duplikat_hash, import_quelle, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, regel_id, status, pruef_grund, parent_buchung_id, split_anteil, created_at, updated_at",
+      "id, konto_id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, duplikat_hash, import_quelle, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, regel_id, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am, created_at, updated_at",
     )
     .eq("owner_id", user.id)
     .eq("id", id)
@@ -128,6 +129,7 @@ export async function GET(
     pruef_grund: string | null;
     parent_buchung_id: string | null;
     split_anteil: number | null;
+    gemerkt_am: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -274,6 +276,7 @@ export async function GET(
     pruef_grund: b.pruef_grund,
     parent_buchung_id: b.parent_buchung_id,
     split_anteil: b.split_anteil === null ? null : Number(b.split_anteil),
+    gemerkt_am: b.gemerkt_am,
     created_at: b.created_at,
     updated_at: b.updated_at,
     belege,

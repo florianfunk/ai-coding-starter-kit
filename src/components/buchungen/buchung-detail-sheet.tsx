@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { MerkenStern } from "@/components/merkliste/merken-stern";
 
 interface AuditEintrag {
   id: string;
@@ -81,11 +82,18 @@ export function BuchungDetailSheet({
   kategorien,
   open,
   onOpenChange,
+  gemerkt = false,
+  merkenPending = false,
+  onToggleMerken,
 }: {
   buchung: Buchung | null;
   kategorien: Kategorie[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // PROJ-20: Merken-Status wird vom Container (Ledger) gesteuert.
+  gemerkt?: boolean;
+  merkenPending?: boolean;
+  onToggleMerken?: () => void;
 }) {
   // Audit-Ladezustand wird AUSSCHLIESSLICH asynchron gesetzt (nie synchron im
   // Effekt), inkl. der zugehörigen Buchungs-ID, damit die Anzeige nicht den
@@ -173,10 +181,21 @@ export function BuchungDetailSheet({
         {buchung && (
           <>
             <SheetHeader>
-              <SheetTitle>Buchungsdetails</SheetTitle>
-              <SheetDescription>
-                Nachvollziehbarkeit der Klassifizierungs-Entscheidung.
-              </SheetDescription>
+              <div className="flex items-start justify-between gap-2 pr-6">
+                <div>
+                  <SheetTitle>Buchungsdetails</SheetTitle>
+                  <SheetDescription>
+                    Nachvollziehbarkeit der Klassifizierungs-Entscheidung.
+                  </SheetDescription>
+                </div>
+                {onToggleMerken ? (
+                  <MerkenStern
+                    gemerkt={gemerkt}
+                    pending={merkenPending}
+                    onToggle={onToggleMerken}
+                  />
+                ) : null}
+              </div>
             </SheetHeader>
 
             <div className="mt-4 space-y-4 px-4 pb-6 text-sm">

@@ -33,6 +33,8 @@ import type {
   Konto,
 } from "@/lib/types";
 import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet";
+import { MerkenStern } from "@/components/merkliste/merken-stern";
+import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -199,6 +201,12 @@ export function BuchungenLedger({
   const [bis, setBis] = useState(filter.bis ?? "");
   const [detail, setDetail] = useState<Buchung | null>(null);
   const [detailOffen, setDetailOffen] = useState(false);
+
+  // PROJ-20: Merken-Status (Set) wird hier zentral gehalten, damit Zeile und
+  // Detail-Sheet derselben Buchung synchron bleiben.
+  const merk = useMerkSet(
+    buchungen.filter((b) => b.gemerkt_am !== null).map((b) => b.id),
+  );
 
   // Client-side Filter & Sort (keine URL-Persistenz — Konto/Zeitraum macht
   // schon Server-Side-Filter; das hier verfeinert nur die geladene Menge).
@@ -742,6 +750,9 @@ export function BuchungenLedger({
                       onClick={() => oeffneDetail(b)}
                       letzterEintrag={idx === items.length - 1}
                       animationsIndex={gIdx === 0 ? idx : -1}
+                      gemerkt={merk.istGemerkt(b.id)}
+                      merkenPending={merk.istPending(b.id)}
+                      onToggleMerken={() => merk.toggle(b.id)}
                     />
                   ))}
                 </ul>
@@ -756,6 +767,9 @@ export function BuchungenLedger({
         kategorien={kategorien}
         open={detailOffen}
         onOpenChange={setDetailOffen}
+        gemerkt={detail ? merk.istGemerkt(detail.id) : false}
+        merkenPending={detail ? merk.istPending(detail.id) : false}
+        onToggleMerken={detail ? () => merk.toggle(detail.id) : undefined}
       />
     </div>
   );
@@ -811,6 +825,9 @@ function LedgerZeile({
   onClick,
   letzterEintrag,
   animationsIndex,
+  gemerkt,
+  merkenPending,
+  onToggleMerken,
 }: {
   buchung: Buchung;
   kontoName: string;
@@ -818,6 +835,9 @@ function LedgerZeile({
   onClick: () => void;
   letzterEintrag: boolean;
   animationsIndex: number;
+  gemerkt: boolean;
+  merkenPending: boolean;
+  onToggleMerken: () => void;
 }) {
   const ausgabe = b.betrag < 0;
   const datumKurz = formatDatumKurz(b.buchung_datum);
@@ -827,7 +847,10 @@ function LedgerZeile({
 
   return (
     <li
-      className={cn(!letzterEintrag && "border-b border-line-hair")}
+      className={cn(
+        "flex items-stretch",
+        !letzterEintrag && "border-b border-line-hair",
+      )}
       style={{
         animation:
           animationsIndex >= 0 && animationsIndex < 12
@@ -842,7 +865,7 @@ function LedgerZeile({
       <button
         type="button"
         onClick={onClick}
-        className="group relative grid w-full grid-cols-[3px_88px_1fr_auto_16px] items-stretch gap-x-4 py-3 pl-3 pr-3 text-left transition-colors hover:bg-[color:var(--surface-2)] sm:pl-4 sm:pr-4"
+        className="group relative grid min-w-0 flex-1 grid-cols-[3px_88px_1fr_auto_16px] items-stretch gap-x-4 py-3 pl-3 pr-3 text-left transition-colors hover:bg-[color:var(--surface-2)] sm:pl-4 sm:pr-4"
       >
         {/* Vorzeichen-Balken links (statt Icon-Container — schlanker, tabellariger) */}
         <div
@@ -953,6 +976,16 @@ function LedgerZeile({
           {`. Monat: ${monatHinweis}.`}
         </span>
       </button>
+
+      {/* Merken-Stern — eigener Button neben der Zeile (kein verschachtelter
+          Button), togglet ohne das Detail zu öffnen. */}
+      <div className="flex items-center pr-2 sm:pr-3">
+        <MerkenStern
+          gemerkt={gemerkt}
+          pending={merkenPending}
+          onToggle={onToggleMerken}
+        />
+      </div>
     </li>
   );
 }

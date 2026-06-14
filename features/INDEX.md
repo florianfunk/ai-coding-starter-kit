@@ -33,7 +33,8 @@
 | PROJ-17 | KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Approved | [Spec](PROJ-17-ki-chat-finanzen.md) | 2026-05-21 |
 | PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | Approved | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
 | PROJ-19 | Kündigungsliste für wiederkehrende Empfänger | In Review | [Spec](PROJ-19-kuendigungsliste.md) | 2026-06-13 |
+| PROJ-20 | Merkliste (Buchungen für späteres Review merken) | In Review | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-20
+## Next Available ID: PROJ-21

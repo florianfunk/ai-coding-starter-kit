@@ -49,6 +49,7 @@ function bu(
     pruef_grund: null,
     parent_buchung_id: null,
     split_anteil: null,
+    gemerkt_am: null,
     ...over,
   };
 }

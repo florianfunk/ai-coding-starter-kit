@@ -25,6 +25,27 @@ interface AuditEintrag {
   created_at: string;
 }
 
+interface WebSnippet {
+  titel: string;
+  beschreibung: string;
+  url: string;
+}
+
+interface EmpfaengerKenntnis {
+  branche: string | null;
+  leistung: string | null;
+  quelle: "web" | "manuell" | "llm";
+  recherche_versucht: boolean;
+  web_snippets: WebSnippet[] | null;
+  updated_at: string;
+}
+
+const KENNTNIS_QUELLE_LABEL: Record<EmpfaengerKenntnis["quelle"], string> = {
+  web: "Web-Recherche",
+  llm: "Aus KI-Wissen abgeleitet",
+  manuell: "Von dir bestätigt",
+};
+
 const KLASS_LABEL: Record<Klassifikation, string> = {
   privat: "Privat",
   geschaeftlich: "Geschäftlich",
@@ -75,6 +96,14 @@ export function BuchungDetailSheet({
     fehler: boolean;
   }>({ buchungId: null, daten: null, fehler: false });
 
+  // Empfänger-Wissen (Web-Recherche / KI-Wissen) — separat geladen, damit der
+  // Nutzer das Recherche-Ergebnis hinter einer Klassifizierung sieht.
+  const [kenntnisState, setKenntnisState] = useState<{
+    buchungId: string | null;
+    daten: EmpfaengerKenntnis | null;
+    geladen: boolean;
+  }>({ buchungId: null, daten: null, geladen: false });
+
   useEffect(() => {
     if (!open || !buchung) return;
     const id = buchung.id;
@@ -100,8 +129,38 @@ export function BuchungDetailSheet({
     };
   }, [open, buchung]);
 
+  useEffect(() => {
+    if (!open || !buchung) return;
+    const id = buchung.id;
+    let abbruch = false;
+    setKenntnisState({ buchungId: id, daten: null, geladen: false });
+    fetch(`/api/empfaenger-kenntnis?buchung_id=${encodeURIComponent(id)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Fehler"))))
+      .then((j: { kenntnis?: EmpfaengerKenntnis | null }) => {
+        if (!abbruch) {
+          setKenntnisState({
+            buchungId: id,
+            daten: j.kenntnis ?? null,
+            geladen: true,
+          });
+        }
+      })
+      .catch(() => {
+        if (!abbruch) {
+          setKenntnisState({ buchungId: id, daten: null, geladen: true });
+        }
+      });
+    return () => {
+      abbruch = true;
+    };
+  }, [open, buchung]);
+
   const fuerAktuelle =
     buchung != null && auditState.buchungId === buchung.id;
+  const kenntnis =
+    buchung != null && kenntnisState.buchungId === buchung.id
+      ? kenntnisState.daten
+      : null;
   const audit = fuerAktuelle ? auditState.daten : null;
   const ladeFehler = fuerAktuelle ? auditState.fehler : false;
 
@@ -205,6 +264,72 @@ export function BuchungDetailSheet({
                   {buchung.begruendung ?? "Noch nicht klassifiziert."}
                 </p>
               </div>
+
+              {kenntnis &&
+                (kenntnis.branche ||
+                  kenntnis.leistung ||
+                  (kenntnis.web_snippets?.length ?? 0) > 0 ||
+                  (kenntnis.quelle === "web" && kenntnis.recherche_versucht)) && (
+                  <div>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">
+                        Empfänger-Recherche
+                      </span>
+                      <Badge variant="secondary" className="text-xs">
+                        {KENNTNIS_QUELLE_LABEL[kenntnis.quelle]}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2 rounded-md border p-3">
+                      {kenntnis.branche && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">
+                            Branche:{" "}
+                          </span>
+                          <span className="font-medium">{kenntnis.branche}</span>
+                        </div>
+                      )}
+                      {kenntnis.leistung && (
+                        <div className="text-sm">{kenntnis.leistung}</div>
+                      )}
+                      {kenntnis.web_snippets &&
+                      kenntnis.web_snippets.length > 0 ? (
+                        <div className="space-y-2 pt-1">
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Gefundene Quellen
+                          </div>
+                          {kenntnis.web_snippets.map((s, i) => (
+                            <a
+                              key={i}
+                              href={s.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block rounded bg-muted p-2 transition-colors hover:bg-muted/70"
+                            >
+                              <div className="truncate text-xs font-medium text-foreground">
+                                {s.titel || s.url}
+                              </div>
+                              {s.beschreibung && (
+                                <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                  {s.beschreibung}
+                                </div>
+                              )}
+                              <div className="mt-0.5 truncate text-[11px] text-brand-violet">
+                                {s.url}
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : kenntnis.quelle === "web" &&
+                        kenntnis.recherche_versucht ? (
+                        <div className="text-xs text-muted-foreground">
+                          Web-Recherche durchgeführt — keine verwertbaren Treffer;
+                          die Einordnung beruht auf Empfängername, Verwendungszweck
+                          und Historie.
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
 
               {buchung.pruef_grund && (
                 <div>

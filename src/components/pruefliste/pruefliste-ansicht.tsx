@@ -12,11 +12,13 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ChevronRight,
+  Info,
   Layers,
   Loader2,
   X,
 } from "lucide-react";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
+import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet";
 import { MerkenStern } from "@/components/merkliste/merken-stern";
 import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,9 @@ export function PrueflisteAnsicht({
   const [empfaengerFilter, setEmpfaengerFilter] = useState<string | null>(null);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [dialogFaelle, setDialogFaelle] = useState<Buchung[] | null>(null);
+  // Detail-Ansicht (read-only) einer einzelnen Buchung – Begründung, Konfidenz,
+  // Quelle, Audit-Trail und Empfänger-Wissen.
+  const [detailFall, setDetailFall] = useState<Buchung | null>(null);
   const [reloading, setReloading] = useState(false);
   const [nachregel, setNachregel] = useState<{
     anzahl: number;
@@ -428,6 +433,7 @@ export function PrueflisteAnsicht({
                 ausgewaehlt={auswahl.has(f.id)}
                 onToggle={() => toggle(f.id)}
                 onEntscheiden={() => oeffneEinzeln(f)}
+                onInfo={() => setDetailFall(f)}
                 gemerkt={merk.istGemerkt(f.id)}
                 merkenPending={merk.istPending(f.id)}
                 onToggleMerken={() => merk.toggle(f.id)}
@@ -484,6 +490,20 @@ export function PrueflisteAnsicht({
         />
       )}
 
+      <BuchungDetailSheet
+        buchung={detailFall}
+        kategorien={kategorien}
+        open={detailFall !== null}
+        onOpenChange={(o) => {
+          if (!o) setDetailFall(null);
+        }}
+        gemerkt={detailFall ? merk.istGemerkt(detailFall.id) : false}
+        merkenPending={detailFall ? merk.istPending(detailFall.id) : false}
+        onToggleMerken={
+          detailFall ? () => merk.toggle(detailFall.id) : undefined
+        }
+      />
+
       <AlertDialog
         open={nachregel !== null}
         onOpenChange={(o) => {
@@ -522,6 +542,7 @@ function PrueflisteZeile({
   ausgewaehlt,
   onToggle,
   onEntscheiden,
+  onInfo,
   gemerkt,
   merkenPending,
   onToggleMerken,
@@ -531,6 +552,7 @@ function PrueflisteZeile({
   ausgewaehlt: boolean;
   onToggle: () => void;
   onEntscheiden: () => void;
+  onInfo: () => void;
   gemerkt: boolean;
   merkenPending: boolean;
   onToggleMerken: () => void;
@@ -601,6 +623,17 @@ function PrueflisteZeile({
           {f.waehrung} · {kontoName}
         </div>
       </div>
+      {/* Detail-Info */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onInfo}
+        aria-label="Buchungsdetails anzeigen"
+        title="Buchungsdetails anzeigen"
+        className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+      >
+        <Info className="h-4 w-4" />
+      </Button>
       {/* Merken */}
       <MerkenStern
         gemerkt={gemerkt}

@@ -158,5 +158,21 @@ PROJ-6 angedockt werden. E2E-Tests (Playwright) noch nicht ergänzt.
 
 Offen für manuelle/E2E-QA mit echten Daten: visuelle Prüfung, End-to-End-Flows mit echter Paperless-Instanz und realen Kontoauszügen.
 
+## Nachträge
+
+**2026-06-13 — Empfänger-Filter & automatischer Regel-Vorschlag:**
+- Klick auf einen Mustergruppen-Chip filtert die Fallliste auf diesen
+  Empfänger (statt nur zu selektieren) und wählt die Fälle zugleich vor;
+  aktiver Chip hervorgehoben, erneuter Klick / Clear-Button hebt den Filter
+  auf. Chips werden aus einer Basis-Liste (vor dem Empfänger-Filter) gebildet,
+  bleiben also vollständig sichtbar.
+- Beim Anlegen einer Lernregel wird die Bedingung jetzt automatisch aus den
+  ausgewählten Buchungen vorgeschlagen: stabiles Empfänger-Muster (führende
+  Payment-Präfixe wie „PayPal *" und nachlaufende Transaktions-IDs entfernt),
+  ersatzweise ein Zweck-Muster. Logik in
+  `src/lib/classifier/regel-vorschlag.ts` (rein, 16 Unit-Tests). Der Vorschlag
+  bleibt bewusst ein Teilstring des Rohwerts, damit die Substring-Trefferlogik
+  (`classifier/rules.ts`) die Ausgangsbuchung sicher matcht.
+
 ## Deployment
 _To be added by /deploy_

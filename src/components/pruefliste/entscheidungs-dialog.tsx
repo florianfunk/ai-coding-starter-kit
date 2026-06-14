@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { schlageRegelVor } from "@/lib/classifier/regel-vorschlag";
 import { formatBetrag } from "./labels";
 
 const KLASS_OPTIONEN: Array<{ value: Klassifikation; label: string }> = [
@@ -91,6 +92,11 @@ export function EntscheidungsDialog({
   const einzel = faelle.length === 1;
   const fall = einzel ? faelle[0] : null;
 
+  // Automatischer Regel-Vorschlag aus den ausgewählten Buchungen: ein stabiles
+  // Empfänger-Muster (variable IDs/Präfixe entfernt), damit künftige Buchungen
+  // desselben Empfängers automatisch gleich verbucht werden.
+  const vorschlag = useMemo(() => schlageRegelVor(faelle), [faelle]);
+
   const defaults = useMemo<FormValues>(
     () => ({
       kategorie_id: fall?.kategorie_id ?? "",
@@ -108,13 +114,11 @@ export function EntscheidungsDialog({
       split_klass_a: "geschaeftlich",
       split_klass_b: "privat",
       regel_aktiv: false,
-      regel_bezeichnung: fall?.empfaenger
-        ? `${fall.empfaenger} automatisch`
-        : "Neue Regel",
-      regel_empfaenger: fall?.empfaenger ?? "",
-      regel_zweck: "",
+      regel_bezeichnung: vorschlag.bezeichnung,
+      regel_empfaenger: vorschlag.empfaenger_muster,
+      regel_zweck: vorschlag.zweck_muster,
     }),
-    [fall],
+    [fall, vorschlag],
   );
 
   const form = useForm<FormValues>({ defaultValues: defaults });
@@ -446,7 +450,8 @@ export function EntscheidungsDialog({
                     <div className="space-y-0.5">
                       <FormLabel>Als Lernregel speichern</FormLabel>
                       <FormDescription>
-                        Gleichartige Buchungen laufen künftig automatisch.
+                        Gleichartige Buchungen laufen künftig automatisch —
+                        Vorschlag unten aus den Buchungen, anpassbar.
                       </FormDescription>
                     </div>
                     <FormControl>

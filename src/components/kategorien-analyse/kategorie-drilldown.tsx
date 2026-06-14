@@ -18,15 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import {
   Table,
   TableBody,
@@ -296,14 +288,14 @@ export function KategorieDrilldown({
                 <span className="ml-1 text-sm text-muted-foreground">
                   {selected.size} ausgewählt
                 </span>
-                <Select value={zielKat} onValueChange={setZielKat}>
-                  <SelectTrigger className="h-8 w-[240px] text-xs">
-                    <SelectValue placeholder="Zielkategorie (optional)…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <KategorieGruppen kategorien={kategorien} />
-                  </SelectContent>
-                </Select>
+                <KategorieCombobox
+                  kategorien={kategorien}
+                  value={zielKat}
+                  onChange={setZielKat}
+                  triggerClassName="h-8 w-[240px] text-xs"
+                  placeholder="Zielkategorie (optional)…"
+                  ariaLabel="Zielkategorie wählen"
+                />
                 <Button size="sm" onClick={auswahlUebernehmen} disabled={bulkBusy}>
                   {bulkBusy ? (
                     <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
@@ -392,20 +384,17 @@ export function KategorieDrilldown({
                       <StatusBadge status={b.status} />
                     </TableCell>
                     <TableCell>
-                      <Select
+                      <KategorieCombobox
+                        kategorien={kategorien}
+                        value={b.kategorie_id ?? ""}
+                        onChange={(v) => {
+                          if (v) aendereKategorie(b, v);
+                        }}
                         disabled={savingId === b.id}
-                        value={b.kategorie_id ?? "__none__"}
-                        onValueChange={(v) =>
-                          v !== "__none__" && aendereKategorie(b, v)
-                        }
-                      >
-                        <SelectTrigger className="h-8 text-xs">
-                          <SelectValue placeholder="Kategorie wählen…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <KategorieGruppen kategorien={kategorien} />
-                        </SelectContent>
-                      </Select>
+                        triggerClassName="h-8 text-xs"
+                        placeholder="Kategorie wählen…"
+                        ariaLabel="Kategorie wählen"
+                      />
                     </TableCell>
                     <TableCell>
                       {b.status === "manuell_bestaetigt" ? (
@@ -454,45 +443,5 @@ function StatusBadge({ status }: { status: Buchung["status"] }) {
     <Badge variant={m.variant} className="text-xs">
       {m.label}
     </Badge>
-  );
-}
-
-function KategorieGruppen({
-  kategorien,
-}: {
-  kategorien: KategorieOption[];
-}) {
-  const gruppen: Record<KategorieTyp, KategorieOption[]> = {
-    einnahme: [],
-    ausgabe: [],
-    privat: [],
-    neutral: [],
-  };
-  for (const k of kategorien) gruppen[k.typ].push(k);
-  const labels: Record<KategorieTyp, string> = {
-    einnahme: "Einnahmen",
-    ausgabe: "Ausgaben",
-    privat: "Privat",
-    neutral: "Neutral",
-  };
-  const reihenfolge: KategorieTyp[] = ["einnahme", "ausgabe", "privat", "neutral"];
-  return (
-    <>
-      {reihenfolge.map((typ) =>
-        gruppen[typ].length === 0 ? null : (
-          <SelectGroup key={typ}>
-            <SelectLabel>{labels[typ]}</SelectLabel>
-            {gruppen[typ]
-              .slice()
-              .sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung))
-              .map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ),
-      )}
-    </>
   );
 }

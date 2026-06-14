@@ -29,6 +29,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import {
   Select,
   SelectContent,
@@ -356,26 +357,14 @@ export function RegelDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>EÜR-Kategorie</FormLabel>
-                      <Select
+                      <KategorieCombobox
+                        kategorien={kategorien}
                         value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">
-                            — nicht setzen —
-                          </SelectItem>
-                          {kategorien.map((k) => (
-                            <SelectItem key={k.id} value={k.id}>
-                              {k.bezeichnung}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={field.onChange}
+                        vorabOptionen={[
+                          { value: "none", label: "— nicht setzen —" },
+                        ]}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}

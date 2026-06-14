@@ -57,6 +57,7 @@ import type {
 import type { Bereich } from "@/lib/validation/kategorien-analyse";
 import type { KategorieTyp } from "@/lib/types";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 
 interface KategorieOption {
   id: string;
@@ -482,41 +483,34 @@ export function GeldbewegungenAnsicht({
                           {eur(z.betrag)}
                         </TableCell>
                         <TableCell>
-                          <Select
+                          <KategorieCombobox
+                            kategorien={kategorien}
+                            value={z.kategorie_id ?? ""}
+                            onChange={(v) => {
+                              if (v) aendereKategorie(z, v);
+                            }}
                             disabled={savingId === z.id}
-                            value={z.kategorie_id ?? "__none__"}
-                            onValueChange={(v) =>
-                              v !== "__none__" && aendereKategorie(z, v)
-                            }
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue
-                                placeholder={
-                                  z.kategorie_bezeichnung ?? "— ohne —"
-                                }
-                              >
-                                <span className="flex items-center gap-2 truncate">
-                                  {z.kategorie_typ ? (
-                                    <Badge
-                                      variant={
-                                        TYP_BADGE[z.kategorie_typ] ?? "outline"
-                                      }
-                                      className="text-[10px]"
-                                    >
-                                      {TYP_LABEL[z.kategorie_typ] ??
-                                        z.kategorie_typ}
-                                    </Badge>
-                                  ) : null}
-                                  <span className="truncate">
-                                    {z.kategorie_bezeichnung ?? "— ohne —"}
-                                  </span>
+                            triggerClassName="h-8 text-xs"
+                            ariaLabel="Kategorie wählen"
+                            triggerInhalt={
+                              <span className="flex items-center gap-2 truncate">
+                                {z.kategorie_typ ? (
+                                  <Badge
+                                    variant={
+                                      TYP_BADGE[z.kategorie_typ] ?? "outline"
+                                    }
+                                    className="text-[10px]"
+                                  >
+                                    {TYP_LABEL[z.kategorie_typ] ??
+                                      z.kategorie_typ}
+                                  </Badge>
+                                ) : null}
+                                <span className="truncate">
+                                  {z.kategorie_bezeichnung ?? "— ohne —"}
                                 </span>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <KategorieGruppen kategorien={kategorien} />
-                            </SelectContent>
-                          </Select>
+                              </span>
+                            }
+                          />
                         </TableCell>
                         <TableCell>
                           <BereichBadge

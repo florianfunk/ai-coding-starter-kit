@@ -97,25 +97,29 @@ export function KategorieDialog({
   open,
   onOpenChange,
   kategorie,
+  vorlage = null,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   kategorie: Kategorie | null;
+  /** Vorbelegung für eine NEUE Kategorie (Duplizieren). Wird nur genutzt,
+   *  wenn `kategorie` null ist; das Speichern legt dann neu an (POST). */
+  vorlage?: Kategorie | null;
   onSaved: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const istBearbeiten = kategorie !== null;
 
   const form = useForm<FormValues>({
-    defaultValues: toFormValues(kategorie),
+    defaultValues: toFormValues(kategorie ?? vorlage),
   });
 
   useEffect(() => {
     if (open) {
-      form.reset(toFormValues(kategorie));
+      form.reset(toFormValues(kategorie ?? vorlage));
     }
-  }, [open, kategorie, form]);
+  }, [open, kategorie, vorlage, form]);
 
   const typ = form.watch("typ");
   const ustGesperrt = typ === "privat" || typ === "neutral";

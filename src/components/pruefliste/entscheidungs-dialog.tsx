@@ -8,7 +8,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import type { Buchung, Kategorie, Klassifikation } from "@/lib/types";
+import type {
+  Buchung,
+  Kategorie,
+  KategorieTyp,
+  Klassifikation,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +43,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { schlageRegelVor } from "@/lib/classifier/regel-vorschlag";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { formatBetrag } from "./labels";
 
 const KLASS_OPTIONEN: Array<{ value: Klassifikation; label: string }> = [
@@ -46,6 +52,15 @@ const KLASS_OPTIONEN: Array<{ value: Klassifikation; label: string }> = [
   { value: "neutral", label: "Neutral / Durchlaufend" },
   { value: "unklar", label: "Unklar (offen lassen)" },
 ];
+
+// Welche EÜR-Kategorie-Typen zu einer privat/geschäftlich-Einstufung passen.
+// Bei "unklar" wird nicht gefiltert (null = alle Typen erlaubt).
+const KLASS_KATEGORIE_TYPEN: Record<Klassifikation, KategorieTyp[] | null> = {
+  geschaeftlich: ["einnahme", "ausgabe"],
+  privat: ["privat"],
+  neutral: ["neutral"],
+  unklar: null,
+};
 
 const UST_OPTIONEN = [
   { value: "null", label: "Kein USt-Satz" },
@@ -129,6 +144,30 @@ export function EntscheidungsDialog({
 
   const splitAktiv = form.watch("split_aktiv");
   const regelAktiv = form.watch("regel_aktiv");
+  const klassifikation = form.watch("klassifikation");
+
+  // EÜR-Kategorien passend zur gewählten privat/geschäftlich-Einstufung:
+  // bei "Privat" nur private Kategorien, bei "Geschäftlich" Einnahmen/Ausgaben.
+  const sichtbareKategorien = useMemo(() => {
+    const erlaubt = KLASS_KATEGORIE_TYPEN[klassifikation];
+    if (!erlaubt) return kategorien;
+    return kategorien.filter((k) => erlaubt.includes(k.typ));
+  }, [kategorien, klassifikation]);
+
+  // Wechselt die Einstufung, passt die bisher gewählte Kategorie aber nicht mehr
+  // zum neuen Typ, wird sie zurückgesetzt, damit keine widersprüchliche
+  // Zuordnung stehen bleibt.
+  function handleKlassifikationChange(value: Klassifikation) {
+    form.setValue("klassifikation", value);
+    const erlaubt = KLASS_KATEGORIE_TYPEN[value];
+    const aktuelle = form.getValues("kategorie_id");
+    if (erlaubt && aktuelle) {
+      const kat = kategorien.find((k) => k.id === aktuelle);
+      if (!kat || !erlaubt.includes(kat.typ)) {
+        form.setValue("kategorie_id", "");
+      }
+    }
+  }
 
   async function onSubmit(values: FormValues) {
     const ustSatz =
@@ -241,7 +280,9 @@ export function EntscheidungsDialog({
                   <FormLabel>Privat / geschäftlich</FormLabel>
                   <Select
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={(v) =>
+                      handleKlassifikationChange(v as Klassifikation)
+                    }
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -267,26 +308,12 @@ export function EntscheidungsDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>EÜR-Kategorie</FormLabel>
-                  <Select
+                  <KategorieCombobox
+                    kategorien={sichtbareKategorien}
                     value={field.value || "none"}
-                    onValueChange={(v) =>
-                      field.onChange(v === "none" ? "" : v)
-                    }
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kategorie wählen" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="none">Keine Kategorie</SelectItem>
-                      {kategorien.map((k) => (
-                        <SelectItem key={k.id} value={k.id}>
-                          {k.bezeichnung}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(v) => field.onChange(v === "none" ? "" : v)}
+                    vorabOptionen={[{ value: "none", label: "Keine Kategorie" }]}
+                  />
                   <FormMessage />
                 </FormItem>
               )}

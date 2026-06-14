@@ -133,6 +133,19 @@ export function PrueflisteAnsicht({
     ? gruppen.find((g) => g.schluessel === empfaengerFilter) ?? null
     : null;
 
+  // Summe der ausgewählten Fälle – pro Währung getrennt, da gemischte
+  // Währungen nicht aufaddiert werden dürfen.
+  const auswahlSumme = useMemo(() => {
+    const proWaehrung = new Map<string, number>();
+    for (const f of faelle) {
+      if (!auswahl.has(f.id)) continue;
+      proWaehrung.set(f.waehrung, (proWaehrung.get(f.waehrung) ?? 0) + f.betrag);
+    }
+    return Array.from(proWaehrung.entries())
+      .map(([waehrung, summe]) => ({ waehrung, summe }))
+      .sort((a, b) => a.waehrung.localeCompare(b.waehrung));
+  }, [faelle, auswahl]);
+
   async function reload(): Promise<Buchung[]> {
     setReloading(true);
     try {
@@ -411,6 +424,34 @@ export function PrueflisteAnsicht({
               />
             ))}
           </ul>
+          {/* Summenzeile der ausgewählten Fälle */}
+          {auswahl.size > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-line-hair bg-[color:var(--surface-2)] px-4 py-3">
+              <span className="text-[12px] font-medium text-muted-foreground">
+                Summe · {auswahl.size} ausgewählt
+              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                {auswahlSumme.map(({ waehrung, summe }) => (
+                  <div
+                    key={waehrung}
+                    className="font-mono text-[15px] font-bold tabular-nums leading-tight"
+                  >
+                    <span
+                      className={cn(
+                        summe < 0 ? "text-destructive" : "text-income-strong",
+                      )}
+                    >
+                      {summe < 0 ? "−" : "+"}
+                      {formatBetrag(Math.abs(summe))}
+                    </span>
+                    <span className="ml-1.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                      {waehrung}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 

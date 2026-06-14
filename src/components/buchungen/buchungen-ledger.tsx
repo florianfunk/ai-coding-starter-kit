@@ -36,6 +36,7 @@ import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import {
   Select,
   SelectContent,
@@ -600,26 +601,17 @@ export function BuchungenLedger({
             <Label htmlFor="f-kat" className="text-xs text-muted-foreground">
               Kategorie
             </Label>
-            <Select
+            <KategorieCombobox
+              id="f-kat"
+              kategorien={kategorienInListe}
               value={kategorieFilter}
-              onValueChange={(v) => setKategorieFilter(v as KategorieFilter)}
-            >
-              <SelectTrigger
-                id="f-kat"
-                className="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)]"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="alle">Alle Kategorien</SelectItem>
-                <SelectItem value="ohne">Ohne Kategorie</SelectItem>
-                {kategorienInListe.map((k) => (
-                  <SelectItem key={k.id} value={k.id}>
-                    {k.bezeichnung}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(v) => setKategorieFilter(v as KategorieFilter)}
+              vorabOptionen={[
+                { value: "alle", label: "Alle Kategorien" },
+                { value: "ohne", label: "Ohne Kategorie" },
+              ]}
+              triggerClassName="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)]"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Sortierung</Label>

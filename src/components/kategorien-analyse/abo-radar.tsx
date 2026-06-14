@@ -37,15 +37,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -63,6 +54,7 @@ import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/r
 import type { KategorieTyp } from "@/lib/types";
 import { lerneRegelFuer, regelToast } from "@/lib/finanzen/regel-helper";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 
 interface KategorieOption {
   id: string;
@@ -710,7 +702,7 @@ function ItemDrilldown({
   );
   useEffect(() => setBuchungen(item.buchungen), [item.buchungen]);
 
-  const [bulkKat, setBulkKat] = useState<string>("__none__");
+  const [bulkKat, setBulkKat] = useState<string>("");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [bestaetigeId, setBestaetigeId] = useState<string | null>(null);
   const [bulkBusy, startBulk] = useTransition();
@@ -957,7 +949,7 @@ function ItemDrilldown({
   }
 
   function wendeAuAlleAn() {
-    if (bulkKat === "__none__") {
+    if (bulkKat === "") {
       toast.error("Bitte eine Kategorie auswählen.");
       return;
     }
@@ -1054,18 +1046,18 @@ function ItemDrilldown({
             Kategorie auf alle anwenden
           </div>
           <div className="flex items-center gap-2">
-            <Select value={bulkKat} onValueChange={setBulkKat}>
-              <SelectTrigger className="h-9 w-[280px] text-sm">
-                <SelectValue placeholder="Kategorie wählen…" />
-              </SelectTrigger>
-              <SelectContent>
-                <KategorieGruppen kategorien={kategorien} />
-              </SelectContent>
-            </Select>
+            <KategorieCombobox
+              kategorien={kategorien}
+              value={bulkKat}
+              onChange={setBulkKat}
+              placeholder="Kategorie wählen…"
+              triggerClassName="h-9 w-[280px] text-sm"
+              ariaLabel="Kategorie wählen"
+            />
             <Button
               size="sm"
               onClick={wendeAuAlleAn}
-              disabled={bulkBusy || bulkKat === "__none__"}
+              disabled={bulkBusy || bulkKat === ""}
             >
               {bulkBusy ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -1155,38 +1147,31 @@ function ItemDrilldown({
                 {eur(b.betrag)}
               </TableCell>
               <TableCell>
-                <Select
+                <KategorieCombobox
+                  kategorien={kategorien}
+                  value={b.kategorie_id ?? ""}
+                  onChange={(v) => {
+                    if (v) aendereEinzeln(b, v);
+                  }}
                   disabled={savingId === b.id}
-                  value={b.kategorie_id ?? "__none__"}
-                  onValueChange={(v) =>
-                    v !== "__none__" && aendereEinzeln(b, v)
-                  }
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue
-                      placeholder={b.kategorie_bezeichnung ?? "— ohne —"}
-                    >
-                      <span className="flex items-center gap-2 truncate">
-                        {b.kategorie_typ ? (
-                          <Badge
-                            variant={
-                              TYP_BADGE[b.kategorie_typ] ?? "outline"
-                            }
-                            className="text-[10px]"
-                          >
-                            {TYP_LABEL[b.kategorie_typ] ?? b.kategorie_typ}
-                          </Badge>
-                        ) : null}
-                        <span className="truncate">
-                          {b.kategorie_bezeichnung ?? "— ohne —"}
-                        </span>
+                  triggerClassName="h-8 text-xs"
+                  ariaLabel="Kategorie wählen"
+                  triggerInhalt={
+                    <span className="flex items-center gap-2 truncate">
+                      {b.kategorie_typ ? (
+                        <Badge
+                          variant={TYP_BADGE[b.kategorie_typ] ?? "outline"}
+                          className="text-[10px]"
+                        >
+                          {TYP_LABEL[b.kategorie_typ] ?? b.kategorie_typ}
+                        </Badge>
+                      ) : null}
+                      <span className="truncate">
+                        {b.kategorie_bezeichnung ?? "— ohne —"}
                       </span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <KategorieGruppen kategorien={kategorien} />
-                  </SelectContent>
-                </Select>
+                    </span>
+                  }
+                />
               </TableCell>
               <TableCell>
                 {b.status === "manuell_bestaetigt" ? (
@@ -1272,50 +1257,5 @@ function ItemDrilldown({
         </TableBody>
       </Table>
     </div>
-  );
-}
-
-function KategorieGruppen({
-  kategorien,
-}: {
-  kategorien: KategorieOption[];
-}) {
-  const gruppen: Record<KategorieTyp, KategorieOption[]> = {
-    einnahme: [],
-    ausgabe: [],
-    privat: [],
-    neutral: [],
-  };
-  for (const k of kategorien) gruppen[k.typ].push(k);
-  const labels: Record<KategorieTyp, string> = {
-    einnahme: "Einnahmen",
-    ausgabe: "Ausgaben",
-    privat: "Privat",
-    neutral: "Neutral",
-  };
-  const reihenfolge: KategorieTyp[] = [
-    "einnahme",
-    "ausgabe",
-    "privat",
-    "neutral",
-  ];
-  return (
-    <>
-      {reihenfolge.map((typ) =>
-        gruppen[typ].length === 0 ? null : (
-          <SelectGroup key={typ}>
-            <SelectLabel>{labels[typ]}</SelectLabel>
-            {gruppen[typ]
-              .slice()
-              .sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung))
-              .map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ),
-      )}
-    </>
   );
 }

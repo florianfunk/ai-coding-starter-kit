@@ -30,12 +30,11 @@ import {
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 
 import type {
   BuchungDetail,
@@ -290,21 +289,18 @@ function SteuerBlock({
       <div className="space-y-3 text-sm">
         <div className="grid grid-cols-[140px_1fr] items-center gap-3">
           <Label htmlFor="kat-edit">Kategorie</Label>
-          <Select
+          <KategorieCombobox
+            id="kat-edit"
+            kategorien={kategorien}
+            value={daten.kategorie_id ?? ""}
+            onChange={(v) => {
+              if (v) onPatch({ kategorie_id: v, bestaetigen: true });
+            }}
             disabled={saving}
-            value={daten.kategorie_id ?? "__none__"}
-            onValueChange={(v) =>
-              v !== "__none__" &&
-              onPatch({ kategorie_id: v, bestaetigen: true })
-            }
-          >
-            <SelectTrigger id="kat-edit" className="h-9">
-              <SelectValue placeholder={daten.kategorie_bezeichnung ?? "— ohne —"} />
-            </SelectTrigger>
-            <SelectContent>
-              <KategorieGruppen kategorien={kategorien} />
-            </SelectContent>
-          </Select>
+            triggerClassName="h-9"
+            placeholder={daten.kategorie_bezeichnung ?? "— ohne —"}
+            ariaLabel="Kategorie wählen"
+          />
         </div>
 
         <div className="grid grid-cols-[140px_1fr] items-center gap-3">
@@ -586,51 +582,6 @@ function FeldZeile({
     <>
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0">{wert}</dd>
-    </>
-  );
-}
-
-function KategorieGruppen({
-  kategorien,
-}: {
-  kategorien: KategorieOption[];
-}) {
-  const gruppen: Record<KategorieTyp, KategorieOption[]> = {
-    einnahme: [],
-    ausgabe: [],
-    privat: [],
-    neutral: [],
-  };
-  for (const k of kategorien) gruppen[k.typ].push(k);
-  const labels: Record<KategorieTyp, string> = {
-    einnahme: "Einnahmen",
-    ausgabe: "Ausgaben",
-    privat: "Privat",
-    neutral: "Neutral",
-  };
-  const reihenfolge: KategorieTyp[] = [
-    "einnahme",
-    "ausgabe",
-    "privat",
-    "neutral",
-  ];
-  return (
-    <>
-      {reihenfolge.map((typ) =>
-        gruppen[typ].length === 0 ? null : (
-          <SelectGroup key={typ}>
-            <SelectLabel>{labels[typ]}</SelectLabel>
-            {gruppen[typ]
-              .slice()
-              .sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung))
-              .map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ),
-      )}
     </>
   );
 }

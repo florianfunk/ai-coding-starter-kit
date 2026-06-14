@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, Loader2, Trash2, FileText } from "lucide-react";
+import { Plus, Pencil, Copy, Loader2, Trash2, FileText } from "lucide-react";
 import type { Kategorie, KategorieTyp } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -54,6 +54,7 @@ export function KontenrahmenTabelle({
   const [kategorien, setKategorien] = useState<Kategorie[]>(initialKategorien);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bearbeiten, setBearbeiten] = useState<Kategorie | null>(null);
+  const [vorlage, setVorlage] = useState<Kategorie | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deaktivieren, setDeaktivieren] = useState<Kategorie | null>(null);
@@ -208,6 +209,7 @@ export function KontenrahmenTabelle({
           <Button
             onClick={() => {
               setBearbeiten(null);
+              setVorlage(null);
               setDialogOpen(true);
             }}
             className="h-9 rounded-full bg-brand-violet font-semibold text-white hover:bg-[color:var(--accent-hover)]"
@@ -308,11 +310,28 @@ export function KontenrahmenTabelle({
                     className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
                     onClick={() => {
                       setBearbeiten(k);
+                      setVorlage(null);
                       setDialogOpen(true);
                     }}
                     title="Bearbeiten"
                   >
                     <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+                    onClick={() => {
+                      setBearbeiten(null);
+                      setVorlage({
+                        ...k,
+                        bezeichnung: `${k.bezeichnung} (Kopie)`,
+                      });
+                      setDialogOpen(true);
+                    }}
+                    title="Duplizieren"
+                  >
+                    <Copy className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -335,6 +354,7 @@ export function KontenrahmenTabelle({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         kategorie={bearbeiten}
+        vorlage={vorlage}
         onSaved={reload}
       />
 

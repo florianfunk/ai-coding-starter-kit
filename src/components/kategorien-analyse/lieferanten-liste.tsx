@@ -32,15 +32,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -54,6 +45,7 @@ import {
   lerneRegelFuer,
   regelToast,
 } from "@/lib/finanzen/regel-helper";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
 import type { KategorieTyp } from "@/lib/types";
 import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
@@ -666,14 +658,16 @@ function LieferantDrilldown({
             Kategorie auf alle anwenden
           </div>
           <div className="flex items-center gap-2">
-            <Select value={bulkKat} onValueChange={setBulkKat}>
-              <SelectTrigger className="h-9 w-[280px] text-sm">
-                <SelectValue placeholder="Kategorie wählen…" />
-              </SelectTrigger>
-              <SelectContent>
-                <KategorieGruppen kategorien={kategorien} />
-              </SelectContent>
-            </Select>
+            <KategorieCombobox
+              kategorien={kategorien}
+              value={bulkKat === "__none__" ? "" : bulkKat}
+              onChange={(v) => {
+                if (v) setBulkKat(v);
+              }}
+              placeholder="Kategorie wählen…"
+              triggerClassName="h-9 w-[280px] text-sm"
+              ariaLabel="Kategorie wählen"
+            />
             <Button
               size="sm"
               onClick={wendeAufAlleAn}
@@ -743,26 +737,21 @@ function LieferantDrilldown({
                 {eur(b.betrag)}
               </TableCell>
               <TableCell>
-                <Select
+                <KategorieCombobox
+                  kategorien={kategorien}
+                  value={b.kategorie_id ?? ""}
+                  onChange={(v) => {
+                    if (v) aendereEinzeln(b, v);
+                  }}
                   disabled={savingId === b.id}
-                  value={b.kategorie_id ?? "__none__"}
-                  onValueChange={(v) =>
-                    v !== "__none__" && aendereEinzeln(b, v)
+                  triggerClassName="h-8 text-xs"
+                  triggerInhalt={
+                    <span className="truncate">
+                      {b.kategorie_bezeichnung ?? "— ohne —"}
+                    </span>
                   }
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue
-                      placeholder={b.kategorie_bezeichnung ?? "— ohne —"}
-                    >
-                      <span className="truncate">
-                        {b.kategorie_bezeichnung ?? "— ohne —"}
-                      </span>
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <KategorieGruppen kategorien={kategorien} />
-                  </SelectContent>
-                </Select>
+                  ariaLabel="Kategorie wählen"
+                />
               </TableCell>
               <TableCell>
                 <Button
@@ -780,50 +769,5 @@ function LieferantDrilldown({
         </TableBody>
       </Table>
     </div>
-  );
-}
-
-function KategorieGruppen({
-  kategorien,
-}: {
-  kategorien: KategorieOption[];
-}) {
-  const gruppen: Record<KategorieTyp, KategorieOption[]> = {
-    einnahme: [],
-    ausgabe: [],
-    privat: [],
-    neutral: [],
-  };
-  for (const k of kategorien) gruppen[k.typ].push(k);
-  const labels: Record<KategorieTyp, string> = {
-    einnahme: "Einnahmen",
-    ausgabe: "Ausgaben",
-    privat: "Privat",
-    neutral: "Neutral",
-  };
-  const reihenfolge: KategorieTyp[] = [
-    "einnahme",
-    "ausgabe",
-    "privat",
-    "neutral",
-  ];
-  return (
-    <>
-      {reihenfolge.map((typ) =>
-        gruppen[typ].length === 0 ? null : (
-          <SelectGroup key={typ}>
-            <SelectLabel>{labels[typ]}</SelectLabel>
-            {gruppen[typ]
-              .slice()
-              .sort((a, b) => a.bezeichnung.localeCompare(b.bezeichnung))
-              .map((k) => (
-                <SelectItem key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </SelectItem>
-              ))}
-          </SelectGroup>
-        ),
-      )}
-    </>
   );
 }

@@ -105,8 +105,12 @@ const TYP_BADGE: Record<string, "default" | "secondary" | "outline"> = {
 
 export function GeldbewegungenAnsicht({
   filter,
+  refreshKey,
 }: {
   filter: GeldbewegungenFilter;
+  // PROJ-20-Fix: erzwingt Neuladen (Fokus/Manuell/Zeitraum-Reselect), damit
+  // die Analyse nach einem Import nie veralteten Datenstand zeigt.
+  refreshKey?: number;
 }) {
   const [suche, setSuche] = useState("");
   const [sucheDebounced, setSucheDebounced] = useState("");
@@ -212,6 +216,7 @@ export function GeldbewegungenAnsicht({
     sortRichtung,
     seite,
     proSeite,
+    refreshKey,
   ]);
 
   useEffect(() => {

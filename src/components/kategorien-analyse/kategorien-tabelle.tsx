@@ -111,7 +111,15 @@ export interface KategorienFilter {
   nurSteuerrelevant: boolean;
 }
 
-export function KategorienTabelle({ filter }: { filter: KategorienFilter }) {
+export function KategorienTabelle({
+  filter,
+  refreshKey,
+}: {
+  filter: KategorienFilter;
+  // PROJ-20-Fix: erzwingt Neuladen (Fokus/Manuell/Zeitraum-Reselect), damit
+  // die Analyse nach einem Import nie veralteten Datenstand zeigt.
+  refreshKey?: number;
+}) {
   const [daten, setDaten] = useState<AnalyseResponse | null>(null);
   const [ladeFehler, setLadeFehler] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -151,6 +159,7 @@ export function KategorienTabelle({ filter }: { filter: KategorienFilter }) {
     filter.kontoId,
     filter.bereich,
     filter.nurSteuerrelevant,
+    refreshKey,
   ]);
 
   const sichtbar = (daten?.kategorien ?? []).filter((k) => k.anzahl > 0);

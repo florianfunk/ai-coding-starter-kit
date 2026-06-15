@@ -85,7 +85,15 @@ export interface CockpitFilter {
   bereich: Bereich;
 }
 
-export function FinanzenCockpit({ filter }: { filter: CockpitFilter }) {
+export function FinanzenCockpit({
+  filter,
+  refreshKey,
+}: {
+  filter: CockpitFilter;
+  // PROJ-20-Fix: erzwingt Neuladen (Fokus/Manuell/Zeitraum-Reselect), damit
+  // die Analyse nach einem Import nie veralteten Datenstand zeigt.
+  refreshKey?: number;
+}) {
   const [daten, setDaten] = useState<CockpitResponse | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -109,7 +117,7 @@ export function FinanzenCockpit({ filter }: { filter: CockpitFilter }) {
         toast.error("Cockpit konnte nicht geladen werden: " + msg);
       }
     });
-  }, [filter.von, filter.bis, filter.kontoId, filter.bereich]);
+  }, [filter.von, filter.bis, filter.kontoId, filter.bereich, refreshKey]);
 
   useEffect(() => {
     ladeDaten();

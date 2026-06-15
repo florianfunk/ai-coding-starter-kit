@@ -5,8 +5,10 @@
 // Tab-Wahl bestimmt den Bereichs-Filter. Die Filter-Werte werden an die
 // Tab-Inhalte durchgereicht — jeder Tab lädt seine eigenen Daten.
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { RefreshCw } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,6 +47,14 @@ function defaultZeitraum(): Zeitraum {
   return { von: `${y}-01-01`, bis: `${y}-12-31` };
 }
 
+/** Aktuelle Uhrzeit (HH:MM) für die "Stand"-Anzeige. */
+function uhrzeitJetzt(): string {
+  return new Date().toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 type Tab =
   | "geschaeft"
   | "privat"
@@ -58,6 +68,56 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
   const [kontoId, setKontoId] = useState<string>("alle");
   const [nurSteuerrelevant, setNurSteuerrelevant] = useState(false);
   const [tab, setTab] = useState<Tab>("geschaeft");
+
+  // PROJ-20-Fix gegen veralteten Datenstand: ein zentraler refreshKey wird an
+  // alle Tabs durchgereicht. Jede Erhöhung erzwingt dort ein Neuladen. Wird
+  // ausgelöst durch (a) den manuellen Button, (b) Fenster-Fokus/Sichtbarkeit
+  // — fängt Importe in anderen Tabs/Fenstern ab —, (c) erneute Wahl desselben
+  // Zeitraums (Filter-Deps ändern sich dann nicht).
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Leer initialisieren und erst clientseitig setzen — sonst Server-/Client-
+  // Uhrzeit-Mismatch bei der Hydration.
+  const [standZeit, setStandZeit] = useState<string>("");
+  const letzterFokusRefresh = useRef<number>(0);
+
+  useEffect(() => {
+    setStandZeit(uhrzeitJetzt());
+  }, []);
+
+  const aktualisieren = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+    setStandZeit(uhrzeitJetzt());
+  }, []);
+
+  // Auto-Refresh, sobald das Fenster/der Tab wieder den Fokus bekommt —
+  // gedrosselt auf höchstens alle 10 s, damit schnelles Hin- und Herklicken
+  // keine Fetch-Flut auslöst.
+  useEffect(() => {
+    function beiFokus() {
+      if (typeof document !== "undefined" && document.hidden) return;
+      const jetzt = Date.now();
+      if (jetzt - letzterFokusRefresh.current < 10_000) return;
+      letzterFokusRefresh.current = jetzt;
+      aktualisieren();
+    }
+    window.addEventListener("focus", beiFokus);
+    document.addEventListener("visibilitychange", beiFokus);
+    return () => {
+      window.removeEventListener("focus", beiFokus);
+      document.removeEventListener("visibilitychange", beiFokus);
+    };
+  }, [aktualisieren]);
+
+  // Zeitraum-Wahl: bei echter Änderung greift der Filter-Deps-Refetch der Tabs.
+  // Wird derselbe Zeitraum erneut gewählt, ändern sich die Deps nicht — dann
+  // explizit refreshen, damit die Auswahl trotzdem aktuelle Daten zieht.
+  const handleZeitraum = useCallback(
+    (z: Zeitraum) => {
+      setZeitraum(z);
+      if (zeitraum.von === z.von && zeitraum.bis === z.bis) aktualisieren();
+    },
+    [zeitraum.von, zeitraum.bis, aktualisieren],
+  );
 
   // Tab → Bereich: 'geschaeft' und 'privat' bestimmen den Bereichs-Filter
   // direkt. 'cockpit' und 'bewegungen' zeigen alle Bereiche und nutzen
@@ -83,7 +143,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
       {/* Filter — alles in einer kompakten Zeile, bricht responsiv um */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-          <ZeitraumPicker value={zeitraum} onChange={setZeitraum} />
+          <ZeitraumPicker value={zeitraum} onChange={handleZeitraum} />
           <span aria-hidden className="hidden h-6 w-px bg-border sm:inline-block" />
           <Select value={kontoId} onValueChange={setKontoId}>
             <SelectTrigger
@@ -121,6 +181,25 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               Nur steuerrelevant
             </Label>
           </div>
+
+          {/* Aktualisieren + Datenstand — ganz rechts. Schützt davor, dass
+              nach einem Import veraltete Zahlen stehen bleiben. */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Stand {standZeit}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={aktualisieren}
+              className="h-8 gap-1.5"
+              title="Daten neu laden"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Aktualisieren
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -136,10 +215,10 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
         </TabsList>
 
         <TabsContent value="geschaeft" className="mt-6">
-          <KategorienTabelle filter={kategorienFilter} />
+          <KategorienTabelle filter={kategorienFilter} refreshKey={refreshKey} />
         </TabsContent>
         <TabsContent value="privat" className="mt-6">
-          <KategorienTabelle filter={kategorienFilter} />
+          <KategorienTabelle filter={kategorienFilter} refreshKey={refreshKey} />
         </TabsContent>
         <TabsContent value="bewegungen" className="mt-6">
           <GeldbewegungenAnsicht
@@ -149,6 +228,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               kontoId: kontoId === "alle" ? null : kontoId,
               bereich: "alle",
             }}
+            refreshKey={refreshKey}
           />
         </TabsContent>
         <TabsContent value="abos" className="mt-6">
@@ -159,6 +239,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               kontoId: kontoId === "alle" ? null : kontoId,
               bereich: "alle",
             }}
+            refreshKey={refreshKey}
           />
         </TabsContent>
         <TabsContent value="lieferanten" className="mt-6">
@@ -170,6 +251,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               bereich: "alle",
               nurSteuerrelevant,
             }}
+            refreshKey={refreshKey}
           />
         </TabsContent>
         <TabsContent value="cockpit" className="mt-6">
@@ -180,6 +262,7 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
               kontoId: kontoId === "alle" ? null : kontoId,
               bereich: "alle",
             }}
+            refreshKey={refreshKey}
           />
         </TabsContent>
       </Tabs>

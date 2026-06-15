@@ -21,8 +21,12 @@ export interface LieferantenTabFilter {
 
 export function LieferantenTab({
   filter,
+  refreshKey,
 }: {
   filter: LieferantenTabFilter;
+  // PROJ-20-Fix: erzwingt Neuladen (Fokus/Manuell/Zeitraum-Reselect), damit
+  // die Analyse nach einem Import nie veralteten Datenstand zeigt.
+  refreshKey?: number;
 }) {
   const [daten, setDaten] = useState<LieferantenResponse | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -55,6 +59,7 @@ export function LieferantenTab({
     filter.kontoId,
     filter.bereich,
     filter.nurSteuerrelevant,
+    refreshKey,
   ]);
 
   useEffect(() => {

@@ -27,7 +27,15 @@ export interface AboRadarTabFilter {
   bereich: Bereich;
 }
 
-export function AboRadarTab({ filter }: { filter: AboRadarTabFilter }) {
+export function AboRadarTab({
+  filter,
+  refreshKey,
+}: {
+  filter: AboRadarTabFilter;
+  // PROJ-20-Fix: erzwingt Neuladen (Fokus/Manuell/Zeitraum-Reselect), damit
+  // die Analyse nach einem Import nie veralteten Datenstand zeigt.
+  refreshKey?: number;
+}) {
   const [daten, setDaten] = useState<WiederkehrendResponse | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -52,7 +60,7 @@ export function AboRadarTab({ filter }: { filter: AboRadarTabFilter }) {
         toast.error("Abo-Radar konnte nicht geladen werden: " + msg);
       }
     });
-  }, [filter.von, filter.bis, filter.kontoId, filter.bereich]);
+  }, [filter.von, filter.bis, filter.kontoId, filter.bereich, refreshKey]);
 
   useEffect(() => {
     ladeDaten();

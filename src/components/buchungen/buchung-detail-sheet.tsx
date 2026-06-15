@@ -141,7 +141,10 @@ export function BuchungDetailSheet({
     if (!open || !buchung) return;
     const id = buchung.id;
     let abbruch = false;
-    setKenntnisState({ buchungId: id, daten: null, geladen: false });
+    // Kein synchroner Reset hier: Bis der Fetch auflöst, greift im Render die
+    // buchungId-Guard (kenntnisState.buchungId === buchung.id) und liefert für
+    // die neue Buchung ohnehin null — so vermeiden wir setState-im-Effekt und
+    // ein unnötiges Flackern beim erneuten Öffnen derselben Buchung.
     fetch(`/api/empfaenger-kenntnis?buchung_id=${encodeURIComponent(id)}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Fehler"))))
       .then((j: { kenntnis?: EmpfaengerKenntnis | null }) => {

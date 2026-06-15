@@ -81,6 +81,10 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
   const letzterFokusRefresh = useRef<number>(0);
 
   useEffect(() => {
+    // Bewusster Einmal-Render nach Mount: Die Uhrzeit ist client-only, der
+    // Server kennt sie nicht — synchrones Setzen würde sonst einen Hydration-
+    // Mismatch erzeugen. Genau der Fall, für den set-state-in-effect gedacht ist.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStandZeit(uhrzeitJetzt());
   }, []);
 

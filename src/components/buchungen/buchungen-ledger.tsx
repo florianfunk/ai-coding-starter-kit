@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ChevronRight,
@@ -189,11 +190,16 @@ export function BuchungenLedger({
   konten,
   kategorien,
   filter,
+  abgeschnitten = false,
+  maxBuchungen,
 }: {
   buchungen: Buchung[];
   konten: Konto[];
   kategorien: Kategorie[];
   filter: { konto?: string; von?: string; bis?: string };
+  // Obergrenze beim Laden erreicht → Suche/Summen ggf. unvollständig.
+  abgeschnitten?: boolean;
+  maxBuchungen?: number;
 }) {
   const router = useRouter();
   const [konto, setKonto] = useState(filter.konto ?? "alle");
@@ -702,6 +708,21 @@ export function BuchungenLedger({
           ) : null}
         </div>
       </section>
+
+      {/* Hinweis, wenn die geladene Menge an der Obergrenze abgeschnitten wurde —
+          Suche und Summen beziehen sich dann nur auf die geladenen Buchungen. */}
+      {abgeschnitten && (
+        <div className="flex items-start gap-2.5 rounded-[var(--radius)] border border-amber-300/70 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Es werden nur die neuesten{" "}
+            {maxBuchungen ? maxBuchungen.toLocaleString("de-DE") : "geladenen"}{" "}
+            Buchungen angezeigt. <strong>Suche und Summen sind dadurch ggf.
+            unvollständig</strong> — grenze den Zeitraum oben ein, um ältere
+            Buchungen einzuschließen.
+          </span>
+        </div>
+      )}
 
       {/* ───────────────── LEDGER ───────────────── */}
       {istLeer ? (

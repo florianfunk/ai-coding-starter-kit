@@ -17,6 +17,13 @@ export const metadata = {
 const SELECT_FELDER =
   "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
 
+// Obergrenze der geladenen Buchungen. Such-, Filter- und Summenberechnung
+// laufen client-seitig über die geladene Menge — ist diese kleiner als der
+// gewählte Zeitraum (alte Grenze: 500), fehlen ältere Buchungen still in Suche
+// UND Summen. Großzügig dimensioniert (~2+ Jahre); wird die Grenze erreicht,
+// weist der Ledger sichtbar darauf hin.
+const MAX_BUCHUNGEN = 5000;
+
 type Such = {
   konto?: string;
   von?: string;
@@ -73,7 +80,7 @@ export default async function BuchungenPage({
     .select(SELECT_FELDER)
     .eq("owner_id", user.id)
     .order("buchung_datum", { ascending: false })
-    .limit(500);
+    .limit(MAX_BUCHUNGEN);
 
   if (filter.konto && filter.konto !== "alle") {
     query = query.eq("konto_id", filter.konto);
@@ -87,6 +94,9 @@ export default async function BuchungenPage({
   }
 
   const { data, error } = await query;
+  // Wurde die Obergrenze erreicht, ist die geladene Menge ggf. unvollständig —
+  // der Ledger blendet dann einen Hinweis ein (Suche/Summen unvollständig).
+  const abgeschnitten = (data?.length ?? 0) >= MAX_BUCHUNGEN;
 
   return (
     <div className="space-y-8">
@@ -104,6 +114,8 @@ export default async function BuchungenPage({
           konten={konten}
           kategorien={kategorien}
           filter={filter}
+          abgeschnitten={abgeschnitten}
+          maxBuchungen={MAX_BUCHUNGEN}
         />
       )}
 

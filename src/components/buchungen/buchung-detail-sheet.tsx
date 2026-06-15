@@ -4,7 +4,10 @@
 // und Audit-Trail (auf Anfrage geladen). Nachvollziehbarkeit, keine Blackbox.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { StickyNote } from "lucide-react";
 import type { Buchung, Kategorie, Klassifikation } from "@/lib/types";
+import type { LieferantNotiz } from "@/lib/finanzen/lieferant-notizen";
 import {
   Sheet,
   SheetContent,
@@ -112,6 +115,12 @@ export function BuchungDetailSheet({
     geladen: boolean;
   }>({ buchungId: null, daten: null, geladen: false });
 
+  // PROJ-21: Lieferanten-Notizen für den Empfänger dieser Buchung (read-only).
+  const [notizenState, setNotizenState] = useState<{
+    buchungId: string | null;
+    daten: LieferantNotiz[];
+  }>({ buchungId: null, daten: [] });
+
   useEffect(() => {
     if (!open || !buchung) return;
     const id = buchung.id;
@@ -166,8 +175,33 @@ export function BuchungDetailSheet({
     };
   }, [open, buchung]);
 
+  useEffect(() => {
+    if (!open || !buchung) return;
+    const id = buchung.id;
+    let abbruch = false;
+    fetch(
+      `/api/finanzen/lieferanten/notizen?buchung_id=${encodeURIComponent(id)}`,
+    )
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Fehler"))))
+      .then((j: { notizen?: LieferantNotiz[] }) => {
+        if (!abbruch) {
+          setNotizenState({ buchungId: id, daten: j.notizen ?? [] });
+        }
+      })
+      .catch(() => {
+        if (!abbruch) setNotizenState({ buchungId: id, daten: [] });
+      });
+    return () => {
+      abbruch = true;
+    };
+  }, [open, buchung]);
+
   const fuerAktuelle =
     buchung != null && auditState.buchungId === buchung.id;
+  const notizen =
+    buchung != null && notizenState.buchungId === buchung.id
+      ? notizenState.daten
+      : [];
   const kenntnis =
     buchung != null && kenntnisState.buchungId === buchung.id
       ? kenntnisState.daten
@@ -352,6 +386,35 @@ export function BuchungDetailSheet({
                     </div>
                   </div>
                 )}
+
+              {notizen.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <StickyNote className="h-3.5 w-3.5" />
+                      Lieferanten-Notizen
+                    </span>
+                    <Link
+                      href="/lieferanten-notizen"
+                      className="text-xs text-brand-violet hover:underline"
+                    >
+                      bearbeiten
+                    </Link>
+                  </div>
+                  <ul className="space-y-2 rounded-md border p-3">
+                    {notizen.map((n) => (
+                      <li key={n.id} className="text-sm">
+                        <p className="whitespace-pre-wrap break-words">
+                          {n.inhalt}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {formatDatum(n.erstellt_am)}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {buchung.pruef_grund && (
                 <div>

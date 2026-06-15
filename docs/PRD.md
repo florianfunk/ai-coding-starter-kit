@@ -34,6 +34,7 @@ Single-Tenant: keine Mandanten-, Kanzlei- oder Mehrbenutzerverwaltung.
 | P2 | PROJ-15 — Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | In Progress |
 | P2 | PROJ-16 — Mein Profil — persönliche Stammdaten als LLM-Kontext | Planned |
 | P2 | PROJ-17 — KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Planned |
+| P2 | PROJ-21 — Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger) | Planned |
 
 ## Success Metrics
 - **Automatisierungsgrad:** ≥ 85 % aller Kontobuchungen werden vom Agenten ohne Nachfrage korrekt klassifiziert (geschäftlich/privat + EÜR-Kategorie)

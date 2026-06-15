@@ -32,6 +32,7 @@ const NAV_HEUTE = [
 const NAV_BUECHER = [
   { href: "/buchungen", label: "Buchungen" },
   { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
+  { href: "/lieferanten-notizen", label: "Lieferanten-Notizen" },
   { href: "/abgleich", label: "Beleg-Abgleich" },
   { href: "/belege", label: "Belege" },
 ];

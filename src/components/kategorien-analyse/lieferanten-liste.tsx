@@ -25,6 +25,7 @@ import {
   CircleHelp,
   Eye,
   Loader2,
+  StickyNote,
   User,
 } from "lucide-react";
 
@@ -55,6 +56,7 @@ import {
 } from "@/lib/finanzen/regel-helper";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
+import { LieferantNotizenPanel } from "@/components/lieferanten-notizen/lieferant-notizen-panel";
 import type { KategorieTyp } from "@/lib/types";
 import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
 import type { BulkKlassifikationResponse } from "@/app/api/buchungen/bulk-klassifikation/route";
@@ -325,6 +327,9 @@ function LieferantItemRow({
   onMutiert?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  // PROJ-21 — Notiz-Zähler lokal, damit das Badge nach Add/Delete im Drilldown
+  // sofort stimmt, ohne die ganze Liste neu zu laden.
+  const [notizAnzahl, setNotizAnzahl] = useState(item.notiz_anzahl);
   const tintHintergrund =
     item.richtung === "einnahme" ? "bg-tint-cyan" : "bg-tint-cerise";
   const richtungFarbe =
@@ -360,6 +365,15 @@ function LieferantItemRow({
                 ohne Kategorie
               </Badge>
             )}
+            {notizAnzahl > 0 ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-tint-yellow px-1.5 py-0.5 text-[10px] font-medium text-highlight-strong"
+                title={item.notiz_vorschau ?? "Notiz vorhanden"}
+              >
+                <StickyNote className="h-3 w-3" />
+                {notizAnzahl}
+              </span>
+            ) : null}
           </div>
           <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
             {item.richtung === "einnahme" ? (
@@ -411,6 +425,7 @@ function LieferantItemRow({
             kategorien={kategorien}
             onOpenSheet={onOpenSheet}
             onMutiert={onMutiert}
+            onNotizAnzahl={setNotizAnzahl}
           />
         </div>
       ) : null}
@@ -423,11 +438,14 @@ function LieferantDrilldown({
   kategorien,
   onOpenSheet,
   onMutiert,
+  onNotizAnzahl,
 }: {
   item: LieferantItemAnzeige;
   kategorien: KategorieOption[];
   onOpenSheet: (id: string) => void;
   onMutiert?: () => void;
+  /** PROJ-21 — meldet die aktuelle Notiz-Anzahl zurück (Badge-Update). */
+  onNotizAnzahl?: (anzahl: number) => void;
 }) {
   // Lokaler Snapshot — optimistische Updates ohne Komplett-Reload.
   // Neutrale Durchläufer ans Ende; Reihenfolge danach stabil, damit
@@ -1133,6 +1151,19 @@ function LieferantDrilldown({
           })}
         </TableBody>
       </Table>
+
+      {/* PROJ-21 — Lieferanten-Notizen (lazy geladen) */}
+      <div className="space-y-2 rounded-md border bg-background p-3">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <StickyNote className="h-3.5 w-3.5" />
+          Notizen zu {item.empfaenger}
+        </div>
+        <LieferantNotizenPanel
+          empfaengerNorm={item.empfaenger_norm}
+          empfaengerName={item.empfaenger}
+          onCountChange={onNotizAnzahl}
+        />
+      </div>
     </div>
   );
 }

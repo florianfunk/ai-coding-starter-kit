@@ -15,6 +15,7 @@ import {
   type LieferantenBuchung,
 } from "@/lib/finanzen/lieferanten-erkennung";
 import { MIN_LOOKBACK_TAGE } from "@/lib/finanzen/wiederkehrend-erkennung";
+import { notizVorschau } from "@/lib/finanzen/lieferant-notizen";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
@@ -43,6 +44,10 @@ export interface LieferantItemAnzeige
     anzahl: number;
     anteil: number;
   } | null;
+  /** PROJ-21 — Anzahl hinterlegter Lieferanten-Notizen (für das Badge). */
+  notiz_anzahl: number;
+  /** PROJ-21 — gekürzte Vorschau der jüngsten Notiz (Tooltip), oder null. */
+  notiz_vorschau: string | null;
   buchungen: LieferantBuchungAnzeige[];
 }
 
@@ -191,6 +196,38 @@ export async function GET(request: Request) {
 
   const items = erkenneLieferanten(eingang);
 
+  // PROJ-21 — Notiz-Existenz/Vorschau je Lieferant. Eine kleine Extra-Abfrage
+  // (Tabelle ist winzig), gemappt auf empfaenger_norm — kein N+1.
+  const notizMap = new Map<string, { anzahl: number; vorschau: string }>();
+  if (items.length > 0) {
+    const { data: notizData } = await supabase
+      .from("lieferant_notiz")
+      .select("empfaenger_norm, inhalt, aktualisiert_am")
+      .eq("owner_id", user.id)
+      .in(
+        "empfaenger_norm",
+        items.map((it) => it.empfaenger_norm),
+      )
+      .order("aktualisiert_am", { ascending: false })
+      .limit(2000);
+    for (const n of (notizData ?? []) as Array<{
+      empfaenger_norm: string;
+      inhalt: string;
+      aktualisiert_am: string;
+    }>) {
+      const vorhanden = notizMap.get(n.empfaenger_norm);
+      if (vorhanden) {
+        vorhanden.anzahl += 1;
+      } else {
+        // Erste Zeile je Empfänger ist dank Sortierung die jüngste → Vorschau.
+        notizMap.set(n.empfaenger_norm, {
+          anzahl: 1,
+          vorschau: notizVorschau(n.inhalt),
+        });
+      }
+    }
+  }
+
   const anzeige: LieferantItemAnzeige[] = items.map((it) => {
     const domKat = it.dominante_kategorie
       ? (() => {
@@ -205,9 +242,12 @@ export async function GET(request: Request) {
           };
         })()
       : null;
+    const notiz = notizMap.get(it.empfaenger_norm);
     return {
       ...it,
       dominante_kategorie_anzeige: domKat,
+      notiz_anzahl: notiz?.anzahl ?? 0,
+      notiz_vorschau: notiz?.vorschau ?? null,
       buchungen: it.buchungen.map((b) => {
         const k = b.kategorie_id ? katMap.get(b.kategorie_id) : undefined;
         return {

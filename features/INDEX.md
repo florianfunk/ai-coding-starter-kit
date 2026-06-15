@@ -34,7 +34,8 @@
 | PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | Deployed | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
 | PROJ-19 | Kündigungsliste für wiederkehrende Empfänger | In Review | [Spec](PROJ-19-kuendigungsliste.md) | 2026-06-13 |
 | PROJ-20 | Merkliste (Buchungen für späteres Review merken) | In Review | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |
+| PROJ-21 | Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger) | Approved | [Spec](PROJ-21-lieferanten-notizen.md) | 2026-06-15 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-21
+## Next Available ID: PROJ-22

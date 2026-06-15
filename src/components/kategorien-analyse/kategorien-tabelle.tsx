@@ -59,9 +59,9 @@ const CLUSTER_STIL: Record<
   { bg: string; accent: string; text: string }
 > = {
   einnahme: {
-    bg: "bg-tint-cyan/60 hover:bg-tint-cyan",
+    bg: "bg-emerald-50/80 hover:bg-emerald-50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/40",
     accent: "border-l-emerald-500",
-    text: "text-income-strong dark:text-income",
+    text: "text-emerald-700 dark:text-emerald-300",
   },
   ausgabe: {
     bg: "bg-rose-50/80 hover:bg-rose-50 dark:bg-rose-950/30 dark:hover:bg-rose-950/40",

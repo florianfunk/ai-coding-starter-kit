@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { bewegungenFilterSchema } from "@/lib/validation/finanzen";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type {
   BuchungStatus,
   KategorieTyp,
@@ -106,22 +107,28 @@ export async function GET(request: Request) {
   // Suche werden zusätzlich in JS nachgezogen (Suche, weil wir auf zwei
   // Spalten OR-suchen wollen und das auch über die Empfänger-Normierung
   // greifen soll).
-  let q = supabase
-    .from("buchung")
-    .select(
-      "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund",
-    )
-    .eq("owner_id", user.id)
-    .limit(20000);
-  if (f.von) q = q.gte("buchung_datum", f.von);
-  if (f.bis) q = q.lte("buchung_datum", f.bis);
-  if (f.konto_id) q = q.eq("konto_id", f.konto_id);
-  if (f.kategorie_id === "ohne") q = q.is("kategorie_id", null);
-  else if (f.kategorie_id) q = q.eq("kategorie_id", f.kategorie_id);
-  if (f.richtung === "einnahme") q = q.gt("betrag", 0);
-  if (f.richtung === "ausgabe") q = q.lt("betrag", 0);
-
-  const { data: bData, error: bErr } = await q;
+  // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen.
+  // Gesamt-Anzahl, Summen und die Display-Pagination (.slice unten) brauchen
+  // den KOMPLETTEN Treffer-Satz, nicht nur die ersten 1000. Stabile Sortierung
+  // via id; die fachliche Sortierung passiert später in JS.
+  const { data: bData, error: bErr } = await ladeAlle((von, bisIdx) => {
+    let q = supabase
+      .from("buchung")
+      .select(
+        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund",
+      )
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx);
+    if (f.von) q = q.gte("buchung_datum", f.von);
+    if (f.bis) q = q.lte("buchung_datum", f.bis);
+    if (f.konto_id) q = q.eq("konto_id", f.konto_id);
+    if (f.kategorie_id === "ohne") q = q.is("kategorie_id", null);
+    else if (f.kategorie_id) q = q.eq("kategorie_id", f.kategorie_id);
+    if (f.richtung === "einnahme") q = q.gt("betrag", 0);
+    if (f.richtung === "ausgabe") q = q.lt("betrag", 0);
+    return q;
+  });
   if (bErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { analyseFilterSchema } from "@/lib/validation/kategorien-analyse";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungRow {
@@ -93,24 +94,28 @@ export async function GET(request: Request) {
 
   const supabase = await createClient();
 
-  // Buchungen laden — auf Filter eingeschränkt.
-  let q = supabase
-    .from("buchung")
-    .select(
-      "id, konto_id, buchung_datum, betrag, klassifikation, steuerrelevant, kategorie_id, konfidenz, status",
-    )
-    .eq("owner_id", user.id)
-    .limit(20000);
   // `von`/`bis` haben Vorrang vor `jahr` — wenn der Nutzer explizit einen
   // Datumsbereich gewählt hat, ignorieren wir den Jahres-Quickfilter.
   const von = filter.von ?? (filter.jahr ? `${filter.jahr}-01-01` : null);
   const bis = filter.bis ?? (filter.jahr ? `${filter.jahr}-12-31` : null);
-  if (von) q = q.gte("buchung_datum", von);
-  if (bis) q = q.lte("buchung_datum", bis);
-  if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
-  if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
 
-  const { data: bData, error: bErr } = await q;
+  // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen und
+  // verfälscht so jede Aggregation. Stabile Sortierung via id.
+  const { data: bData, error: bErr } = await ladeAlle((von2, bisIdx) => {
+    let q = supabase
+      .from("buchung")
+      .select(
+        "id, konto_id, buchung_datum, betrag, klassifikation, steuerrelevant, kategorie_id, konfidenz, status",
+      )
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von2, bisIdx);
+    if (von) q = q.gte("buchung_datum", von);
+    if (bis) q = q.lte("buchung_datum", bis);
+    if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
+    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
+    return q;
+  });
   if (bErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

@@ -32,6 +32,7 @@ import {
   type EstTarif,
   type EstTarifZone,
 } from "@/lib/tax/est";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type { Buchung, Kategorie } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -89,14 +90,17 @@ async function ladeBuchungen(
   von: string,
   bis: string,
 ): Promise<Buchung[]> {
-  const { data, error } = await supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", ownerId)
-    .gte("buchung_datum", von)
-    .lte("buchung_datum", bis)
-    .order("buchung_datum", { ascending: true })
-    .limit(50000);
+  const { data, error } = await ladeAlle((vonIdx, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(SELECT_BUCHUNG)
+      .eq("owner_id", ownerId)
+      .gte("buchung_datum", von)
+      .lte("buchung_datum", bis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(vonIdx, bisIdx),
+  );
   if (error) throw new Error("Buchungen konnten nicht geladen werden.");
   return (data ?? []) as Buchung[];
 }
@@ -185,11 +189,14 @@ async function ermittleGewinn(
     };
   }
 
-  const { data: katData } = await supabase
-    .from("kategorie")
-    .select(SELECT_KATEGORIE)
-    .eq("owner_id", ownerId)
-    .limit(2000);
+  const { data: katData } = await ladeAlle((vonIdx, bisIdx) =>
+    supabase
+      .from("kategorie")
+      .select(SELECT_KATEGORIE)
+      .eq("owner_id", ownerId)
+      .order("id", { ascending: true })
+      .range(vonIdx, bisIdx),
+  );
   const kategorien = (katData ?? []) as Kategorie[];
   const ergebnis = berechneEuer(buchungen, kategorien, jahr, wjBeginn);
   return { gewinn: ergebnis.gewinn, abgeschlossen: false, buchungen, von, bis };
@@ -234,12 +241,15 @@ async function ladePrivatentnahmen(
   ];
   const katName = new Map<string, string>();
   if (katIds.length > 0) {
-    const { data: katData } = await supabase
-      .from("kategorie")
-      .select("id, bezeichnung")
-      .eq("owner_id", ownerId)
-      .in("id", katIds)
-      .limit(2000);
+    const { data: katData } = await ladeAlle((vonIdx, bisIdx) =>
+      supabase
+        .from("kategorie")
+        .select("id, bezeichnung")
+        .eq("owner_id", ownerId)
+        .in("id", katIds)
+        .order("id", { ascending: true })
+        .range(vonIdx, bisIdx),
+    );
     for (const k of (katData ?? []) as Array<{
       id: string;
       bezeichnung: string;

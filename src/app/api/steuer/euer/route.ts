@@ -18,6 +18,7 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import { euerJahrSchema, euerAbschlussSchema } from "@/lib/validation/euer";
 import {
   berechneEuer,
@@ -71,14 +72,17 @@ async function ladeBuchungen(
   von: string,
   bis: string,
 ): Promise<Buchung[]> {
-  const { data, error } = await supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", ownerId)
-    .gte("buchung_datum", von)
-    .lte("buchung_datum", bis)
-    .order("buchung_datum", { ascending: true })
-    .limit(50000);
+  const { data, error } = await ladeAlle((von_idx, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(SELECT_BUCHUNG)
+      .eq("owner_id", ownerId)
+      .gte("buchung_datum", von)
+      .lte("buchung_datum", bis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von_idx, bisIdx),
+  );
   if (error) throw new Error("Buchungen konnten nicht geladen werden.");
   return (data ?? []) as Buchung[];
 }
@@ -108,12 +112,16 @@ async function ermittleWarnungen(
   let ohneBelegSumme = 0;
   if (geschaeftlich.length > 0) {
     const ids = geschaeftlich.map((b) => b.id);
-    const { data: bbData } = await supabase
-      .from("beleg_buchung")
-      .select("buchung_id")
-      .eq("owner_id", ownerId)
-      .in("buchung_id", ids)
-      .limit(50000);
+    const { data: bbData } = await ladeAlle((von, bisIdx) =>
+      supabase
+        .from("beleg_buchung")
+        .select("buchung_id")
+        .eq("owner_id", ownerId)
+        .in("buchung_id", ids)
+        .order("buchung_id", { ascending: true })
+        .order("id", { ascending: true })
+        .range(von, bisIdx),
+    );
     const mitBeleg = new Set(
       ((bbData ?? []) as Array<{ buchung_id: string }>).map(
         (r) => r.buchung_id,
@@ -198,11 +206,14 @@ export async function GET(request: Request) {
     });
   }
 
-  const { data: katData, error: katErr } = await supabase
-    .from("kategorie")
-    .select(SELECT_KATEGORIE)
-    .eq("owner_id", user.id)
-    .limit(2000);
+  const { data: katData, error: katErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("kategorie")
+      .select(SELECT_KATEGORIE)
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (katErr) {
     return NextResponse.json(
       { error: "Kategorien konnten nicht geladen werden." },
@@ -303,11 +314,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: katData, error: katErr } = await supabase
-    .from("kategorie")
-    .select(SELECT_KATEGORIE)
-    .eq("owner_id", user.id)
-    .limit(2000);
+  const { data: katData, error: katErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("kategorie")
+      .select(SELECT_KATEGORIE)
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (katErr) {
     return NextResponse.json(
       { error: "Kategorien konnten nicht geladen werden." },

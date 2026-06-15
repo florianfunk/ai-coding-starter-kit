@@ -32,6 +32,7 @@ import {
   type Intervall,
   type Richtung,
 } from "@/lib/finanzen/wiederkehrend-erkennung";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungRow {
@@ -152,19 +153,23 @@ export async function GET(request: Request) {
     ? filterVon
     : toIso(lookbackStart);
 
-  let q = supabase
-    .from("buchung")
-    .select(
-      "id, konto_id, buchung_datum, betrag, empfaenger, empfaenger_normalisiert, klassifikation, kategorie_id, status",
-    )
-    .eq("owner_id", user.id)
-    .gte("buchung_datum", lookbackVon)
-    .lte("buchung_datum", bis)
-    .order("buchung_datum", { ascending: true })
-    .limit(20000);
-  if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
-
-  const { data: bData, error: bErr } = await q;
+  // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen und
+  // schnitte (asc-Sortierung) neuere Buchungen ab. Stabile Sortierung via id.
+  const { data: bData, error: bErr } = await ladeAlle((von, bisIdx) => {
+    let q = supabase
+      .from("buchung")
+      .select(
+        "id, konto_id, buchung_datum, betrag, empfaenger, empfaenger_normalisiert, klassifikation, kategorie_id, status",
+      )
+      .eq("owner_id", user.id)
+      .gte("buchung_datum", lookbackVon)
+      .lte("buchung_datum", bis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von, bisIdx);
+    if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
+    return q;
+  });
   if (bErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

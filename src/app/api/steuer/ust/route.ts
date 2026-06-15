@@ -23,6 +23,7 @@ import {
   ustAbschlussSchema,
 } from "@/lib/validation/ustva";
 import { berechneUstVa, type UstBuchung } from "@/lib/tax/ust";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import {
   ustVaPerioden,
   ustVaPeriode,
@@ -80,11 +81,15 @@ async function ladeBelegteIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
 ): Promise<Set<string>> {
-  const { data } = await supabase
-    .from("beleg_buchung")
-    .select("buchung_id")
-    .eq("owner_id", ownerId)
-    .limit(100000);
+  const { data } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("beleg_buchung")
+      .select("buchung_id")
+      .eq("owner_id", ownerId)
+      .order("buchung_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   const s = new Set<string>();
   for (const r of (data ?? []) as Array<{ buchung_id: string }>) {
     s.add(r.buchung_id);
@@ -137,13 +142,18 @@ export async function GET(request: Request) {
   }
 
   // Buchungen des Kalenderjahres laden (Periodenzuordnung in perioden.ts).
-  const { data: buData, error: buErr } = await supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", user.id)
-    .gte("buchung_datum", `${jahr}-01-01`)
-    .lte("buchung_datum", `${jahr}-12-31`)
-    .limit(100000);
+  // Vollständig paginiert — PostgREST deckelt sonst bei 1000 Zeilen und
+  // verfälscht jede Aggregation. Stabile Sortierung via id (Pflicht für range).
+  const { data: buData, error: buErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(SELECT_BUCHUNG)
+      .eq("owner_id", user.id)
+      .gte("buchung_datum", `${jahr}-01-01`)
+      .lte("buchung_datum", `${jahr}-12-31`)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (buErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },
@@ -356,13 +366,18 @@ export async function POST(request: Request) {
   }
 
   // Snapshot deterministisch aus aktuellen Daten bilden.
-  const { data: buData, error: buErr } = await supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", user.id)
-    .gte("buchung_datum", `${jahr}-01-01`)
-    .lte("buchung_datum", `${jahr}-12-31`)
-    .limit(100000);
+  // Vollständig paginiert — PostgREST deckelt sonst bei 1000 Zeilen und der
+  // eingefrorene Snapshot wäre falsch. Stabile Sortierung via id (range-Pflicht).
+  const { data: buData, error: buErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(SELECT_BUCHUNG)
+      .eq("owner_id", user.id)
+      .gte("buchung_datum", `${jahr}-01-01`)
+      .lte("buchung_datum", `${jahr}-12-31`)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (buErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

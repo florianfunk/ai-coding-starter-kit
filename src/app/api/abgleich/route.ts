@@ -30,6 +30,7 @@ import {
   type EngineConfig,
 } from "@/lib/matching/engine";
 import { DEFAULT_SCORE_CONFIG, type BelegFuerScore } from "@/lib/matching/score";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -97,13 +98,18 @@ export async function GET(request: Request) {
   const f = filterParsed.data;
 
   // Alle Zuordnungen owner-scoped (für "hat Beleg?"-Auswertung).
-  const { data: bbData, error: bbErr } = await supabase
-    .from("beleg_buchung")
-    .select(
-      "id, beleg_id, buchung_id, match_score, kriterien, status, gesperrt",
-    )
-    .eq("owner_id", user.id)
-    .limit(20000);
+  // Vollständig paginiert — PostgREST deckelt sonst bei 1000 Zeilen.
+  // Stabile Sortierung via id (range-Pagination erfordert deterministische Ordnung).
+  const { data: bbData, error: bbErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("beleg_buchung")
+      .select(
+        "id, beleg_id, buchung_id, match_score, kriterien, status, gesperrt",
+      )
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (bbErr) {
     return NextResponse.json(
       { error: "Zuordnungen konnten nicht geladen werden." },
@@ -123,19 +129,22 @@ export async function GET(request: Request) {
   );
 
   // Fehlliste A: geschäftliche Buchungen, gefiltert.
-  let bQuery = supabase
-    .from("buchung")
-    .select(
-      "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation",
-    )
-    .eq("owner_id", user.id)
-    .eq("klassifikation", "geschaeftlich")
-    .order("buchung_datum", { ascending: false })
-    .limit(5000);
-  if (f.konto) bQuery = bQuery.eq("konto_id", f.konto);
-  if (f.von) bQuery = bQuery.gte("buchung_datum", f.von);
-  if (f.bis) bQuery = bQuery.lte("buchung_datum", f.bis);
-  const { data: buchungenData, error: bErr } = await bQuery;
+  // Vollständig paginiert — id als stabiler Tiebreaker für range-Pagination.
+  const { data: buchungenData, error: bErr } = await ladeAlle((von, bisIdx) => {
+    let bQuery = supabase
+      .from("buchung")
+      .select(
+        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation",
+      )
+      .eq("owner_id", user.id)
+      .eq("klassifikation", "geschaeftlich")
+      .order("buchung_datum", { ascending: false })
+      .order("id", { ascending: true });
+    if (f.konto) bQuery = bQuery.eq("konto_id", f.konto);
+    if (f.von) bQuery = bQuery.gte("buchung_datum", f.von);
+    if (f.bis) bQuery = bQuery.lte("buchung_datum", f.bis);
+    return bQuery.range(von, bisIdx);
+  });
   if (bErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },
@@ -158,17 +167,21 @@ export async function GET(request: Request) {
   );
 
   // Fehlliste B: Belege ohne (sichere) Zuordnung.
-  let belQuery = supabase
-    .from("beleg")
-    .select(
-      "id, paperless_id, titel, beleg_datum, korrespondent, betrag, status, quell_link",
-    )
-    .eq("owner_id", user.id)
-    .order("beleg_datum", { ascending: false, nullsFirst: false })
-    .limit(5000);
-  if (f.von) belQuery = belQuery.gte("beleg_datum", f.von);
-  if (f.bis) belQuery = belQuery.lte("beleg_datum", f.bis);
-  const { data: belegeData, error: belErr } = await belQuery;
+  // Vollständig paginiert — beleg_datum-Sortierung (nullsFirst) bleibt, id als
+  // finaler Tiebreaker für deterministische range-Pagination.
+  const { data: belegeData, error: belErr } = await ladeAlle((von, bisIdx) => {
+    let belQuery = supabase
+      .from("beleg")
+      .select(
+        "id, paperless_id, titel, beleg_datum, korrespondent, betrag, status, quell_link",
+      )
+      .eq("owner_id", user.id)
+      .order("beleg_datum", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true });
+    if (f.von) belQuery = belQuery.gte("beleg_datum", f.von);
+    if (f.bis) belQuery = belQuery.lte("beleg_datum", f.bis);
+    return belQuery.range(von, bisIdx);
+  });
   if (belErr) {
     return NextResponse.json(
       { error: "Belege konnten nicht geladen werden." },
@@ -277,15 +290,19 @@ export async function POST(request: Request) {
   }
 
   // Geschäftliche Buchungen laden.
-  const { data: buchungenData, error: bErr } = await supabase
-    .from("buchung")
-    .select(
-      "id, betrag, buchung_datum, verwendungszweck, empfaenger, klassifikation",
-    )
-    .eq("owner_id", user.id)
-    .eq("klassifikation", "geschaeftlich")
-    .order("buchung_datum", { ascending: true })
-    .limit(5000);
+  // Vollständig paginiert — id als stabiler Tiebreaker für range-Pagination.
+  const { data: buchungenData, error: bErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(
+        "id, betrag, buchung_datum, verwendungszweck, empfaenger, klassifikation",
+      )
+      .eq("owner_id", user.id)
+      .eq("klassifikation", "geschaeftlich")
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (bErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },
@@ -295,11 +312,15 @@ export async function POST(request: Request) {
   const buchungen = (buchungenData ?? []) as BuchungFuerEngine[];
 
   // Belege laden.
-  const { data: belegeData, error: belErr } = await supabase
-    .from("beleg")
-    .select("id, betrag, beleg_datum, titel, korrespondent, ocr_text")
-    .eq("owner_id", user.id)
-    .limit(10000);
+  // Vollständig paginiert — id als stabile Sortierung für range-Pagination.
+  const { data: belegeData, error: belErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("beleg")
+      .select("id, betrag, beleg_datum, titel, korrespondent, ocr_text")
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (belErr) {
     return NextResponse.json(
       { error: "Belege konnten nicht geladen werden." },
@@ -309,11 +330,15 @@ export async function POST(request: Request) {
   const belege = (belegeData ?? []) as BelegFuerScore[];
 
   // Bestehende Zuordnungen (gesperrte schützen, offene ggf. neu rechnen).
-  const { data: bbData, error: bbErr } = await supabase
-    .from("beleg_buchung")
-    .select("id, beleg_id, buchung_id, status, gesperrt")
-    .eq("owner_id", user.id)
-    .limit(20000);
+  // Vollständig paginiert — id als stabile Sortierung für range-Pagination.
+  const { data: bbData, error: bbErr } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("beleg_buchung")
+      .select("id, beleg_id, buchung_id, status, gesperrt")
+      .eq("owner_id", user.id)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (bbErr) {
     return NextResponse.json(
       { error: "Zuordnungen konnten nicht geladen werden." },

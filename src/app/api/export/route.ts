@@ -53,6 +53,7 @@ import {
   type ElsterKennzahlZeile,
 } from "@/lib/export/csv";
 import type { Buchung, Kategorie } from "@/lib/types";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 
 export const runtime = "nodejs";
 
@@ -74,7 +75,7 @@ const SELECT_PROFIL =
   "firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, ust_status, ust_va_rhythmus, wirtschaftsjahr_beginn";
 
 const SELECT_BUCHUNG =
-  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil";
+  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
 
 const SELECT_KATEGORIE =
   "id, bezeichnung, typ, ust_satz, euer_zeile, elster_kennzahl, aktiv, gueltig_ab";
@@ -140,14 +141,17 @@ async function ladeBuchungenJahr(
   von: string,
   bis: string,
 ): Promise<Buchung[]> {
-  const { data, error } = await supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", ownerId)
-    .gte("buchung_datum", von)
-    .lte("buchung_datum", bis)
-    .order("buchung_datum", { ascending: true })
-    .limit(100000);
+  const { data, error } = await ladeAlle((von2, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(SELECT_BUCHUNG)
+      .eq("owner_id", ownerId)
+      .gte("buchung_datum", von)
+      .lte("buchung_datum", bis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von2, bisIdx),
+  );
   if (error) throw new Error("Buchungen konnten nicht geladen werden.");
   return (data ?? []) as Buchung[];
 }
@@ -156,11 +160,14 @@ async function ladeKategorien(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
 ): Promise<Kategorie[]> {
-  const { data, error } = await supabase
-    .from("kategorie")
-    .select(SELECT_KATEGORIE)
-    .eq("owner_id", ownerId)
-    .limit(5000);
+  const { data, error } = await ladeAlle<Kategorie>((von, bisIdx) =>
+    supabase
+      .from("kategorie")
+      .select(SELECT_KATEGORIE)
+      .eq("owner_id", ownerId)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   if (error) throw new Error("Kategorien konnten nicht geladen werden.");
   return (data ?? []) as Kategorie[];
 }
@@ -169,11 +176,15 @@ async function ladeBelegteIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
 ): Promise<Set<string>> {
-  const { data } = await supabase
-    .from("beleg_buchung")
-    .select("buchung_id")
-    .eq("owner_id", ownerId)
-    .limit(100000);
+  const { data } = await ladeAlle<{ buchung_id: string }>((von, bisIdx) =>
+    supabase
+      .from("beleg_buchung")
+      .select("buchung_id")
+      .eq("owner_id", ownerId)
+      .order("buchung_id", { ascending: true })
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   const s = new Set<string>();
   for (const r of (data ?? []) as Array<{ buchung_id: string }>) {
     s.add(r.buchung_id);
@@ -343,11 +354,14 @@ async function erzeugeBuchungenCsv(
   );
 
   // Beleg-Referenzen je Buchung (Beleg-Titel/Paperless-ID).
-  const { data: bbData } = await supabase
-    .from("beleg_buchung")
-    .select("buchung_id, beleg:beleg_id(titel, paperless_id)")
-    .eq("owner_id", ownerId)
-    .limit(100000);
+  const { data: bbData } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("beleg_buchung")
+      .select("buchung_id, beleg:beleg_id(titel, paperless_id)")
+      .eq("owner_id", ownerId)
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
   const belegRef = new Map<string, string[]>();
   type BelegEmbed = { titel: string | null; paperless_id: number };
   const bbRows = (bbData ?? []) as unknown as Array<{

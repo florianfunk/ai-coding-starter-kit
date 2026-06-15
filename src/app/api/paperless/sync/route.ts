@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { decrypt } from "@/lib/crypto";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import { paperlessSyncFilterSchema } from "@/lib/validation/paperless";
 import {
   PaperlessError,
@@ -273,12 +274,15 @@ export async function POST(request: Request) {
       !filter.korrespondent &&
       !filter.speicherpfad;
     if (ohneFilter && gesehenePaperlessIds.size > 0) {
-      const { data: alle } = await supabase
-        .from("beleg")
-        .select("id, paperless_id, status")
-        .eq("owner_id", user.id)
-        .neq("status", "quelle_entfernt")
-        .limit(50000);
+      const { data: alle } = await ladeAlle((von, bisIdx) =>
+        supabase
+          .from("beleg")
+          .select("id, paperless_id, status")
+          .eq("owner_id", user.id)
+          .neq("status", "quelle_entfernt")
+          .order("id", { ascending: true })
+          .range(von, bisIdx),
+      );
 
       const verwaiste = (
         (alle as

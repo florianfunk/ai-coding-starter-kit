@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { klassifizierungInputSchema } from "@/lib/validation/klassifizierung";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import {
   klassifiziereBuchung,
   ManuellBestaetigtError,
@@ -210,20 +211,26 @@ export async function POST(request: Request) {
     };
   }
 
-  // Zu klassifizierende Buchungen.
-  let buchungQuery = supabase
-    .from("buchung")
-    .select(SELECT_BUCHUNG)
-    .eq("owner_id", user.id)
-    .order("buchung_datum", { ascending: true })
-    .limit(5000);
-  if (nur_offen) {
-    buchungQuery = buchungQuery.eq("status", "offen");
-  } else {
-    // Re-Klassifizierung: alles AUSSER manuell bestätigt.
-    buchungQuery = buchungQuery.neq("status", "manuell_bestaetigt");
-  }
-  const { data: buchungenData, error: buchungenErr } = await buchungQuery;
+  // Zu klassifizierende Buchungen — vollständig paginiert laden, sonst kappt
+  // PostgREST bei 1000 Zeilen und nur die ältesten würden klassifiziert.
+  const { data: buchungenData, error: buchungenErr } = await ladeAlle(
+    (von, bisIdx) => {
+      let q = supabase
+        .from("buchung")
+        .select(SELECT_BUCHUNG)
+        .eq("owner_id", user.id)
+        .order("buchung_datum", { ascending: true })
+        .order("id", { ascending: true })
+        .range(von, bisIdx);
+      if (nur_offen) {
+        q = q.eq("status", "offen");
+      } else {
+        // Re-Klassifizierung: alles AUSSER manuell bestätigt.
+        q = q.neq("status", "manuell_bestaetigt");
+      }
+      return q;
+    },
+  );
   if (buchungenErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

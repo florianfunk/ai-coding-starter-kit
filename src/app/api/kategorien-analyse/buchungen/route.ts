@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { analyseFilterSchema } from "@/lib/validation/kategorien-analyse";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type { Buchung, KategorieTyp } from "@/lib/types";
 
 export async function GET(request: Request) {
@@ -35,31 +36,33 @@ export async function GET(request: Request) {
   const filter = parsed.data;
 
   const supabase = await createClient();
-  let q = supabase
-    .from("buchung")
-    .select(
-      "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil",
-    )
-    .eq("owner_id", user.id)
-    .order("buchung_datum", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(2000);
-
   // Datumsbereich: explizite `von`/`bis` haben Vorrang vor `jahr`.
   const von = filter.von ?? (filter.jahr ? `${filter.jahr}-01-01` : null);
   const bis = filter.bis ?? (filter.jahr ? `${filter.jahr}-12-31` : null);
-  if (von) q = q.gte("buchung_datum", von);
-  if (bis) q = q.lte("buchung_datum", bis);
-  if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
-  if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
 
-  if (filter.kategorie_id === "ohne") {
-    q = q.is("kategorie_id", null);
-  } else if (filter.kategorie_id) {
-    q = q.eq("kategorie_id", filter.kategorie_id);
-  }
-
-  const { data, error } = await q;
+  // Vollständig paginiert laden — PostgREST kappt sonst bei 1000 Zeilen, was
+  // den Drilldown unvollständig machen würde. Stabile Sortierung via id.
+  const { data, error } = await ladeAlle((vonIdx, bisIdx) => {
+    let q = supabase
+      .from("buchung")
+      .select(
+        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil",
+      )
+      .eq("owner_id", user.id)
+      .order("buchung_datum", { ascending: false })
+      .order("id", { ascending: false })
+      .range(vonIdx, bisIdx);
+    if (von) q = q.gte("buchung_datum", von);
+    if (bis) q = q.lte("buchung_datum", bis);
+    if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
+    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
+    if (filter.kategorie_id === "ohne") {
+      q = q.is("kategorie_id", null);
+    } else if (filter.kategorie_id) {
+      q = q.eq("kategorie_id", filter.kategorie_id);
+    }
+    return q;
+  });
   if (error) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },

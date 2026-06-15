@@ -200,26 +200,9 @@ export async function ladeDashboardAggregat(
   );
   const rohWj = wjBuchungen as Roh[];
 
-  // belegt-Flag nur für die WJ-geschäftlichen Buchungen ermitteln.
-  const wjGeschIds = rohWj
-    .filter((b) => b.klassifikation === "geschaeftlich")
-    .map((b) => b.id);
-  let wjBelegt = new Set<string>();
-  if (wjGeschIds.length > 0) {
-    const { data: bb } = await ladeAlle<{ buchung_id: string }>((von, bis) =>
-      supabase
-        .from("beleg_buchung")
-        .select("buchung_id")
-        .eq("owner_id", ownerId)
-        .in("buchung_id", wjGeschIds)
-        .order("buchung_id", { ascending: true })
-        .range(von, bis),
-    );
-    wjBelegt = new Set(
-      (bb as Array<{ buchung_id: string }>).map((r) => r.buchung_id),
-    );
-  }
-
+  // Hinweis: Das belegt-Flag wird von berechneJahresKennzahlen nicht mehr
+  // benötigt (Vorsteuer-Schätzung läuft seit Phase 1 ohne Belegabgleich, wie
+  // im USt-VA-Modul). Daher kein zusätzlicher beleg_buchung-Load hier.
   const dashboardBuchungen: DashboardBuchung[] = rohWj.map((b) => ({
     betrag: typeof b.betrag === "number" ? b.betrag : Number(b.betrag),
     buchung_datum: b.buchung_datum,
@@ -231,7 +214,7 @@ export async function ladeDashboardAggregat(
         : typeof b.ust_satz === "number"
           ? b.ust_satz
           : Number(b.ust_satz),
-    belegt: wjBelegt.has(b.id),
+    belegt: false,
   }));
 
   const jahr = berechneJahresKennzahlen(dashboardBuchungen, heute, wjBeginn);

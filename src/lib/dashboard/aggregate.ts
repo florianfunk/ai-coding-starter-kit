@@ -131,7 +131,8 @@ export interface JahresKennzahlen {
   vorlaeufiger_gewinn: number;
   /**
    * GROBE voraussichtliche USt-Zahllast: Umsatzsteuer auf Einnahmen abzgl.
-   * Vorsteuer auf belegte Ausgaben, je Buchungs-USt-Satz. Negativ = Erstattung.
+   * Vorsteuer auf alle geschäftlichen Ausgaben mit USt-Satz (ohne Belegabgleich,
+   * Phase 1 — wie das USt-VA-Modul). Negativ = Erstattung.
    */
   voraussichtliche_ust_zahllast: number;
   /** Anzahl einbezogener (geschäftlicher) Buchungen. */
@@ -150,7 +151,9 @@ export interface JahresKennzahlen {
  * irreführenden Zahlen entstehen.
  *
  * USt-Schätzung: ein USt-Satz wird nur berücksichtigt, wenn er an der
- * Buchung hinterlegt ist (0/7/19). Vorsteuer nur bei belegten Ausgaben.
+ * Buchung hinterlegt ist (0/7/19). Vorsteuer wird auf alle geschäftlichen
+ * Ausgaben mit USt-Satz angesetzt (Phase 1, ohne Belegabgleich — konsistent
+ * zum USt-VA-Modul).
  */
 export function berechneJahresKennzahlen(
   buchungen: readonly DashboardBuchung[],
@@ -184,8 +187,11 @@ export function berechneJahresKennzahlen(
     } else if (b.betrag < 0) {
       const abs = Math.abs(b.betrag);
       ausgaben += abs;
-      // Vorsteuer nur, wenn die Ausgabe belegt ist (Architektur/USt-Regel).
-      if (b.belegt && satz && satz > 0) {
+      // Vorsteuer auf ALLE geschäftlichen Ausgaben mit USt-Satz — kein
+      // Belegabgleich (Phase 1, konsistent zum USt-VA-Modul, das die volle
+      // Vorsteuer in Kz 66 ansetzt). Sonst zeigte das Dashboard ohne gematchte
+      // Belege fälschlich die volle Ausgangssteuer als Zahllast.
+      if (satz && satz > 0) {
         vorsteuer += (abs * satz) / (100 + satz);
       }
     }

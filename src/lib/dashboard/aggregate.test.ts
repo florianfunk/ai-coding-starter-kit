@@ -127,7 +127,7 @@ describe("berechneJahresKennzahlen", () => {
     expect(r.zeitraum).toEqual({ von: "2026-01-01", bis: "2026-12-31" });
   });
 
-  it("schätzt voraussichtliche USt-Zahllast (USt auf Einnahmen − Vorsteuer belegter Ausgaben)", () => {
+  it("schätzt voraussichtliche USt-Zahllast (USt auf Einnahmen − Vorsteuer aller Ausgaben, ohne Belegabgleich)", () => {
     const buchungen: DashboardBuchung[] = [
       // 1190 brutto @19% → enthaltene USt = 190
       bu({ betrag: 1190, buchung_datum: "2026-03-01", ust_satz: 19 }),
@@ -138,7 +138,7 @@ describe("berechneJahresKennzahlen", () => {
         ust_satz: 19,
         belegt: true,
       }),
-      // unbelegte Ausgabe → keine Vorsteuer
+      // unbelegte Ausgabe → Vorsteuer wird trotzdem angesetzt (= 19)
       bu({
         betrag: -119,
         buchung_datum: "2026-03-06",
@@ -147,7 +147,8 @@ describe("berechneJahresKennzahlen", () => {
       }),
     ];
     const r = berechneJahresKennzahlen(buchungen, "2026-05-15", 1);
-    expect(r.voraussichtliche_ust_zahllast).toBe(171);
+    // 190 − 19 (belegt) − 19 (unbelegt) = 152
+    expect(r.voraussichtliche_ust_zahllast).toBe(152);
   });
 
   it("liefert für leere Daten Nullsummen mit korrektem Zeitraum", () => {

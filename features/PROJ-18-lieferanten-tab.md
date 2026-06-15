@@ -136,6 +136,7 @@ Keine neuen.
 - 19 Unit-Tests in `src/lib/finanzen/lieferanten-erkennung.test.ts` decken Aggregation ab: Gruppierung, dominante Klassifikation (80%-Schwelle), dominante Kategorie mit Anteil, Abo-Ausschluss via `erkenneCluster()`, Jahresumsatz-Hochrechnung
 - Schwelle `MIN_LIEFERANT_BUCHUNGEN = 3` als Konstante in `lieferanten-erkennung.ts`
 - Spec-Erkenntnis während der Implementierung: `BuchungStatus` heißt `auto_verbucht` (nicht wie in einer früheren Spec-Variante `klassifiziert_auto`) — Tests-Fixtures entsprechend angepasst
+- Nachbesserung (2026-06-15): Neutrale Buchungen (Geldtransit/Umbuchung zwischen Konten, `typ = "neutral"`) werden für **Richtung** (Header-Farbe) und **dominante Kategorie** (Badge) ausgeschlossen — sie verzerrten sonst die Empfänger-Anzeige (z.B. PayPal-Header „Privat/ausgabe", während sichtbare Zeilen Geldtransit waren). `LieferantenBuchung` um optionales `kategorie_typ` erweitert; Fallback auf die volle Gruppe, wenn ein Empfänger ausschließlich neutral ist. +2 Tests (jetzt 21)
 
 ## Test Plan
 - API:

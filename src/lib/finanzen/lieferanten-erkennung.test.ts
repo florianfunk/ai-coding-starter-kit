@@ -2,7 +2,7 @@
 // wiederkehrend-erkennung.test.ts: kein Supabase, deterministisch.
 
 import { describe, it, expect } from "vitest";
-import type { Klassifikation } from "@/lib/types";
+import type { KategorieTyp, Klassifikation } from "@/lib/types";
 import {
   bestimmeDominanteKategorie,
   bestimmeDominanteKlassifikation,
@@ -138,6 +138,7 @@ function buFull(
   betrag: number,
   klassifikation: Klassifikation | null = null,
   kategorie_id: string | null = null,
+  kategorie_typ: KategorieTyp | null = null,
 ): LieferantenBuchung {
   return {
     id,
@@ -147,6 +148,7 @@ function buFull(
     betrag,
     klassifikation,
     kategorie_id,
+    kategorie_typ,
     konto_id: "k1",
     status: "auto_verbucht",
   };
@@ -223,6 +225,42 @@ describe("erkenneLieferanten", () => {
     expect(items[0].gesamt_summe).toBe(150);
     expect(items[0].jahresumsatz).toBeGreaterThan(150);
     expect(items[0].jahresumsatz).toBeLessThan(1100);
+  });
+
+  it("neutrale Geldtransit-Buchungen zählen NICHT für Richtung & dominante Kategorie", () => {
+    // PayPal-Fall: viele neutrale Umbuchungen (Geldtransit, hier Zuflüsse),
+    // dazu echte private Ausgaben. Richtung und Badge sollen nur die
+    // steuerlich relevanten (nicht-neutralen) Buchungen beschreiben.
+    const buchungen = [
+      buFull("1", "paypal", "PayPal", "2026-01-03", 100, "neutral", "kat-gt", "neutral"),
+      buFull("2", "paypal", "PayPal", "2026-01-10", 100, "neutral", "kat-gt", "neutral"),
+      buFull("3", "paypal", "PayPal", "2026-01-17", 100, "neutral", "kat-gt", "neutral"),
+      buFull("4", "paypal", "PayPal", "2026-02-01", -20, "privat", "kat-priv", "privat"),
+      buFull("5", "paypal", "PayPal", "2026-03-01", -20, "privat", "kat-priv", "privat"),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items.length).toBe(1);
+    // Ohne Ausschluss wären 3 Zuflüsse die Mehrheit → "einnahme".
+    // Mit Ausschluss bleiben nur die zwei privaten Abflüsse → "ausgabe".
+    expect(items[0].richtung).toBe("ausgabe");
+    // Geldtransit (3×) wäre häufigste Kategorie; ausgeschlossen gewinnt
+    // die private Kategorie (2× von 2 relevanten → Anteil 1).
+    expect(items[0].dominante_kategorie?.id).toBe("kat-priv");
+    expect(items[0].dominante_kategorie?.anteil).toBe(1);
+  });
+
+  it("rein neutraler Empfänger → Fallback auf volle Gruppe", () => {
+    // Empfänger mit ausschließlich Geldtransit: kein steuerrelevanter Rest,
+    // daher Fallback auf die volle Gruppe statt leerer Signale.
+    const buchungen = [
+      buFull("1", "umbuchung", "Umbuchung", "2026-01-03", 100, "neutral", "kat-gt", "neutral"),
+      buFull("2", "umbuchung", "Umbuchung", "2026-01-20", 100, "neutral", "kat-gt", "neutral"),
+      buFull("3", "umbuchung", "Umbuchung", "2026-02-15", 100, "neutral", "kat-gt", "neutral"),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items.length).toBe(1);
+    expect(items[0].richtung).toBe("einnahme");
+    expect(items[0].dominante_kategorie?.id).toBe("kat-gt");
   });
 
   it("Jahresumsatz wird NICHT unter Gesamtsumme gekappt", () => {

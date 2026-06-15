@@ -84,6 +84,22 @@ const KLASSIFIKATION_ICON = {
   unklar: CircleHelp,
 } as const;
 
+/**
+ * Neutrale Buchungen (Geldtransit/Umbuchung) ans Ende sortieren, innerhalb
+ * jeder Gruppe chronologisch. So führen im Drilldown die steuerlich
+ * relevanten Buchungen — die Durchläufer landen sichtbar abgesetzt darunter.
+ */
+function neutralAnsEnde(
+  bs: LieferantBuchungAnzeige[],
+): LieferantBuchungAnzeige[] {
+  return [...bs].sort((a, b) => {
+    const an = a.kategorie_typ === "neutral" ? 1 : 0;
+    const bn = b.kategorie_typ === "neutral" ? 1 : 0;
+    if (an !== bn) return an - bn;
+    return a.buchung_datum.localeCompare(b.buchung_datum);
+  });
+}
+
 export function LieferantenListe({
   daten,
   onMutiert,

@@ -174,6 +174,9 @@ export async function GET(request: Request) {
     betrag: Number(b.betrag) || 0,
     klassifikation: b.klassifikation,
     kategorie_id: b.kategorie_id,
+    kategorie_typ: b.kategorie_id
+      ? (katMap.get(b.kategorie_id)?.typ ?? null)
+      : null,
     konto_id: b.konto_id,
     status: b.status,
   }));

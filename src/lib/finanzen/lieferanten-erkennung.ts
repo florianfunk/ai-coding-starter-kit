@@ -22,7 +22,7 @@ import {
   type Richtung,
 } from "./wiederkehrend-erkennung";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
-import type { BuchungStatus, Klassifikation } from "@/lib/types";
+import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 export const MIN_LIEFERANT_BUCHUNGEN = 3;
 /** Anteilsschwelle: ≥ 80% einer Klassifikation → diese ist dominant. */
@@ -39,6 +39,13 @@ export interface LieferantenBuchung {
   betrag: number;
   klassifikation: Klassifikation | null;
   kategorie_id: string | null;
+  /**
+   * Typ der zugeordneten Kategorie. Optional/abwärtskompatibel: fehlt der
+   * Wert, gilt die Buchung als steuerlich relevant (nicht neutral). Wird
+   * gebraucht, um Geldtransit/neutrale Durchläufer aus Richtung & dominanter
+   * Kategorie auszuschließen.
+   */
+  kategorie_typ?: KategorieTyp | null;
   konto_id: string;
   status: BuchungStatus;
 }
@@ -178,15 +185,22 @@ export function erkenneLieferanten(
     const skalierung = Math.min(365 / spanTage, 12);
     const jahresumsatz = Math.round(gesamtSumme * skalierung * 100) / 100;
 
-    const positive = gruppe.filter((b) => Number(b.betrag) > 0).length;
+    // Richtung & dominante Kategorie nur aus steuerlich relevanten Buchungen
+    // ableiten — neutrale Geldtransit-Durchläufer (Umbuchung zwischen Konten)
+    // sollen Header-Farbe und Kategorie-Badge nicht verzerren. Fallback auf
+    // die volle Gruppe, wenn der Empfänger AUSSCHLIESSLICH neutral ist.
+    const relevant = gruppe.filter((b) => b.kategorie_typ !== "neutral");
+    const signalBasis = relevant.length > 0 ? relevant : gruppe;
+
+    const positive = signalBasis.filter((b) => Number(b.betrag) > 0).length;
     const richtung: Richtung =
-      positive > anzahl / 2 ? "einnahme" : "ausgabe";
+      positive > signalBasis.length / 2 ? "einnahme" : "ausgabe";
 
     const dominanteKlassifikation = bestimmeDominanteKlassifikation(
       gruppe.map((b) => b.klassifikation),
     );
     const dominanteKategorie = bestimmeDominanteKategorie(
-      gruppe.map((b) => b.kategorie_id),
+      signalBasis.map((b) => b.kategorie_id),
     );
 
     const anzeigeEmpfaenger =

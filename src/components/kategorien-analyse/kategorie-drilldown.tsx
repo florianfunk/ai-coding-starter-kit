@@ -6,7 +6,16 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, CheckCheck, Info } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle2,
+  CheckCheck,
+  Info,
+  Search,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+} from "lucide-react";
 
 import {
   Sheet,
@@ -18,6 +27,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
 import {
@@ -55,6 +73,24 @@ function deDate(iso: string): string {
   });
 }
 
+type SortKey = "datum" | "empfaenger" | "betrag" | "konfidenz";
+type SortDir = "asc" | "desc";
+type StatusFilter = "alle" | Buchung["status"];
+
+const STATUS_FILTER_LABEL: Record<StatusFilter, string> = {
+  alle: "Alle Status",
+  offen: "Offen",
+  auto_verbucht: "Auto",
+  zur_pruefung: "Prüfung",
+  manuell_bestaetigt: "Bestätigt",
+};
+
+// Eine Zeile der gerenderten Liste: entweder eine Buchung oder – bei
+// Gruppierung nach Empfänger – eine Zwischensummen-Zeile.
+type Zeile =
+  | { kind: "buchung"; b: Buchung }
+  | { kind: "summe"; key: string; label: string; anzahl: number; summe: number };
+
 export function KategorieDrilldown({
   kategorie,
   von,
@@ -84,13 +120,118 @@ export function KategorieDrilldown({
   const [bulkBusy, setBulkBusy] = useState(false);
   // Detail-Sheet (Info-Button) — Buchung, deren Details gezeigt werden.
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Filter + Sortierung.
+  const [suche, setSuche] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
+  const [sortKey, setSortKey] = useState<SortKey>("datum");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const unbestaetigt = useMemo(
     () => buchungen.filter((b) => b.status !== "manuell_bestaetigt"),
     [buchungen],
   );
+
+  // Gefilterte + sortierte Buchungen (Basis der Anzeige).
+  const sichtbareBuchungen = useMemo(() => {
+    const q = suche.trim().toLowerCase();
+    let liste = buchungen.filter((b) => {
+      if (statusFilter !== "alle" && b.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        (b.empfaenger ?? "").toLowerCase().includes(q) ||
+        (b.verwendungszweck ?? "").toLowerCase().includes(q)
+      );
+    });
+    liste = liste.slice().sort((a, b) => {
+      let r = 0;
+      if (sortKey === "datum") r = a.buchung_datum.localeCompare(b.buchung_datum);
+      else if (sortKey === "empfaenger")
+        r = (a.empfaenger ?? "").localeCompare(b.empfaenger ?? "", "de");
+      else if (sortKey === "betrag") r = Number(a.betrag) - Number(b.betrag);
+      else r = (Number(a.konfidenz) || 0) - (Number(b.konfidenz) || 0);
+      return sortDir === "asc" ? r : -r;
+    });
+    return liste;
+  }, [buchungen, suche, statusFilter, sortKey, sortDir]);
+
+  // Bei Sortierung nach Empfänger: nach Empfänger gruppieren und je Gruppe eine
+  // Zwischensumme einschieben (Anzahl + Betragssumme).
+  const zeilen = useMemo<Zeile[]>(() => {
+    if (sortKey !== "empfaenger") {
+      return sichtbareBuchungen.map((b) => ({ kind: "buchung", b }) as Zeile);
+    }
+    const out: Zeile[] = [];
+    let i = 0;
+    while (i < sichtbareBuchungen.length) {
+      const key = (sichtbareBuchungen[i].empfaenger ?? "—").trim().toLowerCase();
+      const label = sichtbareBuchungen[i].empfaenger ?? "—";
+      let anzahl = 0;
+      let summe = 0;
+      while (
+        i < sichtbareBuchungen.length &&
+        (sichtbareBuchungen[i].empfaenger ?? "—").trim().toLowerCase() === key
+      ) {
+        const b = sichtbareBuchungen[i];
+        out.push({ kind: "buchung", b });
+        anzahl += 1;
+        summe += Number(b.betrag);
+        i += 1;
+      }
+      out.push({ kind: "summe", key, label, anzahl, summe });
+    }
+    return out;
+  }, [sichtbareBuchungen, sortKey]);
+
   const alleSichtbarGewaehlt =
-    buchungen.length > 0 && selected.size === buchungen.length;
+    sichtbareBuchungen.length > 0 &&
+    sichtbareBuchungen.every((b) => selected.has(b.id));
+
+  function sortiereNach(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // sinnvolle Default-Richtung je Spalte
+      setSortDir(key === "empfaenger" ? "asc" : "desc");
+    }
+  }
+
+  function SortKopf({
+    k,
+    align = "left",
+    className,
+    children,
+  }: {
+    k: SortKey;
+    align?: "left" | "right";
+    className?: string;
+    children: React.ReactNode;
+  }) {
+    const aktiv = sortKey === k;
+    return (
+      <TableHead className={className}>
+        <button
+          type="button"
+          onClick={() => sortiereNach(k)}
+          className={cn(
+            "flex w-full items-center gap-1 hover:text-foreground",
+            align === "right" ? "justify-end" : "justify-start",
+          )}
+        >
+          {children}
+          {aktiv ? (
+            sortDir === "asc" ? (
+              <ArrowUp className="h-3.5 w-3.5" />
+            ) : (
+              <ArrowDown className="h-3.5 w-3.5" />
+            )
+          ) : (
+            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+          )}
+        </button>
+      </TableHead>
+    );
+  }
 
   const ladeDaten = useCallback(() => {
     if (!kategorie) return;
@@ -189,11 +330,15 @@ export function KategorieDrilldown({
   }
 
   function toggleAlle() {
-    setSelected((s) =>
-      s.size === buchungen.length
-        ? new Set()
-        : new Set(buchungen.map((b) => b.id)),
-    );
+    setSelected((s) => {
+      const next = new Set(s);
+      const alleDa =
+        sichtbareBuchungen.length > 0 &&
+        sichtbareBuchungen.every((b) => s.has(b.id));
+      if (alleDa) for (const b of sichtbareBuchungen) next.delete(b.id);
+      else for (const b of sichtbareBuchungen) next.add(b.id);
+      return next;
+    });
   }
 
   /**
@@ -324,6 +469,52 @@ export function KategorieDrilldown({
           </div>
         )}
 
+        {offen && buchungen.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={suche}
+                onChange={(e) => setSuche(e.target.value)}
+                placeholder="Empfänger oder Zweck filtern…"
+                className="h-9 pl-8"
+              />
+            </div>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as StatusFilter)}
+            >
+              <SelectTrigger className="h-9 w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(STATUS_FILTER_LABEL) as StatusFilter[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {STATUS_FILTER_LABEL[s]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">
+              {sichtbareBuchungen.length === buchungen.length
+                ? `${buchungen.length} Buchungen`
+                : `${sichtbareBuchungen.length} von ${buchungen.length}`}
+            </span>
+            {(suche || statusFilter !== "alle") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSuche("");
+                  setStatusFilter("alle");
+                }}
+              >
+                Filter zurücksetzen
+              </Button>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 max-h-[80vh] overflow-y-auto">
           {isPending && buchungen.length === 0 ? (
             <p className="text-sm text-muted-foreground">Lade Buchungen…</p>
@@ -344,19 +535,62 @@ export function KategorieDrilldown({
                       aria-label="Alle auswählen"
                     />
                   </TableHead>
-                  <TableHead className="w-[100px]">Datum</TableHead>
-                  <TableHead>Empfänger</TableHead>
+                  <SortKopf k="datum" className="w-[100px]">
+                    Datum
+                  </SortKopf>
+                  <SortKopf k="empfaenger">Empfänger</SortKopf>
                   <TableHead>Zweck</TableHead>
-                  <TableHead className="text-right w-[110px]">Betrag</TableHead>
+                  <SortKopf k="betrag" align="right" className="w-[110px]">
+                    Betrag
+                  </SortKopf>
                   <TableHead className="text-right w-[70px]">USt</TableHead>
-                  <TableHead className="text-right w-[80px]">Konf.</TableHead>
+                  <SortKopf k="konfidenz" align="right" className="w-[80px]">
+                    Konf.
+                  </SortKopf>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[260px]">Kategorie ändern</TableHead>
                   <TableHead className="w-[150px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {buchungen.map((b) => (
+                {zeilen.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={10}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      Keine Treffer für den Filter.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {zeilen.map((z) => {
+                  if (z.kind === "summe") {
+                    return (
+                      <TableRow
+                        key={`summe-${z.key}`}
+                        className="border-t bg-muted/50 font-semibold hover:bg-muted/50"
+                      >
+                        <TableCell
+                          colSpan={4}
+                          className="text-xs uppercase tracking-wide"
+                        >
+                          Σ {z.label} · {z.anzahl} Buchung
+                          {z.anzahl === 1 ? "" : "en"}
+                        </TableCell>
+                        <TableCell
+                          className={cn(
+                            "text-right tabular-nums font-mono",
+                            z.summe < 0 ? "text-destructive" : "",
+                          )}
+                        >
+                          {eur(Math.round(z.summe * 100) / 100)}
+                        </TableCell>
+                        <TableCell colSpan={5} />
+                      </TableRow>
+                    );
+                  }
+                  const b = z.b;
+                  return (
                   <TableRow
                     key={b.id}
                     data-state={selected.has(b.id) ? "selected" : undefined}
@@ -444,7 +678,8 @@ export function KategorieDrilldown({
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}

@@ -50,6 +50,47 @@ const TYP_GRUPPEN_LABEL: Record<string, string> = {
   ohne: "Ohne Kategorie",
 };
 
+// Farbschema der Summenzeilen (Σ): jede Bereichsgruppe bekommt eine eigene
+// Farbe, damit man auf einen Blick erkennt, dass es Summen sind und zu welchem
+// Bereich sie gehören. Semantik: Einnahmen grün, Ausgaben rot, Privat amber
+// (persönlich), Neutral blau (durchlaufend), Ohne Kategorie magenta (Hinweis).
+const CLUSTER_STIL: Record<
+  string,
+  { bg: string; accent: string; text: string }
+> = {
+  einnahme: {
+    bg: "bg-tint-cyan/60 hover:bg-tint-cyan",
+    accent: "border-l-emerald-500",
+    text: "text-income-strong dark:text-income",
+  },
+  ausgabe: {
+    bg: "bg-rose-50/80 hover:bg-rose-50 dark:bg-rose-950/30 dark:hover:bg-rose-950/40",
+    accent: "border-l-rose-500",
+    text: "text-rose-700 dark:text-rose-300",
+  },
+  privat: {
+    bg: "bg-amber-50/80 hover:bg-amber-50 dark:bg-amber-950/30 dark:hover:bg-amber-950/40",
+    accent: "border-l-amber-500",
+    text: "text-amber-700 dark:text-amber-300",
+  },
+  neutral: {
+    bg: "bg-sky-50/80 hover:bg-sky-50 dark:bg-sky-950/30 dark:hover:bg-sky-950/40",
+    accent: "border-l-sky-500",
+    text: "text-sky-700 dark:text-sky-300",
+  },
+  ohne: {
+    bg: "bg-fuchsia-50/80 hover:bg-fuchsia-50 dark:bg-fuchsia-950/30 dark:hover:bg-fuchsia-950/40",
+    accent: "border-l-fuchsia-500",
+    text: "text-fuchsia-700 dark:text-fuchsia-300",
+  },
+};
+
+const CLUSTER_STIL_FALLBACK = {
+  bg: "bg-muted/40 hover:bg-muted/50",
+  accent: "border-l-muted-foreground/40",
+  text: "",
+};
+
 function eur(n: number): string {
   return new Intl.NumberFormat("de-DE", {
     style: "currency",
@@ -275,36 +316,18 @@ function renderGruppiert(
     const anzahl = kats.reduce((s, k) => s + k.anzahl, 0);
     const summeRaw = kats.reduce((s, k) => s + k.summe, 0);
     const summe = typ === "ausgabe" ? -Math.abs(summeRaw) : summeRaw;
-    const clusterBg =
-      typ === "einnahme"
-        ? "bg-tint-cyan/60 hover:bg-tint-cyan"
-        : typ === "ausgabe"
-          ? "bg-rose-50/80 hover:bg-rose-50 dark:bg-rose-950/30 dark:hover:bg-rose-950/40"
-          : "bg-muted/40 hover:bg-muted/50";
-    const clusterAccent =
-      typ === "einnahme"
-        ? "border-l-4 border-l-emerald-500"
-        : typ === "ausgabe"
-          ? "border-l-4 border-l-rose-500"
-          : "border-l-4 border-l-muted-foreground/40";
+    const stil = CLUSTER_STIL[typ] ?? CLUSTER_STIL_FALLBACK;
     rows.push(
       <TableRow
         key={`subtotal-${typ}`}
-        className={`border-t-2 font-semibold ${clusterBg} ${clusterAccent}`}
+        className={`border-t-2 border-l-4 font-semibold ${stil.bg} ${stil.accent}`}
       >
         <TableCell colSpan={3} className="text-xs uppercase tracking-wide">
           Σ {TYP_GRUPPEN_LABEL[typ] ?? typ}
         </TableCell>
         <TableCell className="text-right tabular-nums">{anzahl}</TableCell>
         <TableCell
-          className={
-            "text-right tabular-nums font-mono " +
-            (typ === "einnahme"
-              ? "text-income-strong dark:text-income"
-              : typ === "ausgabe"
-                ? "text-rose-700 dark:text-rose-300"
-                : "")
-          }
+          className={`text-right tabular-nums font-mono ${stil.text}`}
         >
           {eur(Math.round(summe * 100) / 100)}
         </TableCell>

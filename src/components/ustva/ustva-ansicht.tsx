@@ -84,6 +84,7 @@ export function UstvaAnsicht({
   const [laden, setLaden] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
   const [abschliessen, setAbschliessen] = useState(false);
+  const [wiedereroeffnen, setWiedereroeffnen] = useState(false);
   const [drillZeile, setDrillZeile] = useState<KennzahlZeileDTO | null>(null);
   const [drillOffen, setDrillOffen] = useState(false);
 
@@ -133,6 +134,30 @@ export function UstvaAnsicht({
       toast.error("Netzwerkfehler beim Abschluss.");
     } finally {
       setAbschliessen(false);
+    }
+  }
+
+  async function periodeWiedereroeffnen() {
+    setWiedereroeffnen(true);
+    try {
+      const res = await fetch("/api/steuer/ust", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jahr, periode }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error ?? "Wiedereröffnen fehlgeschlagen.");
+        return;
+      }
+      toast.success(
+        "Abschluss rückgängig gemacht. Die Periode ist wieder offen.",
+      );
+      await laden_();
+    } catch {
+      toast.error("Netzwerkfehler beim Wiedereröffnen.");
+    } finally {
+      setWiedereroeffnen(false);
     }
   }
 
@@ -409,19 +434,51 @@ export function UstvaAnsicht({
           </CardHeader>
           <CardContent>
             {istAbgeschlossen ? (
-              <Alert>
-                <AlertTitle>Bereits abgeschlossen</AlertTitle>
-                <AlertDescription>
-                  Diese Periode wurde geprüft und abgeschlossen
-                  {daten?.abgeschlossen_at
-                    ? ` (${new Date(
-                        daten.abgeschlossen_at,
-                      ).toLocaleString("de-DE")})`
-                    : ""}
-                  . Die angezeigten Zahlen stammen aus dem eingefrorenen
-                  Snapshot.
-                </AlertDescription>
-              </Alert>
+              <div className="space-y-4">
+                <Alert>
+                  <AlertTitle>Bereits abgeschlossen</AlertTitle>
+                  <AlertDescription>
+                    Diese Periode wurde geprüft und abgeschlossen
+                    {daten?.abgeschlossen_at
+                      ? ` (${new Date(
+                          daten.abgeschlossen_at,
+                        ).toLocaleString("de-DE")})`
+                      : ""}
+                    . Die angezeigten Zahlen stammen aus dem eingefrorenen
+                    Snapshot.
+                  </AlertDescription>
+                </Alert>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" disabled={wiedereroeffnen}>
+                      {wiedereroeffnen && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Abschluss rückgängig machen
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Abschluss von {daten?.periode_label} rückgängig machen?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Die Periode wird wieder geöffnet und der eingefrorene
+                        Snapshot verworfen. Anschließend gelten wieder die
+                        live aus den Buchungen berechneten Zahlen. Du kannst
+                        die Periode danach erneut abschließen. Buchungen bleiben
+                        unverändert.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                      <AlertDialogAction onClick={periodeWiedereroeffnen}>
+                        Rückgängig machen
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             ) : (
               <AlertDialog>
                 <AlertDialogTrigger asChild>

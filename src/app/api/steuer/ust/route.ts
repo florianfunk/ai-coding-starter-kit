@@ -12,6 +12,11 @@
 //        steuerperiode.status='abgeschlossen'. Bereits abgeschlossene
 //        Perioden werden NIE still überschrieben.
 //
+// DELETE {jahr,periode} -> Macht einen Abschluss rückgängig
+//        (Wiedereröffnen): status zurück auf 'offen', verwirft den
+//        eingefrorenen Snapshot. Nur erlaubt, wenn die Periode aktuell
+//        abgeschlossen ist. Buchungen bleiben unberührt.
+//
 // Auth Pflicht (getApiUser → 401). Owner-scoped zusätzlich zur RLS. Zod.
 // Rein deterministisch — keine KI in der Endsumme.
 
@@ -464,4 +469,86 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({ ok: true, jahr, periode, snapshot });
+}
+
+export async function DELETE(request: Request) {
+  const user = await getApiUser();
+  if (!user) {
+    return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Ungültiger Request-Body." },
+      { status: 400 },
+    );
+  }
+  const parsed = ustAbschlussSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: "Validierung fehlgeschlagen.",
+        details: parsed.error.flatten().fieldErrors,
+      },
+      { status: 422 },
+    );
+  }
+  const { jahr, periode } = parsed.data;
+  const supabase = await createClient();
+
+  // Periode muss existieren und abgeschlossen sein.
+  const { data: vorhanden } = await supabase
+    .from("steuerperiode")
+    .select("id, status")
+    .eq("owner_id", user.id)
+    .eq("art", "ust_va")
+    .eq("jahr", jahr)
+    .eq("periode", periode)
+    .limit(1)
+    .maybeSingle();
+  if (
+    !vorhanden ||
+    (vorhanden as { status: string }).status !== "abgeschlossen"
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Diese Periode ist nicht abgeschlossen — es gibt nichts rückgängig zu machen.",
+      },
+      { status: 409 },
+    );
+  }
+
+  // Abschluss zurücknehmen: Status auf 'offen', Snapshot verwerfen.
+  // .eq("status","abgeschlossen") schützt vor Race-Conditions.
+  const { error: updErr } = await supabase
+    .from("steuerperiode")
+    .update({
+      status: "offen",
+      snapshot: null,
+      abgeschlossen_at: null,
+    })
+    .eq("id", (vorhanden as { id: string }).id)
+    .eq("owner_id", user.id)
+    .eq("status", "abgeschlossen");
+  if (updErr) {
+    return NextResponse.json(
+      { error: "Abschluss konnte nicht rückgängig gemacht werden." },
+      { status: 500 },
+    );
+  }
+
+  await supabase.from("audit_eintrag").insert({
+    owner_id: user.id,
+    entitaet: "steuerperiode",
+    entitaet_id: (vorhanden as { id: string }).id,
+    aktion: "ust_va_wiedereroeffnet",
+    quelle: "nutzer",
+    details: { jahr, periode },
+  });
+
+  return NextResponse.json({ ok: true, jahr, periode, status: "offen" });
 }

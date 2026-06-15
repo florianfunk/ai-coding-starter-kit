@@ -107,11 +107,17 @@ Nachträgliche Buchungen → Berichtigungshinweis statt stillem Überschreiben; 
   Datum, ohne USt-Satz) sowie `buchung_details` für den Drill-down. POST
   friert Snapshot ein (status='abgeschlossen', unveränderlich, kein stilles
   Überschreiben), Audit-Eintrag. getApiUser→401, owner-scoped, Zod.
+  DELETE macht einen Abschluss rückgängig (Wiedereröffnen): status zurück
+  auf 'offen', verwirft Snapshot + abgeschlossen_at, nur wenn aktuell
+  abgeschlossen (sonst 409), Audit-Eintrag 'ust_va_wiedereroeffnet'.
+  Buchungen bleiben unberührt; danach gelten wieder die Live-Zahlen.
 - `src/app/(app)/ust-voranmeldung/page.tsx` + `src/components/ustva/*`
   (`ustva-ansicht.tsx`, `kennzahl-drilldown.tsx`, `typen.ts`) —
   Perioden-Auswahl + Jahresübersicht, Kennzahl-Tabelle mit ELSTER-Feldnr.,
   Drill-down-Sheet je Kennzahl (einbezogene Buchungen, Beleg-Status),
-  Warnpanel, Abschluss-Button mit Bestätigungsdialog. Lade-/Fehler-/
+  Warnpanel, Abschluss-Button mit Bestätigungsdialog. Bei abgeschlossener
+  Periode zusätzlich ein "Abschluss rückgängig machen"-Button (outline) mit
+  Bestätigungsdialog → DELETE-Aufruf. Lade-/Fehler-/
   Leerzustände, nur shadcn/ui, Deutsch.
 
 ### Designentscheidungen / Hinweise

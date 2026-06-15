@@ -1,9 +1,16 @@
 # PROJ-21: Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-15
 **Last Updated:** 2026-06-15
 **Priorität:** P2
+
+## Deployment
+- **Production:** https://steueragent.vercel.app — deployed 2026-06-15
+- Deployment-ID `dpl_GcCB1grgMWfx8XTWbUru5WYngTnA` (target production, via `vercel --prod`), readyState READY
+- **DB-Migration `0011_lieferant_notiz.sql` auf der Production-Supabase angewendet** (Projekt `xhrjtkcnbmknaribuhyo`, via MCP `apply_migration`). Security-Advisor nach DDL: kein RLS-Lint für `lieferant_notiz`.
+- Smoke-Test Prod: `/lieferanten-notizen` → `307 → /login`, `/api/finanzen/lieferanten/notizen` → `401` (Auth greift) ✓
+- Commit `e714743` (lokal auf `feat/steueragent-mvp`, **nicht** gepusht — Branch enthält separate PROJ-15-WIP)
 
 ## Implementierungsnotizen
 - **DB:** Migration `0011_lieferant_notiz.sql` — neue Tabelle `lieferant_notiz`

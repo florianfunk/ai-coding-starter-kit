@@ -1,8 +1,13 @@
 # PROJ-18: Lieferanten-Tab (wiederkehrende Empfänger ohne Abo)
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-05-21
-**Last Updated:** 2026-05-21
+**Last Updated:** 2026-06-15
+
+## Deployment
+- **Production:** https://steueragent.vercel.app — deployed 2026-06-15
+- Deployment-ID `dpl_9CqXMJDsQt5gWtmSYQszLFxQeWad` (target production, via `vercel --prod`)
+- Commit `15f846b` (neutral-Geldtransit-Nachbesserung) + `ae951a0` (Logik-Fix). Preview-Build (Git-Integration) und Production-Build grün; Prod liefert erwartete `307 → /login`
 
 ## Dependencies
 - Requires: PROJ-14 (Kategorien-Analyse) — Tab-Host, Filter, Bulk-Endpoints

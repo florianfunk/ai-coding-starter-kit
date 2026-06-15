@@ -105,8 +105,8 @@ KategorienAnalyseAnsicht (bestehend)
 1. Lade Buchungen im Lookback (≥ 365 Tage, wie Abo-Radar), Filter wie im Endpoint
 2. Gruppiere nach `empfaenger_normalisiert` (Fallback `normalisiereEmpfaenger`)
 3. Pro Gruppe mit `anzahl >= 3`:
-   - `erkenneCluster(buchungen)` aufrufen — wenn Cluster zurückkommt → Abo, **überspringen**
-   - sonst: Lieferant-Item bauen
+   - `erkenneCluster(buchungen)` aufrufen — wenn Cluster zurückkommt → `abo`-Feld setzen (Intervall, Intervall-Tage, Konfidenz); der Empfänger erscheint **zusätzlich** im Abo-Radar
+   - in jedem Fall: Lieferant-Item bauen (Abos werden seit 2026-06-15 **nicht mehr übersprungen**, nur markiert — siehe Implementierungsnotizen)
 4. `dominante_klassifikation`:
    - Wenn alle Buchungen `klassifikation === 'privat'` → `privat`
    - Wenn alle `klassifikation === 'geschaeftlich'` → `geschaeftlich`
@@ -143,11 +143,15 @@ Keine neuen.
 - Spec-Erkenntnis während der Implementierung: `BuchungStatus` heißt `auto_verbucht` (nicht wie in einer früheren Spec-Variante `klassifiziert_auto`) — Tests-Fixtures entsprechend angepasst
 - Nachbesserung (2026-06-15): Neutrale Buchungen (Geldtransit/Umbuchung zwischen Konten, `typ = "neutral"`) werden für **Richtung** (Header-Farbe) und **dominante Kategorie** (Badge) ausgeschlossen — sie verzerrten sonst die Empfänger-Anzeige (z.B. PayPal-Header „Privat/ausgabe", während sichtbare Zeilen Geldtransit waren). `LieferantenBuchung` um optionales `kategorie_typ` erweitert; Fallback auf die volle Gruppe, wenn ein Empfänger ausschließlich neutral ist. +2 Tests (jetzt 21)
 - Nachbesserung (2026-06-15, UI): Im Drilldown werden neutrale Zeilen via `neutralAnsEnde()` ans Ende sortiert (Sortierung nur beim Laden → Inline-Edits springen nicht) und dezent abgesetzt (gedämpfter Hintergrund, Betrag in `text-muted-foreground` statt Grün/Rot, Tooltip „durchlaufender Posten")
+- **Bugfix (2026-06-15): „Fehlende Lieferanten" — zwei Ursachen.** Der Inhaber meldete, dass monatlich gezahlte Empfänger (Scalable, NinjaOne) im Lieferanten-Tab fehlten.
+  - **Ursache 1 — Abo-Ausschluss (Design):** Empfänger mit stabilem Rhythmus + Betrag wurden via `erkenneCluster()` komplett aus den Lieferanten entfernt (sie lebten nur im Abo-Radar). **Fix:** Abos werden nicht mehr übersprungen, sondern via neuem `abo`-Feld (`{ intervall, intervall_tage, konfidenz } | null`) markiert und mit einem „Abo · <Intervall>"-Badge angezeigt. Der Netflix-Test wurde von „erscheint NICHT" auf „erscheint MIT Abo-Markierung" umgestellt; +1 Aldi-„ohne Abo"-Test (jetzt 22 Tests).
+  - **Ursache 2 — Normalisierungs-Fragmentierung (Bug):** `normalisiereEmpfaenger()` entfernte keine Städte/Filialnummern/Order-Tokens, sodass ein realer Empfänger in viele Schlüssel zerfiel (`ninjaone, oldsmar` vs `ninjaone, tampa`; `rewe markt muenchen` vs `rewe markt gruenwald`; 53 `amzn mktp de*<order>`-Schlüssel). Jeder Teil fiel unter `MIN_LIEFERANT_BUCHUNGEN = 3` und verschwand. **Fix:** `KONZERN_MARKER` in `src/lib/classifier/normalize.ts` zu `{ praefix, kanonisch }` erweitert (u. a. `amzn→amazon`, `dm-drogerie→dm`, `ninjaone`, `rewe`, `edeka`, `aldi`, `rossmann`, `mcdonalds`, `netto`, `audible`, `shopify`, `openai`, `allianz`, `signal iduna`, `tegut`, `dinzler`, `rackls`) + Wortgrenze auf Nicht-Wort-Zeichen erweitert (greift jetzt bei `ninjaone,`/`amzn `/`apple.com`, NICHT bei `amazonas reisen`). +19 Tests in `normalize.test.ts` inkl. Over-Merge-Schutz („Johannes Funk" ≠ „Johannes Wutz") und Idempotenz.
+  - **Backfill:** `scripts/renormalisiere-empfaenger.ts` rechnet `empfaenger_normalisiert` für ALLE bestehenden Buchungen neu (im Gegensatz zum NULL-only-Backfill). Dry-Run: 212 / 2163 Zeilen konsolidieren. Vom Inhaber lokal auszuführen (Service-Role-Key): `npx tsx scripts/renormalisiere-empfaenger.ts [--dry-run]`.
 
 ## Test Plan
 - API:
   - 5× Aldi-Buchungen mit unterschiedlichen Beträgen → erscheint als Lieferant
-  - 12× Netflix-Buchungen mit identischem Betrag im Monatsabstand → Abo, NICHT als Lieferant
+  - 12× Netflix-Buchungen mit identischem Betrag im Monatsabstand → erscheint als Lieferant MIT `abo`-Markierung (seit 2026-06-15; vorher: ausgeschlossen)
   - 2× MediaMarkt → unter Schwelle, NICHT als Lieferant
   - Mischbuchungen (3× privat Aldi, 2× geschäftlich MediaMarkt für denselben normalisierten Empfänger) → `dominante_klassifikation = 'unklar'`
 - UI (manuell):

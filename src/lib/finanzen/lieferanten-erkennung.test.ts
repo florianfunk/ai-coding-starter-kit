@@ -170,7 +170,11 @@ describe("erkenneLieferanten", () => {
     expect(items[0].richtung).toBe("ausgabe");
   });
 
-  it("Netflix monatlich gleicher Betrag → NICHT als Lieferant (ist Abo)", () => {
+  it("Netflix monatlich gleicher Betrag → Lieferant MIT Abo-Markierung", () => {
+    // PROJ-18 (2026-06-15): Abos werden nicht mehr aus dem Lieferanten-Tab
+    // ausgeschlossen, sondern als Abo markiert (sie erscheinen zusätzlich im
+    // Abo-Radar). So fehlen wiederkehrende Empfänger wie Scalable/NinjaOne
+    // nicht mehr in der Lieferanten-Liste.
     const buchungen = [
       buFull("1", "netflix", "NETFLIX", "2026-01-15", -12.99),
       buFull("2", "netflix", "NETFLIX", "2026-02-15", -12.99),
@@ -178,7 +182,22 @@ describe("erkenneLieferanten", () => {
       buFull("4", "netflix", "NETFLIX", "2026-04-15", -12.99),
     ];
     const items = erkenneLieferanten(buchungen);
-    expect(items.length).toBe(0);
+    expect(items.length).toBe(1);
+    expect(items[0].empfaenger_norm).toBe("netflix");
+    expect(items[0].abo).not.toBeNull();
+    expect(items[0].abo?.intervall).toBe("monatlich");
+  });
+
+  it("Aldi mit schwankenden Beträgen → Lieferant OHNE Abo-Markierung", () => {
+    const buchungen = [
+      buFull("1", "aldi", "ALDI SUED", "2026-01-03", -23.5),
+      buFull("2", "aldi", "ALDI SUED", "2026-01-19", -41.2),
+      buFull("3", "aldi", "ALDI Süd", "2026-02-04", -18.0),
+      buFull("4", "aldi", "ALDI", "2026-02-22", -67.4),
+      buFull("5", "aldi", "ALDI SÜD", "2026-03-09", -29.9),
+    ];
+    const items = erkenneLieferanten(buchungen);
+    expect(items[0].abo).toBeNull();
   });
 
   it("MediaMarkt mit 2 Buchungen → unter Schwelle, NICHT als Lieferant", () => {

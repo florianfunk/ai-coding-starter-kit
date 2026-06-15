@@ -314,31 +314,67 @@ function entferneLaendercodeSuffix(input: string): string {
  * nicht "american express" matcht. (Wortgrenze `\s|$` macht das eigentlich
  * unmoeglich, aber explizit ist besser.)
  */
-const KONZERN_MARKER = [
-  "american express",
-  "amazon",
-  "google",
-  "apple",
-  "microsoft",
-  "paypal",
+/**
+ * Marken-Marker: wenn der normalisierte String mit `praefix` (als ganzes Wort)
+ * beginnt, wird er auf `kanonisch` verdichtet — alles dahinter (Filiale, Stadt,
+ * Order-Token, Branchenklartext) fällt weg. `kanonisch` weicht nur dann von
+ * `praefix` ab, wenn eine Kartentext-Variante auf den ausgeschriebenen Namen
+ * gemappt werden soll (z. B. "amzn" → "amazon").
+ *
+ * Reihenfolge: spezifischere/längere Marker zuerst. Ein kürzerer Marker, der
+ * Präfix eines längeren ist, würde sonst zuerst greifen.
+ *
+ * Bewusst NUR eindeutige Marken-am-Wortanfang — KEINE Nachnamen oder
+ * mehrdeutigen Einzelwörter (sonst Over-Merge à la "Johannes Funk" /
+ * "Johannes Wutz"). Mehrdeutige Marken als Mehrwort-Marker ("signal iduna").
+ */
+const KONZERN_MARKER: ReadonlyArray<{ praefix: string; kanonisch: string }> = [
+  { praefix: "american express", kanonisch: "american express" },
+  { praefix: "amazon", kanonisch: "amazon" },
+  // Kartentext-Variante von Amazon Marketplace ("AMZN Mktp DE*<order> …").
+  { praefix: "amzn", kanonisch: "amazon" },
+  { praefix: "google", kanonisch: "google" },
+  { praefix: "apple", kanonisch: "apple" },
+  { praefix: "microsoft", kanonisch: "microsoft" },
+  { praefix: "paypal", kanonisch: "paypal" },
   // Markennamen, die als erstes Wort stehen und vom Rest des
   // Firmen-Klartexts (Branche / Adresse) gefolgt werden. Wenn der
   // normalisierte String mit einem dieser Marker beginnt, schneiden
   // wir alles dahinter ab.
-  "skandia",
-  "strato",
-  "klarna",
-  "enercity",
+  { praefix: "skandia", kanonisch: "skandia" },
+  { praefix: "strato", kanonisch: "strato" },
+  { praefix: "klarna", kanonisch: "klarna" },
+  { praefix: "enercity", kanonisch: "enercity" },
+  // PROJ-18 Fragmentierungs-Fix: wiederkehrende Empfänger, die durch
+  // Filialnummern/Städte/Order-Tokens in viele Schlüssel zerfielen.
+  { praefix: "ninjaone", kanonisch: "ninjaone" },
+  { praefix: "dm-drogerie", kanonisch: "dm" },
+  { praefix: "rewe", kanonisch: "rewe" },
+  { praefix: "edeka", kanonisch: "edeka" },
+  { praefix: "aldi", kanonisch: "aldi" },
+  { praefix: "rossmann", kanonisch: "rossmann" },
+  { praefix: "mcdonalds", kanonisch: "mcdonalds" },
+  { praefix: "netto", kanonisch: "netto" },
+  { praefix: "audible", kanonisch: "audible" },
+  { praefix: "shopify", kanonisch: "shopify" },
+  { praefix: "openai", kanonisch: "openai" },
+  { praefix: "allianz", kanonisch: "allianz" },
+  { praefix: "signal iduna", kanonisch: "signal iduna" },
+  { praefix: "tegut", kanonisch: "tegut" },
+  { praefix: "dinzler", kanonisch: "dinzler" },
+  { praefix: "rackls", kanonisch: "rackls" },
 ] as const;
 
 function verdichteKonzern(input: string): string {
-  for (const marker of KONZERN_MARKER) {
-    const literal = regexEscape(marker);
-    // Match: String beginnt mit dem Marker, danach Whitespace oder String-Ende.
-    // Wortgrenze schuetzt vor "amazonas reisen".
-    const muster = new RegExp(`^${literal}(\\s|$)`, "i");
+  for (const { praefix, kanonisch } of KONZERN_MARKER) {
+    const literal = regexEscape(praefix);
+    // Match: String beginnt mit dem Marker, danach ein Nicht-Wort-Zeichen
+    // (Whitespace, Komma, *, ., /, …) oder String-Ende. Damit greift die
+    // Verdichtung auch bei "ninjaone, oldsmar", "amzn mktp …" oder
+    // "apple.com/bill", aber NICHT bei "amazonas reisen" (Buchstabe folgt).
+    const muster = new RegExp(`^${literal}(?=[^\\p{L}\\p{N}]|$)`, "iu");
     if (muster.test(input)) {
-      return marker;
+      return kanonisch;
     }
   }
   return input;

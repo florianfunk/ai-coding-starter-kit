@@ -19,6 +19,7 @@ import {
   modusEmpfaenger,
   MIN_BUCHUNGEN,
   tageZwischen,
+  type Intervall,
   type Richtung,
 } from "./wiederkehrend-erkennung";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
@@ -142,6 +143,12 @@ export interface LieferantItem {
   richtung: Richtung;
   dominante_klassifikation: DominanteKlassifikation;
   dominante_kategorie: DominanteKategorie | null;
+  /**
+   * Abo-Markierung: gesetzt, wenn der Empfänger einen stabilen Rhythmus
+   * (Intervall + Betrag) bildet — derselbe Empfänger erscheint dann auch im
+   * Abo-Radar. `null`, wenn es ein unregelmäßiger Lieferant ist (z. B. Aldi).
+   */
+  abo: { intervall: Intervall; intervall_tage: number; konfidenz: number } | null;
   /** ISO-Datum der ersten / letzten Buchung. */
   erste: string;
   letzte: string;
@@ -168,10 +175,18 @@ export function erkenneLieferanten(
     // für die Span-Berechnung notwendig.
     gruppe.sort((a, b) => a.buchung_datum.localeCompare(b.buchung_datum));
 
-    // Abo-Ausschluss: wenn erkenneCluster() ein Cluster zurückgibt,
-    // ist es ein Abo (lebt im Abo-Radar) und gehört NICHT hierher.
+    // Abo-Markierung: wenn erkenneCluster() ein Cluster zurückgibt, ist es
+    // ein Abo (lebt zusätzlich im Abo-Radar). Es wird NICHT mehr aus den
+    // Lieferanten entfernt, sondern markiert — so fehlen wiederkehrende
+    // Empfänger (Scalable, NinjaOne, …) nicht mehr in der Lieferanten-Liste.
     const cluster = erkenneCluster(gruppe);
-    if (cluster) continue;
+    const abo: LieferantItem["abo"] = cluster
+      ? {
+          intervall: cluster.intervall,
+          intervall_tage: cluster.intervall_tage,
+          konfidenz: cluster.konfidenz,
+        }
+      : null;
 
     const anzahl = gruppe.length;
     const gesamtSumme = gruppe.reduce(
@@ -217,6 +232,7 @@ export function erkenneLieferanten(
       richtung,
       dominante_klassifikation: dominanteKlassifikation,
       dominante_kategorie: dominanteKategorie,
+      abo,
       erste,
       letzte,
       buchungen: gruppe,

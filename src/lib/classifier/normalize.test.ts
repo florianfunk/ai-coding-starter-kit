@@ -328,6 +328,81 @@ describe("Reale Daten aus dem Backfill (2026-05-20)", () => {
   });
 });
 
+describe("normalisiereEmpfaenger — Merchant-Marken-Verdichtung (PROJ-18 Fragmentierungs-Fix)", () => {
+  // Bug: Filialnamen/Städte/Order-Tokens hängen am Empfänger und zersplittern
+  // einen realen Lieferanten in viele Schlüssel ("ninjaone, oldsmar" vs
+  // "ninjaone, tampa", "rewe markt muenchen" vs "rewe markt gruenwald", ...).
+  // Fix: bekannte Marken am Wortanfang auf den Marken-Schlüssel verdichten.
+  it.each([
+    // NinjaOne: US-Stadt nach Komma leakt — beide Varianten → "ninjaone"
+    ["Ninjaone, LLC Oldsmar", "ninjaone"],
+    ["Ninjaone, LLC Tampa", "ninjaone"],
+    // Amazon Marketplace: Order-Token + Biller-Domain → "amazon"
+    ["amzn mktp de*n62pz4zv4 amzn.com/bill", "amazon"],
+    ["AMZN Mktp DE*NL20F0E74 amzn.com/bill", "amazon"],
+    // Retail-Ketten: Filiale/Stadt → Marke
+    ["REWE Markt Muenchen", "rewe"],
+    ["REWE Volkan Cakmakci Muenchen", "rewe"],
+    ["EDEKA Reichart Gruenwald", "edeka"],
+    ["EDEKA Niggel Muenchen", "edeka"],
+    ["dm-drogerie markt d543 münchen", "dm"],
+    ["dm-drogerie markt d0bg", "dm"],
+    ["ALDI SUED Ebersberg", "aldi"],
+    ["Rossmann Gruenwald", "rossmann"],
+    ["McDonalds 1006 Muenchen", "mcdonalds"],
+    ["Netto 8310 Muenchen Muenchen", "netto"],
+    // Biller-Tokens
+    ["Audible GmbH*DY7SI8UI5 audible.de/rg", "audible"],
+    // Mehrwort-Marke (sicherer als bloßes "signal")
+    ["Signal Iduna Krankenversicherung a. G", "signal iduna"],
+    ["Signal Iduna Gruppe", "signal iduna"],
+  ])("verdichtet %s → %s", (input, erwartet) => {
+    expect(normalisiereEmpfaenger(input)).toBe(erwartet);
+  });
+
+  it("führt fragmentierte NinjaOne-Varianten auf denselben Schlüssel zusammen", () => {
+    const a = normalisiereEmpfaenger("Ninjaone, LLC Oldsmar");
+    const b = normalisiereEmpfaenger("Ninjaone, LLC Tampa");
+    expect(a).toBe(b);
+  });
+
+  it("merged amzn-Variante mit ausgeschriebenem Amazon", () => {
+    expect(normalisiereEmpfaenger("amzn mktp de*n62pz4zv4 amzn.com/bill")).toBe(
+      normalisiereEmpfaenger("Amazon Payments Europe S.C.A."),
+    );
+  });
+
+  it("merged NICHT verschiedene Personen mit gleichem Vornamen (kein Over-Merge)", () => {
+    // "johannes" ist KEIN Marken-Marker → Nachname bleibt erhalten.
+    expect(normalisiereEmpfaenger("Johannes Funk")).toBe("johannes funk");
+    expect(normalisiereEmpfaenger("Johannes Wutz")).toBe("johannes wutz");
+    expect(normalisiereEmpfaenger("Johannes Funk")).not.toBe(
+      normalisiereEmpfaenger("Johannes Wutz"),
+    );
+  });
+
+  it("verdichtet 'amazonas reisen' NICHT zu amazon (Wortgrenze)", () => {
+    expect(normalisiereEmpfaenger("amazonas reisen")).toBe("amazonas reisen");
+  });
+
+  it("ist idempotent für die Marken-Verdichtungs-Cases", () => {
+    const cases = [
+      "Ninjaone, LLC Oldsmar",
+      "amzn mktp de*n62pz4zv4 amzn.com/bill",
+      "REWE Markt Muenchen",
+      "dm-drogerie markt d543 münchen",
+      "ALDI SUED Ebersberg",
+      "Audible GmbH*DY7SI8UI5 audible.de/rg",
+      "Signal Iduna Krankenversicherung a. G",
+    ];
+    for (const c of cases) {
+      const ein = normalisiereEmpfaenger(c);
+      const zwei = normalisiereEmpfaenger(ein);
+      expect(zwei).toBe(ein);
+    }
+  });
+});
+
 describe("normalisiereEmpfaenger — Idempotenz", () => {
   it("ist idempotent fuer reale Beispiele", () => {
     const beispiele = [

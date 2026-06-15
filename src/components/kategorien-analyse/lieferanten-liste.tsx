@@ -25,6 +25,7 @@ import {
   CircleHelp,
   Eye,
   Loader2,
+  Repeat,
   StickyNote,
   User,
 } from "lucide-react";
@@ -101,6 +102,14 @@ const KLASSIFIKATION_ICON = {
   geschaeftlich: Briefcase,
   privat: User,
   unklar: CircleHelp,
+} as const;
+
+/** Deutsche Labels für die Abo-Intervalle (PROJ-18 Abo-Markierung). */
+const ABO_INTERVALL_LABEL = {
+  woechentlich: "wöchentlich",
+  monatlich: "monatlich",
+  quartalsweise: "quartalsweise",
+  jaehrlich: "jährlich",
 } as const;
 
 /**
@@ -365,6 +374,16 @@ function LieferantItemRow({
                 ohne Kategorie
               </Badge>
             )}
+            {item.abo ? (
+              <Badge
+                variant="secondary"
+                className="gap-1 text-[10px]"
+                title={`Wiederkehrend (${ABO_INTERVALL_LABEL[item.abo.intervall]}) — erscheint auch im Abo-Radar`}
+              >
+                <Repeat className="h-3 w-3" />
+                Abo · {ABO_INTERVALL_LABEL[item.abo.intervall]}
+              </Badge>
+            ) : null}
             {notizAnzahl > 0 ? (
               <span
                 className="inline-flex items-center gap-1 rounded-full bg-tint-yellow px-1.5 py-0.5 text-[10px] font-medium text-highlight-strong"

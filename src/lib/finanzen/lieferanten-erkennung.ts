@@ -46,6 +46,8 @@ export interface LieferantenBuchung {
    * Kategorie auszuschließen.
    */
   kategorie_typ?: KategorieTyp | null;
+  /** Aktiver USt-Satz der Buchung (0/7/19) oder null. Für die UI-Anzeige. */
+  ust_satz?: number | null;
   konto_id: string;
   status: BuchungStatus;
 }

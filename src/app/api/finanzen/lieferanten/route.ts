@@ -28,6 +28,7 @@ export interface LieferantBuchungAnzeige {
   kategorie_id: string | null;
   kategorie_bezeichnung: string | null;
   kategorie_typ: KategorieTyp | null;
+  ust_satz: number | null;
   klassifikation: Klassifikation | null;
   status: BuchungStatus;
 }
@@ -59,6 +60,7 @@ interface BuchungRow {
   empfaenger_normalisiert: string | null;
   klassifikation: Klassifikation | null;
   kategorie_id: string | null;
+  ust_satz: number | null;
   status: BuchungStatus;
 }
 
@@ -105,7 +107,7 @@ export async function GET(request: Request) {
     let q = supabase
       .from("buchung")
       .select(
-        "id, konto_id, buchung_datum, betrag, empfaenger, empfaenger_normalisiert, klassifikation, kategorie_id, status",
+        "id, konto_id, buchung_datum, betrag, empfaenger, empfaenger_normalisiert, klassifikation, kategorie_id, ust_satz, status",
       )
       .eq("owner_id", user.id)
       .gte("buchung_datum", lookbackVon)
@@ -182,6 +184,7 @@ export async function GET(request: Request) {
     kategorie_typ: b.kategorie_id
       ? (katMap.get(b.kategorie_id)?.typ ?? null)
       : null,
+    ust_satz: b.ust_satz === null ? null : Number(b.ust_satz),
     konto_id: b.konto_id,
     status: b.status,
   }));
@@ -216,6 +219,7 @@ export async function GET(request: Request) {
           kategorie_id: b.kategorie_id,
           kategorie_bezeichnung: k?.bezeichnung ?? null,
           kategorie_typ: k?.typ ?? null,
+          ust_satz: b.ust_satz ?? null,
           klassifikation: b.klassifikation,
           status: b.status,
         };

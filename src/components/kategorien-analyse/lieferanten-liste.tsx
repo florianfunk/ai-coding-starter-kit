@@ -731,6 +731,7 @@ function LieferantDrilldown({
             <TableHead className="w-[100px]">Datum</TableHead>
             <TableHead className="w-[120px]">Konto</TableHead>
             <TableHead className="text-right w-[110px]">Betrag</TableHead>
+            <TableHead className="text-right w-[70px]">USt</TableHead>
             <TableHead>Kategorie</TableHead>
             <TableHead className="w-[40px]"></TableHead>
           </TableRow>
@@ -765,6 +766,28 @@ function LieferantDrilldown({
                 }
               >
                 {eur(b.betrag)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums font-mono text-sm">
+                {b.ust_satz === null || b.ust_satz === undefined ? (
+                  <span
+                    className={
+                      b.kategorie_typ === "einnahme" ||
+                      b.kategorie_typ === "ausgabe"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                    }
+                    title={
+                      b.kategorie_typ === "einnahme" ||
+                      b.kategorie_typ === "ausgabe"
+                        ? "Kein USt-Satz gesetzt — bitte prüfen"
+                        : "Kein USt-Satz (neutral/privat)"
+                    }
+                  >
+                    —
+                  </span>
+                ) : (
+                  `${b.ust_satz} %`
+                )}
               </TableCell>
               <TableCell>
                 <KategorieCombobox

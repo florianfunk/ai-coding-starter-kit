@@ -4,9 +4,9 @@
 // (Kategorie ändern, bestätigen). Lädt die Buchungen via /api/.../buchungen,
 // PATCH geht an /api/buchungen/[id].
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, CheckCheck } from "lucide-react";
+import { Loader2, CheckCircle2, CheckCheck, Info } from "lucide-react";
 
 import {
   Sheet,
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
+import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
 import {
   Table,
   TableBody,
@@ -81,6 +82,8 @@ export function KategorieDrilldown({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [zielKat, setZielKat] = useState<string>("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Detail-Sheet (Info-Button) — Buchung, deren Details gezeigt werden.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const unbestaetigt = useMemo(
     () => buchungen.filter((b) => b.status !== "manuell_bestaetigt"),
@@ -89,7 +92,7 @@ export function KategorieDrilldown({
   const alleSichtbarGewaehlt =
     buchungen.length > 0 && selected.size === buchungen.length;
 
-  useEffect(() => {
+  const ladeDaten = useCallback(() => {
     if (!kategorie) return;
     setLadeFehler(null);
     const params = new URLSearchParams();
@@ -118,6 +121,10 @@ export function KategorieDrilldown({
       }
     });
   }, [kategorie, von, bis, kontoId, nurSteuerrelevant]);
+
+  useEffect(() => {
+    ladeDaten();
+  }, [ladeDaten]);
 
   async function aendereKategorie(buchung: Buchung, neueKategorieId: string) {
     if (neueKategorieId === buchung.kategorie_id) return;
@@ -247,6 +254,7 @@ export function KategorieDrilldown({
   }
 
   return (
+    <>
     <Sheet open={offen} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-[1100px] sm:w-[90vw]">
         <SheetHeader>
@@ -340,10 +348,11 @@ export function KategorieDrilldown({
                   <TableHead>Empfänger</TableHead>
                   <TableHead>Zweck</TableHead>
                   <TableHead className="text-right w-[110px]">Betrag</TableHead>
+                  <TableHead className="text-right w-[70px]">USt</TableHead>
                   <TableHead className="text-right w-[80px]">Konf.</TableHead>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[260px]">Kategorie ändern</TableHead>
-                  <TableHead className="w-[110px]"></TableHead>
+                  <TableHead className="w-[150px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,6 +385,9 @@ export function KategorieDrilldown({
                     >
                       {eur(Number(b.betrag))}
                     </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {b.ust_satz === null ? "—" : `${b.ust_satz} %`}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {b.konfidenz === null
                         ? "—"
@@ -399,25 +411,37 @@ export function KategorieDrilldown({
                       />
                     </TableCell>
                     <TableCell>
-                      {b.status === "manuell_bestaetigt" ? (
-                        <Badge variant="secondary" className="gap-1 text-xs">
-                          <CheckCircle2 className="h-3 w-3" />
-                          bestätigt
-                        </Badge>
-                      ) : (
+                      <div className="flex items-center justify-end gap-1">
                         <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={savingId === b.id}
-                          onClick={() => bestaetige(b)}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => setDetailId(b.id)}
+                          aria-label="Details anzeigen"
+                          title="Details"
                         >
-                          {savingId === b.id ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            "Bestätigen"
-                          )}
+                          <Info className="h-4 w-4" />
                         </Button>
-                      )}
+                        {b.status === "manuell_bestaetigt" ? (
+                          <Badge variant="secondary" className="gap-1 text-xs">
+                            <CheckCircle2 className="h-3 w-3" />
+                            bestätigt
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={savingId === b.id}
+                            onClick={() => bestaetige(b)}
+                          >
+                            {savingId === b.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Bestätigen"
+                            )}
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -427,6 +451,17 @@ export function KategorieDrilldown({
         </div>
       </SheetContent>
     </Sheet>
+
+    <BuchungDetailSheet
+      buchungId={detailId}
+      kategorien={kategorien}
+      onClose={() => setDetailId(null)}
+      onMutiert={() => {
+        onMutiert();
+        ladeDaten();
+      }}
+    />
+    </>
   );
 }
 

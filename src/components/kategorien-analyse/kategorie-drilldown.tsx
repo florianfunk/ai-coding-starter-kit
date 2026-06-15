@@ -256,7 +256,7 @@ export function KategorieDrilldown({
   return (
     <>
     <Sheet open={offen} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-[1100px] sm:w-[90vw]">
+      <SheetContent className="w-full sm:max-w-[1500px] sm:w-[92vw]">
         <SheetHeader>
           <SheetTitle>{kategorie?.bezeichnung ?? ""}</SheetTitle>
           <SheetDescription>
@@ -371,10 +371,10 @@ export function KategorieDrilldown({
                     <TableCell className="tabular-nums">
                       {deDate(b.buchung_datum)}
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
+                    <TableCell className="max-w-[300px] truncate">
                       {b.empfaenger ?? "—"}
                     </TableCell>
-                    <TableCell className="max-w-[240px] truncate text-xs text-muted-foreground">
+                    <TableCell className="max-w-[440px] truncate text-xs text-muted-foreground">
                       {b.verwendungszweck ?? "—"}
                     </TableCell>
                     <TableCell

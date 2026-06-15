@@ -413,10 +413,12 @@ function LieferantDrilldown({
   onMutiert?: () => void;
 }) {
   // Lokaler Snapshot — optimistische Updates ohne Komplett-Reload.
-  const [buchungen, setBuchungen] = useState<LieferantBuchungAnzeige[]>(
-    item.buchungen,
+  // Neutrale Durchläufer ans Ende; Reihenfolge danach stabil, damit
+  // Inline-Edits keine Zeilen springen lassen.
+  const [buchungen, setBuchungen] = useState<LieferantBuchungAnzeige[]>(() =>
+    neutralAnsEnde(item.buchungen),
   );
-  useEffect(() => setBuchungen(item.buchungen), [item.buchungen]);
+  useEffect(() => setBuchungen(neutralAnsEnde(item.buchungen)), [item.buchungen]);
 
   const [bulkKat, setBulkKat] = useState<string>("__none__");
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -734,8 +736,18 @@ function LieferantDrilldown({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {buchungen.map((b) => (
-            <TableRow key={b.id}>
+          {buchungen.map((b) => {
+            const istNeutral = b.kategorie_typ === "neutral";
+            return (
+            <TableRow
+              key={b.id}
+              className={istNeutral ? "bg-muted/30" : undefined}
+              title={
+                istNeutral
+                  ? "Neutral (Geldtransit) — durchlaufender Posten, keine Steuerwirkung"
+                  : undefined
+              }
+            >
               <TableCell className="tabular-nums text-sm">
                 {deDate(b.buchung_datum)}
               </TableCell>
@@ -745,9 +757,11 @@ function LieferantDrilldown({
               <TableCell
                 className={
                   "text-right tabular-nums font-mono text-sm " +
-                  (b.betrag < 0
-                    ? "text-destructive"
-                    : "text-income-strong dark:text-income")
+                  (istNeutral
+                    ? "text-muted-foreground"
+                    : b.betrag < 0
+                      ? "text-destructive"
+                      : "text-income-strong dark:text-income")
                 }
               >
                 {eur(b.betrag)}
@@ -781,7 +795,8 @@ function LieferantDrilldown({
                 </Button>
               </TableCell>
             </TableRow>
-          ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>

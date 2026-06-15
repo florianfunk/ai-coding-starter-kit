@@ -137,6 +137,7 @@ Keine neuen.
 - Schwelle `MIN_LIEFERANT_BUCHUNGEN = 3` als Konstante in `lieferanten-erkennung.ts`
 - Spec-Erkenntnis während der Implementierung: `BuchungStatus` heißt `auto_verbucht` (nicht wie in einer früheren Spec-Variante `klassifiziert_auto`) — Tests-Fixtures entsprechend angepasst
 - Nachbesserung (2026-06-15): Neutrale Buchungen (Geldtransit/Umbuchung zwischen Konten, `typ = "neutral"`) werden für **Richtung** (Header-Farbe) und **dominante Kategorie** (Badge) ausgeschlossen — sie verzerrten sonst die Empfänger-Anzeige (z.B. PayPal-Header „Privat/ausgabe", während sichtbare Zeilen Geldtransit waren). `LieferantenBuchung` um optionales `kategorie_typ` erweitert; Fallback auf die volle Gruppe, wenn ein Empfänger ausschließlich neutral ist. +2 Tests (jetzt 21)
+- Nachbesserung (2026-06-15, UI): Im Drilldown werden neutrale Zeilen via `neutralAnsEnde()` ans Ende sortiert (Sortierung nur beim Laden → Inline-Edits springen nicht) und dezent abgesetzt (gedämpfter Hintergrund, Betrag in `text-muted-foreground` statt Grün/Rot, Tooltip „durchlaufender Posten")
 
 ## Test Plan
 - API:

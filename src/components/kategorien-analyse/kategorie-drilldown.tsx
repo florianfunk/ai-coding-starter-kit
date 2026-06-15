@@ -256,7 +256,7 @@ export function KategorieDrilldown({
   return (
     <>
     <Sheet open={offen} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-full sm:max-w-[1500px] sm:w-[92vw]">
+      <SheetContent className="w-full sm:w-[90vw] sm:max-w-none">
         <SheetHeader>
           <SheetTitle>{kategorie?.bezeichnung ?? ""}</SheetTitle>
           <SheetDescription>

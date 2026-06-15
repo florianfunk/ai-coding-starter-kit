@@ -8,6 +8,8 @@
 - **Production:** https://steueragent.vercel.app — deployed 2026-06-15
 - Deployment-ID `dpl_9CqXMJDsQt5gWtmSYQszLFxQeWad` (target production, via `vercel --prod`)
 - Commit `15f846b` (neutral-Geldtransit-Nachbesserung) + `ae951a0` (Logik-Fix). Preview-Build (Git-Integration) und Production-Build grün; Prod liefert erwartete `307 → /login`
+- **Re-Deploy 2026-06-15 (Bugfix „fehlende Lieferanten"):** Commit `42ee190` (Abo-Markierung statt Ausschluss + Normalisierungs-Konsolidierung). Deployment-ID `dpl_G4bHKwVJujEQrpHorWg5kgkTytzL` (target production, `vercel --prod`, `READY`). Production-Build grün.
+  - ⚠️ **Offen:** Backfill `npx tsx scripts/renormalisiere-empfaenger.ts` (212/2163 Zeilen) muss vom Inhaber noch ausgeführt werden, damit bestehende Buchungen neu gruppiert werden — der Code-Fix wirkt sonst nur für künftige Importe.
 
 ## Dependencies
 - Requires: PROJ-14 (Kategorien-Analyse) — Tab-Host, Filter, Bulk-Endpoints

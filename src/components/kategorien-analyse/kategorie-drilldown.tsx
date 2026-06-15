@@ -568,11 +568,11 @@ export function KategorieDrilldown({
                     return (
                       <TableRow
                         key={`summe-${z.key}`}
-                        className="border-t bg-muted/50 font-semibold hover:bg-muted/50"
+                        className="border-y border-primary/20 bg-primary/10 font-semibold hover:bg-primary/10"
                       >
                         <TableCell
                           colSpan={4}
-                          className="text-xs uppercase tracking-wide"
+                          className="text-xs uppercase tracking-wide text-primary"
                         >
                           Σ {z.label} · {z.anzahl} Buchung
                           {z.anzahl === 1 ? "" : "en"}
@@ -580,7 +580,7 @@ export function KategorieDrilldown({
                         <TableCell
                           className={cn(
                             "text-right tabular-nums font-mono",
-                            z.summe < 0 ? "text-destructive" : "",
+                            z.summe < 0 ? "text-destructive" : "text-primary",
                           )}
                         >
                           {eur(Math.round(z.summe * 100) / 100)}

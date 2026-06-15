@@ -8,6 +8,7 @@
 // Server-Komponente (/dashboard) verwendet, damit es eine Datenquelle gibt.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import {
   bereitePerioden,
   berechneJahresKennzahlen,
@@ -135,22 +136,31 @@ export async function ladeDashboardAggregat(
   // Fehlende Belege: geschäftliche Buchungen ohne beleg_buchung-Zuordnung.
   // Wir laden nur IDs der geschäftlichen Buchungen (schlank) + die belegten
   // IDs und bilden die Differenz.
-  const { data: geschIds } = await supabase
-    .from("buchung")
-    .select("id")
-    .eq("owner_id", ownerId)
-    .eq("klassifikation", "geschaeftlich")
-    .limit(50000);
-  const geschaeftlicheIds = ((geschIds ?? []) as Array<{ id: string }>).map(
+  // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen
+  // (siehe ladeAlle); stabile Sortierung via id.
+  const { data: geschIds } = await ladeAlle<{ id: string }>((von, bis) =>
+    supabase
+      .from("buchung")
+      .select("id")
+      .eq("owner_id", ownerId)
+      .eq("klassifikation", "geschaeftlich")
+      .order("id", { ascending: true })
+      .range(von, bis),
+  );
+  const geschaeftlicheIds = (geschIds as Array<{ id: string }>).map(
     (r) => r.id,
   );
   let fehlendeBelege = 0;
   if (geschaeftlicheIds.length > 0) {
-    const { data: bbData } = await supabase
-      .from("beleg_buchung")
-      .select("buchung_id")
-      .eq("owner_id", ownerId)
-      .limit(50000);
+    const { data: bbData } = await ladeAlle<{ buchung_id: string }>(
+      (von, bis) =>
+        supabase
+          .from("beleg_buchung")
+          .select("buchung_id")
+          .eq("owner_id", ownerId)
+          .order("buchung_id", { ascending: true })
+          .range(von, bis),
+    );
     const belegt = new Set(
       ((bbData ?? []) as Array<{ buchung_id: string }>).map(
         (r) => r.buchung_id,
@@ -166,14 +176,9 @@ export async function ladeDashboardAggregat(
   };
 
   // Jahres-Kennzahlen: nur Buchungen des laufenden WJ, schlanke Spalten.
-  const { data: wjBuchungen } = await supabase
-    .from("buchung")
-    .select("id, betrag, buchung_datum, klassifikation, status, ust_satz")
-    .eq("owner_id", ownerId)
-    .gte("buchung_datum", von)
-    .lte("buchung_datum", bis)
-    .limit(100000);
-
+  // Vollständig paginiert laden — sonst deckelt PostgREST bei 1000 Zeilen und
+  // die Jahres-Summen wären zu niedrig (siehe ladeAlle). Stabile Sortierung
+  // via buchung_datum + id.
   type Roh = {
     id: string;
     betrag: number;
@@ -182,7 +187,18 @@ export async function ladeDashboardAggregat(
     status: DashboardBuchung["status"];
     ust_satz: number | null;
   };
-  const rohWj = (wjBuchungen ?? []) as Roh[];
+  const { data: wjBuchungen } = await ladeAlle<Roh>((rangeVon, rangeBis) =>
+    supabase
+      .from("buchung")
+      .select("id, betrag, buchung_datum, klassifikation, status, ust_satz")
+      .eq("owner_id", ownerId)
+      .gte("buchung_datum", von)
+      .lte("buchung_datum", bis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(rangeVon, rangeBis),
+  );
+  const rohWj = wjBuchungen as Roh[];
 
   // belegt-Flag nur für die WJ-geschäftlichen Buchungen ermitteln.
   const wjGeschIds = rohWj
@@ -190,14 +206,17 @@ export async function ladeDashboardAggregat(
     .map((b) => b.id);
   let wjBelegt = new Set<string>();
   if (wjGeschIds.length > 0) {
-    const { data: bb } = await supabase
-      .from("beleg_buchung")
-      .select("buchung_id")
-      .eq("owner_id", ownerId)
-      .in("buchung_id", wjGeschIds)
-      .limit(50000);
+    const { data: bb } = await ladeAlle<{ buchung_id: string }>((von, bis) =>
+      supabase
+        .from("beleg_buchung")
+        .select("buchung_id")
+        .eq("owner_id", ownerId)
+        .in("buchung_id", wjGeschIds)
+        .order("buchung_id", { ascending: true })
+        .range(von, bis),
+    );
     wjBelegt = new Set(
-      ((bb ?? []) as Array<{ buchung_id: string }>).map((r) => r.buchung_id),
+      (bb as Array<{ buchung_id: string }>).map((r) => r.buchung_id),
     );
   }
 

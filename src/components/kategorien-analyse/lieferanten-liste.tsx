@@ -31,6 +31,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -50,6 +58,7 @@ import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-deta
 import type { KategorieTyp } from "@/lib/types";
 import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
 import type { BulkKlassifikationResponse } from "@/app/api/buchungen/bulk-klassifikation/route";
+import type { BulkUstResponse } from "@/app/api/buchungen/bulk-ust/route";
 import type {
   LieferantBuchungAnzeige,
   LieferantItemAnzeige,
@@ -76,6 +85,14 @@ function deDate(iso: string): string {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+// USt-Satz ⇄ Select-Wert. null = "kein" (neutrale/private Posten ohne Satz).
+function ustZuWert(u: number | null | undefined): string {
+  return u === null || u === undefined ? "kein" : String(u);
+}
+function wertZuUst(v: string): number | null {
+  return v === "kein" ? null : Number(v);
 }
 
 const KLASSIFIKATION_ICON = {
@@ -418,14 +435,41 @@ function LieferantDrilldown({
   const [buchungen, setBuchungen] = useState<LieferantBuchungAnzeige[]>(() =>
     neutralAnsEnde(item.buchungen),
   );
-  useEffect(() => setBuchungen(neutralAnsEnde(item.buchungen)), [item.buchungen]);
+  useEffect(() => {
+    setBuchungen(neutralAnsEnde(item.buchungen));
+    setAuswahl(new Set());
+  }, [item.buchungen]);
 
   const [bulkKat, setBulkKat] = useState<string>("__none__");
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [ustSavingId, setUstSavingId] = useState<string | null>(null);
   const [bulkBusy, startBulk] = useTransition();
   const [klassBusy, setKlassBusy] = useState<
     "privat" | "geschaeftlich" | null
   >(null);
+
+  // PROJ-18 — Zeilen-Auswahl + Bulk-Bearbeitung der markierten Teilmenge
+  // (Klassifikation / Kategorie / USt), analog zur Prüfliste.
+  const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
+  const [selKat, setSelKat] = useState<string>("__none__");
+  const [selUst, setSelUst] = useState<string>("__none__");
+  const [selBusy, setSelBusy] = useState(false);
+
+  const alleGewaehlt =
+    buchungen.length > 0 && buchungen.every((b) => auswahl.has(b.id));
+  function toggleAuswahl(id: string) {
+    setAuswahl((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function alleWaehlen(an: boolean) {
+    setAuswahl(an ? new Set(buchungen.map((b) => b.id)) : new Set());
+  }
+  const auswahlIds = () =>
+    buchungen.filter((b) => auswahl.has(b.id)).map((b) => b.id);
 
   const distinct = new Set(
     buchungen.map((b) => b.kategorie_id ?? "__none__"),
@@ -476,6 +520,164 @@ function LieferantDrilldown({
       );
     } finally {
       setSavingId(null);
+    }
+  }
+
+  // Einzelne Zeile: USt-Satz ändern (0/7/19/null) — speichert sofort und
+  // bestätigt die Buchung (wie der Kategorie-Inline-Edit).
+  async function aendereUstEinzeln(
+    b: LieferantBuchungAnzeige,
+    neuerSatz: number | null,
+  ) {
+    if (neuerSatz === (b.ust_satz ?? null)) return;
+    setUstSavingId(b.id);
+    try {
+      const r = await fetch(`/api/buchungen/${b.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ust_satz: neuerSatz, bestaetigen: true }),
+      });
+      if (!r.ok) {
+        const e = (await r.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(e?.error ?? `HTTP ${r.status}`);
+      }
+      setBuchungen((bs) =>
+        bs.map((x) =>
+          x.id === b.id
+            ? { ...x, ust_satz: neuerSatz, status: "manuell_bestaetigt" }
+            : x,
+        ),
+      );
+      toast.success("USt-Satz geändert");
+      onMutiert?.();
+    } catch (e) {
+      toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+    } finally {
+      setUstSavingId(null);
+    }
+  }
+
+  // Bulk auf die markierte Teilmenge — Klassifikation.
+  async function bulkKlassAuswahl(klass: "privat" | "geschaeftlich") {
+    const ids = auswahlIds();
+    if (ids.length === 0) return;
+    setSelBusy(true);
+    try {
+      const r = await fetch("/api/buchungen/bulk-klassifikation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, klassifikation: klass }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as BulkKlassifikationResponse;
+      setBuchungen((bs) =>
+        bs.map((b) =>
+          auswahl.has(b.id)
+            ? { ...b, klassifikation: j.klassifikation, status: "manuell_bestaetigt" }
+            : b,
+        ),
+      );
+      toast.success(
+        `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} als ${klass === "privat" ? "privat" : "geschäftlich"} markiert`,
+      );
+      setAuswahl(new Set());
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "Klassifikation fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
+      );
+    } finally {
+      setSelBusy(false);
+    }
+  }
+
+  // Bulk auf die markierte Teilmenge — Kategorie.
+  async function bulkKatAuswahl() {
+    if (selKat === "__none__") {
+      toast.error("Bitte eine Kategorie auswählen.");
+      return;
+    }
+    const ids = auswahlIds();
+    if (ids.length === 0) return;
+    setSelBusy(true);
+    try {
+      const r = await fetch("/api/buchungen/bulk-kategorie", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, kategorie_id: selKat }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as BulkKategorieResponse;
+      setBuchungen((bs) =>
+        bs.map((b) =>
+          auswahl.has(b.id)
+            ? {
+                ...b,
+                kategorie_id: j.kategorie.id,
+                kategorie_bezeichnung: j.kategorie.bezeichnung,
+                kategorie_typ: j.kategorie.typ,
+                status: "manuell_bestaetigt",
+              }
+            : b,
+        ),
+      );
+      toast.success(
+        `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} auf "${j.kategorie.bezeichnung}" gesetzt`,
+      );
+      setAuswahl(new Set());
+      setSelKat("__none__");
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "Kategorie-Update fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
+      );
+    } finally {
+      setSelBusy(false);
+    }
+  }
+
+  // Bulk auf die markierte Teilmenge — USt-Satz.
+  async function bulkUstAuswahl() {
+    if (selUst === "__none__") {
+      toast.error("Bitte einen USt-Satz auswählen.");
+      return;
+    }
+    const ids = auswahlIds();
+    if (ids.length === 0) return;
+    const satz = wertZuUst(selUst);
+    setSelBusy(true);
+    try {
+      const r = await fetch("/api/buchungen/bulk-ust", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, ust_satz: satz }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = (await r.json()) as BulkUstResponse;
+      setBuchungen((bs) =>
+        bs.map((b) =>
+          auswahl.has(b.id)
+            ? { ...b, ust_satz: satz, status: "manuell_bestaetigt" }
+            : b,
+        ),
+      );
+      toast.success(
+        `${j.aktualisiert} Buchung${j.aktualisiert === 1 ? "" : "en"} auf ${satz === null ? "kein" : satz + " %"} gesetzt`,
+      );
+      setAuswahl(new Set());
+      setSelUst("__none__");
+      onMutiert?.();
+    } catch (e) {
+      toast.error(
+        "USt-Update fehlgeschlagen: " +
+          (e instanceof Error ? e.message : "unbekannt"),
+      );
+    } finally {
+      setSelBusy(false);
     }
   }
 
@@ -724,14 +926,100 @@ function LieferantDrilldown({
         </div>
       </div>
 
+      {/* Auswahl-Bulk — nur sichtbar, wenn Zeilen markiert sind. Wirkt auf
+          die markierte Teilmenge (nicht auf alle Buchungen des Lieferanten). */}
+      {auswahl.size > 0 ? (
+        <div className="space-y-2 rounded-md border border-brand-violet/40 bg-tint-violet/30 p-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wide text-brand-violet">
+              Auswahl bearbeiten · {auswahl.size} markiert
+            </div>
+            <button
+              type="button"
+              onClick={() => setAuswahl(new Set())}
+              className="text-xs text-muted-foreground transition-colors hover:text-destructive"
+            >
+              Auswahl aufheben
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => bulkKlassAuswahl("privat")}
+              disabled={selBusy}
+            >
+              <User className="mr-1.5 h-3.5 w-3.5" />
+              privat
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => bulkKlassAuswahl("geschaeftlich")}
+              disabled={selBusy}
+            >
+              <Briefcase className="mr-1.5 h-3.5 w-3.5" />
+              geschäftlich
+            </Button>
+            <span aria-hidden className="h-6 w-px bg-border" />
+            <KategorieCombobox
+              kategorien={kategorien}
+              value={selKat === "__none__" ? "" : selKat}
+              onChange={(v) => {
+                if (v) setSelKat(v);
+              }}
+              placeholder="Kategorie…"
+              triggerClassName="h-8 w-[220px] text-xs"
+              ariaLabel="Kategorie für Auswahl"
+            />
+            <Button
+              size="sm"
+              onClick={bulkKatAuswahl}
+              disabled={selBusy || selKat === "__none__"}
+            >
+              Kategorie setzen
+            </Button>
+            <span aria-hidden className="h-6 w-px bg-border" />
+            <Select value={selUst} onValueChange={setSelUst}>
+              <SelectTrigger className="h-8 w-[110px] text-xs">
+                <SelectValue placeholder="USt…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="19">19 %</SelectItem>
+                <SelectItem value="7">7 %</SelectItem>
+                <SelectItem value="0">0 %</SelectItem>
+                <SelectItem value="kein">kein</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={bulkUstAuswahl}
+              disabled={selBusy || selUst === "__none__"}
+            >
+              {selBusy ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              USt setzen
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Buchungs-Liste */}
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[36px]">
+              <Checkbox
+                checked={alleGewaehlt}
+                onCheckedChange={(v) => alleWaehlen(Boolean(v))}
+                aria-label="Alle Buchungen auswählen"
+              />
+            </TableHead>
             <TableHead className="w-[100px]">Datum</TableHead>
             <TableHead className="w-[120px]">Konto</TableHead>
             <TableHead className="text-right w-[110px]">Betrag</TableHead>
-            <TableHead className="text-right w-[70px]">USt</TableHead>
+            <TableHead className="w-[120px]">USt</TableHead>
             <TableHead>Kategorie</TableHead>
             <TableHead className="w-[40px]"></TableHead>
           </TableRow>
@@ -749,6 +1037,13 @@ function LieferantDrilldown({
                   : undefined
               }
             >
+              <TableCell>
+                <Checkbox
+                  checked={auswahl.has(b.id)}
+                  onCheckedChange={() => toggleAuswahl(b.id)}
+                  aria-label="Buchung auswählen"
+                />
+              </TableCell>
               <TableCell className="tabular-nums text-sm">
                 {deDate(b.buchung_datum)}
               </TableCell>
@@ -767,27 +1062,43 @@ function LieferantDrilldown({
               >
                 {eur(b.betrag)}
               </TableCell>
-              <TableCell className="text-right tabular-nums font-mono text-sm">
-                {b.ust_satz === null || b.ust_satz === undefined ? (
-                  <span
-                    className={
-                      b.kategorie_typ === "einnahme" ||
-                      b.kategorie_typ === "ausgabe"
-                        ? "text-destructive"
-                        : "text-muted-foreground"
-                    }
-                    title={
-                      b.kategorie_typ === "einnahme" ||
-                      b.kategorie_typ === "ausgabe"
-                        ? "Kein USt-Satz gesetzt — bitte prüfen"
-                        : "Kein USt-Satz (neutral/privat)"
-                    }
-                  >
-                    —
-                  </span>
-                ) : (
-                  `${b.ust_satz} %`
-                )}
+              <TableCell>
+                {(() => {
+                  const fehltSatz =
+                    (b.ust_satz === null || b.ust_satz === undefined) &&
+                    (b.kategorie_typ === "einnahme" ||
+                      b.kategorie_typ === "ausgabe");
+                  return (
+                    <Select
+                      value={ustZuWert(b.ust_satz)}
+                      onValueChange={(v) => aendereUstEinzeln(b, wertZuUst(v))}
+                      disabled={ustSavingId === b.id}
+                    >
+                      <SelectTrigger
+                        className={
+                          "h-8 w-[92px] text-xs " +
+                          (fehltSatz
+                            ? "border-destructive/60 text-destructive"
+                            : "")
+                        }
+                        title={
+                          fehltSatz
+                            ? "Kein USt-Satz gesetzt — bitte prüfen"
+                            : undefined
+                        }
+                        aria-label="USt-Satz"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="19">19 %</SelectItem>
+                        <SelectItem value="7">7 %</SelectItem>
+                        <SelectItem value="0">0 %</SelectItem>
+                        <SelectItem value="kein">kein</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  );
+                })()}
               </TableCell>
               <TableCell>
                 <KategorieCombobox

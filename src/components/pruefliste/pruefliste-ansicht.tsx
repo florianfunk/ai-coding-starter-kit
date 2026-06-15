@@ -15,14 +15,17 @@ import {
   Info,
   Layers,
   Loader2,
+  Search,
   X,
 } from "lucide-react";
-import type { Buchung, Kategorie, Konto } from "@/lib/types";
+import type { Buchung, Kategorie, Klassifikation, Konto } from "@/lib/types";
 import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet";
+import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { MerkenStern } from "@/components/merkliste/merken-stern";
 import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -57,6 +60,34 @@ function normEmpfaenger(value: string | null): string {
   return (value ?? "").toLowerCase().trim();
 }
 
+type SortFeld = "datum" | "betrag" | "empfaenger" | "konfidenz";
+type KlassFilter = "alle" | Klassifikation;
+// "alle" = egal, "ohne" = keine Kategorie gesetzt, sonst eine kategorie_id.
+type KategorieFilter = "alle" | "ohne" | string;
+
+const KLASS_FILTER_LABEL: Record<KlassFilter, string> = {
+  alle: "Alle Klassifikationen",
+  geschaeftlich: "Geschäftlich",
+  privat: "Privat",
+  unklar: "Unklar",
+  neutral: "Neutral",
+};
+
+const SORT_LABEL: Record<SortFeld, string> = {
+  datum: "Nach Datum",
+  betrag: "Nach Betrag",
+  empfaenger: "Empfänger A–Z",
+  konfidenz: "Nach Konfidenz",
+};
+
+// Betragsfeld → Zahl (Komma erlaubt) oder null, wenn leer/ungültig.
+function parseBetrag(value: string): number | null {
+  const s = value.trim().replace(",", ".");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
 export function PrueflisteAnsicht({
   initialFaelle,
   konten,
@@ -75,7 +106,12 @@ export function PrueflisteAnsicht({
   );
   const [konto, setKonto] = useState("alle");
   const [grund, setGrund] = useState("alle");
-  const [sort, setSort] = useState<"datum" | "betrag">("datum");
+  const [sort, setSort] = useState<SortFeld>("datum");
+  const [suche, setSuche] = useState("");
+  const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
+  const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");
+  const [betragVon, setBetragVon] = useState("");
+  const [betragBis, setBetragBis] = useState("");
   const [empfaengerFilter, setEmpfaengerFilter] = useState<string | null>(null);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [dialogFaelle, setDialogFaelle] = useState<Buchung[] | null>(null);
@@ -99,22 +135,88 @@ export function PrueflisteAnsicht({
     return Array.from(s).sort();
   }, [faelle]);
 
-  // Basis = Konto-/Grund-Filter + Sortierung. Die Mustergruppen werden hieraus
-  // gebildet, damit alle Empfänger-Chips sichtbar bleiben, auch wenn unten
-  // bereits auf einen Empfänger gefiltert ist.
+  // Basis = alle Filter (Konto, Grund, Suche, Klassifikation, Kategorie-Status,
+  // Betrag-Bereich) + Sortierung. Die Mustergruppen werden hieraus gebildet,
+  // damit die Empfänger-Chips konsistent zur gefilterten Menge bleiben.
   const basis = useMemo(() => {
-    let liste = faelle.slice();
-    if (konto !== "alle") liste = liste.filter((f) => f.konto_id === konto);
-    if (grund !== "alle") {
-      liste = liste.filter((f) => gruendeListe(f.pruef_grund).includes(grund));
-    }
-    liste.sort((a, b) =>
-      sort === "betrag"
-        ? Math.abs(b.betrag) - Math.abs(a.betrag)
-        : b.buchung_datum.localeCompare(a.buchung_datum),
-    );
+    const q = suche.trim().toLowerCase();
+    const von = parseBetrag(betragVon);
+    const bis = parseBetrag(betragBis);
+    // Von/Bis können vertauscht eingegeben werden – Grenzen normalisieren.
+    const min = von !== null && bis !== null ? Math.min(von, bis) : von;
+    const max = von !== null && bis !== null ? Math.max(von, bis) : bis;
+
+    let liste = faelle.filter((f) => {
+      if (konto !== "alle" && f.konto_id !== konto) return false;
+      if (grund !== "alle" && !gruendeListe(f.pruef_grund).includes(grund)) {
+        return false;
+      }
+      if (klassFilter !== "alle" && f.klassifikation !== klassFilter) {
+        return false;
+      }
+      if (kategorieFilter === "ohne") {
+        if (f.kategorie_id !== null) return false;
+      } else if (kategorieFilter !== "alle" && f.kategorie_id !== kategorieFilter) {
+        return false;
+      }
+      const abs = Math.abs(f.betrag);
+      if (min !== null && abs < min) return false;
+      if (max !== null && abs > max) return false;
+      if (q) {
+        const heu = `${f.empfaenger ?? ""} ${f.verwendungszweck ?? ""}`.toLowerCase();
+        if (!heu.includes(q)) return false;
+      }
+      return true;
+    });
+
+    liste = liste.sort((a, b) => {
+      switch (sort) {
+        case "betrag":
+          return Math.abs(b.betrag) - Math.abs(a.betrag);
+        case "empfaenger":
+          return normEmpfaenger(a.empfaenger).localeCompare(
+            normEmpfaenger(b.empfaenger),
+          );
+        case "konfidenz":
+          // Unsicherste zuerst: aufsteigend, null ("KI nicht verfügbar") ganz oben.
+          return (a.konfidenz ?? -1) - (b.konfidenz ?? -1);
+        default:
+          return b.buchung_datum.localeCompare(a.buchung_datum);
+      }
+    });
     return liste;
-  }, [faelle, konto, grund, sort]);
+  }, [
+    faelle,
+    konto,
+    grund,
+    sort,
+    suche,
+    klassFilter,
+    kategorieFilter,
+    betragVon,
+    betragBis,
+  ]);
+
+  const filterAktiv =
+    konto !== "alle" ||
+    grund !== "alle" ||
+    klassFilter !== "alle" ||
+    kategorieFilter !== "alle" ||
+    suche.trim() !== "" ||
+    betragVon.trim() !== "" ||
+    betragBis.trim() !== "";
+
+  function filterZuruecksetzen() {
+    setKonto("alle");
+    setGrund("alle");
+    setKlassFilter("alle");
+    setKategorieFilter("alle");
+    setSuche("");
+    setBetragVon("");
+    setBetragBis("");
+    setEmpfaengerFilter(null);
+    setAuswahl(new Set());
+  }
 
   const gruppen = useMemo<Mustergruppe[]>(() => {
     const map = new Map<string, Mustergruppe>();
@@ -329,16 +431,28 @@ export function PrueflisteAnsicht({
                 ? "Alles erledigt — der Agent meldet sich, sobald wieder etwas Unsicheres reinkommt."
                 : "Filtere und entscheide einzeln oder als Bulk."}
             </div>
-            {empfaengerFilter && (
-              <button
-                type="button"
-                onClick={empfaengerFilterAufheben}
-                className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-tint-violet px-2.5 py-1 text-[12px] font-medium text-brand-violet transition-colors hover:bg-brand-violet hover:text-white"
-              >
-                Empfänger: {aktiveGruppe?.empfaenger ?? empfaengerFilter}
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {empfaengerFilter && (
+                <button
+                  type="button"
+                  onClick={empfaengerFilterAufheben}
+                  className="inline-flex items-center gap-1 rounded-full bg-tint-violet px-2.5 py-1 text-[12px] font-medium text-brand-violet transition-colors hover:bg-brand-violet hover:text-white"
+                >
+                  Empfänger: {aktiveGruppe?.empfaenger ?? empfaengerFilter}
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {(filterAktiv || empfaengerFilter) && (
+                <button
+                  type="button"
+                  onClick={filterZuruecksetzen}
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Filter zurücksetzen
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <Select value={konto} onValueChange={setKonto}>
@@ -367,16 +481,16 @@ export function PrueflisteAnsicht({
                 ))}
               </SelectContent>
             </Select>
-            <Select
-              value={sort}
-              onValueChange={(v) => setSort(v as "datum" | "betrag")}
-            >
-              <SelectTrigger className="h-9 w-36 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
+            <Select value={sort} onValueChange={(v) => setSort(v as SortFeld)}>
+              <SelectTrigger className="h-9 w-40 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="datum">Nach Datum</SelectItem>
-                <SelectItem value="betrag">Nach Betrag</SelectItem>
+                {(Object.keys(SORT_LABEL) as SortFeld[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {SORT_LABEL[s]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button
@@ -390,6 +504,70 @@ export function PrueflisteAnsicht({
             </Button>
           </div>
         </div>
+
+        {/* Zweite Reihe: Suche + verfeinernde Filter */}
+        {!istLeer && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-line-hair pt-3">
+            <div className="relative min-w-[200px] flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={suche}
+                onChange={(e) => setSuche(e.target.value)}
+                placeholder="Empfänger oder Verwendungszweck suchen…"
+                aria-label="Fälle durchsuchen"
+                className="h-9 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] pl-9 text-[13px]"
+              />
+            </div>
+            <Select
+              value={klassFilter}
+              onValueChange={(v) => setKlassFilter(v as KlassFilter)}
+            >
+              <SelectTrigger className="h-9 w-44 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(KLASS_FILTER_LABEL) as KlassFilter[]).map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {KLASS_FILTER_LABEL[k]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="w-56">
+              <KategorieCombobox
+                kategorien={kategorien}
+                value={kategorieFilter}
+                onChange={(v) => setKategorieFilter(v as KategorieFilter)}
+                vorabOptionen={[
+                  { value: "alle", label: "Alle Kategorien" },
+                  { value: "ohne", label: "Ohne Kategorie" },
+                ]}
+                triggerClassName="h-9 bg-[color:var(--surface-2)] text-[13px]"
+                placeholder="Kategorie-Status"
+                ariaLabel="Nach Kategorie filtern"
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Input
+                value={betragVon}
+                onChange={(e) => setBetragVon(e.target.value)}
+                inputMode="decimal"
+                placeholder="Betrag von"
+                aria-label="Betrag von"
+                className="h-9 w-28 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]"
+              />
+              <span className="text-[12px] text-muted-foreground">–</span>
+              <Input
+                value={betragBis}
+                onChange={(e) => setBetragBis(e.target.value)}
+                inputMode="decimal"
+                placeholder="bis"
+                aria-label="Betrag bis"
+                className="h-9 w-24 rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)] text-[13px]"
+              />
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Liste */}

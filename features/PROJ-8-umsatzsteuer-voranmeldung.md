@@ -1,8 +1,8 @@
 # PROJ-8: Umsatzsteuer-Voranmeldung (Vorschlag)
 
-## Status: In Progress
+## Status: Deployed
 **Created:** 2026-05-15
-**Last Updated:** 2026-05-15
+**Last Updated:** 2026-06-16
 
 ## Dependencies
 - Requires: PROJ-5 (Autonome Klassifizierung) — liefert kategorisierte, USt-behaftete Buchungen
@@ -153,4 +153,11 @@ Nachträgliche Buchungen → Berichtigungshinweis statt stillem Überschreiben; 
 Offen für manuelle/E2E-QA mit echten Daten: visuelle Prüfung, End-to-End-Flows mit echter Paperless-Instanz und realen Kontoauszügen.
 
 ## Deployment
-_To be added by /deploy_
+- **Production:** https://steueragent.vercel.app (2026-06-16)
+- **Deploy:** `vercel --prod` (Vercel-Projekt `steueragent`), Deployment READY.
+- **Enthalten:** USt-VA inkl. Abschluss-Wiedereröffnung (DELETE /api/steuer/ust,
+  "Abschluss rückgängig machen"-Button).
+- Pre-Deploy: `npm run build` ok, `npm run lint` 0 Errors (6 vorbestehende
+  Warnungen). Keine Migration/RLS-Änderung, keine neuen Env-Vars.
+- Post-Deploy: Root + /ust-voranmeldung antworten mit 307 (Auth-Redirect,
+  erwartet).

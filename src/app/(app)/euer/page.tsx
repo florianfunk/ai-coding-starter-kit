@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { EuerAnsicht } from "@/components/euer/euer-ansicht";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { ladeAktivesJahr } from "@/lib/jahr/aktives-jahr";
 
 export const metadata = {
   title: "Jahres-EÜR · STEUERAGENT",
@@ -62,10 +63,15 @@ export default async function EuerPage({
     jahre.push(j);
   }
 
+  // PROJ-22: Vorauswahl = explizites ?jahr= > aktives Jahr (falls in der
+  // Auswahl) > jüngstes Datenjahr. „Alle Jahre" (null) → jüngstes Datenjahr.
+  const aktivesJahr = await ladeAktivesJahr(supabase, user.id);
   const vorgewaehlt =
     typeof sp.jahr === "string" && /^\d{4}$/.test(sp.jahr)
       ? Number(sp.jahr)
-      : (jahre[0] ?? heute);
+      : aktivesJahr != null && jahre.includes(aktivesJahr)
+        ? aktivesJahr
+        : (jahre[0] ?? heute);
 
   return (
     <PageShell>
@@ -75,7 +81,10 @@ export default async function EuerPage({
         beschreibung="§4 Abs.3 EStG — Betriebseinnahmen minus Betriebsausgaben je EÜR-Kategorie nach striktem Zufluss-/Abflussprinzip. Deterministisch berechnet, keine KI in den Summen. Klicke eine Position für den Drill-down auf die einzelnen Buchungen."
       />
 
+      {/* key=vorgewaehlt: bei globalem Jahreswechsel re-initialisiert die
+          interne Jahres-Auswahl auf das neue Jahr. */}
       <EuerAnsicht
+        key={vorgewaehlt}
         jahre={jahre}
         jahrInitial={vorgewaehlt}
         wjBeginn={wjBeginn}

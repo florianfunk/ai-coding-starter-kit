@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { bewegungenFilterSchema } from "@/lib/validation/finanzen";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
 import type {
   BuchungStatus,
@@ -103,6 +104,15 @@ export async function GET(request: Request) {
   const f = parsed.data;
   const supabase = await createClient();
 
+  // PROJ-22: Datumsfenster über den globalen Jahreswähler auflösen — fehlende
+  // von/bis scopen so automatisch aufs aktive Jahr; explizite Grenzen werden
+  // darauf geklammert. jahr:null → kein expliziter Jahres-Override hier.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {
+    von: f.von ?? null,
+    bis: f.bis ?? null,
+    jahr: null,
+  });
+
   // Buchungen laden — Server-Filter, soweit möglich. Bereichs-Filter und
   // Suche werden zusätzlich in JS nachgezogen (Suche, weil wir auf zwei
   // Spalten OR-suchen wollen und das auch über die Empfänger-Normierung
@@ -111,7 +121,7 @@ export async function GET(request: Request) {
   // Gesamt-Anzahl, Summen und die Display-Pagination (.slice unten) brauchen
   // den KOMPLETTEN Treffer-Satz, nicht nur die ersten 1000. Stabile Sortierung
   // via id; die fachliche Sortierung passiert später in JS.
-  const { data: bData, error: bErr } = await ladeAlle((von, bisIdx) => {
+  const { data: bData, error: bErr } = await ladeAlle((von2, bisIdx) => {
     let q = supabase
       .from("buchung")
       .select(
@@ -119,9 +129,9 @@ export async function GET(request: Request) {
       )
       .eq("owner_id", user.id)
       .order("id", { ascending: true })
-      .range(von, bisIdx);
-    if (f.von) q = q.gte("buchung_datum", f.von);
-    if (f.bis) q = q.lte("buchung_datum", f.bis);
+      .range(von2, bisIdx);
+    if (von) q = q.gte("buchung_datum", von);
+    if (bis) q = q.lte("buchung_datum", bis);
     if (f.konto_id) q = q.eq("konto_id", f.konto_id);
     if (f.kategorie_id === "ohne") q = q.is("kategorie_id", null);
     else if (f.kategorie_id) q = q.eq("kategorie_id", f.kategorie_id);

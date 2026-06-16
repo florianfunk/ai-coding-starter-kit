@@ -14,6 +14,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { analyseFilterSchema } from "@/lib/validation/kategorien-analyse";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungRow {
@@ -102,8 +103,13 @@ export async function GET(request: Request) {
   const filter = parsed.data;
   const supabase = await createClient();
 
-  const von = filter.von ?? (filter.jahr ? `${filter.jahr}-01-01` : null);
-  const bis = filter.bis ?? (filter.jahr ? `${filter.jahr}-12-31` : null);
+  // PROJ-22: Datumsfenster zentral auflösen — expliziter ?jahr= übersteuert das
+  // globale aktive Jahr; explizite von/bis werden auf das Jahr geklammert.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {
+    von: filter.von ?? null,
+    bis: filter.bis ?? null,
+    jahr: filter.jahr ?? null,
+  });
 
   // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen und
   // schnitte (asc-Sortierung) neuere Buchungen ab. Stabile Sortierung via id.

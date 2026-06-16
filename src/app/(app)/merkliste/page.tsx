@@ -5,6 +5,7 @@
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MerklisteAnsicht } from "@/components/merkliste/merkliste-ansicht";
@@ -39,13 +40,20 @@ export default async function MerklistePage() {
     .limit(500);
   const kategorien = (kategorienData ?? []) as Kategorie[];
 
-  const { data, error } = await supabase
+  // PROJ-22: Merkliste aufs global aktive Jahr scopen.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {});
+
+  let buchungenQuery = supabase
     .from("buchung")
     .select(SELECT_FELDER)
     .eq("owner_id", user.id)
     .not("gemerkt_am", "is", null)
     .order("gemerkt_am", { ascending: false })
     .limit(1000);
+  if (von) buchungenQuery = buchungenQuery.gte("buchung_datum", von);
+  if (bis) buchungenQuery = buchungenQuery.lte("buchung_datum", bis);
+
+  const { data, error } = await buchungenQuery;
 
   return (
     <PageShell>

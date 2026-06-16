@@ -12,6 +12,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 
 export type KuendigungStatus = "offen" | "gekuendigt" | "beendet";
 
@@ -84,18 +85,25 @@ export async function GET() {
   // Buchungen aller markierten Empfaenger holen (auf einmal — wir wollen
   // pro Empfaenger eine Statistik bilden).
   const normWerte = markierungenSafe.map((m) => m.empfaenger_norm);
+
+  // PROJ-22: Buchungen der markierten Empfaenger aufs global aktive Jahr scopen.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {});
+
   // Vollständig paginiert laden — PostgREST deckelt sonst bei 1000 Zeilen und
   // schnitte (asc-Sortierung) neuere Buchungen ab. Stabile Sortierung via id.
-  const { data: buchungenData } = await ladeAlle((von, bisIdx) =>
-    supabase
+  const { data: buchungenData } = await ladeAlle((vonIdx, bisIdx) => {
+    let q = supabase
       .from("buchung")
       .select("empfaenger_normalisiert, empfaenger, buchung_datum, betrag")
       .eq("owner_id", user.id)
       .in("empfaenger_normalisiert", normWerte)
       .order("buchung_datum", { ascending: true })
       .order("id", { ascending: true })
-      .range(von, bisIdx),
-  );
+      .range(vonIdx, bisIdx);
+    if (von) q = q.gte("buchung_datum", von);
+    if (bis) q = q.lte("buchung_datum", bis);
+    return q;
+  });
   const buchungen = (buchungenData ?? []) as Array<{
     empfaenger_normalisiert: string | null;
     empfaenger: string | null;

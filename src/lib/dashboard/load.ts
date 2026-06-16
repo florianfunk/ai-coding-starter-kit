@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { ladeAktivesJahr } from "@/lib/jahr/aktives-jahr";
 import {
   bereitePerioden,
   berechneJahresKennzahlen,
@@ -90,7 +91,23 @@ export async function ladeDashboardAggregat(
   const wjBeginn = profilRow?.wirtschaftsjahr_beginn ?? 1;
   const profilAngelegt = !!profilRow?.firmenname?.trim();
 
-  const { von, bis } = laufendesWirtschaftsjahr(heute, wjBeginn);
+  // PROJ-22: Globales aktives Jahr berücksichtigen. Die Jahres-Kennzahlen
+  // (Einnahmen/Ausgaben/USt-Schätzung) sollen das gewählte Jahr abbilden, nicht
+  // hart das laufende Wirtschaftsjahr. Dazu setzen wir das Referenzdatum auf das
+  // aktive Jahr (Beginn des Wirtschaftsjahres in diesem Jahr); `berechneJahres-
+  // Kennzahlen` leitet daraus dasselbe Fenster ab wie der Lade-Query. Bei
+  // "Alle Jahre" (null) bleibt es beim laufenden Wirtschaftsjahr (heute).
+  // Cross-Period-Status (Aktions-Kennzahlen, Perioden, Onboarding) bleibt
+  // bewusst über alle Jahre — diese zeigen den Gesamt-Handlungsbedarf.
+  const aktivesJahr = await ladeAktivesJahr(supabase, ownerId);
+  const refDatum =
+    aktivesJahr == null
+      ? heute
+      : `${aktivesJahr}-${String(
+          wjBeginn >= 1 && wjBeginn <= 12 ? wjBeginn : 1,
+        ).padStart(2, "0")}-01`;
+
+  const { von, bis } = laufendesWirtschaftsjahr(refDatum, wjBeginn);
 
   // Aktions-Kennzahlen + Onboarding-Signale: count-only / top-1 Queries.
   const [
@@ -217,7 +234,9 @@ export async function ladeDashboardAggregat(
     belegt: false,
   }));
 
-  const jahr = berechneJahresKennzahlen(dashboardBuchungen, heute, wjBeginn);
+  // PROJ-22: refDatum (aktives Jahr) statt heute — so deckt sich das
+  // intern abgeleitete Fenster mit dem geladenen `von`/`bis`.
+  const jahr = berechneJahresKennzahlen(dashboardBuchungen, refDatum, wjBeginn);
 
   // Steuerperioden (alle, klein begrenzt — eine Firma hat überschaubar viele).
   const { data: periodenData } = await supabase

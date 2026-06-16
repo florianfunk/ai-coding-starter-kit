@@ -34,17 +34,13 @@ import { GeldbewegungenAnsicht } from "@/components/kategorien-analyse/geldbeweg
 import { AboRadarTab } from "@/components/kategorien-analyse/abo-radar-tab";
 import { LieferantenTab } from "@/components/kategorien-analyse/lieferanten-tab";
 import type { Bereich } from "@/lib/validation/kategorien-analyse";
+import { useJahr } from "@/components/jahr/jahr-provider";
+import { clampZeitraum, jahrZuZeitraum } from "@/lib/jahr/aktives-jahr";
 
 interface Konto {
   id: string;
   bezeichnung: string;
   typ: "bank" | "paypal" | "kreditkarte";
-}
-
-/** Default-Zeitraum: laufendes Kalenderjahr. */
-function defaultZeitraum(): Zeitraum {
-  const y = new Date().getFullYear();
-  return { von: `${y}-01-01`, bis: `${y}-12-31` };
 }
 
 /** Aktuelle Uhrzeit (HH:MM) für die "Stand"-Anzeige. */
@@ -64,7 +60,11 @@ type Tab =
   | "cockpit";
 
 export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
-  const [zeitraum, setZeitraum] = useState<Zeitraum>(defaultZeitraum);
+  // PROJ-22: Default-Zeitraum = aktives Jahr (oder „Alle Jahre" = offen).
+  const { aktivesJahr } = useJahr();
+  const [zeitraum, setZeitraum] = useState<Zeitraum>(() =>
+    jahrZuZeitraum(aktivesJahr),
+  );
   const [kontoId, setKontoId] = useState<string>("alle");
   const [nurSteuerrelevant, setNurSteuerrelevant] = useState(false);
   const [tab, setTab] = useState<Tab>("geschaeft");
@@ -84,7 +84,6 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
     // Bewusster Einmal-Render nach Mount: Die Uhrzeit ist client-only, der
     // Server kennt sie nicht — synchrones Setzen würde sonst einen Hydration-
     // Mismatch erzeugen. Genau der Fall, für den set-state-in-effect gedacht ist.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStandZeit(uhrzeitJetzt());
   }, []);
 
@@ -92,6 +91,13 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
     setRefreshKey((k) => k + 1);
     setStandZeit(uhrzeitJetzt());
   }, []);
+
+  // PROJ-22: Wechselt das globale Jahr, wird der lokale Zeitraum auf dessen
+  // Fenster zurückgesetzt (harte Klammer). „Alle Jahre" → offenes Fenster.
+  useEffect(() => {
+    // Synchronisation auf den globalen Jahres-Kontext — bewusst per Effect.
+    setZeitraum(jahrZuZeitraum(aktivesJahr));
+  }, [aktivesJahr]);
 
   // Auto-Refresh, sobald das Fenster/der Tab wieder den Fokus bekommt —
   // gedrosselt auf höchstens alle 10 s, damit schnelles Hin- und Herklicken
@@ -117,10 +123,13 @@ export function KategorienAnalyseAnsicht({ konten }: { konten: Konto[] }) {
   // explizit refreshen, damit die Auswahl trotzdem aktuelle Daten zieht.
   const handleZeitraum = useCallback(
     (z: Zeitraum) => {
-      setZeitraum(z);
-      if (zeitraum.von === z.von && zeitraum.bis === z.bis) aktualisieren();
+      // PROJ-22: Detail-Auswahl bleibt innerhalb des aktiven Jahres.
+      const geklammert = clampZeitraum(z, aktivesJahr);
+      setZeitraum(geklammert);
+      if (zeitraum.von === geklammert.von && zeitraum.bis === geklammert.bis)
+        aktualisieren();
     },
-    [zeitraum.von, zeitraum.bis, aktualisieren],
+    [zeitraum.von, zeitraum.bis, aktualisieren, aktivesJahr],
   );
 
   // Tab → Bereich: 'geschaeft' und 'privat' bestimmen den Bereichs-Filter

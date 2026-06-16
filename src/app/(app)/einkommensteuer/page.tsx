@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { EstAnsicht } from "@/components/est/est-ansicht";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { ladeAktivesJahr } from "@/lib/jahr/aktives-jahr";
 
 export const metadata = {
   title: "Einkommensteuer · STEUERAGENT",
@@ -51,10 +52,14 @@ export default async function EinkommensteuerPage({
     jahre.push(j);
   }
 
+  // PROJ-22: Vorauswahl bevorzugt das aktive Jahr (falls in der Auswahl).
+  const aktivesJahr = await ladeAktivesJahr(supabase, user.id);
   const vorgewaehlt =
     typeof sp.jahr === "string" && /^\d{4}$/.test(sp.jahr)
       ? Number(sp.jahr)
-      : (jahre[0] ?? heute);
+      : aktivesJahr != null && jahre.includes(aktivesJahr)
+        ? aktivesJahr
+        : (jahre[0] ?? heute);
 
   return (
     <PageShell>
@@ -64,7 +69,7 @@ export default async function EinkommensteuerPage({
         beschreibung="Grobe ESt-Schätzung auf Basis des EÜR-Gewinns (deterministisch, §32a EStG) sowie die vollständige Aufstellung aller privaten Entnahmen. Reproduzierbar je Jahr mit Drill-down. Schätzung ausdrücklich unverbindlich."
       />
 
-      <EstAnsicht jahre={jahre} jahrInitial={vorgewaehlt} />
+      <EstAnsicht key={vorgewaehlt} jahre={jahre} jahrInitial={vorgewaehlt} />
     </PageShell>
   );
 }

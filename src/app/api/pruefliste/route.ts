@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { Buchung } from "@/lib/types";
 
 const SELECT_FELDER =
@@ -58,6 +59,10 @@ export async function GET(request: Request) {
   const { konto, grund, sort, richtung } = parsed.data;
 
   const supabase = await createClient();
+
+  // PROJ-22: Prüfliste auf das global aktive Jahr scopen.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {});
+
   let query = supabase
     .from("buchung")
     .select(SELECT_FELDER)
@@ -68,6 +73,8 @@ export async function GET(request: Request) {
     })
     .limit(1000);
 
+  if (von) query = query.gte("buchung_datum", von);
+  if (bis) query = query.lte("buchung_datum", bis);
   if (konto) {
     query = query.eq("konto_id", konto);
   }

@@ -98,13 +98,18 @@ export function ExportAuswahl({
   jahre,
   rhythmus,
   periodenProJahr,
+  jahrInitial,
 }: {
   jahre: number[];
   rhythmus: UstRhythmus;
   periodenProJahr: Record<number, Array<{ periode: number; label: string }>>;
+  /** PROJ-22: Vorauswahl (aktives Jahr). Default: jüngstes Jahr. */
+  jahrInitial?: number;
 }) {
   const [typId, setTypId] = useState<ExportTyp>("euer");
-  const [jahr, setJahr] = useState<number>(jahre[0] ?? new Date().getFullYear());
+  const [jahr, setJahr] = useState<number>(
+    jahrInitial ?? jahre[0] ?? new Date().getFullYear(),
+  );
   const [periode, setPeriode] = useState<number>(0);
   const [format, setFormat] = useState<ExportFormat>("pdf");
   const [laden, setLaden] = useState(false);

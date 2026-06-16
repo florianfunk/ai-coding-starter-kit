@@ -10,6 +10,7 @@ import { UstvaAnsicht } from "@/components/ustva/ustva-ansicht";
 import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
 import type { UstStatus } from "@/lib/types";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { ladeJahrKontext, parseJahrParam } from "@/lib/jahr/aktives-jahr";
 
 export const metadata = {
   title: "USt-Voranmeldung · STEUERAGENT",
@@ -28,9 +29,14 @@ function rhythmusVon(p: ProfilRow): UstRhythmus {
       : "monatlich";
 }
 
-export default async function UstVoranmeldungPage() {
+export default async function UstVoranmeldungPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
   const supabase = await createClient();
+  const sp = await searchParams;
 
   const { data: profilData } = await supabase
     .from("firmenprofil")
@@ -40,7 +46,17 @@ export default async function UstVoranmeldungPage() {
     .maybeSingle();
   const profil = (profilData as ProfilRow | null) ?? null;
 
-  const aktuellesJahr = new Date().getFullYear();
+  // PROJ-22: Jahr aus explizitem ?jahr= (z. B. Drilldown) > aktivem Jahr >
+  // jüngstem Datenjahr > laufendem Kalenderjahr. USt-VA braucht genau ein Jahr,
+  // daher bei „Alle Jahre" Fallback auf das jüngste Datenjahr.
+  const heute = new Date().getFullYear();
+  const explizit = parseJahrParam(typeof sp.jahr === "string" ? sp.jahr : null);
+  const { aktivesJahr, verfuegbareJahre } = await ladeJahrKontext(
+    supabase,
+    user.id,
+    heute,
+  );
+  const jahr = explizit ?? aktivesJahr ?? verfuegbareJahre[0] ?? heute;
 
   return (
     <PageShell>
@@ -62,8 +78,8 @@ export default async function UstVoranmeldungPage() {
         <UstvaAnsicht
           rhythmus={rhythmusVon(profil)}
           ustStatus={profil.ust_status}
-          jahr={aktuellesJahr}
-          perioden={ustVaPerioden(aktuellesJahr, rhythmusVon(profil)).map(
+          jahr={jahr}
+          perioden={ustVaPerioden(jahr, rhythmusVon(profil)).map(
             (p) => ({ periode: p.periode, label: p.label }),
           )}
         />

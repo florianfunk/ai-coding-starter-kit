@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExportAuswahl } from "@/components/export/export-auswahl";
 import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { ladeAktivesJahr } from "@/lib/jahr/aktives-jahr";
 
 export const metadata = {
   title: "Export · STEUERAGENT",
@@ -68,6 +69,13 @@ export default async function ExportPage() {
     jahre.push(j);
   }
 
+  // PROJ-22: aktives Jahr als Vorauswahl (falls im Bereich).
+  const aktivesJahr = await ladeAktivesJahr(supabase, user.id);
+  const vorgewaehlt =
+    aktivesJahr != null && jahre.includes(aktivesJahr)
+      ? aktivesJahr
+      : (jahre[0] ?? heute);
+
   const rhy: UstRhythmus = profil ? rhythmusVon(profil) : "monatlich";
   // Perioden je auswählbarem Jahr (für USt-VA/ELSTER).
   const periodenProJahr: Record<
@@ -99,9 +107,11 @@ export default async function ExportPage() {
         </Alert>
       ) : (
         <ExportAuswahl
+          key={vorgewaehlt}
           jahre={jahre}
           rhythmus={rhy}
           periodenProJahr={periodenProJahr}
+          jahrInitial={vorgewaehlt}
         />
       )}
     </PageShell>

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BelegTabelle } from "@/components/belege/beleg-tabelle";
@@ -19,7 +20,10 @@ export default async function BelegePage() {
   const user = await requireUser();
   const supabase = await createClient();
 
-  const { data, error } = await supabase
+  // PROJ-22: Belege aufs global aktive Jahr scopen (Datumsspalte beleg_datum).
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {});
+
+  let query = supabase
     .from("beleg")
     .select(
       "id, paperless_id, titel, beleg_datum, korrespondent, betrag, tags, dokumenttyp, ocr_text, quell_link, status",
@@ -27,6 +31,10 @@ export default async function BelegePage() {
     .eq("owner_id", user.id)
     .order("beleg_datum", { ascending: false, nullsFirst: false })
     .limit(1000);
+  if (von) query = query.gte("beleg_datum", von);
+  if (bis) query = query.lte("beleg_datum", bis);
+
+  const { data, error } = await query;
 
   return (
     <PageShell>

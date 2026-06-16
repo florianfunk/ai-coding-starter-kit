@@ -5,6 +5,7 @@
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { Buchung, JobLauf, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BuchungenLedger } from "@/components/buchungen/buchungen-ledger";
@@ -39,10 +40,26 @@ export default async function BuchungenPage({
   const supabase = await createClient();
   const sp = await searchParams;
 
-  const filter: Such = {
+  const rohFilter: Such = {
     konto: typeof sp.konto === "string" ? sp.konto : undefined,
     von: typeof sp.von === "string" ? sp.von : undefined,
     bis: typeof sp.bis === "string" ? sp.bis : undefined,
+  };
+
+  // PROJ-22: Datumsfenster über den globalen Jahreswähler auflösen. Fehlen
+  // explizite von/bis (Search-Params), greift das aktive Jahr; gesetzte
+  // Grenzen werden darauf geklammert. Das effektive Fenster fließt sowohl in
+  // die Server-Query als auch (für die Anzeige der Datums-Inputs) in den an den
+  // Ledger gereichten Filter.
+  const { von: effVon, bis: effBis } = await aktiverZeitraum(supabase, user.id, {
+    von: rohFilter.von ?? null,
+    bis: rohFilter.bis ?? null,
+    jahr: null,
+  });
+  const filter: Such = {
+    konto: rohFilter.konto,
+    von: effVon ?? undefined,
+    bis: effBis ?? undefined,
   };
 
   const { data: kontenData } = await supabase

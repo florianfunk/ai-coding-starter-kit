@@ -31,6 +31,7 @@ import {
 } from "@/lib/matching/engine";
 import { DEFAULT_SCORE_CONFIG, type BelegFuerScore } from "@/lib/matching/score";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -97,10 +98,20 @@ export async function GET(request: Request) {
   }
   const f = filterParsed.data;
 
+  // PROJ-22: Datumsfenster über den globalen Jahreswähler auflösen — fehlende
+  // von/bis scopen so automatisch aufs aktive Jahr; explizite Grenzen werden
+  // darauf geklammert. Wird wie bisher auf BEIDE Datumsspalten (buchung_datum,
+  // beleg_datum) angewandt.
+  const { von, bis } = await aktiverZeitraum(supabase, user.id, {
+    von: f.von ?? null,
+    bis: f.bis ?? null,
+    jahr: null,
+  });
+
   // Alle Zuordnungen owner-scoped (für "hat Beleg?"-Auswertung).
   // Vollständig paginiert — PostgREST deckelt sonst bei 1000 Zeilen.
   // Stabile Sortierung via id (range-Pagination erfordert deterministische Ordnung).
-  const { data: bbData, error: bbErr } = await ladeAlle((von, bisIdx) =>
+  const { data: bbData, error: bbErr } = await ladeAlle((vonIdx, bisIdx) =>
     supabase
       .from("beleg_buchung")
       .select(
@@ -108,7 +119,7 @@ export async function GET(request: Request) {
       )
       .eq("owner_id", user.id)
       .order("id", { ascending: true })
-      .range(von, bisIdx),
+      .range(vonIdx, bisIdx),
   );
   if (bbErr) {
     return NextResponse.json(
@@ -130,7 +141,7 @@ export async function GET(request: Request) {
 
   // Fehlliste A: geschäftliche Buchungen, gefiltert.
   // Vollständig paginiert — id als stabiler Tiebreaker für range-Pagination.
-  const { data: buchungenData, error: bErr } = await ladeAlle((von, bisIdx) => {
+  const { data: buchungenData, error: bErr } = await ladeAlle((vonIdx, bisIdx) => {
     let bQuery = supabase
       .from("buchung")
       .select(
@@ -141,9 +152,9 @@ export async function GET(request: Request) {
       .order("buchung_datum", { ascending: false })
       .order("id", { ascending: true });
     if (f.konto) bQuery = bQuery.eq("konto_id", f.konto);
-    if (f.von) bQuery = bQuery.gte("buchung_datum", f.von);
-    if (f.bis) bQuery = bQuery.lte("buchung_datum", f.bis);
-    return bQuery.range(von, bisIdx);
+    if (von) bQuery = bQuery.gte("buchung_datum", von);
+    if (bis) bQuery = bQuery.lte("buchung_datum", bis);
+    return bQuery.range(vonIdx, bisIdx);
   });
   if (bErr) {
     return NextResponse.json(
@@ -169,7 +180,7 @@ export async function GET(request: Request) {
   // Fehlliste B: Belege ohne (sichere) Zuordnung.
   // Vollständig paginiert — beleg_datum-Sortierung (nullsFirst) bleibt, id als
   // finaler Tiebreaker für deterministische range-Pagination.
-  const { data: belegeData, error: belErr } = await ladeAlle((von, bisIdx) => {
+  const { data: belegeData, error: belErr } = await ladeAlle((vonIdx, bisIdx) => {
     let belQuery = supabase
       .from("beleg")
       .select(
@@ -178,9 +189,9 @@ export async function GET(request: Request) {
       .eq("owner_id", user.id)
       .order("beleg_datum", { ascending: false, nullsFirst: false })
       .order("id", { ascending: true });
-    if (f.von) belQuery = belQuery.gte("beleg_datum", f.von);
-    if (f.bis) belQuery = belQuery.lte("beleg_datum", f.bis);
-    return belQuery.range(von, bisIdx);
+    if (von) belQuery = belQuery.gte("beleg_datum", von);
+    if (bis) belQuery = belQuery.lte("beleg_datum", bis);
+    return belQuery.range(vonIdx, bisIdx);
   });
   if (belErr) {
     return NextResponse.json(

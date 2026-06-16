@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { bulkUstSchema } from "@/lib/validation/buchungen-ust-bulk";
+import { ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import type { BuchungStatus } from "@/lib/types";
 
 interface BuchungVorher {
@@ -48,11 +49,15 @@ export async function POST(request: Request) {
   const { ids, ust_satz } = parsed.data;
   const supabase = await createClient();
 
-  const { data: vorherData, error: vorherErr } = await supabase
-    .from("buchung")
-    .select("id, ust_satz, status")
-    .eq("owner_id", user.id)
-    .in("id", ids);
+  const { data: vorherData, error: vorherErr } = await ladeNachBloecken(
+    ids,
+    (block) =>
+      supabase
+        .from("buchung")
+        .select("id, ust_satz, status")
+        .eq("owner_id", user.id)
+        .in("id", block),
+  );
   if (vorherErr) {
     return NextResponse.json(
       { error: "Vorher-Snapshot fehlgeschlagen: " + vorherErr.message },
@@ -78,12 +83,16 @@ export async function POST(request: Request) {
     pruef_grund: null,
   };
 
-  const { data: nachherData, error: updErr } = await supabase
-    .from("buchung")
-    .update(updates)
-    .eq("owner_id", user.id)
-    .in("id", Array.from(gefunden))
-    .select("id, ust_satz, status");
+  const { data: nachherData, error: updErr } = await ladeNachBloecken(
+    Array.from(gefunden),
+    (block) =>
+      supabase
+        .from("buchung")
+        .update(updates)
+        .eq("owner_id", user.id)
+        .in("id", block)
+        .select("id, ust_satz, status"),
+  );
   if (updErr) {
     return NextResponse.json(
       { error: "Bulk-Update fehlgeschlagen: " + updErr.message },

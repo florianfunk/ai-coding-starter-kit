@@ -18,7 +18,7 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
-import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { ladeAlle, ladeNachBloecken, MAX_ROWS_SEITE } from "@/lib/supabase/fetch-all";
 import { euerJahrSchema, euerAbschlussSchema } from "@/lib/validation/euer";
 import {
   berechneEuer,
@@ -112,15 +112,16 @@ async function ermittleWarnungen(
   let ohneBelegSumme = 0;
   if (geschaeftlich.length > 0) {
     const ids = geschaeftlich.map((b) => b.id);
-    const { data: bbData } = await ladeAlle((von, bisIdx) =>
+    // Blockweise: ids können ein ganzes Jahr umfassen (>1000 UUIDs) — ein
+    // einzelnes .in() würde die GET-URL sprengen (HTTP 400). Pro Block reichen
+    // höchstens ~ein paar hundert Treffer, daher kein zusätzliches Result-Paging.
+    const { data: bbData } = await ladeNachBloecken(ids, (block) =>
       supabase
         .from("beleg_buchung")
         .select("buchung_id")
         .eq("owner_id", ownerId)
-        .in("buchung_id", ids)
-        .order("buchung_id", { ascending: true })
-        .order("id", { ascending: true })
-        .range(von, bisIdx),
+        .in("buchung_id", block)
+        .limit(MAX_ROWS_SEITE),
     );
     const mitBeleg = new Set(
       ((bbData ?? []) as Array<{ buchung_id: string }>).map(

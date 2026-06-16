@@ -30,7 +30,7 @@ import {
   type EngineConfig,
 } from "@/lib/matching/engine";
 import { DEFAULT_SCORE_CONFIG, type BelegFuerScore } from "@/lib/matching/score";
-import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { ladeAlle, ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 
 export const runtime = "nodejs";
@@ -416,12 +416,14 @@ export async function POST(request: Request) {
     );
     if (zuLoeschen.length > 0) {
       const ids = zuLoeschen.map((z) => z.id as string);
-      const { error: delErr } = await supabase
-        .from("beleg_buchung")
-        .delete()
-        .eq("owner_id", user.id)
-        .eq("gesperrt", false)
-        .in("id", ids);
+      const { error: delErr } = await ladeNachBloecken(ids, (block) =>
+        supabase
+          .from("beleg_buchung")
+          .delete()
+          .eq("owner_id", user.id)
+          .eq("gesperrt", false)
+          .in("id", block),
+      );
       if (delErr) {
         ergebnis.fehler.push("Alte Zuordnungen konnten nicht entfernt werden.");
       }

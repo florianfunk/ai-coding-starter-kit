@@ -19,6 +19,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { bulkKategorieSchema } from "@/lib/validation/buchungen-bulk";
+import { ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import type { BuchungStatus, KategorieTyp, Klassifikation } from "@/lib/types";
 
 interface BuchungVorher {
@@ -90,11 +91,17 @@ export async function POST(request: Request) {
 
   // 2) Vorher-Snapshot — gleichzeitig Owner-Filter (RLS würde reichen,
   //    aber wir wollen die "übersprungen"-Liste melden können).
-  const { data: vorherData, error: vorherErr } = await supabase
-    .from("buchung")
-    .select("id, kategorie_id, klassifikation, steuerrelevant, ust_satz, status")
-    .eq("owner_id", user.id)
-    .in("id", ids);
+  const { data: vorherData, error: vorherErr } = await ladeNachBloecken(
+    ids,
+    (block) =>
+      supabase
+        .from("buchung")
+        .select(
+          "id, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
+        )
+        .eq("owner_id", user.id)
+        .in("id", block),
+  );
   if (vorherErr) {
     return NextResponse.json(
       { error: "Vorher-Snapshot fehlgeschlagen: " + vorherErr.message },
@@ -129,12 +136,18 @@ export async function POST(request: Request) {
     kat.typ === "privat" || kat.typ === "neutral" ? null : kat.ust_satz;
 
   // 4) Bulk-UPDATE.
-  const { data: nachherData, error: updErr } = await supabase
-    .from("buchung")
-    .update(updates)
-    .eq("owner_id", user.id)
-    .in("id", Array.from(gefunden))
-    .select("id, kategorie_id, klassifikation, steuerrelevant, ust_satz, status");
+  const { data: nachherData, error: updErr } = await ladeNachBloecken(
+    Array.from(gefunden),
+    (block) =>
+      supabase
+        .from("buchung")
+        .update(updates)
+        .eq("owner_id", user.id)
+        .in("id", block)
+        .select(
+          "id, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
+        ),
+  );
   if (updErr) {
     return NextResponse.json(
       { error: "Bulk-Update fehlgeschlagen: " + updErr.message },

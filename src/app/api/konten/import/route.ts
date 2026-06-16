@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/server";
 import { kontoMappingSchema } from "@/lib/validation/konto";
 import { parseKontoauszug } from "@/lib/importer/parser";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
+import { ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import type { KontoMapping } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -171,25 +172,32 @@ export async function POST(request: Request) {
   }
 
   // Duplikaterkennung gegen vorhandene buchung.duplikat_hash (owner-scoped).
+  // Wichtig: lange Auszüge (z. B. Amex/Kreditkarte) erzeugen sehr viele Hashes.
+  // Ein einziges .in() würde alle Hashes in die GET-URL packen → URL zu lang →
+  // PostgREST lehnt mit HTTP 400 ab ("Duplikatprüfung fehlgeschlagen"). Daher
+  // die Abfrage in Blöcke aufteilen. (Die echte Dedup passiert ohnehin per
+  // DB-Constraint onConflict beim Insert; diese Prüfung dient der Vorschau.)
   const hashes = ergebnis.buchungen.map((b) => b.duplikat_hash);
-  const vorhanden = new Set<string>();
-  if (hashes.length > 0) {
-    const { data: existierende, error: dupErr } = await supabase
-      .from("buchung")
-      .select("duplikat_hash")
-      .eq("owner_id", user.id)
-      .in("duplikat_hash", hashes)
-      .limit(hashes.length);
-    if (dupErr) {
-      return NextResponse.json(
-        { error: "Duplikatprüfung fehlgeschlagen" },
-        { status: 500 },
-      );
-    }
-    for (const row of existierende ?? []) {
-      vorhanden.add(row.duplikat_hash as string);
-    }
+  const { data: existierende, error: dupErr } = await ladeNachBloecken(
+    hashes,
+    (block) =>
+      supabase
+        .from("buchung")
+        .select("duplikat_hash")
+        .eq("owner_id", user.id)
+        .in("duplikat_hash", block)
+        .limit(block.length),
+  );
+  if (dupErr) {
+    console.error("[konten/import] Duplikatprüfung fehlgeschlagen", dupErr);
+    return NextResponse.json(
+      { error: "Duplikatprüfung fehlgeschlagen" },
+      { status: 500 },
+    );
   }
+  const vorhanden = new Set<string>(
+    (existierende ?? []).map((row) => row.duplikat_hash as string),
+  );
 
   // Innerhalb der Datei selbst doppelte Zeilen ebenfalls nur einmal nehmen.
   const gesehen = new Set<string>();

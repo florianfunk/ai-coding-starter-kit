@@ -11,7 +11,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { bewegungenFilterSchema } from "@/lib/validation/finanzen";
 import { istImBereich } from "@/lib/finanzen/bereich-filter";
 import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
-import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { ladeAlle, ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import type {
   BuchungStatus,
   KategorieTyp,
@@ -229,11 +229,13 @@ export async function GET(request: Request) {
   const seitenIds = seite.map((b) => b.id);
   const belegAnzahl = new Map<string, number>();
   if (seitenIds.length > 0) {
-    const { data: bbData } = await supabase
-      .from("beleg_buchung")
-      .select("buchung_id")
-      .eq("owner_id", user.id)
-      .in("buchung_id", seitenIds);
+    const { data: bbData } = await ladeNachBloecken(seitenIds, (block) =>
+      supabase
+        .from("beleg_buchung")
+        .select("buchung_id")
+        .eq("owner_id", user.id)
+        .in("buchung_id", block),
+    );
     for (const r of (bbData ?? []) as Array<{ buchung_id: string }>) {
       belegAnzahl.set(r.buchung_id, (belegAnzahl.get(r.buchung_id) ?? 0) + 1);
     }

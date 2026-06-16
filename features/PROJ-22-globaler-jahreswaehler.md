@@ -1,9 +1,33 @@
 # PROJ-22: Globaler Jahreswähler (app-weiter Jahres-Modus)
 
-## Status: In Progress
+## Status: Deployed
 **Created:** 2026-06-16
 **Last Updated:** 2026-06-16
 **Priorität:** P2
+
+## Deployment
+- **Production:** https://steueragent.vercel.app — deployed 2026-06-16
+- Deployment-ID `dpl_C6FEBYPj2aFbJoquLnDVa5AGN1U3` (target production, via
+  `vercel --prod`), readyState READY, aliased.
+- **DB-Migration `0012_firmenprofil_aktives_jahr.sql` auf Production-Supabase
+  angewendet** (Projekt `xhrjtkcnbmknaribuhyo`, via MCP `apply_migration`).
+  Spalte `aktives_jahr` angelegt; bestehendes Profil auf `2026` vorbelegt
+  (jüngstes/einziges Datenjahr — alle 2163 Buchungen liegen in 2026). Security-
+  Advisor nach DDL: kein neuer Lint (nur vorbestehende WARN „leaked password
+  protection", unabhängig von PROJ-22).
+- Smoke-Test Prod: Seiten (`/kategorien-analyse`, `/buchungen`, `/pruefliste`,
+  `/euer`, `/ust-voranmeldung`, `/merkliste`, `/belege`, `/kuendigungen`) →
+  `307 → /login`; APIs (`/api/firma/jahr` PATCH, `/api/finanzen/bewegungen`,
+  `/api/pruefliste`) → `401`; `/login` → `200`. Auth greift überall ✓
+- Commit `0ec2d3a` (lokal auf `feat/steueragent-mvp`, **nicht** gepusht).
+- **QA:** Adversarialer Review des PROJ-22-Diffs (QA Backend) + breiter
+  App-Sweep (general-purpose): **keine Critical/High**. Clamp-Logik und
+  „Alle Jahre"-Pfad verifiziert, kein Auth-/await-/Scope-Fehler, Client↔Server-
+  Parameter-Wiring sauber. Minor/uncertain Notizen ohne Auswirkung auf aktuelle
+  Daten (alles 2026): abgleich-POST-Param-Namenskonsistenz; abgleich-„unsichere
+  Zuordnungen" mit jahresübergreifendem Beleg/Buchung. Ein **vorbestehender**
+  (nicht aus PROJ-22) Medium-Befund dokumentiert: `konten/import` schluckt einen
+  möglichen `job_lauf`-Insert-Fehler → verwaiste `import_lauf_id=null`.
 
 ## Implementierungsnotizen
 - **DB:** Migration `0012_firmenprofil_aktives_jahr.sql` — Spalte
@@ -177,7 +201,11 @@ dieses Kalenderjahres; bei **„Alle Jahre"** kein Datumsfilter:
 - Kein Mehrjahres-Range (z. B. „2024–2025") — nur ein Jahr oder „Alle Jahre"
 
 ## QA Test Results
-_To be added by /qa_
+**Datum:** 2026-06-16 · **Ergebnis:** Production-ready (keine Critical/High)
+- Automatisiert: `tsc` fehlerfrei · `lint` 0 Errors · `npm test` 669 grün
+  (inkl. 19 neuer Helper-Tests) · `npm run build` erfolgreich.
+- Adversarialer PROJ-22-Review + breiter statischer App-Sweep (2 Subagents):
+  keine Critical/High; Befunde siehe Deployment-Abschnitt.
 
 ## Deployment
-_To be added by /deploy_
+Siehe Abschnitt „Deployment" oben (2026-06-16).

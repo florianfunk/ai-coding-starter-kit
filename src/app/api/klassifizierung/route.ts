@@ -70,7 +70,24 @@ interface Klassifikationsergebnis {
    * dass der LLM-Kontext mit Stammdaten angereichert war.
    */
   mein_profil_geladen?: boolean;
+  /**
+   * True, wenn der Lauf wegen des Zeitbudgets (Serverless-Timeout-Schutz)
+   * vorzeitig sauber beendet wurde. Die restlichen Buchungen bleiben 'offen'
+   * und werden beim nächsten Start weiterverarbeitet.
+   */
+  zeitlimit_erreicht?: boolean;
+  /** Verbleibende, noch nicht verarbeitete Buchungen bei Zeitlimit-Abbruch. */
+  verbleibend?: number;
 }
+
+// Zeitbudget für die synchrone Hauptschleife. Liegt bewusst unter maxDuration
+// (300 s), damit die Funktion IMMER sauber zurückkehrt (Job → 'fertig') statt
+// vom Plattform-Timeout gekillt zu werden und als Zombie 'laeuft' hängen zu
+// bleiben. Rest bleibt 'offen' → nächster Lauf macht weiter.
+const ZEIT_BUDGET_MS = 210_000;
+// Ab diesem Alter gilt ein 'laeuft'-Job als tot (Funktion kann nicht länger als
+// maxDuration laufen) → darf überschrieben/freigegeben werden.
+const STALE_LAEUFT_MS = 6 * 60 * 1000;
 
 export async function GET() {
   const user = await getApiUser();
@@ -95,7 +112,34 @@ export async function GET() {
     );
   }
 
-  return NextResponse.json({ job: data ?? null });
+  // Zombie-Schutz: ein 'laeuft'-Job, der älter als das Funktions-Limit ist,
+  // wurde von der Plattform gekillt und wird nie 'fertig'. Hier sauber auf
+  // 'fehler' setzen, damit die UI nicht ewig „Läuft…" anzeigt und ein
+  // Neustart möglich ist.
+  const job = data as
+    | { id: string; status: string; created_at: string }
+    | null;
+  if (job && istStaleLaeuft(job.status, job.created_at)) {
+    await supabase
+      .from("job_lauf")
+      .update({
+        status: "fehler",
+        fehler_text:
+          "Abgebrochen: Funktions-Zeitlimit überschritten (Lauf nicht abgeschlossen). Bitte erneut starten.",
+      })
+      .eq("id", job.id)
+      .eq("owner_id", user.id);
+    job.status = "fehler";
+  }
+
+  return NextResponse.json({ job: job ?? null });
+}
+
+/** True, wenn ein 'laeuft'-Job so alt ist, dass die Funktion längst tot ist. */
+function istStaleLaeuft(status: string, createdAt: string): boolean {
+  if (status !== "laeuft") return false;
+  const alter = Date.now() - new Date(createdAt).getTime();
+  return alter > STALE_LAEUFT_MS;
 }
 
 export async function POST(request: Request) {
@@ -144,23 +188,38 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
 
-  // Doppelstart vermeiden.
+  // Doppelstart vermeiden — aber tote Zombie-Jobs nicht ewig blockieren lassen.
   const { data: laufend } = await supabase
     .from("job_lauf")
-    .select("id")
+    .select("id, created_at")
     .eq("owner_id", user.id)
     .eq("art", "klassifizierung")
     .eq("status", "laeuft")
+    .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (laufend) {
-    return NextResponse.json(
-      {
-        error:
-          "Es läuft bereits eine Klassifizierung. Bitte warte, bis sie fertig ist.",
-      },
-      { status: 409 },
-    );
+    const lr = laufend as { id: string; created_at: string };
+    if (istStaleLaeuft("laeuft", lr.created_at)) {
+      // Toter Lauf (Funktions-Timeout) → freigeben und neuen Lauf zulassen.
+      await supabase
+        .from("job_lauf")
+        .update({
+          status: "fehler",
+          fehler_text:
+            "Abgebrochen: Funktions-Zeitlimit überschritten — durch Neustart ersetzt.",
+        })
+        .eq("id", lr.id)
+        .eq("owner_id", user.id);
+    } else {
+      return NextResponse.json(
+        {
+          error:
+            "Es läuft bereits eine Klassifizierung. Bitte warte, bis sie fertig ist.",
+        },
+        { status: 409 },
+      );
+    }
   }
 
   // Lernregeln + Kategorien einmalig laden (owner-scoped).
@@ -315,8 +374,19 @@ export async function POST(request: Request) {
   // die Server-Lebenszeit.
   const inflight = neueInflightMap();
 
+  const startMs = Date.now();
+  let zeitlimitErreicht = false;
+
   try {
     for (let i = 0; i < buchungen.length; i++) {
+      // Zeitbudget-Schutz: vor jeder Buchung prüfen, ob noch Zeit ist. Sonst
+      // sauber abbrechen (Job wird unten als 'fertig' markiert), Rest bleibt
+      // 'offen' für den nächsten Lauf — kein Funktions-Timeout, kein Zombie.
+      if (Date.now() - startMs > ZEIT_BUDGET_MS) {
+        zeitlimitErreicht = true;
+        ergebnis.verbleibend = buchungen.length - i;
+        break;
+      }
       const b = buchungen[i];
       try {
         const { ergebnis: e, audit } = await klassifiziereBuchung(
@@ -414,28 +484,34 @@ export async function POST(request: Request) {
       }
     }
 
+    ergebnis.zeitlimit_erreicht = zeitlimitErreicht;
+
     // PROJ-15 (Konsistenz-Pro) — Phase 2: Konsistenz-Pass laeuft NACH der
     // Hauptschleife im selben Job. Er gleicht haeufig vorkommende Empfaenger
     // mit Mehrfach-Kategorien auf die Mehrheits-Kategorie an, sofern die
     // Mehrheit mindestens 60% mit >=0.85 Durchschnitts-Konfidenz hat und
     // die Klassifikation einheitlich ist. Manuell bestaetigte Buchungen
     // werden niemals angefasst.
+    // Bei Zeitlimit-Abbruch wird er ÜBERSPRUNGEN — er soll erst auf dem
+    // vollständig klassifizierten Datenstand laufen (und es fehlt ohnehin Zeit).
     try {
-      ergebnis.konsistenz_pass = await wendeKonsistenzPassAn(
-        supabase,
-        user.id,
-      );
+      ergebnis.konsistenz_pass = zeitlimitErreicht
+        ? null
+        : await wendeKonsistenzPassAn(supabase, user.id);
     } catch {
       // Pass ist best-effort: Fehler darf den Lauf nicht als 'fehler'
       // markieren, die Hauptphase ist erfolgreich fertig.
       ergebnis.konsistenz_pass = null;
     }
 
+    // Auch ein zeitlimitierter Lauf endet sauber als 'fertig' (Teil-Erfolg);
+    // fortschritt spiegelt die tatsächlich verarbeitete Anzahl.
+    const verarbeitetGesamt = buchungen.length - (ergebnis.verbleibend ?? 0);
     await supabase
       .from("job_lauf")
       .update({
         status: "fertig",
-        fortschritt: buchungen.length,
+        fortschritt: verarbeitetGesamt,
         gesamt: buchungen.length,
         ergebnis: ergebnis as unknown as Record<string, unknown>,
       })

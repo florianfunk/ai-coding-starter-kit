@@ -38,6 +38,9 @@ interface KlassErgebnis {
   /** PROJ-23: aus eindeutiger Vorjahres-/Historie-Kategorisierung übernommen. */
   via_vorjahr?: number;
   uebersprungen_manuell?: number;
+  /** Lauf wurde wegen Zeitbudget vorzeitig beendet — Rest bleibt offen. */
+  zeitlimit_erreicht?: boolean;
+  verbleibend?: number;
   fehler?: Array<{ buchung_id: string; grund: string }>;
   /** PROJ-15: Phase-2-Statistik des Konsistenz-Passes (optional). */
   konsistenz_pass?: KonsistenzPassErgebnis | null;
@@ -125,11 +128,19 @@ export function KlassifizierungPanel({
       const e = json.ergebnis as KlassErgebnis;
       const vorjahrHinweis =
         (e.via_vorjahr ?? 0) > 0 ? `, ${e.via_vorjahr} aus Vorjahr` : "";
-      toast.success(
-        `Fertig: ${e.auto_verbucht ?? 0} auto-verbucht, ${
-          e.zur_pruefung ?? 0
-        } zur Prüfung${vorjahrHinweis}`,
-      );
+      if (e.zeitlimit_erreicht) {
+        toast.warning(
+          `Teil-Lauf: ${e.verarbeitet ?? 0} verarbeitet${vorjahrHinweis}, noch ${
+            e.verbleibend ?? 0
+          } offen — bitte „Klassifizierung starten" erneut klicken.`,
+        );
+      } else {
+        toast.success(
+          `Fertig: ${e.auto_verbucht ?? 0} auto-verbucht, ${
+            e.zur_pruefung ?? 0
+          } zur Prüfung${vorjahrHinweis}`,
+        );
+      }
       await pollStatus();
       setBusy(false);
       router.refresh();
@@ -234,6 +245,19 @@ export function KlassifizierungPanel({
                 <AlertDescription>
                   {job.fehler_text} Bereits klassifizierte Buchungen bleiben
                   erhalten — ein erneuter Lauf setzt fort.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {e.zeitlimit_erreicht && (e.verbleibend ?? 0) > 0 && (
+              <Alert>
+                <AlertTitle>Teil-Lauf — bitte erneut starten</AlertTitle>
+                <AlertDescription>
+                  Der Lauf wurde wegen des Zeitlimits sauber beendet. Es sind
+                  noch {e.verbleibend} Buchungen offen. Klick „Klassifizierung
+                  starten" erneut — der nächste Lauf macht dort weiter. (Dank
+                  Vorjahres-Übernahme und Empfänger-Cache werden Folge-Läufe
+                  meist deutlich schneller.)
                 </AlertDescription>
               </Alert>
             )}

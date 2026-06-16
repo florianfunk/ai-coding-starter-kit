@@ -36,7 +36,8 @@
 | PROJ-20 | Merkliste (Buchungen für späteres Review merken) | In Review | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |
 | PROJ-21 | Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger) | Deployed | [Spec](PROJ-21-lieferanten-notizen.md) | 2026-06-15 |
 | PROJ-22 | Globaler Jahreswähler (app-weiter Jahres-Modus) | Deployed | [Spec](PROJ-22-globaler-jahreswaehler.md) | 2026-06-16 |
+| PROJ-23 | Vorjahres-Übernahme (deterministischer Vor-Pass der Klassifizierung) | Deployed | [Spec](PROJ-23-vorjahres-uebernahme.md) | 2026-06-16 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-23
+## Next Available ID: PROJ-24

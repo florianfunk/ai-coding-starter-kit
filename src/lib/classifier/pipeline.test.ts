@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   entscheideBuchung,
+  entscheideVorjahresUebernahme,
   klassifiziereBuchung,
   ManuellBestaetigtError,
   DEFAULT_CONFIG,
   type BuchungFuerPipeline,
 } from "./pipeline";
+import type { VorjahrKategorisierung } from "./vorjahres-uebernahme";
 import {
   LlmKlassifiziererError,
   type LlmErgebnis,
@@ -922,5 +924,95 @@ describe("klassifiziereBuchung — PROJ-15 Cache-First", () => {
       (c: unknown[]) => (c[0] as { quelle: string }).quelle === "llm",
     );
     expect(llmUpserts).toHaveLength(0);
+  });
+});
+
+describe("PROJ-23 — Vorjahres-Übernahme", () => {
+  const treffer: VorjahrKategorisierung = {
+    kategorie_id: "kat-soft",
+    klassifikation: "geschaeftlich",
+    steuerrelevant: true,
+    ust_satz: 19,
+  };
+
+  it("entscheideVorjahresUebernahme → auto_verbucht, quelle 'vorjahr'", () => {
+    const { ergebnis } = entscheideVorjahresUebernahme(buchung(), treffer);
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.quelle).toBe("vorjahr");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+    expect(ergebnis.klassifikation).toBe("geschaeftlich");
+    expect(ergebnis.konfidenz).toBe(1);
+  });
+
+  it("Betrag über Ausreißer-Limit → zur_pruefung trotz Treffer", () => {
+    const { ergebnis } = entscheideVorjahresUebernahme(
+      buchung({ betrag: -99999 }),
+      treffer,
+    );
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toBe("ausreisser_betrag");
+    expect(ergebnis.quelle).toBe("vorjahr");
+  });
+
+  it("manuell bestätigte Buchung wird nicht übernommen (wirft)", () => {
+    expect(() =>
+      entscheideVorjahresUebernahme(
+        buchung({ status: "manuell_bestaetigt" }),
+        treffer,
+      ),
+    ).toThrow(ManuellBestaetigtError);
+  });
+
+  it("klassifiziereBuchung: Map-Treffer übernimmt OHNE LLM-Aufruf", async () => {
+    const llmFn = vi.fn();
+    const map = new Map<string, VorjahrKategorisierung>([["rewe", treffer]]);
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger_normalisiert: "rewe" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn as never,
+      undefined,
+      { vorjahr_map: map },
+    );
+    expect(llmFn).not.toHaveBeenCalled();
+    expect(ergebnis.quelle).toBe("vorjahr");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+  });
+
+  it("klassifiziereBuchung: Lernregel hat Vorrang vor der Vorjahres-Map", async () => {
+    const llmFn = vi.fn();
+    const map = new Map<string, VorjahrKategorisierung>([["rewe", treffer]]);
+    const r = regel({
+      bedingung: { empfaenger_muster: "test gmbh" },
+      aktion: { klassifikation: "privat", kategorie_id: "kat-privat" },
+    });
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger_normalisiert: "rewe", empfaenger: "Test GmbH" }),
+      [r],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn as never,
+      undefined,
+      { vorjahr_map: map },
+    );
+    expect(llmFn).not.toHaveBeenCalled();
+    expect(ergebnis.quelle).toBe("regel");
+  });
+
+  it("klassifiziereBuchung: kein Map-Treffer → normaler LLM-Pfad", async () => {
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const map = new Map<string, VorjahrKategorisierung>([["andererempf", treffer]]);
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger_normalisiert: "rewe" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn as never,
+      undefined,
+      { vorjahr_map: map },
+    );
+    expect(llmFn).toHaveBeenCalledTimes(1);
+    expect(ergebnis.quelle).toBe("ki");
   });
 });

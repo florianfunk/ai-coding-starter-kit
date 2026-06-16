@@ -52,6 +52,10 @@ import {
   type MeinProfil,
 } from "@/lib/classifier/profil";
 import {
+  vorjahrSchluessel,
+  type VorjahrKategorisierung,
+} from "@/lib/classifier/vorjahres-uebernahme";
+import {
   extrahiereBrancheUndLeistung,
   formatiereRechercheKontext,
   rechercheEmpfaenger,
@@ -98,7 +102,7 @@ export interface Klassifikationsergebnis {
   ust_satz: number | null;
   begruendung: string;
   konfidenz: number | null;
-  quelle: "regel" | "ki";
+  quelle: "regel" | "ki" | "vorjahr";
   regel_id: string | null;
   status: "auto_verbucht" | "zur_pruefung";
   pruef_grund: string | null;
@@ -349,6 +353,41 @@ function baue(
   };
 }
 
+/**
+ * PROJ-23 — REINE Übernahme-Entscheidung: kopiert eine eindeutige Vorjahres-/
+ * Historie-Kategorisierung desselben Empfängers 1:1 auf die Buchung. Beträge
+ * über dem Ausreißer-Limit gehen wie überall trotzdem zur Prüfung (statt
+ * blind auto-verbucht). Kein IO.
+ */
+export function entscheideVorjahresUebernahme(
+  buchung: BuchungFuerPipeline,
+  treffer: VorjahrKategorisierung,
+  config: PipelineConfig = DEFAULT_CONFIG,
+): PipelineEntscheidung {
+  if (buchung.status === "manuell_bestaetigt") {
+    throw new ManuellBestaetigtError();
+  }
+  const istAusreisser = Math.abs(buchung.betrag) > config.betrag_limit;
+  return baue(buchung, {
+    klassifikation: treffer.klassifikation,
+    steuerrelevant: treffer.steuerrelevant,
+    kategorie_id: treffer.kategorie_id,
+    ust_satz: treffer.ust_satz,
+    begruendung: istAusreisser
+      ? "Gleicher Empfänger bereits eindeutig kategorisiert (Vorjahr/Historie) — Betrag über Ausreißer-Limit, daher zur Prüfung."
+      : "Automatisch aus eindeutiger Vorjahres-/Historie-Kategorisierung desselben Empfängers übernommen.",
+    konfidenz: 1,
+    quelle: "vorjahr",
+    regel_id: null,
+    status: istAusreisser ? "zur_pruefung" : "auto_verbucht",
+    pruef_grund: istAusreisser ? "ausreisser_betrag" : null,
+    auditExtra: {
+      vorjahr_uebernahme: true,
+      uebernommene_kategorie_id: treffer.kategorie_id,
+    },
+  });
+}
+
 /** Optionales Daten-Bundle, das die API-Route an die Pipeline reicht. */
 export interface PipelineKontext {
   /**
@@ -362,6 +401,14 @@ export interface PipelineKontext {
   supabase?: SupabaseClient;
   /** Owner-ID, fuer DB-Calls nach Cache und Historie. */
   ownerId?: string;
+  /**
+   * PROJ-23: Vorjahres-Übernahme-Map (empfaenger_norm → eindeutige
+   * Kategorisierung aus bereits final verbuchten Buchungen). Wird vom
+   * API-Route EINMAL pro Job aus den finalisierten Buchungen gebaut. Greift
+   * NACH den Regeln und VOR dem LLM: bei Treffer wird 1:1 übernommen und das
+   * LLM gar nicht erst aufgerufen.
+   */
+  vorjahr_map?: Map<string, VorjahrKategorisierung>;
   /**
    * PROJ-16: Persoenliche Stammdaten ("Mein Profil"). Wird vom API-Route
    * EINMAL pro Job geladen und hier durchgereicht. Steuert:
@@ -431,6 +478,19 @@ export async function klassifiziereBuchung(
   });
   if (regelAuswertung.treffer) {
     return entscheideBuchung(buchung, regeln, null, config);
+  }
+
+  // (1b) PROJ-23 — Vorjahres-Übernahme: greift kein gelernter Regelsatz, aber
+  // derselbe (normalisierte) Empfänger wurde in bereits final verbuchten
+  // Buchungen EINDEUTIG kategorisiert → übernehmen wir das 1:1 und sparen den
+  // LLM-Aufruf. Gemischte/zu dünne Historie → weiter im normalen Prozess.
+  if (ctx.vorjahr_map) {
+    const treffer = ctx.vorjahr_map.get(
+      vorjahrSchluessel(buchung.empfaenger_normalisiert),
+    );
+    if (treffer) {
+      return entscheideVorjahresUebernahme(buchung, treffer, config);
+    }
   }
 
   // (2) Cache-Lookup + ggf. Web-Recherche. Funktioniert nur mit ctx.supabase

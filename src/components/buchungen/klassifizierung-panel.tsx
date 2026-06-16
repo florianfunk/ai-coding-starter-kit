@@ -35,6 +35,8 @@ interface KlassErgebnis {
   zur_pruefung?: number;
   via_regel?: number;
   via_ki?: number;
+  /** PROJ-23: aus eindeutiger Vorjahres-/Historie-Kategorisierung übernommen. */
+  via_vorjahr?: number;
   uebersprungen_manuell?: number;
   fehler?: Array<{ buchung_id: string; grund: string }>;
   /** PROJ-15: Phase-2-Statistik des Konsistenz-Passes (optional). */
@@ -121,10 +123,12 @@ export function KlassifizierungPanel({
         return;
       }
       const e = json.ergebnis as KlassErgebnis;
+      const vorjahrHinweis =
+        (e.via_vorjahr ?? 0) > 0 ? `, ${e.via_vorjahr} aus Vorjahr` : "";
       toast.success(
         `Fertig: ${e.auto_verbucht ?? 0} auto-verbucht, ${
           e.zur_pruefung ?? 0
-        } zur Prüfung`,
+        } zur Prüfung${vorjahrHinweis}`,
       );
       await pollStatus();
       setBusy(false);
@@ -208,6 +212,11 @@ export function KlassifizierungPanel({
                 Zur Prüfung: {e.zur_pruefung ?? 0}
               </Badge>
               <Badge variant="outline">Per Regel: {e.via_regel ?? 0}</Badge>
+              {(e.via_vorjahr ?? 0) > 0 && (
+                <Badge variant="outline">
+                  Aus Vorjahr übernommen: {e.via_vorjahr}
+                </Badge>
+              )}
               <Badge variant="outline">Per KI: {e.via_ki ?? 0}</Badge>
               {(e.uebersprungen_manuell ?? 0) > 0 && (
                 <Badge variant="outline">

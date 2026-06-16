@@ -24,6 +24,10 @@ import {
   type PipelineConfig,
 } from "@/lib/classifier/pipeline";
 import { neueInflightMap } from "@/lib/classifier/empfaenger-cache";
+import {
+  baueVorjahrUebernahmeMap,
+  type FinalBuchungZeile,
+} from "@/lib/classifier/vorjahres-uebernahme";
 import { wendeKonsistenzPassAn } from "@/lib/classifier/konsistenz-pass";
 import type { KonsistenzPassResultat } from "@/lib/classifier/konsistenz-pass";
 import type { KategorieOption } from "@/lib/classifier/llm";
@@ -50,6 +54,8 @@ interface Klassifikationsergebnis {
   zur_pruefung: number;
   via_regel: number;
   via_ki: number;
+  /** PROJ-23: aus eindeutiger Vorjahres-/Historie-Kategorisierung übernommen. */
+  via_vorjahr: number;
   uebersprungen_manuell: number;
   fehler: Array<{ buchung_id: string; grund: string }>;
   /**
@@ -239,6 +245,26 @@ export async function POST(request: Request) {
   }
   const buchungen = (buchungenData ?? []) as BuchungFuerPipeline[];
 
+  // PROJ-23: Vorjahres-Übernahme-Map aus bereits FINAL verbuchten Buchungen
+  // bauen (auto_verbucht/manuell_bestaetigt — typ. die Vorjahres-Daten, z. B.
+  // 2026). Greift in der Pipeline nach den Regeln und vor dem LLM. Einmal pro
+  // Job geladen; nicht jahres-gefiltert, damit die neuen (offenen) Buchungen
+  // die eindeutige Kategorisierung des Vorjahres erben.
+  const { data: finalData } = await ladeAlle((von, bisIdx) =>
+    supabase
+      .from("buchung")
+      .select(
+        "empfaenger_normalisiert, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
+      )
+      .eq("owner_id", user.id)
+      .in("status", ["auto_verbucht", "manuell_bestaetigt"])
+      .order("id", { ascending: true })
+      .range(von, bisIdx),
+  );
+  const vorjahrMap = baueVorjahrUebernahmeMap(
+    (finalData ?? []) as FinalBuchungZeile[],
+  );
+
   // job_lauf anlegen.
   const { data: jobRow, error: jobErr } = await supabase
     .from("job_lauf")
@@ -272,6 +298,7 @@ export async function POST(request: Request) {
     zur_pruefung: 0,
     via_regel: 0,
     via_ki: 0,
+    via_vorjahr: 0,
     uebersprungen_manuell: 0,
     fehler: [],
     konsistenz_pass: null,
@@ -299,7 +326,7 @@ export async function POST(request: Request) {
           config,
           undefined,
           undefined,
-          { supabase, ownerId: user.id, inflight },
+          { supabase, ownerId: user.id, inflight, vorjahr_map: vorjahrMap },
         );
 
         const { error: updErr } = await supabase
@@ -348,6 +375,8 @@ export async function POST(request: Request) {
               (regelTreffer.get(e.regel_id) ?? 0) + 1,
             );
           }
+        } else if (e.quelle === "vorjahr") {
+          ergebnis.via_vorjahr++;
         } else {
           ergebnis.via_ki++;
         }

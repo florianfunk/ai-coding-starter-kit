@@ -1,6 +1,6 @@
 # PROJ-24: Klassifizierung-Center (eigener Menüpunkt, Statistik, Auto-Continue, Manuell-First)
 
-## Status: In Progress
+## Status: Deployed
 **Created:** 2026-06-17
 **Last Updated:** 2026-06-17
 **Priorität:** P1
@@ -67,7 +67,8 @@ eindeutig.
 - **Seite:** `/klassifizierung` (Server) → `KlassifizierungCenter` (Client, Stats-Props + Lauf-Controls).
 
 ## QA Test Results
-_To be added_
+**Datum:** 2026-06-17 · keine Critical/High. tsc ✓ · lint 0 Errors ✓ · 694 Tests grün (6 neu: 3 Manuell-First + 3 Statistik) ✓ · Build ✓.
 
 ## Deployment
-_To be added_
+- **Production:** https://steueragent.vercel.app — deployed 2026-06-17, Commit `364151b`, readyState READY.
+- Smoke: `/klassifizierung` und `/buchungen` → 307 → /login (Auth greift). Keine DB-Migration.

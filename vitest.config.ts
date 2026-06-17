@@ -8,6 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Vitest runs co-located unit tests in src/. Playwright owns tests/ (E2E).
+    include: ['src/**/*.test.{ts,tsx}'],
   },
   resolve: {
     alias: {

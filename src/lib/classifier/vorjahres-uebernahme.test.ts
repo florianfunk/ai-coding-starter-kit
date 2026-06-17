@@ -100,4 +100,32 @@ describe("baueVorjahrUebernahmeMap", () => {
     ]);
     expect(map.size).toBe(0);
   });
+
+  // --- Manuell-First (PROJ-24) ---
+
+  it("Manuell-First: manuelle Kategorie schlägt abweichende auto-verbuchte", () => {
+    const map = baueVorjahrUebernahmeMap([
+      zeile({ status: "manuell_bestaetigt", kategorie_id: "kat-richtig", klassifikation: "geschaeftlich" }),
+      zeile({ status: "auto_verbucht", kategorie_id: "kat-llm-falsch", klassifikation: "privat" }),
+      zeile({ status: "auto_verbucht", kategorie_id: "kat-llm-falsch", klassifikation: "privat" }),
+    ]);
+    // Basis = nur die manuelle → kat-richtig, trotz 2x abweichender auto.
+    expect(map.get("rewe")?.kategorie_id).toBe("kat-richtig");
+    expect(map.get("rewe")?.klassifikation).toBe("geschaeftlich");
+  });
+
+  it("widersprüchliche MANUELLE Kategorien → keine Übernahme", () => {
+    const map = baueVorjahrUebernahmeMap([
+      zeile({ status: "manuell_bestaetigt", kategorie_id: "kat-a" }),
+      zeile({ status: "manuell_bestaetigt", kategorie_id: "kat-b" }),
+    ]);
+    expect(map.has("rewe")).toBe(false);
+  });
+
+  it("eine manuelle reicht, auch wenn nur eine einzige existiert", () => {
+    const map = baueVorjahrUebernahmeMap([
+      zeile({ status: "manuell_bestaetigt", kategorie_id: "kat-x" }),
+    ]);
+    expect(map.get("rewe")?.kategorie_id).toBe("kat-x");
+  });
 });

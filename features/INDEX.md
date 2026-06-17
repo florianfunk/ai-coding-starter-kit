@@ -37,7 +37,8 @@
 | PROJ-21 | Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger) | Deployed | [Spec](PROJ-21-lieferanten-notizen.md) | 2026-06-15 |
 | PROJ-22 | Globaler Jahreswähler (app-weiter Jahres-Modus) | Deployed | [Spec](PROJ-22-globaler-jahreswaehler.md) | 2026-06-16 |
 | PROJ-23 | Vorjahres-Übernahme (deterministischer Vor-Pass der Klassifizierung) | Deployed | [Spec](PROJ-23-vorjahres-uebernahme.md) | 2026-06-16 |
+| PROJ-24 | Klassifizierung-Center (Menüpunkt, Statistik, Auto-Continue, Manuell-First) | In Progress | [Spec](PROJ-24-klassifizierung-center.md) | 2026-06-17 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-24
+## Next Available ID: PROJ-25

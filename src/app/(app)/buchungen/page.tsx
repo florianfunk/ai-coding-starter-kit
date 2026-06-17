@@ -6,10 +6,9 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
-import type { Buchung, JobLauf, Kategorie, Konto } from "@/lib/types";
+import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BuchungenLedger } from "@/components/buchungen/buchungen-ledger";
-import { KlassifizierungPanel } from "@/components/buchungen/klassifizierung-panel";
 
 export const metadata = {
   title: "Buchungen · STEUERAGENT",
@@ -80,18 +79,6 @@ export default async function BuchungenPage({
     .limit(500);
   const kategorien = (kategorienData ?? []) as Kategorie[];
 
-  const { data: jobData } = await supabase
-    .from("job_lauf")
-    .select(
-      "id, art, status, fortschritt, gesamt, ergebnis, fehler_text, created_at",
-    )
-    .eq("owner_id", user.id)
-    .eq("art", "klassifizierung")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const letzterJob = (jobData ?? null) as JobLauf | null;
-
   let query = supabase
     .from("buchung")
     .select(SELECT_FELDER)
@@ -135,10 +122,6 @@ export default async function BuchungenPage({
           maxBuchungen={MAX_BUCHUNGEN}
         />
       )}
-
-      {/* Klassifizierungs-Panel bleibt unter dem Ledger — wirkt wie ein
-          "Tools"-Bereich nach der Hauptansicht. */}
-      <KlassifizierungPanel initialJob={letzterJob} />
     </div>
   );
 }

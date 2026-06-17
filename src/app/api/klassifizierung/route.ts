@@ -418,6 +418,14 @@ export async function POST(request: Request) {
           .neq("status", "manuell_bestaetigt"); // letzte Sicherung
 
         if (updErr) {
+          // Serverseitig die echte DB-Ursache loggen (z. B. CHECK-Constraint),
+          // damit stille Schreibfehler nicht mehr unentdeckt bleiben.
+          console.error(
+            "[klassifizierung] update fehlgeschlagen",
+            b.id,
+            "quelle=" + e.quelle,
+            updErr.message,
+          );
           ergebnis.fehler.push({
             buchung_id: b.id,
             grund: "Buchung konnte nicht aktualisiert werden.",

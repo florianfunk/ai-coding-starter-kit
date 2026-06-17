@@ -88,3 +88,16 @@ Kategorien → kein Eintrag → normaler LLM-Prozess.
 ## Deployment
 - **Production:** https://steueragent.vercel.app — deployed 2026-06-16
 - Keine DB-Migration nötig (nur Code).
+
+### Nachtrag 2026-06-17 — kritischer Fix (Constraint)
+- **Bug:** Der Pass setzt `quelle='vorjahr'`, aber `buchung_quelle_check` erlaubte
+  nur `('regel','ki','manuell')`. Folge: JEDER Vorjahres-Treffer schlug beim
+  UPDATE fehl → Buchung blieb `offen`, `via_vorjahr` blieb 0 (in Prod 882
+  Buchungen hingen, da exakt die vorjahr-eligiblen). tsc/Unit-Tests trafen die
+  DB-Constraint nicht.
+- **Fix:** Migration `0013_buchung_quelle_vorjahr.sql` erweitert die Constraint
+  um `'vorjahr'` (lokal + Prod via MCP angewendet). Zusätzlich loggt die Route
+  `updErr.message` jetzt serverseitig (keine stillen Schreibfehler mehr).
+- **Audit:** Vollständiger Abgleich aller CHECK-Constraints gegen die vom Code
+  geschriebenen Enum-Werte — `quelle='vorjahr'` war der EINZIGE Mismatch; alle
+  anderen constrained Spalten sind durch Zod/Union-Typen gedeckt.

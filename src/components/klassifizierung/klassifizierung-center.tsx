@@ -2,6 +2,10 @@
 
 // PROJ-24: Klassifizierung-Center — Status-Statistik + Lauf-Steuerung mit
 // Auto-Continue (zeitbegrenzte Batches werden automatisch fortgesetzt).
+//
+// Reload-sicher: läuft beim Laden bereits ein Job, übernimmt die Seite ihn,
+// wartet auf sein Ende und setzt die Batch-Kette fort — so kann der Nutzer
+// nicht versehentlich „Starten" in einen laufenden Batch klicken (409).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -62,6 +66,10 @@ function pct(teil: number, ganz: number): number {
   return Math.min(100, Math.round((teil / ganz) * 100));
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export function KlassifizierungCenter({
   statistik,
   initialJob,
@@ -74,90 +82,131 @@ export function KlassifizierungCenter({
   const [running, setRunning] = useState(false);
   const [reklassifizieren, setReklassifizieren] = useState(false);
   const [agg, setAgg] = useState<SessionAggregat>(LEER_AGG);
-  const stopRef = useRef(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const pollStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/klassifizierung", { method: "GET" });
-      if (!res.ok) return;
-      const json = (await res.json()) as { job: JobLauf | null };
-      setJob(json.job);
-    } catch {
-      // nächster Tick versucht es erneut
+  const stopRef = useRef(false);
+  const aktivRef = useRef(false); // Re-Entrancy-Schutz (genau eine Schleife)
+  const aggRef = useRef<SessionAggregat>(LEER_AGG);
+
+  // Aktuellen Job-Status pollen, bis kein 'laeuft'-Job mehr aktiv ist.
+  const wartenAufJobEnde = useCallback(async () => {
+    for (;;) {
+      if (stopRef.current) return;
+      try {
+        const res = await fetch("/api/klassifizierung", { method: "GET" });
+        if (res.ok) {
+          const json = (await res.json()) as { job: JobLauf | null };
+          setJob(json.job);
+          if (!json.job || json.job.status !== "laeuft") return;
+        }
+      } catch {
+        // nächster Versuch
+      }
+      await sleep(2000);
     }
   }, []);
 
-  // Fortschritt eines laufenden Batches pollen.
-  useEffect(() => {
-    if (running && !pollRef.current) {
-      pollRef.current = setInterval(pollStatus, 2000);
-    }
-    if (!running && pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
+  // Genau ein Batch (POST). 409 = „läuft bereits" wird gesondert signalisiert.
+  const einBatch = useCallback(
+    async (
+      nurOffen: boolean,
+    ): Promise<{
+      ok: boolean;
+      laeuftBereits?: boolean;
+      e?: KlassErgebnis;
+      error?: string;
+    }> => {
+      const res = await fetch("/api/klassifizierung", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nur_offen: nurOffen }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ergebnis?: KlassErgebnis; error?: string }
+        | null;
+      if (res.status === 409) {
+        return { ok: false, laeuftBereits: true, error: json?.error };
       }
-    };
-  }, [running, pollStatus]);
+      if (!res.ok) {
+        return { ok: false, error: json?.error ?? "Klassifizierung fehlgeschlagen" };
+      }
+      return { ok: true, e: json?.ergebnis ?? {} };
+    },
+    [],
+  );
 
-  const starteSession = useCallback(async () => {
-    if (running) return;
-    stopRef.current = false;
-    setAgg(LEER_AGG);
-    setRunning(true);
-    let lokal = { ...LEER_AGG };
-    try {
-      let weiter = true;
-      while (weiter && !stopRef.current) {
-        const res = await fetch("/api/klassifizierung", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nur_offen: !reklassifizieren }),
-        });
-        const json = (await res.json().catch(() => null)) as
-          | { ergebnis?: KlassErgebnis; error?: string }
-          | null;
-        if (!res.ok) {
-          toast.error(json?.error ?? "Klassifizierung fehlgeschlagen");
-          break;
+  const laufeWeiter = useCallback(
+    async (resume: boolean) => {
+      if (aktivRef.current) return;
+      aktivRef.current = true;
+      stopRef.current = false;
+      if (!resume) {
+        aggRef.current = LEER_AGG;
+        setAgg(LEER_AGG);
+      }
+      setRunning(true);
+      const nurOffen = !reklassifizieren;
+      try {
+        // Resume: erst den schon laufenden Batch zu Ende laufen lassen.
+        if (resume) await wartenAufJobEnde();
+
+        while (!stopRef.current) {
+          const r = await einBatch(nurOffen);
+          if (r.laeuftBereits) {
+            // Kollision mit einem noch laufenden Batch → warten, dann weiter.
+            await wartenAufJobEnde();
+            continue;
+          }
+          if (!r.ok) {
+            toast.error(r.error ?? "Klassifizierung fehlgeschlagen");
+            break;
+          }
+          const e = r.e ?? {};
+          aggRef.current = {
+            batches: aggRef.current.batches + 1,
+            verarbeitet: aggRef.current.verarbeitet + (e.verarbeitet ?? 0),
+            auto_verbucht: aggRef.current.auto_verbucht + (e.auto_verbucht ?? 0),
+            zur_pruefung: aggRef.current.zur_pruefung + (e.zur_pruefung ?? 0),
+            via_vorjahr: aggRef.current.via_vorjahr + (e.via_vorjahr ?? 0),
+            via_regel: aggRef.current.via_regel + (e.via_regel ?? 0),
+            via_ki: aggRef.current.via_ki + (e.via_ki ?? 0),
+          };
+          setAgg(aggRef.current);
+          router.refresh(); // Server-Statistik live aktualisieren
+
+          // Weiter nur, wenn zeitbegrenzt abgebrochen, noch Rest da UND dieser
+          // Batch etwas geschafft hat (Schutz gegen Endlosschleife).
+          const weiter =
+            !!e.zeitlimit_erreicht &&
+            (e.verbleibend ?? 0) > 0 &&
+            (e.verarbeitet ?? 0) > 0;
+          if (!weiter) break;
         }
-        const e = json?.ergebnis ?? {};
-        lokal = {
-          batches: lokal.batches + 1,
-          verarbeitet: lokal.verarbeitet + (e.verarbeitet ?? 0),
-          auto_verbucht: lokal.auto_verbucht + (e.auto_verbucht ?? 0),
-          zur_pruefung: lokal.zur_pruefung + (e.zur_pruefung ?? 0),
-          via_vorjahr: lokal.via_vorjahr + (e.via_vorjahr ?? 0),
-          via_regel: lokal.via_regel + (e.via_regel ?? 0),
-          via_ki: lokal.via_ki + (e.via_ki ?? 0),
-        };
-        setAgg(lokal);
-        // Server-Statistik live aktualisieren.
+
+        const a = aggRef.current;
+        if (stopRef.current) {
+          toast.info(`Gestoppt nach ${a.verarbeitet} verarbeiteten Buchungen.`);
+        } else if (a.batches > 0) {
+          toast.success(
+            `Fertig: ${a.verarbeitet} verarbeitet (${a.via_vorjahr} aus Vorjahr, ${a.auto_verbucht} auto, ${a.zur_pruefung} zur Prüfung) in ${a.batches} Durchläufen.`,
+          );
+        }
+      } finally {
+        aktivRef.current = false;
+        setRunning(false);
         router.refresh();
-        // Weiter, solange zeitbegrenzt abgebrochen UND noch Rest UND dieser
-        // Batch tatsächlich etwas geschafft hat (Schutz gegen Endlosschleife).
-        weiter =
-          !!e.zeitlimit_erreicht &&
-          (e.verbleibend ?? 0) > 0 &&
-          (e.verarbeitet ?? 0) > 0;
       }
-      if (stopRef.current) {
-        toast.info(`Gestoppt nach ${lokal.verarbeitet} verarbeiteten Buchungen.`);
-      } else {
-        toast.success(
-          `Fertig: ${lokal.verarbeitet} verarbeitet (${lokal.via_vorjahr} aus Vorjahr, ${lokal.auto_verbucht} auto, ${lokal.zur_pruefung} zur Prüfung) in ${lokal.batches} Durchläufen.`,
-        );
-      }
-    } finally {
-      setRunning(false);
-      router.refresh();
+    },
+    [reklassifizieren, einBatch, wartenAufJobEnde, router],
+  );
+
+  // Reload-sicher: läuft beim Laden bereits ein Job, automatisch übernehmen.
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (!startedRef.current && initialJob?.status === "laeuft") {
+      startedRef.current = true;
+      void laufeWeiter(true);
     }
-  }, [running, reklassifizieren, router]);
+  }, [initialJob?.status, laufeWeiter]);
 
   const gesamt = statistik.gesamt;
   const allesVerarbeitet = gesamt.total > 0 && gesamt.offen === 0;
@@ -221,12 +270,20 @@ export function KlassifizierungCenter({
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4">
             {running ? (
-              <Button variant="destructive" onClick={() => (stopRef.current = true)}>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  stopRef.current = true;
+                }}
+              >
                 <StopCircle className="mr-2 h-4 w-4" />
                 Nach aktuellem Durchlauf stoppen
               </Button>
             ) : (
-              <Button onClick={starteSession} disabled={gesamt.offen === 0 && !reklassifizieren}>
+              <Button
+                onClick={() => void laufeWeiter(false)}
+                disabled={gesamt.offen === 0 && !reklassifizieren}
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
                 Klassifizierung starten
               </Button>

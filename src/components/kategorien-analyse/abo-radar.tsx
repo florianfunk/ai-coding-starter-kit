@@ -552,8 +552,10 @@ function AboItemRow({
     (b) => b.status === "manuell_bestaetigt",
   ).length;
   const gesamt = item.buchungen.length;
+  // Netto-Summe vorzeichenbehaftet: Gutschriften/Rückzahlungen in einer
+  // Abo-Reihe mindern die Summe, statt als Volumen aufaddiert zu werden.
   const bisherSumme = item.buchungen.reduce(
-    (s, b) => s + Math.abs(b.betrag),
+    (s, b) => s + (Number(b.betrag) || 0),
     0,
   );
   const richtungFarbe =

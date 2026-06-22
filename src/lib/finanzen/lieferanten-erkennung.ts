@@ -189,8 +189,11 @@ export function erkenneLieferanten(
       : null;
 
     const anzahl = gruppe.length;
+    // Netto-Summe (vorzeichenbehaftet): Zuflüsse zählen positiv, Abflüsse
+    // negativ. Eine Darlehens-Rückzahlung mindert also die Empfänger-Summe,
+    // statt fälschlich als zusätzliches Volumen aufaddiert zu werden.
     const gesamtSumme = gruppe.reduce(
-      (s, b) => s + Math.abs(Number(b.betrag) || 0),
+      (s, b) => s + (Number(b.betrag) || 0),
       0,
     );
     const erste = gruppe[0].buchung_datum;
@@ -198,7 +201,8 @@ export function erkenneLieferanten(
     const spanTage = Math.max(1, tageZwischen(erste, letzte));
     // Hochrechnung auf 365 Tage; bei sehr kurzem Span begrenzen wir
     // den Skalierfaktor, damit "3 Buchungen in 7 Tagen" nicht
-    // unrealistisch hochgerechnet werden.
+    // unrealistisch hochgerechnet werden. Vorzeichen der Netto-Summe bleibt
+    // erhalten (Jahres-Projektion einer Ausgabe ist negativ).
     const skalierung = Math.min(365 / spanTage, 12);
     const jahresumsatz = Math.round(gesamtSumme * skalierung * 100) / 100;
 
@@ -239,8 +243,10 @@ export function erkenneLieferanten(
     });
   }
 
-  // Sortierung: nach Jahresumsatz absteigend. Sektionierung passiert im UI.
-  items.sort((a, b) => b.jahresumsatz - a.jahresumsatz);
+  // Sortierung: nach Jahresumsatz-Volumen absteigend. Da die Summe jetzt
+  // vorzeichenbehaftet ist (Ausgaben negativ), wird über den Betrag sortiert,
+  // damit große Empfänger unabhängig von der Richtung oben stehen.
+  items.sort((a, b) => Math.abs(b.jahresumsatz) - Math.abs(a.jahresumsatz));
   return items;
 }
 

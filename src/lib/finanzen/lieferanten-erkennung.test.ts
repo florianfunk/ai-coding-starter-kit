@@ -241,9 +241,11 @@ describe("erkenneLieferanten", () => {
       buFull("4", "aldi", "ALDI", "2026-03-02", -50),
     ];
     const items = erkenneLieferanten(buchungen);
-    expect(items[0].gesamt_summe).toBe(150);
-    expect(items[0].jahresumsatz).toBeGreaterThan(150);
-    expect(items[0].jahresumsatz).toBeLessThan(1100);
+    // Netto-Summe vorzeichenbehaftet: vier Ausgaben → -150 EUR.
+    expect(items[0].gesamt_summe).toBe(-150);
+    // Jahres-Hochrechnung behält das Vorzeichen (Ausgabe → negativ).
+    expect(items[0].jahresumsatz).toBeLessThan(-150);
+    expect(items[0].jahresumsatz).toBeGreaterThan(-1100);
   });
 
   it("neutrale Geldtransit-Buchungen zählen NICHT für Richtung & dominante Kategorie", () => {
@@ -291,9 +293,10 @@ describe("erkenneLieferanten", () => {
       buFull("4", "aldi", "ALDI", "2026-01-01", -100),
     ];
     const items = erkenneLieferanten(buchungen);
-    expect(items[0].gesamt_summe).toBe(400);
-    // Span ~730 Tage, also jahresumsatz ~200
-    expect(items[0].jahresumsatz).toBeLessThan(400);
-    expect(items[0].jahresumsatz).toBeGreaterThan(100);
+    // Netto-Summe vorzeichenbehaftet: vier Ausgaben → -400 EUR.
+    expect(items[0].gesamt_summe).toBe(-400);
+    // Span ~730 Tage, also jahresumsatz ~-200 (Vorzeichen erhalten).
+    expect(items[0].jahresumsatz).toBeGreaterThan(-400);
+    expect(items[0].jahresumsatz).toBeLessThan(-100);
   });
 });

@@ -57,6 +57,7 @@ import {
 } from "@/lib/finanzen/regel-helper";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { BuchungDetailSheet } from "@/components/kategorien-analyse/buchung-detail-sheet";
+import { BetragSummary } from "@/components/kategorien-analyse/betrag-summary";
 import { LieferantNotizenPanel } from "@/components/lieferanten-notizen/lieferant-notizen-panel";
 import type { KategorieTyp } from "@/lib/types";
 import type { BulkKategorieResponse } from "@/app/api/buchungen/bulk-kategorie/route";
@@ -1170,6 +1171,15 @@ function LieferantDrilldown({
           })}
         </TableBody>
       </Table>
+
+      {buchungen.length > 0 && (
+        <div className="flex justify-end">
+          <BetragSummary
+            betraege={buchungen.map((b) => Number(b.betrag))}
+            className="w-full max-w-xs"
+          />
+        </div>
+      )}
 
       {/* PROJ-21 — Lieferanten-Notizen (lazy geladen) */}
       <div className="space-y-2 rounded-md border bg-background p-3">

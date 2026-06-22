@@ -25,6 +25,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { BetragSummary } from "@/components/kategorien-analyse/betrag-summary";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -682,6 +683,15 @@ export function KategorieDrilldown({
                 })}
               </TableBody>
             </Table>
+          )}
+
+          {offen && sichtbareBuchungen.length > 0 && (
+            <div className="mt-4 flex justify-end">
+              <BetragSummary
+                betraege={sichtbareBuchungen.map((b) => Number(b.betrag))}
+                className="w-full max-w-xs"
+              />
+            </div>
           )}
         </div>
       </SheetContent>

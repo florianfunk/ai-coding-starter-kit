@@ -39,6 +39,8 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RegexFeld } from "@/components/regeln/regex-feld";
+import { SplitBlock, type SplitBlockValues } from "@/components/regeln/split-block";
 
 const KLASS_OPTIONEN: Array<{ value: Klassifikation | "none"; label: string }> =
   [
@@ -60,6 +62,8 @@ interface FormValues {
   bezeichnung: string;
   empfaenger_muster: string;
   zweck_muster: string;
+  empfaenger_regex: string;
+  zweck_regex: string;
   konto_id: string; // "none" | uuid
   betrag_min: string;
   betrag_max: string;
@@ -70,11 +74,20 @@ interface FormValues {
   aktiv: boolean;
 }
 
+const SPLIT_DEFAULT: SplitBlockValues = {
+  anteilGeschaeftlichProzent: 70,
+  kategorieGeschaeftlich: "none",
+  kategoriePrivat: "none",
+  ustSatzGeschaeftlich: "none",
+};
+
 function toForm(r: Lernregel | null): FormValues {
   return {
     bezeichnung: r?.bezeichnung ?? "",
     empfaenger_muster: r?.bedingung?.empfaenger_muster ?? "",
     zweck_muster: r?.bedingung?.zweck_muster ?? "",
+    empfaenger_regex: r?.bedingung?.empfaenger_regex ?? "",
+    zweck_regex: r?.bedingung?.zweck_regex ?? "",
     konto_id: r?.bedingung?.konto_id ?? "none",
     betrag_min:
       typeof r?.bedingung?.betrag_min === "number"
@@ -95,10 +108,32 @@ function toForm(r: Lernregel | null): FormValues {
   };
 }
 
+/** Split-State (außerhalb der RHF-Werte, eigene Composite-Form). */
+function toSplit(r: Lernregel | null): SplitBlockValues {
+  const s = r?.aktion?.split;
+  if (!s) return SPLIT_DEFAULT;
+  return {
+    anteilGeschaeftlichProzent: Math.round(s.anteil_geschaeftlich * 100),
+    kategorieGeschaeftlich: s.kategorie_geschaeftlich ?? "none",
+    kategoriePrivat: s.kategorie_privat ?? "none",
+    ustSatzGeschaeftlich:
+      typeof s.ust_satz_geschaeftlich === "number"
+        ? String(s.ust_satz_geschaeftlich)
+        : "none",
+  };
+}
+
 export interface RegelKonfliktInfo {
   regel_id: string;
   bezeichnung?: string;
   felder: string[];
+}
+
+export interface RegelPrefill {
+  /** Vorbelegung für die Bezeichnung der neuen Regel. */
+  bezeichnung?: string;
+  /** Vorbelegung für das Empfänger-Substring-Muster. */
+  empfaenger_muster?: string;
 }
 
 export function RegelDialog({
@@ -108,6 +143,8 @@ export function RegelDialog({
   konten,
   kategorien,
   onSaved,
+  beispielBetrag,
+  prefill,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -115,19 +152,38 @@ export function RegelDialog({
   konten: Konto[];
   kategorien: Kategorie[];
   onSaved: () => void;
+  /** Optionaler Beispielbetrag (€) für die Split-Vorschau. */
+  beispielBetrag?: number;
+  /**
+   * PROJ-15 P2 (#3): Vorbelegung für eine NEUE Regel (nur wirksam, wenn
+   * `regel === null`). Erlaubt es z. B. der „Häufige Prüflisten-Empfänger"-
+   * Seite, den Empfänger direkt vorzufüllen.
+   */
+  prefill?: RegelPrefill;
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [konflikte, setKonflikte] = useState<RegelKonfliktInfo[]>([]);
+  const [splitAktiv, setSplitAktiv] = useState(false);
+  const [split, setSplit] = useState<SplitBlockValues>(SPLIT_DEFAULT);
   const istBearbeiten = regel !== null;
 
   const form = useForm<FormValues>({ defaultValues: toForm(regel) });
 
   useEffect(() => {
     if (open) {
-      form.reset(toForm(regel));
+      const basis = toForm(regel);
+      // Prefill nur für NEUE Regeln (regel === null) anwenden.
+      if (!regel && prefill) {
+        if (prefill.bezeichnung) basis.bezeichnung = prefill.bezeichnung;
+        if (prefill.empfaenger_muster)
+          basis.empfaenger_muster = prefill.empfaenger_muster;
+      }
+      form.reset(basis);
+      setSplit(toSplit(regel));
+      setSplitAktiv(Boolean(regel?.aktion?.split));
       setKonflikte([]);
     }
-  }, [open, regel, form]);
+  }, [open, regel, prefill, form]);
 
   function bauePayload(values: FormValues) {
     const bedingung: Record<string, unknown> = {};
@@ -135,6 +191,10 @@ export function RegelDialog({
       bedingung.empfaenger_muster = values.empfaenger_muster.trim();
     if (values.zweck_muster.trim())
       bedingung.zweck_muster = values.zweck_muster.trim();
+    if (values.empfaenger_regex.trim())
+      bedingung.empfaenger_regex = values.empfaenger_regex.trim();
+    if (values.zweck_regex.trim())
+      bedingung.zweck_regex = values.zweck_regex.trim();
     if (values.konto_id !== "none") bedingung.konto_id = values.konto_id;
     if (values.betrag_min.trim() !== "")
       bedingung.betrag_min = Number(values.betrag_min);
@@ -142,11 +202,32 @@ export function RegelDialog({
       bedingung.betrag_max = Number(values.betrag_max);
 
     const aktion: Record<string, unknown> = {};
-    if (values.kategorie_id !== "none")
-      aktion.kategorie_id = values.kategorie_id;
-    if (values.ust_satz !== "none") aktion.ust_satz = Number(values.ust_satz);
-    if (values.klassifikation !== "none")
-      aktion.klassifikation = values.klassifikation;
+    if (splitAktiv) {
+      // Split schließt einfache Kategorie/USt/Klassifikation aus (Schema).
+      const anteilG = Math.min(
+        100,
+        Math.max(0, Math.round(split.anteilGeschaeftlichProzent)),
+      );
+      const splitAktion: Record<string, unknown> = {
+        anteil_geschaeftlich: anteilG / 100,
+        anteil_privat: (100 - anteilG) / 100,
+      };
+      if (split.kategorieGeschaeftlich !== "none")
+        splitAktion.kategorie_geschaeftlich = split.kategorieGeschaeftlich;
+      if (split.kategoriePrivat !== "none")
+        splitAktion.kategorie_privat = split.kategoriePrivat;
+      if (split.ustSatzGeschaeftlich !== "none")
+        splitAktion.ust_satz_geschaeftlich = Number(
+          split.ustSatzGeschaeftlich,
+        );
+      aktion.split = splitAktion;
+    } else {
+      if (values.kategorie_id !== "none")
+        aktion.kategorie_id = values.kategorie_id;
+      if (values.ust_satz !== "none") aktion.ust_satz = Number(values.ust_satz);
+      if (values.klassifikation !== "none")
+        aktion.klassifikation = values.klassifikation;
+    }
 
     return {
       bezeichnung: values.bezeichnung.trim(),
@@ -274,6 +355,36 @@ export function RegelDialog({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="empfaenger_regex"
+                  render={({ field }) => (
+                    <RegexFeld
+                      id="empfaenger_regex"
+                      label="Empfänger-Regex"
+                      beschreibung="Optional. Deckt ganze Provider-Familien ab, z. B. ^STRIPE\*.* — case-insensitiv, gegen den normalisierten Empfänger."
+                      value={field.value}
+                      onChange={field.onChange}
+                      probePlaceholder="z. B. ^STRIPE\*.*"
+                    />
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zweck_regex"
+                  render={({ field }) => (
+                    <RegexFeld
+                      id="zweck_regex"
+                      label="Verwendungszweck-Regex"
+                      beschreibung="Optional. Case-insensitiver Regex gegen den Verwendungszweck."
+                      value={field.value}
+                      onChange={field.onChange}
+                      probePlaceholder="z. B. (abo|subscription)"
+                    />
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="konto_id"
@@ -351,84 +462,97 @@ export function RegelDialog({
             <div className="rounded-md border p-3">
               <p className="mb-3 text-sm font-medium">Aktion</p>
               <div className="space-y-3">
-                <FormField
-                  control={form.control}
-                  name="kategorie_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>EÜR-Kategorie</FormLabel>
-                      <KategorieCombobox
-                        kategorien={kategorien}
-                        value={field.value}
-                        onChange={field.onChange}
-                        vorabOptionen={[
-                          { value: "none", label: "— nicht setzen —" },
-                        ]}
-                        inDialog
+                {!splitAktiv && (
+                  <>
+                    <FormField
+                      control={form.control}
+                      name="kategorie_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>EÜR-Kategorie</FormLabel>
+                          <KategorieCombobox
+                            kategorien={kategorien}
+                            value={field.value}
+                            onChange={field.onChange}
+                            vorabOptionen={[
+                              { value: "none", label: "— nicht setzen —" },
+                            ]}
+                            inDialog
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="ust_satz"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>USt-Satz</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {UST_OPTIONEN.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                      <FormField
+                        control={form.control}
+                        name="klassifikation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Privat / geschäftlich</FormLabel>
+                            <Select
+                              value={field.value}
+                              onValueChange={field.onChange}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {KLASS_OPTIONEN.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>
+                                    {o.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormDescription>
+                      Mindestens eine Aktion angeben — oder unten aufteilen.
+                    </FormDescription>
+                  </>
+                )}
+
+                <SplitBlock
+                  aktiv={splitAktiv}
+                  onAktivChange={setSplitAktiv}
+                  values={split}
+                  onChange={setSplit}
+                  kategorien={kategorien}
+                  beispielBetrag={beispielBetrag}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="ust_satz"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>USt-Satz</FormLabel>
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {UST_OPTIONEN.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="klassifikation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Privat / geschäftlich</FormLabel>
-                        <Select
-                          value={field.value}
-                          onValueChange={field.onChange}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {KLASS_OPTIONEN.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormDescription>
-                  Mindestens eine Aktion angeben.
-                </FormDescription>
               </div>
             </div>
 

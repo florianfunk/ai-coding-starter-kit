@@ -9,8 +9,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { encrypt } from "@/lib/crypto";
 import { aiEinstellungSchema } from "@/lib/validation/admin";
+import { STANDARD_MODELL } from "@/lib/admin/claude-modelle";
 
-const DEFAULT_MODEL = "anthropic/claude-haiku-4-5";
+const DEFAULT_MODEL = STANDARD_MODELL;
 
 interface EinstellungRow {
   ai_key_cipher: string | null;

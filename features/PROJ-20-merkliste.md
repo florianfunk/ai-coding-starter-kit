@@ -1,8 +1,14 @@
 # PROJ-20 — Merkliste (Buchungen für späteres Review merken)
 
-**Status:** In Review
+**Status:** Approved
 **Erstellt:** 2026-06-14
+**Aktualisiert:** 2026-06-19
 **Priorität:** P2
+
+> Status-Korrektur 2026-06-19: Alle Akzeptanzkriterien erfüllt (Migration
+> 0010 `gemerkt_am` + Index, Toggle-API mit Audit, `/merkliste`-Seite,
+> `MerkenStern` an allen Einstiegspunkten, Owner-Scope/Zod/UUID-Validierung).
+> 694 Tests grün, Build sauber → Approved.
 **Design-Doc:** [docs/superpowers/specs/2026-06-14-merkliste-design.md](../docs/superpowers/specs/2026-06-14-merkliste-design.md)
 
 ## Ziel

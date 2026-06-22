@@ -99,6 +99,121 @@ describe("regelInputSchema – Eingabevalidierung", () => {
   });
 });
 
+describe("regelInputSchema – PROJ-15 Regex-Felder", () => {
+  it("akzeptiert ein gültiges empfaenger_regex", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Stripe-Provider",
+      bedingung: { empfaenger_regex: "^stripe\\*.*" },
+      aktion: { klassifikation: "geschaeftlich" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("zählt ein gesetztes Regex als gültige Bedingung (kein Catch-All-Fehler)", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Nur Regex",
+      bedingung: { zweck_regex: "abo|subscription" },
+      aktion: { klassifikation: "geschaeftlich" },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("lehnt ein ReDoS-unsicheres Regex ab", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Böses Regex",
+      bedingung: { empfaenger_regex: "(a+)+" },
+      aktion: { klassifikation: "geschaeftlich" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("lehnt ein ungültiges Regex ab", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Kaputtes Regex",
+      bedingung: { zweck_regex: "(unbalanced" },
+      aktion: { klassifikation: "geschaeftlich" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("lehnt ein Regex > 200 Zeichen ab", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Zu lang",
+      bedingung: { empfaenger_regex: "a".repeat(201) },
+      aktion: { klassifikation: "geschaeftlich" },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("regelInputSchema – PROJ-15 Split-Aktion", () => {
+  const KAT_G = "11111111-1111-4111-8111-111111111111";
+  const KAT_P = "22222222-2222-4222-8222-222222222222";
+
+  it("akzeptiert eine gültige 70/30-Split-Aktion", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Handy 70/30",
+      bedingung: { empfaenger_muster: "Telekom" },
+      aktion: {
+        split: {
+          anteil_geschaeftlich: 0.7,
+          anteil_privat: 0.3,
+          kategorie_geschaeftlich: KAT_G,
+          kategorie_privat: KAT_P,
+          ust_satz_geschaeftlich: 19,
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("lehnt Split-Anteile ab, die sich nicht zu 1 summieren", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Falscher Split",
+      bedingung: { empfaenger_muster: "Telekom" },
+      aktion: {
+        split: { anteil_geschaeftlich: 0.7, anteil_privat: 0.4 },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("lehnt Split zusammen mit kategorie_id ab (gegenseitiger Ausschluss)", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Split + Kategorie",
+      bedingung: { empfaenger_muster: "Telekom" },
+      aktion: {
+        kategorie_id: KAT_G,
+        split: { anteil_geschaeftlich: 0.6, anteil_privat: 0.4 },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("lehnt Split zusammen mit klassifikation ab (gegenseitiger Ausschluss)", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Split + Klassifikation",
+      bedingung: { empfaenger_muster: "Telekom" },
+      aktion: {
+        klassifikation: "geschaeftlich",
+        split: { anteil_geschaeftlich: 0.6, anteil_privat: 0.4 },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("lehnt Anteil 0 oder 1 ab (echte Aufteilung nötig)", () => {
+    const result = regelInputSchema.safeParse({
+      bezeichnung: "Kein echter Split",
+      bedingung: { empfaenger_muster: "Telekom" },
+      aktion: {
+        split: { anteil_geschaeftlich: 1, anteil_privat: 0 },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
 describe("bedingungenGleich", () => {
   it("erkennt identische Muster case-insensitiv als gleich", () => {
     expect(
@@ -114,6 +229,33 @@ describe("bedingungenGleich", () => {
       bedingungenGleich(
         { empfaenger_muster: "X", betrag_min: 10 },
         { empfaenger_muster: "X", betrag_min: 20 },
+      ),
+    ).toBe(false);
+  });
+
+  it("erkennt identische Regex-Felder als gleich (case-insensitiv)", () => {
+    expect(
+      bedingungenGleich(
+        { empfaenger_regex: "^STRIPE\\*" },
+        { empfaenger_regex: "^stripe\\*" },
+      ),
+    ).toBe(true);
+  });
+
+  it("erkennt abweichende empfaenger_regex als ungleich", () => {
+    expect(
+      bedingungenGleich(
+        { empfaenger_regex: "^stripe" },
+        { empfaenger_regex: "^paddle" },
+      ),
+    ).toBe(false);
+  });
+
+  it("erkennt abweichende zweck_regex als ungleich", () => {
+    expect(
+      bedingungenGleich(
+        { zweck_muster: "X", zweck_regex: "abo" },
+        { zweck_muster: "X", zweck_regex: "miete" },
       ),
     ).toBe(false);
   });

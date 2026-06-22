@@ -1,8 +1,21 @@
 # PROJ-15: Klassifizierung-Pro — Empfänger-Cache, Regex- & Split-Regeln
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-05-20
-**Last Updated:** 2026-05-20
+**Last Updated:** 2026-06-19
+
+> Fortschritt 2026-06-19: **P0 fertig & produktionsreif** (Normalisierung,
+> Empfänger-Cache, Historie, Konsistenz-Pass). **P1 vollständig**: ReDoS-sichere
+> Regex-Bedingungen (`regex-engine.ts`), Split-Aktionen (`split-apply.ts` +
+> Pipeline-Integration), Migration 0014, Regel-Dialog mit Regex-Live-Validierung
+> + Split-Konfigurator. **P2 #1 + #3 vollständig**: Re-Klassifizierung per
+> `buchung_ids` (Multi-Select auf Buchungs-Liste + Prüfliste), „Häufige
+> Prüflisten-Empfänger"-Kandidatenliste (`/klassifizierung/haeufige-empfaenger`)
+> mit Lernregel-Shortcut, Migration 0015 (Index). `tsc` sauber, 812 Tests grün.
+> **Offen: P2 #2** (konfigurierbarer Web-Recherche-Schwellwert in
+> `app_einstellung`) — bewusst zurückgestellt, kollidiert mit parallelem
+> Security-Workstream an `validation/admin.ts`; wird nachgezogen, sobald der durch ist.
+> Migrationen (0014/0015) + Deploy sind freigabe-pflichtig.
 
 ## Dependencies
 - Erweitert: PROJ-5 (Autonome Klassifizierung) — Pipeline + LLM-Prompt
@@ -735,6 +748,194 @@ Loesung in zwei Schritten:
   Bernstein-Badge und farblicher Hervorhebung. Spaltentitel umbenannt
   in "Jahresvolumen". Komponenten-Header-Untertitel: "Wiederkehrende
   Buchungen (Einnahmen & Ausgaben)".
+
+### 2026-06-19 — P1 — Pipeline-Split-Integration + DB-CHECKs
+- **Pipeline-Split (`src/lib/classifier/pipeline.ts`):** Greift eine Lernregel
+  mit `aktion.split` im konfliktfreien Auto-Pfad (kein Regelkonflikt, kein
+  Ausreißer-Betrag), teilt die Pipeline die Buchung jetzt automatisch in zwei
+  Kind-Buchungen auf. Dazu mappt der neue interne Helper `wendeRegelSplitAn` die
+  geschäftlich/privat-Form der `LernregelSplit` auf die a/b-Form der
+  `SplitDefinition` (Seite A = geschäftlich, Seite B = privat) und delegiert an
+  das geteilte `wendeSplitAn` aus `split-apply.ts` — derselbe DB-Pfad wie die
+  manuelle Aufteilung. Audit: `aktion: 'regel_aufgeteilt'`, `quelle: 'regel'`,
+  `audit_details.regel_id`. Auf dem Pipeline-Ergebnis wird `split_angewandt`
+  gesetzt, damit der Aufrufer das normale Buchungs-Update überspringt (die
+  Klammer ist sonst schon geschrieben).
+- **Seam-Entscheidung:** `klassifiziereBuchung` bekommt Supabase bereits über
+  `ctx.supabase` + `ctx.ownerId` (Cache/Historie-Pfad) — der Split nutzt exakt
+  diesen vorhandenen Client, kein neuer Client/Param. `BuchungFuerPipeline`
+  wurde um die optionalen Felder `waehrung` + `duplikat_hash` erweitert (die
+  Kinder erben sie von der Klammer); ohne diese Felder + `buchung_datum` fällt
+  die Pipeline auf den einfachen Regel-Treffer zurück (kein Split-IO). Ein
+  gescheiterter Split-Insert wirft NICHT — die Klassifikation war erfolgreich;
+  der Randfall (Klammer ohne Kinder) bleibt über das Audit nachvollziehbar.
+- **API-Route (`src/app/api/klassifizierung/route.ts`):** `SELECT_BUCHUNG` um
+  `waehrung, duplikat_hash` erweitert; das normale `buchung`-Update wird bei
+  `split_angewandt` übersprungen (sonst würde es die Klammer überschreiben).
+- **Migration `supabase/migrations/0014_lernregel_regex_split_checks.sql`:**
+  Zwei Defense-in-Depth-CHECKs auf der `lernregel`-JSONB (`bedingung`/`aktion`):
+  Regex-Felder (`empfaenger_regex`, `zweck_regex`) max. 200 Zeichen; Split-
+  Anteile echt in (0,1) und Summe = 1 (±1e-6). RLS unangetastet (nur CHECKs).
+  **Hinweis/Ambiguität:** Die Aufgabe nannte `0011`, das war jedoch bereits
+  vergeben (`0011_lieferant_notiz.sql`, zuletzt `0013`) — daher `0014` als
+  nächster freier Slot. Split-Felder liegen NICHT als eigene Spalten vor,
+  sondern in der `aktion`-JSONB; der CHECK referenziert die JSONB-Pfade.
+- **Tests (TDD-first):** 3 neue Pipeline-Tests in `pipeline.test.ts` (Regel mit
+  Split → 2 Kinder + Klammer + `split_angewandt`/Audit-`regel_id`; Regel ohne
+  Split → unverändert; Split-Regel ohne `ctx.supabase` → kein Split-IO).
+  Pipeline-Suite jetzt 40 Tests grün; alle PROJ-15-Module (pipeline, split-apply,
+  regex-engine, rules) zusammen 94 Tests grün; classifier+regel-Validierung
+  zusammen 341 grün. `npx tsc --noEmit` clean.
+- **Nicht im Scope dieser Sitzung:** UI-Split-Block im Regel-Dialog (separater
+  Frontend-Task).
+
+### 2026-06-19 — P1 — Regel-Dialog UI (Regex-Felder + Split-Block)
+- **`src/components/regeln/regex-feld.tsx` [NEU]:** Wiederverwendbares Regex-Feld
+  mit Live-Validierung gegen `kompiliereWennSicher` (null → „ungültig/unsicher,
+  wird beim Speichern abgelehnt"), sichtbarem 200-Zeichen-Zähler/-Limit
+  (`MAX_REGEX_LAENGE`, rot bei Überschreitung, `aria-invalid`) und einer
+  optionalen Live-Probe gegen einen Beispieltext (case-insensitiv via der
+  kompilierten RegExp → „passt"/„passt nicht"). Engine wird NUR gelesen, nicht
+  verändert.
+- **`src/components/regeln/split-block.tsx` [NEU]:** Split-Block mit Switch zum
+  Aktivieren, 0–100 %-Slider (shadcn) für den geschäftlichen Anteil (privat =
+  Rest), Live-Vorschau beider Anteile (Prozent + Euro-Beträge bei vorhandenem
+  `beispielBetrag`) und je einem `KategorieCombobox` für die geschäftliche und
+  private Seite plus optionalem USt-Satz (geschäftlicher Teil). Composite-State
+  spiegelt die Backend-Form `anteil_geschaeftlich`/`anteil_privat` (0..1, Summe 1).
+- **`src/components/regeln/regel-dialog.tsx` [ÄND]:** Regex-Felder in den
+  Bedingungs-Block eingehängt (`empfaenger_regex`/`zweck_regex` als RHF-Felder),
+  Split-Block in den Aktions-Block. Bei aktivem Split werden die einfachen
+  Aktionsfelder (Kategorie/USt/Klassifikation) ausgeblendet — `bauePayload`
+  schreibt dann `aktion.split` statt der einfachen Felder, exakt nach
+  `splitAktionSchema` (schließt einfache Aktion aus). `toForm`/`toSplit` laden
+  beide Strukturen aus einer bestehenden Regel; neues optionales
+  `beispielBetrag`-Prop reicht den Beispielbetrag an die Vorschau durch.
+- **`src/components/ui/slider.tsx` [NEU, shadcn]:** `npx shadcn add slider`
+  (Radix `react-slider`) — fehlende Primitive, shadcn-first installiert statt
+  handgerollt.
+- **Tests:** `regex-feld.test.tsx` (gültig/Probe, ReDoS-Ablehnung, 200er-Limit)
+  + `split-block.test.tsx` (Felder ausgeblendet wenn inaktiv, %-Vorschau,
+  Euro-Umrechnung 60 %×60 €=36 €/24 €, Switch). Slider braucht einen lokalen
+  `ResizeObserver`-Stub (jsdom). Suite: 786 passed (vorher 779), `tsc --noEmit`
+  clean, ESLint 0 Errors auf den regeln-Dateien.
+- **Scope-Fence eingehalten:** nur `src/components/regeln/*` + die shadcn-
+  Primitive `src/components/ui/slider.tsx` (mit Radix-Slider-Dep in
+  package.json) angefasst. Keine Security-/Pipeline-/Validierungs-Dateien
+  berührt.
+
+### 2026-06-19 — P2 — Komfort-Backend (Re-Klassifizierung per IDs + häufige Empfänger)
+Backend-only (Frontend separat). Strikt TDD. **Der dritte P2-Punkt
+(konfigurierbarer Web-Recherche-Schwellwert in `app_einstellung`) ist
+DEFERRED** — er kollidiert mit aktiven Edits an `validation/admin.ts` durch
+einen parallelen Workstream und wurde bewusst nicht angefasst.
+
+- **P2 #1 — Re-Klassifizierung per `buchung_ids`:**
+  - `src/lib/validation/klassifizierung.ts`: `klassifizierungInputSchema` um
+    optionales `buchung_ids: z.array(z.uuid()).min(1).max(MAX_BUCHUNG_IDS)`
+    erweitert (`MAX_BUCHUNG_IDS = 500`). Wenn gesetzt, gewinnt die explizite
+    Auswahl über `nur_offen`.
+  - `src/app/api/klassifizierung/route.ts`: Bei `explizitIds` werden NUR diese
+    Buchungen geladen — owner-scoped (`.eq("owner_id", user.id)`), blockweise
+    über `ladeNachBloecken` (URL-längen-sicher) per `.in("id", block)`, und
+    weiterhin `.neq("status", "manuell_bestaetigt")`. Die Schutz-Invariante
+    (manuell Bestätigte werden übersprungen) gilt damit doppelt: in der
+    Lade-Query UND im bestehenden Update-Guard. Der Konsistenz-Pass (Phase 2)
+    wird bei expliziter Auswahl ÜBERSPRUNGEN — er gleicht owner-weit ab und
+    wäre für eine punktuelle Re-Klassifizierung ein überraschender Seiteneffekt.
+  - Tests (`src/lib/validation/klassifizierung.test.ts`, 9 neue): leerer Body
+    mit Defaults, gültige UUID-Liste, leere Liste → 422, Nicht-UUID → 422,
+    Nicht-Array → 422, Limit-Überschreitung → 422, genau MAX_BUCHUNG_IDS ok,
+    Kombination mit Schwellwert/Limit.
+
+- **P2 #3 — „Häufige Prüflisten-Empfänger":**
+  - `src/lib/klassifizierung/haeufige-empfaenger.ts` [NEU]: reine Aggregation
+    `aggregiereHaeufigeEmpfaenger(zeilen, { min_anzahl, limit })` — gruppiert
+    Prüffälle nach `empfaenger_normalisiert`, liefert pro Gruppe Anzahl,
+    Beispiel-Rohwert, Summe + Durchschnitt der Absolutbeträge, jüngstes Datum
+    und die distinct (komma-zerlegten) `pruef_gruende`. Sortiert nach Anzahl ↓,
+    Summe ↓, Name. Leerer/Whitespace-Norm wird ignoriert (kein Regel-Kandidat).
+  - `src/app/api/pruefliste/haeufige-empfaenger/route.ts` [NEU]: thin GET,
+    Auth-Pflicht (`getApiUser` → 401), owner-scoped, lädt `status='zur_pruefung'`
+    voll paginiert via `ladeAlle` (PostgREST-1000er-Cap-sicher), Query-Params
+    `min_anzahl` (Default 2) + `limit` (Default 100, max 500) Zod-validiert
+    (422 bei Ungültigkeit). **Bewusst NICHT unter `/api/admin`** (Scope-Fence).
+  - **Jahres-Filter (PROJ-22):** spiegelt `kuendigungen`/`pruefliste` —
+    `const { von, bis } = await aktiverZeitraum(supabase, user.id, {})`, dann
+    `if (von) q.gte("buchung_datum", von)` / `if (bis) q.lte(...)`. Respektiert
+    das global aktive Jahr aus `firmenprofil.aktives_jahr`; „Alle Jahre" → kein
+    Datumsfilter.
+  - Tests (`src/lib/klassifizierung/haeufige-empfaenger.test.ts`, 11 neue):
+    Gruppierung/Zählung, Summe/Durchschnitt/Rohwert, jüngstes Datum, Sortierung,
+    leere Norm ignoriert, distinct Gründe, komma-zerlegte Gründe, `min_anzahl`,
+    `limit`, Rundung 2 NK, leere Eingabe.
+
+- **Migration `supabase/migrations/0015_buchung_pruefliste_index.sql` [NEU,
+  NICHT angewendet]:** partieller Index
+  `idx_buchung_pruefliste (owner_id, buchung_datum) WHERE status='zur_pruefung'`
+  für die Aggregations-Query. Freigabe-pflichtig.
+
+- **Route-Pfade für Frontend:**
+  - `POST /api/klassifizierung` — Body-Feld `buchung_ids: string[]` (1..500 UUIDs).
+  - `GET /api/pruefliste/haeufige-empfaenger?min_anzahl=2&limit=100`.
+
+- **Scope-Fence eingehalten:** keine der gesperrten Dateien angefasst
+  (`validation/admin.ts`, `daten-panel.tsx`, `crypto.ts`, `middleware.ts`,
+  `proxy.ts`, `lib/security/*`, `lib/paperless/*`, `next.config.ts`, Chat-Route,
+  `.env.local.example`). Der konfigurierbare Web-Recherche-Schwellwert wurde
+  übersprungen (Kollision mit `admin.ts`).
+
+- **Ergebnis:** `npm test` → 806 passed (vorher 786; +20 neu), `npx tsc
+  --noEmit` clean.
+
+### 2026-06-19 — P2 — Komfort-Frontend (Multi-Select Re-Klassifizierung + Häufige-Empfänger-Seite)
+Frontend-only, baut auf dem P2-Backend auf. Der dritte P2-Punkt (Web-Recherche-
+Schwellwert-UI) bleibt DEFERRED — bewusst nicht gebaut (Scope-Fence Admin).
+
+- **Geteilter Hook `src/hooks/use-reklassifizierung.ts` [NEU]:** kapselt
+  `POST /api/klassifizierung` mit `{ buchung_ids }` (1..500, client-seitig
+  dedupliziert + MAX-Guard `MAX_REKLASS_IDS=500`), Loading-State, Toast-Feedback
+  und 409-/Fehler-/Netzwerk-Behandlung — exakt nach dem bestehenden
+  Klassifizierungs-Trigger-Muster (klassifizierung-center.tsx). Beide Listen
+  teilen denselben Pfad. Co-Test `use-reklassifizierung.test.ts` (6 Tests:
+  leere Auswahl, >MAX, Erfolg + Request-Format, 409, !ok, Netzwerk).
+- **P2 #1 — Multi-Select Re-Klassifizierung:**
+  - `src/components/pruefliste/pruefliste-ansicht.tsx`: die bereits vorhandene
+    Auswahl (`auswahl`-Set, Zeilen-Checkboxen, Select-all-Bar) bekommt einen
+    Button „Neu klassifizieren" in der Toolbar; ruft den Hook mit den
+    ausgewählten IDs, lädt danach via `reload()` neu. Disabled bei leerer
+    Auswahl/pending; Tooltip erklärt, dass manuell bestätigte übersprungen werden.
+  - `src/components/buchungen/buchungen-ledger.tsx`: NEU Multi-Select — pro
+    `LedgerZeile` eine Checkbox (eigene Zelle, kein verschachtelter Button neben
+    der Detail-Schaltfläche), Auswahl-Leiste über dem Ledger mit Select-all +
+    „Neu klassifizieren" + „Auswahl aufheben". `router.refresh()` nach Erfolg.
+- **P2 #3 — Häufige-Empfänger-Seite:**
+  - `src/components/klassifizierung/haeufige-empfaenger-liste.tsx` [NEU]:
+    selbstständige Client-Komponente, lädt
+    `GET /api/pruefliste/haeufige-empfaenger?min_anzahl=2&limit=100`,
+    Loading-/Error-/Empty-States, shadcn `Table` (Desktop) + Karten-Liste
+    (Mobile, < sm), Badges für `pruef_gruende` (über `grundLabel`). „Regel"-
+    Button pro Zeile öffnet den bestehenden `RegelDialog` vorbefüllt.
+  - `src/app/(app)/klassifizierung/haeufige-empfaenger/page.tsx` [NEU]: Server-
+    Component, lädt Konten/Kategorien für den Dialog. Bewusst unter
+    `/klassifizierung/…`, NICHT im Admin-/Stammdaten-Bereich (Scope-Fence).
+  - `src/components/regeln/regel-dialog.tsx` [ÄND, additiv]: neues optionales
+    `prefill`-Prop (`RegelPrefill { bezeichnung?, empfaenger_muster? }`), nur
+    wirksam bei `regel === null`. Seedet die RHF-Defaults beim Öffnen — keine
+    Änderung an Validierung/Submit/Split/Regex-Interna.
+  - `src/components/app-sidebar.tsx` [ÄND]: neuer Eintrag „Häufige Empfänger"
+    im Bereich Bücher. `istAktiv` erweitert, sodass bei Sub-Routen immer nur der
+    präziseste (längste passende) Nav-Eintrag leuchtet — verhindert
+    Doppel-Highlight von „Klassifizierung" + „Häufige Empfänger".
+- **shadcn-Primitives:** Checkbox, Button, Table, Card, Badge, Alert, Loader2
+  (lucide) — alle vorhanden, nichts neu installiert.
+- **Scope-Fence eingehalten:** nur `src/hooks/*`, `src/components/buchungen/*`,
+  `src/components/pruefliste/*`, `src/components/regeln/regel-dialog.tsx`
+  (additiv), `src/components/app-sidebar.tsx`, neue
+  `src/components/klassifizierung/haeufige-empfaenger-liste.tsx` + neue Seite.
+  Keine Admin-/Chat-/Security-/Paperless-/Crypto-/Config-Datei berührt.
+- **Ergebnis:** `npm test` → 812 passed (vorher 806; +6 Hook-Tests), 48 Dateien,
+  `npx tsc --noEmit` clean.
 
 ## QA Test Results
 _To be added by /qa_

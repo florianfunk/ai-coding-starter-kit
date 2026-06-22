@@ -8,7 +8,13 @@
 // Mustervergleich: case-insensitive Substring-Suche (regex-safe, KEINE
 // Regex-Auswertung von Nutzereingaben — verhindert ReDoS/Injection).
 
-import type { Buchung, Klassifikation, Lernregel } from "@/lib/types";
+import type {
+  Buchung,
+  Klassifikation,
+  Lernregel,
+  LernregelSplit,
+} from "@/lib/types";
+import { kompiliereWennSicher } from "@/lib/classifier/regex-engine";
 
 /** Eine konkrete Regel-Entscheidung für eine Buchung. */
 export interface RegelErgebnis {
@@ -18,6 +24,12 @@ export interface RegelErgebnis {
   klassifikation: Klassifikation | null;
   /** Priorität der angewandten Regel (höher = stärker). */
   prioritaet: number;
+  /**
+   * PROJ-15 — Split-Aktion der angewandten Regel (oder null). Ist sie gesetzt,
+   * teilt die Pipeline die Buchung in zwei Kind-Buchungen auf, statt eine
+   * einfache Kategorie/Klassifikation zu setzen.
+   */
+  split: LernregelSplit | null;
 }
 
 /** Gesamtergebnis der Regel-Auswertung für eine Buchung. */
@@ -37,11 +49,29 @@ export interface RegelAuswertung {
 export type BuchungFuerRegel = Pick<
   Buchung,
   "konto_id" | "betrag" | "verwendungszweck" | "empfaenger"
->;
+> & {
+  /**
+   * PROJ-15 — normalisierter Empfaenger. Regex-Bedingungen prüfen primär
+   * gegen diesen Wert (Fallback: rohes `empfaenger`). Optional, weil
+   * Altdaten ohne Backfill die Spalte noch leer haben.
+   */
+  empfaenger_normalisiert?: string | null;
+};
 
 /** Normalisiert Text für robusten, case-insensitiven Vergleich. */
 function norm(value: string | null | undefined): string {
   return (value ?? "").toLowerCase().trim();
+}
+
+/**
+ * Wertet ein Nutzer-Regex fail-safe gegen einen Wert aus. Ein nicht
+ * kompilierbares oder ReDoS-unsicheres Muster matcht NIE (gibt `false`).
+ * Das Matching ist case-insensitiv (Flag in `kompiliereWennSicher`).
+ */
+function regexTrifft(muster: string, wert: string | null | undefined): boolean {
+  const re = kompiliereWennSicher(muster);
+  if (!re) return false; // fail-safe: unsicher/ungültig → kein Match
+  return re.test(wert ?? "");
 }
 
 /**
@@ -66,6 +96,25 @@ export function regelTrifftZu(
   if (typeof b.zweck_muster === "string" && b.zweck_muster.trim()) {
     hatBedingung = true;
     if (!norm(buchung.verwendungszweck).includes(norm(b.zweck_muster))) {
+      return false;
+    }
+  }
+
+  // PROJ-15 — Regex-Bedingungen (case-insensitive, ReDoS-geprüft).
+  // empfaenger_regex prüft primär gegen den normalisierten Empfaenger und
+  // fällt auf das rohe Feld zurück (entweder-oder reicht).
+  if (typeof b.empfaenger_regex === "string" && b.empfaenger_regex.trim()) {
+    hatBedingung = true;
+    const norm_empf = (buchung.empfaenger_normalisiert ?? "").trim();
+    const trifft =
+      (norm_empf.length > 0 && regexTrifft(b.empfaenger_regex, norm_empf)) ||
+      regexTrifft(b.empfaenger_regex, buchung.empfaenger);
+    if (!trifft) return false;
+  }
+
+  if (typeof b.zweck_regex === "string" && b.zweck_regex.trim()) {
+    hatBedingung = true;
+    if (!regexTrifft(b.zweck_regex, buchung.verwendungszweck)) {
       return false;
     }
   }
@@ -112,6 +161,24 @@ function aktionenWidersprechen(a: Lernregel, b: Lernregel): boolean {
     aa.ust_satz !== ab.ust_satz
   ) {
     return true;
+  }
+  // PROJ-15 — eine Split-Aktion widerspricht jeder abweichenden Aktion
+  // (Split vs. Split mit anderen Anteilen, oder Split vs. einfache Aktion).
+  if (aa.split != null || ab.split != null) {
+    if ((aa.split == null) !== (ab.split == null)) return true;
+    if (aa.split != null && ab.split != null) {
+      if (
+        Math.abs(
+          aa.split.anteil_geschaeftlich - ab.split.anteil_geschaeftlich,
+        ) >= 1e-6 ||
+        (aa.split.kategorie_geschaeftlich ?? null) !==
+          (ab.split.kategorie_geschaeftlich ?? null) ||
+        (aa.split.kategorie_privat ?? null) !==
+          (ab.split.kategorie_privat ?? null)
+      ) {
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -162,6 +229,7 @@ export function werteRegelnAus(
       ust_satz: top.aktion?.ust_satz ?? null,
       klassifikation: top.aktion?.klassifikation ?? null,
       prioritaet: top.prioritaet,
+      split: top.aktion?.split ?? null,
     },
     konflikt,
     passende_regel_ids: passend.map((r) => r.id),

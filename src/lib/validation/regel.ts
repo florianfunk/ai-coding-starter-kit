@@ -11,6 +11,10 @@
 
 import { z } from "zod";
 import type { Klassifikation, Lernregel } from "@/lib/types";
+import {
+  kompiliereWennSicher,
+  MAX_REGEX_LAENGE,
+} from "@/lib/classifier/regex-engine";
 
 /** Erlaubte USt-Sätze (Spiegel des Kontenrahmen-Constraints {0,7,19}). */
 export const UST_SAETZE = [0, 7, 19] as const;
@@ -33,6 +37,26 @@ const optionalMuster = (maxLen: number, feld: string) =>
     .transform((v) => (v && v.length > 0 ? v : undefined));
 
 /**
+ * PROJ-15 — optionales Regex-Feld. Leerer String → undefined. Max. 200 Zeichen
+ * (Defense-in-Depth, spiegelt den DB-CHECK) und ReDoS-/Gültigkeits-Linter aus
+ * `regex-engine.ts`. Ein unsicheres oder ungültiges Muster wird abgelehnt,
+ * damit es gar nicht erst in der DB landet.
+ */
+const optionalRegex = (feld: string) =>
+  z
+    .string()
+    .trim()
+    .max(
+      MAX_REGEX_LAENGE,
+      `${feld} darf höchstens ${MAX_REGEX_LAENGE} Zeichen haben`,
+    )
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : undefined))
+    .refine((v) => v === undefined || kompiliereWennSicher(v) !== null, {
+      error: `${feld} ist kein gültiges oder kein sicheres Regex (verschachtelte Quantoren / Backreferences sind nicht erlaubt).`,
+    });
+
+/**
  * Bedingung einer Lernregel — Feldnamen identisch zu
  * `Lernregel["bedingung"]` und der Auswertung in rules.ts.
  * Mindestens eine Teilbedingung muss gesetzt sein (kein Catch-All).
@@ -41,6 +65,8 @@ export const bedingungSchema = z
   .object({
     empfaenger_muster: optionalMuster(200, "Empfänger-Muster"),
     zweck_muster: optionalMuster(200, "Verwendungszweck-Muster"),
+    empfaenger_regex: optionalRegex("Empfänger-Regex"),
+    zweck_regex: optionalRegex("Verwendungszweck-Regex"),
     konto_id: z.uuid("Ungültige Konto-ID").optional(),
     betrag_min: z
       .number()
@@ -55,12 +81,14 @@ export const bedingungSchema = z
     (b) =>
       Boolean(b.empfaenger_muster) ||
       Boolean(b.zweck_muster) ||
+      Boolean(b.empfaenger_regex) ||
+      Boolean(b.zweck_regex) ||
       Boolean(b.konto_id) ||
       typeof b.betrag_min === "number" ||
       typeof b.betrag_max === "number",
     {
       error:
-        "Mindestens eine Bedingung angeben (Empfänger, Zweck, Konto oder Betragsbereich).",
+        "Mindestens eine Bedingung angeben (Empfänger, Zweck, Regex, Konto oder Betragsbereich).",
       path: ["empfaenger_muster"],
     },
   )
@@ -80,6 +108,33 @@ export const bedingungSchema = z
  * Mindestens ein Aktionsfeld muss gesetzt sein (sonst bewirkt die Regel
  * nichts).
  */
+/**
+ * PROJ-15 — Split-Aktion: zwei Anteile (geschäftlich/privat) in 0..1, die
+ * sich zu 1 summieren (mit kleiner Float-Toleranz). Beide Anteile müssen
+ * ECHT zwischen 0 und 1 liegen (keine 0/1-Aufteilung — das wäre kein Split).
+ */
+export const splitAktionSchema = z
+  .object({
+    anteil_geschaeftlich: z.number().gt(0).lt(1),
+    anteil_privat: z.number().gt(0).lt(1),
+    kategorie_geschaeftlich: z
+      .uuid("Ungültige Kategorie-ID (geschäftlich)")
+      .nullable()
+      .optional(),
+    kategorie_privat: z
+      .uuid("Ungültige Kategorie-ID (privat)")
+      .nullable()
+      .optional(),
+    ust_satz_geschaeftlich: z
+      .union([z.literal(0), z.literal(7), z.literal(19)])
+      .nullable()
+      .optional(),
+  })
+  .refine((s) => Math.abs(s.anteil_geschaeftlich + s.anteil_privat - 1) < 1e-6, {
+    error: "Geschäftlicher und privater Anteil müssen sich zu 100 % summieren.",
+    path: ["anteil_privat"],
+  });
+
 export const aktionSchema = z
   .object({
     kategorie_id: z.uuid("Ungültige Kategorie-ID").optional(),
@@ -87,16 +142,31 @@ export const aktionSchema = z
       .union([z.literal(0), z.literal(7), z.literal(19)])
       .optional(),
     klassifikation: z.enum(KLASSIFIKATIONEN).optional(),
+    split: splitAktionSchema.optional(),
   })
   .refine(
     (a) =>
       Boolean(a.kategorie_id) ||
       typeof a.ust_satz === "number" ||
-      Boolean(a.klassifikation),
+      Boolean(a.klassifikation) ||
+      Boolean(a.split),
     {
       error:
-        "Mindestens eine Aktion angeben (Kategorie, USt-Satz oder privat/geschäftlich).",
+        "Mindestens eine Aktion angeben (Kategorie, USt-Satz, privat/geschäftlich oder Split).",
       path: ["kategorie_id"],
+    },
+  )
+  .refine(
+    // PROJ-15 — Split schließt einfache Kategorie/Klassifikation aus.
+    (a) =>
+      !a.split ||
+      (a.kategorie_id === undefined &&
+        a.klassifikation === undefined &&
+        a.ust_satz === undefined),
+    {
+      error:
+        "Eine Split-Aktion darf nicht zusätzlich Kategorie, USt-Satz oder Klassifikation setzen.",
+      path: ["split"],
     },
   );
 
@@ -143,7 +213,7 @@ export interface RegelKonflikt {
   bezeichnung?: string;
   prioritaet: number;
   /** Welche Aktionsfelder sich widersprechen. */
-  felder: Array<"kategorie_id" | "ust_satz" | "klassifikation">;
+  felder: Array<"kategorie_id" | "ust_satz" | "klassifikation" | "split">;
 }
 
 function normMuster(value: string | undefined): string {
@@ -165,6 +235,8 @@ export function bedingungenGleich(
   return (
     normMuster(x.empfaenger_muster) === normMuster(y.empfaenger_muster) &&
     normMuster(x.zweck_muster) === normMuster(y.zweck_muster) &&
+    normMuster(x.empfaenger_regex) === normMuster(y.empfaenger_regex) &&
+    normMuster(x.zweck_regex) === normMuster(y.zweck_regex) &&
     (x.konto_id ?? "") === (y.konto_id ?? "") &&
     (x.betrag_min ?? null) === (y.betrag_min ?? null) &&
     (x.betrag_max ?? null) === (y.betrag_max ?? null)
@@ -200,6 +272,28 @@ export function widerspruechlicheFelder(
       (ab.klassifikation as Klassifikation)
   ) {
     felder.push("klassifikation");
+  }
+  // PROJ-15 — Split-Aktionen widersprechen sich, wenn beide einen Split
+  // setzen, dieser sich aber in Anteilen/Kategorien/USt unterscheidet. Ein
+  // Split gegen eine einfache Aktion ist ebenfalls ein Widerspruch.
+  if (aa.split != null && ab.split != null) {
+    if (
+      Math.abs(aa.split.anteil_geschaeftlich - ab.split.anteil_geschaeftlich) >=
+        1e-6 ||
+      (aa.split.kategorie_geschaeftlich ?? null) !==
+        (ab.split.kategorie_geschaeftlich ?? null) ||
+      (aa.split.kategorie_privat ?? null) !==
+        (ab.split.kategorie_privat ?? null) ||
+      (aa.split.ust_satz_geschaeftlich ?? null) !==
+        (ab.split.ust_satz_geschaeftlich ?? null)
+    ) {
+      felder.push("split");
+    }
+  } else if (
+    (aa.split != null && (ab.kategorie_id != null || ab.klassifikation != null)) ||
+    (ab.split != null && (aa.kategorie_id != null || aa.klassifikation != null))
+  ) {
+    felder.push("split");
   }
   return felder;
 }

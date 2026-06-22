@@ -1,8 +1,14 @@
 # PROJ-16: Mein Profil — persönliche Stammdaten als LLM-Kontext
 
-## Status: Planned
+## Status: Approved
 **Created:** 2026-05-21
-**Last Updated:** 2026-05-21
+**Last Updated:** 2026-06-19
+
+> Status-Korrektur 2026-06-19: Feature war als „Planned" geführt, ist aber
+> vollständig implementiert (Migrationen 0007/0008, `profil.ts`-Service,
+> 6 API-Routen, 4 UI-Karten, Pipeline-Integration als LLM-Kontextblock,
+> 45 Tests). Alle P0-Akzeptanzkriterien erfüllt, 694 Tests grün → Approved.
+> Offen nur noch: Deployment (Migrationen sind lokal vorhanden).
 
 ## Dependencies
 - Erweitert: PROJ-5 (Autonome Klassifizierung) — Stammdaten wandern in LLM-Prompt

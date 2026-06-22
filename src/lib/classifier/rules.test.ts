@@ -89,6 +89,85 @@ describe("regelTrifftZu", () => {
   });
 });
 
+describe("regelTrifftZu — PROJ-15 Regex-Bedingungen", () => {
+  it("matcht empfaenger_regex gegen empfaenger_normalisiert (Vorrang vor roh)", () => {
+    const b: BuchungFuerRegel = {
+      konto_id: "k1",
+      betrag: -10,
+      verwendungszweck: "abo",
+      empfaenger: "STRIPE*ACME LTD",
+      empfaenger_normalisiert: "acme",
+    };
+    expect(
+      regelTrifftZu(regel({ bedingung: { empfaenger_regex: "^acme$" } }), b),
+    ).toBe(true);
+  });
+
+  it("matcht empfaenger_regex case-insensitive", () => {
+    const r = regel({ bedingung: { empfaenger_regex: "^stripe\\*.*" } });
+    expect(regelTrifftZu(r, buchung)).toBe(false); // empfaenger=Amazon Web Services
+    const b: BuchungFuerRegel = {
+      konto_id: "k1",
+      betrag: -10,
+      verwendungszweck: "x",
+      empfaenger: "STRIPE*FOO",
+    };
+    expect(regelTrifftZu(r, b)).toBe(true);
+  });
+
+  it("fällt auf rohes empfaenger zurück, wenn normalisiert fehlt", () => {
+    const b: BuchungFuerRegel = {
+      konto_id: "k1",
+      betrag: -10,
+      verwendungszweck: "x",
+      empfaenger: "Deutsche Telekom AG",
+    };
+    expect(
+      regelTrifftZu(regel({ bedingung: { empfaenger_regex: "telekom" } }), b),
+    ).toBe(true);
+  });
+
+  it("matcht zweck_regex gegen verwendungszweck", () => {
+    const r = regel({ bedingung: { zweck_regex: "cloud\\s+rechnung" } });
+    expect(regelTrifftZu(r, buchung)).toBe(true);
+  });
+
+  it("UND-Verknüpfung: regex + muster müssen beide greifen", () => {
+    const r = regel({
+      bedingung: { empfaenger_muster: "amazon", zweck_regex: "miete" },
+    });
+    expect(regelTrifftZu(r, buchung)).toBe(false);
+  });
+
+  it("ein UNSICHERES Regex (ReDoS) matcht NICHT (fail-safe)", () => {
+    const r = regel({ bedingung: { empfaenger_regex: "(a+)+" } });
+    const b: BuchungFuerRegel = {
+      konto_id: "k1",
+      betrag: -10,
+      verwendungszweck: "x",
+      empfaenger: "aaaaaa",
+    };
+    expect(regelTrifftZu(r, b)).toBe(false);
+  });
+
+  it("ein ungültiges Regex matcht NICHT (fail-safe)", () => {
+    const r = regel({ bedingung: { empfaenger_regex: "(unbalanced" } });
+    const b: BuchungFuerRegel = {
+      konto_id: "k1",
+      betrag: -10,
+      verwendungszweck: "x",
+      empfaenger: "unbalanced",
+    };
+    expect(regelTrifftZu(r, b)).toBe(false);
+  });
+
+  it("leeres/whitespace-Regex zählt NICHT als Bedingung", () => {
+    expect(
+      regelTrifftZu(regel({ bedingung: { empfaenger_regex: "   " } }), buchung),
+    ).toBe(false);
+  });
+});
+
 describe("werteRegelnAus", () => {
   it("liefert null, wenn keine Regel greift", () => {
     const a = werteRegelnAus(

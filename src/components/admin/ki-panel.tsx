@@ -250,7 +250,7 @@ export function KiPanel({ initialKi }: { initialKi: KiStatus }) {
                     <FormDescription>
                       Aktuelle Claude-Modelle. Mit gültigem Key wird die
                       Live-Liste vom AI Gateway geladen. Standard:
-                      anthropic/claude-haiku-4-5
+                      anthropic/claude-opus-4-8
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

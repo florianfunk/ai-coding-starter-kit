@@ -11,9 +11,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { decrypt } from "@/lib/crypto";
+import { STANDARD_MODELL } from "@/lib/admin/claude-modelle";
 
 /** Standard-Modell, falls weder DB noch Env ein Modell liefern. */
-const DEFAULT_MODEL = "anthropic/claude-haiku-4-5";
+const DEFAULT_MODEL = STANDARD_MODELL;
 
 export interface AiKeyAufloesung {
   /** Klartext-Key oder null, wenn nirgends konfiguriert. */

@@ -1,8 +1,12 @@
 # PROJ-19: Kündigungsliste für wiederkehrende Empfänger
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-06-13
-**Last Updated:** 2026-06-13
+**Last Updated:** 2026-06-19
+
+> Status-Korrektur 2026-06-19: Alle Akzeptanzkriterien erfüllt (Migration
+> 0006, GET/POST/PATCH/DELETE-API, `/kuendigungen`-Seite, Abo-Radar-Toggle,
+> Edge-Cases, Owner-Scope/RLS/Zod). 694 Tests grün, Build sauber → Approved.
 
 > Hinweis: Dieses Spec wurde **nachträglich** zur bereits erfolgten
 > Implementierung geschrieben (Reverse-Spec / „as built"), damit das

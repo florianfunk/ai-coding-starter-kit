@@ -16,6 +16,7 @@ import {
   Layers,
   Loader2,
   Search,
+  Sparkles,
   X,
 } from "lucide-react";
 import type { Buchung, Kategorie, Klassifikation, Konto } from "@/lib/types";
@@ -23,6 +24,7 @@ import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet"
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
 import { MerkenStern } from "@/components/merkliste/merken-stern";
 import { useMerkSet } from "@/hooks/use-merk-set";
+import { useReklassifizierung } from "@/hooks/use-reklassifizierung";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -98,6 +100,7 @@ export function PrueflisteAnsicht({
   kategorien: Kategorie[];
 }) {
   const router = useRouter();
+  const { reklassifiziere, pending: reklassPending } = useReklassifizierung();
   const [faelle, setFaelle] = useState<Buchung[]>(initialFaelle);
   // PROJ-20: Merken unabhängig vom Entscheiden — eine Buchung kann in der
   // Prüfliste bleiben und trotzdem gemerkt sein.
@@ -329,6 +332,15 @@ export function PrueflisteAnsicht({
     setDialogFaelle(sel);
   }
 
+  // PROJ-15 P2 (#1): die ausgewählten Fälle mit dem aktuellen Wissen
+  // (Regeln, Empfänger-Cache, Historie) erneut klassifizieren. Manuell
+  // bestätigte Buchungen werden serverseitig übersprungen.
+  async function reklassifiziereAuswahl() {
+    const ids = gefiltert.filter((f) => auswahl.has(f.id)).map((f) => f.id);
+    const ok = await reklassifiziere(ids);
+    if (ok) await reload();
+  }
+
   async function nachEntscheidung(e: EntscheidungErgebnis) {
     setDialogFaelle(null);
     const neu = await reload();
@@ -493,6 +505,20 @@ export function PrueflisteAnsicht({
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              onClick={reklassifiziereAuswahl}
+              disabled={auswahl.size === 0 || reklassPending}
+              title="Ausgewählte Fälle mit dem aktuellen Wissen erneut klassifizieren (manuell bestätigte werden übersprungen)"
+              className="h-9 rounded-full font-semibold"
+            >
+              {reklassPending ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 h-4 w-4" />
+              )}
+              Neu klassifizieren
+            </Button>
             <Button
               onClick={oeffneBulk}
               disabled={auswahl.size === 0}

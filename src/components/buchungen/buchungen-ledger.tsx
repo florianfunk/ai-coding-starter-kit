@@ -19,6 +19,7 @@ import {
   ArrowUp,
   ChevronRight,
   HelpCircle,
+  Loader2,
   Search,
   Sparkles,
   Tag,
@@ -37,9 +38,11 @@ import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet"
 import { MerkenStern } from "@/components/merkliste/merken-stern";
 import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { KategorieCombobox } from "@/components/kategorien/kategorie-combobox";
+import { useReklassifizierung } from "@/hooks/use-reklassifizierung";
 import {
   Select,
   SelectContent,
@@ -202,11 +205,14 @@ export function BuchungenLedger({
   maxBuchungen?: number;
 }) {
   const router = useRouter();
+  const { reklassifiziere, pending: reklassPending } = useReklassifizierung();
   const [konto, setKonto] = useState(filter.konto ?? "alle");
   const [von, setVon] = useState(filter.von ?? "");
   const [bis, setBis] = useState(filter.bis ?? "");
   const [detail, setDetail] = useState<Buchung | null>(null);
   const [detailOffen, setDetailOffen] = useState(false);
+  // PROJ-15 P2 (#1): Multi-Select für Re-Klassifizierung.
+  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
 
   // PROJ-20: Merken-Status (Set) wird hier zentral gehalten, damit Zeile und
   // Detail-Sheet derselben Buchung synchron bleiben.
@@ -358,12 +364,38 @@ export function BuchungenLedger({
     setBetragBis("");
     setSortFeld("datum");
     setSortRichtung("desc");
+    setAuswahl(new Set());
     router.push("/buchungen");
+  }
+
+  function alleSichtbarenWaehlen(an: boolean) {
+    setAuswahl(an ? new Set(sortiert.map((b) => b.id)) : new Set());
   }
 
   function oeffneDetail(b: Buchung) {
     setDetail(b);
     setDetailOffen(true);
+  }
+
+  function toggleAuswahl(id: string) {
+    setAuswahl((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // PROJ-15 P2 (#1): ausgewählte Buchungen erneut klassifizieren. Manuell
+  // bestätigte werden serverseitig übersprungen — wir filtern hier nichts raus,
+  // ein Hinweis am Button erklärt das. Nach Erfolg Server-Daten neu laden.
+  async function reklassifiziereAuswahl() {
+    const ids = sortiert.filter((b) => auswahl.has(b.id)).map((b) => b.id);
+    const ok = await reklassifiziere(ids);
+    if (ok) {
+      setAuswahl(new Set());
+      router.refresh();
+    }
   }
 
   function toggleSort(feld: SortFeld) {
@@ -376,6 +408,8 @@ export function BuchungenLedger({
   }
 
   const istLeer = sortiert.length === 0;
+  const alleGewaehlt =
+    sortiert.length > 0 && sortiert.every((b) => auswahl.has(b.id));
   const hatFilter =
     konto !== "alle" ||
     von !== "" ||
@@ -724,6 +758,49 @@ export function BuchungenLedger({
         </div>
       )}
 
+      {/* ───────────────── AUSWAHL-LEISTE (Re-Klassifizierung) ─────────────── */}
+      {!istLeer && (
+        <section className="flex flex-col gap-3 rounded-[var(--radius)] bg-card px-4 py-3 shadow-[var(--shadow-1)] ring-1 ring-line/60 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Checkbox
+              checked={alleGewaehlt}
+              onCheckedChange={(v) => alleSichtbarenWaehlen(Boolean(v))}
+              aria-label="Alle sichtbaren Buchungen auswählen"
+            />
+            <span className="text-[13px] text-muted-foreground">
+              {auswahl.size > 0
+                ? `${auswahl.size} ausgewählt`
+                : "Buchungen auswählen, um sie neu zu klassifizieren"}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {auswahl.size > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => setAuswahl(new Set())}
+                className="h-9 rounded-full text-[12.5px] font-medium text-muted-foreground"
+              >
+                Auswahl aufheben
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={reklassifiziereAuswahl}
+              disabled={auswahl.size === 0 || reklassPending}
+              title="Ausgewählte Buchungen mit dem aktuellen Wissen erneut klassifizieren (manuell bestätigte werden übersprungen)"
+              className="h-9 rounded-full font-semibold"
+            >
+              {reklassPending ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-1.5 h-4 w-4" />
+              )}
+              Neu klassifizieren
+            </Button>
+          </div>
+        </section>
+      )}
+
       {/* ───────────────── LEDGER ───────────────── */}
       {istLeer ? (
         <LedgerLeer
@@ -774,6 +851,8 @@ export function BuchungenLedger({
                       gemerkt={merk.istGemerkt(b.id)}
                       merkenPending={merk.istPending(b.id)}
                       onToggleMerken={() => merk.toggle(b.id)}
+                      ausgewaehlt={auswahl.has(b.id)}
+                      onToggleAuswahl={() => toggleAuswahl(b.id)}
                     />
                   ))}
                 </ul>
@@ -849,6 +928,8 @@ function LedgerZeile({
   gemerkt,
   merkenPending,
   onToggleMerken,
+  ausgewaehlt,
+  onToggleAuswahl,
 }: {
   buchung: Buchung;
   kontoName: string;
@@ -859,6 +940,8 @@ function LedgerZeile({
   gemerkt: boolean;
   merkenPending: boolean;
   onToggleMerken: () => void;
+  ausgewaehlt: boolean;
+  onToggleAuswahl: () => void;
 }) {
   const ausgabe = b.betrag < 0;
   const datumKurz = formatDatumKurz(b.buchung_datum);
@@ -871,6 +954,7 @@ function LedgerZeile({
       className={cn(
         "flex items-stretch",
         !letzterEintrag && "border-b border-line-hair",
+        ausgewaehlt && "bg-tint-violet/40",
       )}
       style={{
         animation:
@@ -883,10 +967,18 @@ function LedgerZeile({
             : undefined,
       }}
     >
+      {/* Auswahl-Checkbox — eigene Zelle (kein verschachtelter Button) */}
+      <div className="flex items-center pl-3 pr-1 sm:pl-4">
+        <Checkbox
+          checked={ausgewaehlt}
+          onCheckedChange={onToggleAuswahl}
+          aria-label={`Buchung ${b.empfaenger ?? b.id} für Re-Klassifizierung auswählen`}
+        />
+      </div>
       <button
         type="button"
         onClick={onClick}
-        className="group relative grid min-w-0 flex-1 grid-cols-[3px_88px_1fr_auto_16px] items-stretch gap-x-4 py-3 pl-3 pr-3 text-left transition-colors hover:bg-[color:var(--surface-2)] sm:pl-4 sm:pr-4"
+        className="group relative grid min-w-0 flex-1 grid-cols-[3px_88px_1fr_auto_16px] items-stretch gap-x-4 py-3 pl-1 pr-3 text-left transition-colors hover:bg-[color:var(--surface-2)] sm:pr-4"
       >
         {/* Vorzeichen-Balken links (statt Icon-Container — schlanker, tabellariger) */}
         <div

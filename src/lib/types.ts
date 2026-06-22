@@ -108,12 +108,39 @@ export interface Beleg {
   status: "importiert" | "unvollstaendig" | "quelle_entfernt";
 }
 
+/**
+ * PROJ-15 P1 — Split-Aktion einer Lernregel. Teilt eine Buchung automatisch in
+ * zwei Kind-Buchungen (geschäftlicher + privater Anteil), analog zur manuellen
+ * Aufteilung in der Prüfliste. Anteile sind in 0..1 und summieren sich zu 1.
+ * Schließt einfache `kategorie_id`/`klassifikation` in der Aktion aus.
+ */
+export interface LernregelSplit {
+  /** Geschäftlicher Anteil in 0..1 (z. B. 0.7 für 70 %). */
+  anteil_geschaeftlich: number;
+  /** Privater Anteil in 0..1; `anteil_geschaeftlich + anteil_privat === 1`. */
+  anteil_privat: number;
+  /** Kategorie des geschäftlichen Teils (optional). */
+  kategorie_geschaeftlich?: string | null;
+  /** Kategorie des privaten Teils (optional). */
+  kategorie_privat?: string | null;
+  /** USt-Satz des geschäftlichen Teils (privater Teil bekommt 0 % bzw. Default). */
+  ust_satz_geschaeftlich?: number | null;
+}
+
 export interface Lernregel {
   id: string;
   bezeichnung: string;
   bedingung: {
     empfaenger_muster?: string;
     zweck_muster?: string;
+    /**
+     * PROJ-15 P1 — case-insensitiver Regex gegen `empfaenger_normalisiert`
+     * (Fallback: rohes `empfaenger`). Wird über `regex-engine.ts` statisch
+     * auf ReDoS geprüft; ein nicht-kompilierbares/unsicheres Muster matcht NIE.
+     */
+    empfaenger_regex?: string;
+    /** PROJ-15 P1 — case-insensitiver Regex gegen `verwendungszweck`. */
+    zweck_regex?: string;
     konto_id?: string;
     betrag_min?: number;
     betrag_max?: number;
@@ -122,6 +149,8 @@ export interface Lernregel {
     kategorie_id?: string;
     ust_satz?: number;
     klassifikation?: Klassifikation;
+    /** PROJ-15 P1 — Split-Aktion (schließt kategorie_id/klassifikation aus). */
+    split?: LernregelSplit;
   };
   prioritaet: number;
   aktiv: boolean;

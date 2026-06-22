@@ -22,6 +22,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { KLASSIFIKATIONEN } from "@/lib/validation/regel";
 import { normalisiereEmpfaenger } from "@/lib/classifier/normalize";
+import { wendeSplitAn } from "@/lib/classifier/split-apply";
 import type { Buchung, Klassifikation } from "@/lib/types";
 
 const ustSchema = z
@@ -145,110 +146,52 @@ export async function POST(request: Request) {
   // ---- Split-Sonderfall (genau ein Fall) --------------------------------
   if (eingabe.split) {
     const f = faelle[0];
-    const anteilA = eingabe.split.anteil_a;
-    const anteilB = Number((1 - anteilA).toFixed(4));
-    const betragA = Number((f.betrag * anteilA).toFixed(2));
-    const betragB = Number((f.betrag - betragA).toFixed(2));
-
     // PROJ-15: Kind-Buchungen erben den Empfaenger 1:1 von der Klammer und
     // bekommen damit denselben normalisierten Schluessel — wichtig fuer
-    // Cache-/Historie-Lookups.
-    const empfaengerNorm = normalisiereEmpfaenger(f.empfaenger);
-
-    const kinder = [
+    // Cache-/Historie-Lookups. Die Aufteilungslogik liegt jetzt in
+    // `wendeSplitAn` (geteilt mit der Pipeline-Split-Aktion).
+    const res = await wendeSplitAn(
+      supabase,
       {
+        id: f.id,
         owner_id: user.id,
         konto_id: f.konto_id,
         buchung_datum: f.buchung_datum,
-        betrag: betragA,
+        betrag: f.betrag,
         verwendungszweck: f.verwendungszweck,
         empfaenger: f.empfaenger,
-        empfaenger_normalisiert: empfaengerNorm,
+        empfaenger_normalisiert: normalisiereEmpfaenger(f.empfaenger),
         waehrung: f.waehrung,
-        duplikat_hash: `${f.duplikat_hash}#split-a`,
-        import_quelle: "split",
-        klassifikation: eingabe.split.klassifikation_a,
-        steuerrelevant: steuerrelevantAus(eingabe.split.klassifikation_a),
-        kategorie_id: eingabe.split.kategorie_id_a,
-        ust_satz: eingabe.ust_satz,
-        begruendung: "Teilbuchung aus manueller Aufteilung.",
-        konfidenz: 1,
-        quelle: "manuell" as const,
-        status: "manuell_bestaetigt" as const,
-        pruef_grund: null,
-        parent_buchung_id: f.id,
-        split_anteil: anteilA,
+        duplikat_hash: f.duplikat_hash,
       },
       {
-        owner_id: user.id,
-        konto_id: f.konto_id,
-        buchung_datum: f.buchung_datum,
-        betrag: betragB,
-        verwendungszweck: f.verwendungszweck,
-        empfaenger: f.empfaenger,
-        empfaenger_normalisiert: empfaengerNorm,
-        waehrung: f.waehrung,
-        duplikat_hash: `${f.duplikat_hash}#split-b`,
-        import_quelle: "split",
-        klassifikation: eingabe.split.klassifikation_b,
-        steuerrelevant: steuerrelevantAus(eingabe.split.klassifikation_b),
-        kategorie_id: eingabe.split.kategorie_id_b,
-        ust_satz: eingabe.ust_satz,
-        begruendung: "Teilbuchung aus manueller Aufteilung.",
-        konfidenz: 1,
-        quelle: "manuell" as const,
-        status: "manuell_bestaetigt" as const,
-        pruef_grund: null,
-        parent_buchung_id: f.id,
-        split_anteil: anteilB,
+        anteil_a: eingabe.split.anteil_a,
+        klassifikation_a: eingabe.split.klassifikation_a,
+        kategorie_id_a: eingabe.split.kategorie_id_a,
+        ust_satz_a: eingabe.ust_satz,
+        klassifikation_b: eingabe.split.klassifikation_b,
+        kategorie_id_b: eingabe.split.kategorie_id_b,
+        ust_satz_b: eingabe.ust_satz,
       },
-    ];
-
-    const { error: kindErr } = await supabase
-      .from("buchung")
-      .insert(kinder);
-    if (kindErr) {
+      {
+        aktion: "manuell_aufgeteilt",
+        quelle: "nutzer",
+        kind_quelle: "manuell",
+        kind_begruendung: "Teilbuchung aus manueller Aufteilung.",
+        audit_details: { beleg_hinweis: eingabe.beleg_hinweis ?? null },
+      },
+    );
+    if (!res.ok) {
       return NextResponse.json(
-        { error: "Teilbuchungen konnten nicht angelegt werden." },
+        {
+          error:
+            res.fehler === "kinder_insert"
+              ? "Teilbuchungen konnten nicht angelegt werden."
+              : "Klammerbuchung konnte nicht aktualisiert werden.",
+        },
         { status: 500 },
       );
     }
-
-    // Eltern-Buchung wird zur eingefrorenen Klammer.
-    const { error: elternErr } = await supabase
-      .from("buchung")
-      .update({
-        klassifikation: "neutral",
-        steuerrelevant: false,
-        quelle: "manuell",
-        status: "manuell_bestaetigt",
-        pruef_grund: null,
-        begruendung: "In Teilbuchungen aufgeteilt (Klammerbuchung).",
-      })
-      .eq("id", f.id)
-      .eq("owner_id", user.id)
-      .neq("status", "manuell_bestaetigt");
-    if (elternErr) {
-      return NextResponse.json(
-        { error: "Klammerbuchung konnte nicht aktualisiert werden." },
-        { status: 500 },
-      );
-    }
-
-    await supabase.from("audit_eintrag").insert({
-      owner_id: user.id,
-      entitaet: "buchung",
-      entitaet_id: f.id,
-      aktion: "manuell_aufgeteilt",
-      quelle: "nutzer",
-      details: {
-        anteil_a: anteilA,
-        anteil_b: anteilB,
-        betrag_a: betragA,
-        betrag_b: betragB,
-        beleg_hinweis: eingabe.beleg_hinweis ?? null,
-      },
-    });
     bearbeitet = 1;
   } else {
     // ---- Normalfall: Einzel-/Bulk-Entscheidung -------------------------

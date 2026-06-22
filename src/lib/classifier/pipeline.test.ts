@@ -1016,3 +1016,188 @@ describe("PROJ-23 — Vorjahres-Übernahme", () => {
     expect(ergebnis.quelle).toBe("ki");
   });
 });
+
+// ---------------------------------------------------------------------------
+// PROJ-15 P1 — Pipeline-Split-Integration (Lernregel mit aktion.split)
+// ---------------------------------------------------------------------------
+
+/**
+ * Schlanker Supabase-Mock, der die drei DB-Schritte von `wendeSplitAn`
+ * (buchung.insert → buchung.update → audit_eintrag.insert) abbildet und die
+ * Aufrufe für Assertions sammelt. Kein Cache/Historie-Pfad — Split greift
+ * deterministisch über die Regel und ruft kein LLM.
+ */
+function makeSplitSupabase() {
+  const kinderInserts: unknown[] = [];
+  const klammerUpdates: Array<{ patch: Record<string, unknown> }> = [];
+  const audits: unknown[] = [];
+
+  const from = vi.fn((tabelle: string) => {
+    if (tabelle === "buchung") {
+      return {
+        insert: vi.fn(async (rows: unknown) => {
+          kinderInserts.push(rows);
+          return { error: null };
+        }),
+        update: vi.fn((patch: Record<string, unknown>) => {
+          const chain = {
+            eq: vi.fn(() => chain),
+            neq: vi.fn(async () => {
+              klammerUpdates.push({ patch });
+              return { error: null };
+            }),
+          };
+          return chain;
+        }),
+      };
+    }
+    if (tabelle === "audit_eintrag") {
+      return {
+        insert: vi.fn(async (row: unknown) => {
+          audits.push(row);
+          return { error: null };
+        }),
+      };
+    }
+    throw new Error(`Unerwartete Tabelle im Split-Mock: ${tabelle}`);
+  });
+
+  return { from, kinderInserts, klammerUpdates, audits };
+}
+
+function splitBuchung(p: Partial<BuchungFuerPipeline> = {}): BuchungFuerPipeline {
+  return {
+    ...buchung(p),
+    waehrung: p.waehrung ?? "EUR",
+    duplikat_hash: p.duplikat_hash ?? "hash-1",
+    buchung_datum: p.buchung_datum ?? "2026-03-01",
+  };
+}
+
+describe("klassifiziereBuchung — PROJ-15 Split-Aktion", () => {
+  it("Regel mit aktion.split → zwei Kinder + Klammer, kein LLM, split_angewandt=true", async () => {
+    const { from, kinderInserts, klammerUpdates, audits } = makeSplitSupabase();
+    const supabase = { from } as never;
+    const llmFn = vi.fn();
+
+    const r = regel({
+      id: "r-split",
+      bedingung: { empfaenger_muster: "test gmbh" },
+      aktion: {
+        split: {
+          anteil_geschaeftlich: 0.7,
+          anteil_privat: 0.3,
+          kategorie_geschaeftlich: "kat-soft",
+          kategorie_privat: null,
+          ust_satz_geschaeftlich: 19,
+        },
+      },
+    });
+
+    const { ergebnis, audit } = await klassifiziereBuchung(
+      splitBuchung({ betrag: -100 }),
+      [r],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      undefined,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    // Kein LLM-Aufruf — Regel greift deterministisch.
+    expect(llmFn).not.toHaveBeenCalled();
+    // Split-Flag auf dem Ergebnis gesetzt.
+    expect(ergebnis.split_angewandt).toBe(true);
+    expect(ergebnis.quelle).toBe("regel");
+    expect(ergebnis.regel_id).toBe("r-split");
+    // Elternbuchung wird zur Klammer (neutral, manuell_bestaetigt).
+    expect(klammerUpdates).toHaveLength(1);
+    expect(klammerUpdates[0].patch).toMatchObject({
+      klassifikation: "neutral",
+      status: "manuell_bestaetigt",
+    });
+    // Genau ein Insert-Aufruf mit zwei Kind-Buchungen.
+    expect(kinderInserts).toHaveLength(1);
+    const kinder = kinderInserts[0] as Array<{
+      betrag: number;
+      klassifikation: string;
+      kategorie_id: string | null;
+      split_anteil: number;
+      parent_buchung_id: string;
+      quelle: string;
+    }>;
+    expect(kinder).toHaveLength(2);
+    expect(kinder[0].betrag).toBe(-70);
+    expect(kinder[1].betrag).toBe(-30);
+    expect(kinder[0].klassifikation).toBe("geschaeftlich");
+    expect(kinder[0].kategorie_id).toBe("kat-soft");
+    expect(kinder[1].klassifikation).toBe("privat");
+    expect(kinder[0].quelle).toBe("regel");
+    expect(kinder[0].parent_buchung_id).toBe("b1");
+    // Audit dokumentiert die Aufteilung inkl. regel_id.
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      aktion: "regel_aufgeteilt",
+      quelle: "regel",
+    });
+    expect(
+      (audits[0] as { details: { regel_id?: string } }).details.regel_id,
+    ).toBe("r-split");
+  });
+
+  it("Regel OHNE split → unverändertes Verhalten (kein Insert/Klammer, split_angewandt=false)", async () => {
+    const { from, kinderInserts, klammerUpdates } = makeSplitSupabase();
+    const supabase = { from } as never;
+    const llmFn = vi.fn();
+
+    const r = regel({
+      id: "r-plain",
+      bedingung: { empfaenger_muster: "test gmbh" },
+      aktion: { kategorie_id: "kat-soft", klassifikation: "geschaeftlich" },
+    });
+
+    const { ergebnis } = await klassifiziereBuchung(
+      splitBuchung(),
+      [r],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      undefined,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(llmFn).not.toHaveBeenCalled();
+    expect(ergebnis.split_angewandt).toBeFalsy();
+    expect(ergebnis.quelle).toBe("regel");
+    expect(ergebnis.status).toBe("auto_verbucht");
+    // Kein Split-IO ausgelöst.
+    expect(kinderInserts).toHaveLength(0);
+    expect(klammerUpdates).toHaveLength(0);
+  });
+
+  it("Split-Regel ohne ctx.supabase → kein Split-IO, Ergebnis bleibt Regel-Treffer", async () => {
+    const llmFn = vi.fn();
+    const r = regel({
+      id: "r-split",
+      bedingung: { empfaenger_muster: "test gmbh" },
+      aktion: {
+        split: {
+          anteil_geschaeftlich: 0.6,
+          anteil_privat: 0.4,
+        },
+      },
+    });
+
+    const { ergebnis } = await klassifiziereBuchung(
+      splitBuchung(),
+      [r],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+    );
+
+    expect(llmFn).not.toHaveBeenCalled();
+    expect(ergebnis.split_angewandt).toBeFalsy();
+    expect(ergebnis.quelle).toBe("regel");
+  });
+});

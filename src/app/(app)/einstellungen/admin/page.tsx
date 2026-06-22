@@ -6,12 +6,13 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { STANDARD_MODELL } from "@/lib/admin/claude-modelle";
 
 export const metadata = {
   title: "Admin · STEUERAGENT",
 };
 
-const DEFAULT_MODEL = "anthropic/claude-haiku-4-5";
+const DEFAULT_MODEL = STANDARD_MODELL;
 
 export interface KiStatus {
   ai_model: string;

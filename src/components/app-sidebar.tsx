@@ -32,6 +32,8 @@ const NAV_HEUTE = [
 const NAV_BUECHER = [
   { href: "/buchungen", label: "Buchungen" },
   { href: "/klassifizierung", label: "Klassifizierung" },
+  // PROJ-15 P2 (#3): Kandidatenliste für neue Lernregeln.
+  { href: "/klassifizierung/haeufige-empfaenger", label: "Häufige Empfänger" },
   { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
   { href: "/lieferanten-notizen", label: "Lieferanten-Notizen" },
   { href: "/abgleich", label: "Beleg-Abgleich" },
@@ -111,10 +113,24 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Alle Nav-Hrefs flach — damit `istAktiv` erkennen kann, ob ein spezifischerer
+// (längerer) Eintrag denselben Pfad besser abdeckt (z. B. „Häufige Empfänger"
+// unter „Klassifizierung"). So leuchtet immer nur der präziseste Eintrag.
+const ALLE_HREFS = NAV_SEKTIONEN.flatMap((s) => s.eintraege.map((e) => e.href));
+
 export function AppSidebar() {
   const pathname = usePathname();
-  const istAktiv = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+  const istAktiv = (href: string) => {
+    const passt = pathname === href || pathname.startsWith(href + "/");
+    if (!passt) return false;
+    // Ein längerer, ebenfalls passender Eintrag gewinnt (präziser).
+    const praeziser = ALLE_HREFS.some(
+      (h) =>
+        h.length > href.length &&
+        (pathname === h || pathname.startsWith(h + "/")),
+    );
+    return !praeziser;
+  };
 
   return (
     <aside

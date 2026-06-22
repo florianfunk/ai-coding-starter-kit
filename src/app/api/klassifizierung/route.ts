@@ -16,7 +16,7 @@ import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { klassifizierungInputSchema } from "@/lib/validation/klassifizierung";
-import { ladeAlle } from "@/lib/supabase/fetch-all";
+import { ladeAlle, ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import {
   klassifiziereBuchung,
   ManuellBestaetigtError,
@@ -45,8 +45,10 @@ const SELECT_JOB =
 // owner-scoped pro normalisiertem Empfaenger nachschlagen koennen.
 // PROJ-16: `buchung_datum` zusaetzlich, damit Arbeitgeber-Zeitraeume
 // (aktiv_von/bis) gepruft werden koennen.
+// PROJ-15 P1: `waehrung` + `duplikat_hash` mitladen — die Pipeline braucht sie
+// fuer die automatische Split-Aktion (Kind-Buchungen erben sie von der Klammer).
 const SELECT_BUCHUNG =
-  "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, buchung_datum, status";
+  "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, buchung_datum, waehrung, duplikat_hash, status";
 
 interface Klassifikationsergebnis {
   verarbeitet: number;
@@ -178,7 +180,14 @@ export async function POST(request: Request) {
       { status: 422 },
     );
   }
-  const { nur_offen, konfidenz_schwellwert, betrag_limit } = parsed.data;
+  const { nur_offen, konfidenz_schwellwert, betrag_limit, buchung_ids } =
+    parsed.data;
+  // PROJ-15 P2 (#1): Gezielte Re-Klassifizierung. Wenn eine explizite Liste
+  // übergeben wurde, gewinnt sie über nur_offen — es werden ausschließlich
+  // diese Buchungen verarbeitet (manuell_bestaetigt bleibt dabei ausgeschlossen,
+  // siehe Lade-Query + Update-Guard).
+  const explizitIds =
+    buchung_ids && buchung_ids.length > 0 ? buchung_ids : null;
   // Default-Kategorien für die Pipeline werden weiter unten ermittelt
   // (nachdem Kategorien geladen wurden) und in `config` ergänzt.
   const config: PipelineConfig = {
@@ -276,26 +285,37 @@ export async function POST(request: Request) {
     };
   }
 
-  // Zu klassifizierende Buchungen — vollständig paginiert laden, sonst kappt
-  // PostgREST bei 1000 Zeilen und nur die ältesten würden klassifiziert.
-  const { data: buchungenData, error: buchungenErr } = await ladeAlle(
-    (von, bisIdx) => {
-      let q = supabase
-        .from("buchung")
-        .select(SELECT_BUCHUNG)
-        .eq("owner_id", user.id)
-        .order("buchung_datum", { ascending: true })
-        .order("id", { ascending: true })
-        .range(von, bisIdx);
-      if (nur_offen) {
-        q = q.eq("status", "offen");
-      } else {
-        // Re-Klassifizierung: alles AUSSER manuell bestätigt.
-        q = q.neq("status", "manuell_bestaetigt");
-      }
-      return q;
-    },
-  );
+  // Zu klassifizierende Buchungen laden.
+  // PROJ-15 P2 (#1): Bei expliziter Auswahl nur diese IDs (owner-scoped),
+  // blockweise über .in() geladen (URL-längen-sicher), manuell_bestaetigt
+  // bleibt ausgeschlossen. Sonst der reguläre, voll paginierte Lauf.
+  const { data: buchungenData, error: buchungenErr } = explizitIds
+    ? await ladeNachBloecken(explizitIds, (block) =>
+        supabase
+          .from("buchung")
+          .select(SELECT_BUCHUNG)
+          .eq("owner_id", user.id)
+          .in("id", block)
+          .neq("status", "manuell_bestaetigt")
+          .order("buchung_datum", { ascending: true })
+          .order("id", { ascending: true }),
+      )
+    : await ladeAlle((von, bisIdx) => {
+        let q = supabase
+          .from("buchung")
+          .select(SELECT_BUCHUNG)
+          .eq("owner_id", user.id)
+          .order("buchung_datum", { ascending: true })
+          .order("id", { ascending: true })
+          .range(von, bisIdx);
+        if (nur_offen) {
+          q = q.eq("status", "offen");
+        } else {
+          // Re-Klassifizierung: alles AUSSER manuell bestätigt.
+          q = q.neq("status", "manuell_bestaetigt");
+        }
+        return q;
+      });
   if (buchungenErr) {
     return NextResponse.json(
       { error: "Buchungen konnten nicht geladen werden." },
@@ -399,23 +419,31 @@ export async function POST(request: Request) {
           { supabase, ownerId: user.id, inflight, vorjahr_map: vorjahrMap },
         );
 
-        const { error: updErr } = await supabase
-          .from("buchung")
-          .update({
-            klassifikation: e.klassifikation,
-            steuerrelevant: e.steuerrelevant,
-            kategorie_id: e.kategorie_id,
-            ust_satz: e.ust_satz,
-            begruendung: e.begruendung,
-            konfidenz: e.konfidenz,
-            quelle: e.quelle,
-            regel_id: e.regel_id,
-            status: e.status,
-            pruef_grund: e.pruef_grund,
-          })
-          .eq("id", b.id)
-          .eq("owner_id", user.id)
-          .neq("status", "manuell_bestaetigt"); // letzte Sicherung
+        // PROJ-15 P1: Hat eine Split-Regel gegriffen, hat die Pipeline die
+        // Eltern-Buchung bereits zur Klammer gemacht und zwei Kinder angelegt
+        // (via wendeSplitAn). Ein normales Update wuerde die Klammer wieder
+        // ueberschreiben — daher hier ueberspringen.
+        const updErr = e.split_angewandt
+          ? null
+          : (
+              await supabase
+                .from("buchung")
+                .update({
+                  klassifikation: e.klassifikation,
+                  steuerrelevant: e.steuerrelevant,
+                  kategorie_id: e.kategorie_id,
+                  ust_satz: e.ust_satz,
+                  begruendung: e.begruendung,
+                  konfidenz: e.konfidenz,
+                  quelle: e.quelle,
+                  regel_id: e.regel_id,
+                  status: e.status,
+                  pruef_grund: e.pruef_grund,
+                })
+                .eq("id", b.id)
+                .eq("owner_id", user.id)
+                .neq("status", "manuell_bestaetigt") // letzte Sicherung
+            ).error;
 
         if (updErr) {
           // Serverseitig die echte DB-Ursache loggen (z. B. CHECK-Constraint),
@@ -502,10 +530,15 @@ export async function POST(request: Request) {
     // werden niemals angefasst.
     // Bei Zeitlimit-Abbruch wird er ÜBERSPRUNGEN — er soll erst auf dem
     // vollständig klassifizierten Datenstand laufen (und es fehlt ohnehin Zeit).
+    // PROJ-15 P2 (#1): Bei einer gezielten Auswahl (buchung_ids) wird der
+    // Konsistenz-Pass ebenfalls übersprungen — er gleicht owner-weit ab und
+    // wäre für eine punktuelle Re-Klassifizierung weniger Buchungen ein
+    // überraschender Seiteneffekt.
     try {
-      ergebnis.konsistenz_pass = zeitlimitErreicht
-        ? null
-        : await wendeKonsistenzPassAn(supabase, user.id);
+      ergebnis.konsistenz_pass =
+        zeitlimitErreicht || explizitIds
+          ? null
+          : await wendeKonsistenzPassAn(supabase, user.id);
     } catch {
       // Pass ist best-effort: Fehler darf den Lauf nicht als 'fehler'
       // markieren, die Hauptphase ist erfolgreich fertig.

@@ -24,8 +24,14 @@
 // `entscheideBuchung` ist eine REINE Funktion (testbar ohne IO).
 // `klassifiziereBuchung` orchestriert inkl. LLM-Aufruf, Cache und Historie.
 
-import type { Buchung, Klassifikation, Lernregel } from "@/lib/types";
+import type {
+  Buchung,
+  Klassifikation,
+  Lernregel,
+  LernregelSplit,
+} from "@/lib/types";
 import { werteRegelnAus, type BuchungFuerRegel } from "@/lib/classifier/rules";
+import { wendeSplitAn, type SplitDefinition } from "@/lib/classifier/split-apply";
 import {
   LlmKlassifiziererError,
   klassifiziereMitLlm,
@@ -106,6 +112,14 @@ export interface Klassifikationsergebnis {
   regel_id: string | null;
   status: "auto_verbucht" | "zur_pruefung";
   pruef_grund: string | null;
+  /**
+   * PROJ-15 P1 — true, wenn eine Lernregel mit `aktion.split` gegriffen hat und
+   * die Pipeline die Buchung in zwei Kind-Buchungen aufgeteilt hat (Eltern =
+   * Klammer). Der Aufrufer darf in diesem Fall KEIN normales Buchungs-Update
+   * mehr fahren — `wendeSplitAn` hat die Klammer bereits geschrieben.
+   * Default/undefined = kein Split.
+   */
+  split_angewandt?: boolean;
 }
 
 /** Audit-Detail (wird vom Aufrufer als audit_eintrag persistiert). */
@@ -137,6 +151,14 @@ export type BuchungFuerPipeline = Pick<
    * auf den Arbeitgebernamen ist ausreichend.
    */
   buchung_datum?: string | null;
+  /**
+   * PROJ-15 P1 — nur für die automatische Split-Aktion benötigt: die Kinder
+   * erben Währung und Duplikat-Hash der Klammer. Optional, weil der reguläre
+   * Klassifizierungspfad sie nicht braucht; ohne diese Felder + Datum kann
+   * die Pipeline keinen Split ausführen (Fallback: einfacher Regel-Treffer).
+   */
+  waehrung?: string | null;
+  duplikat_hash?: string | null;
 };
 
 /** Wird geworfen, wenn eine bereits manuell bestätigte Buchung übergeben wird. */
@@ -477,7 +499,39 @@ export async function klassifiziereBuchung(
     empfaenger: buchung.empfaenger,
   });
   if (regelAuswertung.treffer) {
-    return entscheideBuchung(buchung, regeln, null, config);
+    const entscheidung = entscheideBuchung(buchung, regeln, null, config);
+
+    // PROJ-15 P1 — trägt die getroffene Regel eine `aktion.split`, teilen wir
+    // die Buchung in zwei Kind-Buchungen auf (statt eine einfache Kategorie zu
+    // setzen). Das passiert NUR im konfliktfreien, nicht-Ausreißer-Auto-Pfad:
+    // ein Regelkonflikt oder ein Ausreißer-Betrag wandert wie gehabt zur
+    // Prüfung, ohne automatisch aufzuteilen.
+    const split = regelAuswertung.treffer.split;
+    if (
+      split &&
+      entscheidung.ergebnis.status === "auto_verbucht" &&
+      ctx.supabase &&
+      ctx.ownerId &&
+      buchung.buchung_datum &&
+      typeof buchung.waehrung === "string" &&
+      typeof buchung.duplikat_hash === "string"
+    ) {
+      await wendeRegelSplitAn(
+        ctx.supabase,
+        ctx.ownerId,
+        buchung,
+        split,
+        regelAuswertung.treffer.regel_id,
+      );
+      entscheidung.ergebnis.split_angewandt = true;
+      entscheidung.audit.details = {
+        ...entscheidung.audit.details,
+        split_angewandt: true,
+        split_regel_id: regelAuswertung.treffer.regel_id,
+      };
+    }
+
+    return entscheidung;
   }
 
   // (1b) PROJ-23 — Vorjahres-Übernahme: greift kein gelernter Regelsatz, aber
@@ -833,4 +887,61 @@ async function recherchiereUndUpserte(
 
   // Frischen Eintrag zurueckholen — vereinfacht die Konsumenten.
   return await holeKenntnis(supabase, ownerId, norm);
+}
+
+/**
+ * PROJ-15 P1 — wendet eine `aktion.split` einer Lernregel auf die Buchung an.
+ * Bildet die geschäftlich/privat-Form der `LernregelSplit` auf die a/b-Form der
+ * `SplitDefinition` ab (Seite A = geschäftlich, Seite B = privat) und delegiert
+ * die DB-Schritte an das wiederverwendbare `wendeSplitAn` aus split-apply.ts —
+ * derselbe Code-Pfad wie die manuelle Aufteilung in der Prüflisten-Route.
+ *
+ * Owner-Scope läuft über die Eltern-`owner_id` und die `.eq()`-Filter in
+ * `wendeSplitAn` (zusätzlich zur RLS). Fehler werden hier NICHT geworfen — die
+ * Klassifizierung der Buchung war erfolgreich; ein gescheiterter Split-Insert
+ * würde sonst die gesamte Zeile abbrechen. (Der Aufrufer erkennt am
+ * `split_angewandt`-Flag, dass das normale Update entfallen muss; ein
+ * fehlgeschlagener Insert hinterlässt eine Klammer ohne Kinder — bewusst
+ * tolerierter Randfall, der über das Audit nachvollziehbar bleibt.)
+ */
+async function wendeRegelSplitAn(
+  supabase: SupabaseClient,
+  ownerId: string,
+  buchung: BuchungFuerPipeline,
+  split: LernregelSplit,
+  regelId: string,
+): Promise<void> {
+  const def: SplitDefinition = {
+    anteil_a: split.anteil_geschaeftlich,
+    klassifikation_a: "geschaeftlich",
+    kategorie_id_a: split.kategorie_geschaeftlich ?? null,
+    ust_satz_a: split.ust_satz_geschaeftlich ?? null,
+    klassifikation_b: "privat",
+    kategorie_id_b: split.kategorie_privat ?? null,
+    ust_satz_b: null,
+  };
+
+  await wendeSplitAn(
+    supabase,
+    {
+      id: buchung.id,
+      owner_id: ownerId,
+      konto_id: buchung.konto_id,
+      buchung_datum: buchung.buchung_datum!,
+      betrag: buchung.betrag,
+      verwendungszweck: buchung.verwendungszweck,
+      empfaenger: buchung.empfaenger,
+      empfaenger_normalisiert: buchung.empfaenger_normalisiert ?? null,
+      waehrung: buchung.waehrung as string,
+      duplikat_hash: buchung.duplikat_hash as string,
+    },
+    def,
+    {
+      aktion: "regel_aufgeteilt",
+      quelle: "regel",
+      kind_quelle: "regel",
+      kind_begruendung: "Teilbuchung aus automatischer Regel-Aufteilung.",
+      audit_details: { regel_id: regelId },
+    },
+  );
 }

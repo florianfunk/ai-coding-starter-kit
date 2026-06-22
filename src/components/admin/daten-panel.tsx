@@ -8,8 +8,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-import type { WartungAktion } from "@/lib/validation/admin";
+import { WARTUNG_BESTAETIGUNG, type WartungAktion } from "@/lib/validation/admin";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -71,6 +73,8 @@ const AKTIONEN: AktionDef[] = [
 export function DatenPanel() {
   const router = useRouter();
   const [busy, setBusy] = useState<WartungAktion | null>(null);
+  // Eingetippte Bestätigungsphrase je Aktion.
+  const [phrasen, setPhrasen] = useState<Record<string, string>>({});
 
   async function ausfuehren(aktion: WartungAktion) {
     setBusy(aktion);
@@ -78,7 +82,10 @@ export function DatenPanel() {
       const res = await fetch("/api/admin/wartung", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ aktion }),
+        body: JSON.stringify({
+          aktion,
+          bestaetigung: phrasen[aktion] ?? "",
+        }),
       });
       const json = (await res.json().catch(() => null)) as
         | { ok?: boolean; betroffen?: number; message?: string; error?: string }
@@ -94,6 +101,8 @@ export function DatenPanel() {
         } Datensätze betroffen)`,
       );
       router.refresh();
+      // Phrase nach Erfolg zurücksetzen.
+      setPhrasen((p) => ({ ...p, [aktion]: "" }));
     } catch {
       toast.error("Netzwerkfehler. Bitte erneut versuchen.");
     } finally {
@@ -130,9 +139,31 @@ export function DatenPanel() {
                     {a.bestaetigung}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
+                <div className="space-y-2">
+                  <Label htmlFor={`bestaetigung-${a.aktion}`} className="text-sm">
+                    Zur Bestätigung{" "}
+                    <span className="font-mono font-semibold">
+                      {WARTUNG_BESTAETIGUNG[a.aktion]}
+                    </span>{" "}
+                    eintippen:
+                  </Label>
+                  <Input
+                    id={`bestaetigung-${a.aktion}`}
+                    autoComplete="off"
+                    value={phrasen[a.aktion] ?? ""}
+                    onChange={(e) =>
+                      setPhrasen((p) => ({ ...p, [a.aktion]: e.target.value }))
+                    }
+                    placeholder={WARTUNG_BESTAETIGUNG[a.aktion]}
+                  />
+                </div>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                   <AlertDialogAction
+                    disabled={
+                      (phrasen[a.aktion] ?? "").trim() !==
+                      WARTUNG_BESTAETIGUNG[a.aktion]
+                    }
                     onClick={() => void ausfuehren(a.aktion)}
                   >
                     Ja, ausführen

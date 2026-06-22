@@ -275,14 +275,24 @@ export async function POST(
       }
     },
     onError: async ({ error }) => {
-      const msg =
-        error instanceof Error ? error.message : "Unbekannter LLM-Fehler";
-      // Wir markieren die Assistant-Nachricht mit einer kurzen Fehler-Notiz,
-      // damit der Verlauf konsistent bleibt.
+      // Provider-/Stack-Details NIE in den Chat schreiben (könnten Keys,
+      // interne URLs o.Ä. enthalten). Detail nur strukturiert serverseitig
+      // loggen; der Nutzer bekommt eine generische Meldung.
+      console.error(
+        JSON.stringify({
+          ereignis: "chat_llm_fehler",
+          owner_id: user.id,
+          konversation_id,
+          nachricht_id: assistantNachrichtId,
+          name: error instanceof Error ? error.name : "unknown",
+          detail: error instanceof Error ? error.message : String(error),
+        }),
+      );
       await supabase
         .from("chat_nachricht")
         .update({
-          inhalt: `_Antwort fehlgeschlagen: ${msg}_`,
+          inhalt:
+            "_Die Antwort konnte nicht erzeugt werden. Bitte versuche es erneut._",
         })
         .eq("id", assistantNachrichtId)
         .eq("owner_id", user.id);

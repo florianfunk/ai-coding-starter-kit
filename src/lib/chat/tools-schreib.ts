@@ -24,6 +24,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { ChatToolContext } from "./tool-context";
+import { werkzeugFehler } from "./fehler";
 import type {
   BuchungStatus,
   Klassifikation,
@@ -89,9 +90,11 @@ async function legeVorschlagAn(
     .select("id")
     .single();
   if (error || !data) {
-    return {
-      fehler: `Vorschlag konnte nicht gespeichert werden: ${error?.message ?? "unbekannter Fehler"}`,
-    };
+    return werkzeugFehler(
+      aktion,
+      error,
+      "Der Vorschlag konnte nicht gespeichert werden. Bitte später erneut versuchen.",
+    );
   }
   return {
     aktion_id: data.id as string,
@@ -195,7 +198,7 @@ export function aendereKategorieTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.kategorie_id)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("aendere_kategorie", error);
       if (!vorher) return { fehler: "Kategorie nicht gefunden." };
 
       const aenderungen: string[] = [];
@@ -253,7 +256,7 @@ export function loescheKategorieTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.kategorie_id)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("loesche_kategorie", error);
       if (!kat) return { fehler: "Kategorie nicht gefunden." };
 
       const { count } = await supabase
@@ -308,7 +311,7 @@ export function bucheBuchungenUmTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.neue_kategorie_id)
         .maybeSingle();
-      if (katErr) return { fehler: katErr.message };
+      if (katErr) return werkzeugFehler("bucheBuchungenUm", katErr);
       if (!kat) return { fehler: "Ziel-Kategorie nicht gefunden." };
 
       const { data: rows, error: bErr } = await supabase
@@ -318,7 +321,7 @@ export function bucheBuchungenUmTool(ctx: ChatToolContext) {
         )
         .eq("owner_id", ownerId)
         .in("id", input.buchung_ids);
-      if (bErr) return { fehler: bErr.message };
+      if (bErr) return werkzeugFehler("bucheBuchungenUm", bErr);
 
       type Row = {
         id: string;
@@ -387,7 +390,7 @@ export function manuellBestaetigeBuchungenTool(ctx: ChatToolContext) {
         .select("id, buchung_datum, empfaenger, betrag, status")
         .eq("owner_id", ownerId)
         .in("id", input.buchung_ids);
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("manuell_bestaetige_buchungen", error);
 
       type Row = {
         id: string;
@@ -567,7 +570,7 @@ export function aendereLernregelTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.regel_id)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("aendere_lernregel", error);
       if (!vorher) return { fehler: "Lernregel nicht gefunden." };
 
       const vorschau = `Lernregel "${vorher.bezeichnung}" wird geaendert.`;
@@ -604,7 +607,7 @@ export function loescheLernregelTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.regel_id)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("loesche_lernregel", error);
       if (!vorher) return { fehler: "Lernregel nicht gefunden." };
 
       const vorschau = `Lernregel "${vorher.bezeichnung}" wird geloescht (bisheriger Treffer-Zaehler: ${vorher.treffer_zaehler}).`;

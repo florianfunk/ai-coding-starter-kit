@@ -2,6 +2,7 @@
 // NUR serverseitig verwenden — Token wird als Bearer übergeben, NIE geloggt,
 // NIE an den Client. Pagination + Rate-Limit-/Fehler-tolerant.
 import { createHash } from "node:crypto";
+import { pruefePaperlessUrlSicher, PaperlessSicherheitsError } from "./ssrf";
 
 /** Rohes Paperless-Dokument (relevante Felder der REST-API). */
 export interface PaperlessRawDocument {
@@ -57,6 +58,7 @@ export class PaperlessError extends Error {
       | "unreachable"
       | "rate_limit"
       | "bad_response"
+      | "blocked"
       | "unknown",
   ) {
     super(message);
@@ -94,6 +96,17 @@ async function paperlessFetch(
   url: string,
   token: string,
 ): Promise<Response> {
+  // SSRF-Schutz: vor jedem Request prüfen, dass das Ziel kein internes/
+  // privates Netz ist und (im Produktivbetrieb) HTTPS verwendet wird.
+  try {
+    await pruefePaperlessUrlSicher(url);
+  } catch (err) {
+    if (err instanceof PaperlessSicherheitsError) {
+      throw new PaperlessError(err.message, "blocked");
+    }
+    throw err;
+  }
+
   let lastErr: unknown;
   for (let versuch = 0; versuch <= RATE_LIMIT_RETRIES; versuch++) {
     const controller = new AbortController();
@@ -103,8 +116,19 @@ async function paperlessFetch(
         headers: authHeaders(token),
         signal: controller.signal,
         cache: "no-store",
+        // Weiterleitungen NICHT automatisch folgen: ein Redirect könnte sonst
+        // den SSRF-Schutz umgehen (Ziel-Wechsel auf ein internes Netz).
+        redirect: "manual",
       });
       clearTimeout(timer);
+
+      // Manuelle Redirect-Behandlung: 3xx wird nicht gefolgt.
+      if (res.status >= 300 && res.status < 400) {
+        throw new PaperlessError(
+          "Paperless antwortete mit einer Weiterleitung. Aus Sicherheitsgründen werden Weiterleitungen nicht gefolgt — bitte die finale (HTTPS-)URL direkt angeben.",
+          "blocked",
+        );
+      }
 
       if (res.status === 401 || res.status === 403) {
         throw new PaperlessError(

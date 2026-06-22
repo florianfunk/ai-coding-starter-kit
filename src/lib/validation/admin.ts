@@ -74,12 +74,35 @@ export const WARTUNG_AKTIONEN = [
 
 export type WartungAktion = (typeof WARTUNG_AKTIONEN)[number];
 
-/** Daten-Wartung: genau eine typisierte Reset-Aktion. */
-export const wartungSchema = z.object({
-  aktion: z.enum(WARTUNG_AKTIONEN, {
-    message: "Unbekannte Wartungsaktion",
-  }),
-});
+/**
+ * Pro Aktion eine exakte Bestätigungsphrase, die der Nutzer eintippen muss.
+ * Schutz gegen versehentliche (oder per CSRF/Skript ausgelöste) irreversible
+ * Löschaktionen: ein bloßer Klick reicht nicht, die Phrase muss exakt stimmen.
+ */
+export const WARTUNG_BESTAETIGUNG: Record<WartungAktion, string> = {
+  buchungen_reset: "BUCHUNGEN LÖSCHEN",
+  belege_reset: "BELEGE LÖSCHEN",
+  kontenrahmen_reseed: "KONTENRAHMEN LEEREN",
+};
+
+/**
+ * Daten-Wartung: genau eine typisierte Reset-Aktion + exakte
+ * Bestätigungsphrase (Schutz vor irreversiblen Fehlauslösungen).
+ */
+export const wartungSchema = z
+  .object({
+    aktion: z.enum(WARTUNG_AKTIONEN, {
+      message: "Unbekannte Wartungsaktion",
+    }),
+    bestaetigung: z
+      .string()
+      .min(1, "Bestätigungsphrase ist erforderlich")
+      .max(100, "Bestätigungsphrase ist zu lang"),
+  })
+  .refine((d) => d.bestaetigung.trim() === WARTUNG_BESTAETIGUNG[d.aktion], {
+    error: "Bestätigungsphrase stimmt nicht. Bitte exakt wie angezeigt eintippen.",
+    path: ["bestaetigung"],
+  });
 
 export type WartungInput = z.input<typeof wartungSchema>;
 export type WartungParsed = z.output<typeof wartungSchema>;

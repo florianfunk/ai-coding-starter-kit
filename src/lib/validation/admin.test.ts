@@ -3,6 +3,7 @@ import {
   aiEinstellungSchema,
   passwortAendernSchema,
   wartungSchema,
+  WARTUNG_BESTAETIGUNG,
 } from "./admin";
 
 describe("aiEinstellungSchema", () => {
@@ -81,18 +82,46 @@ describe("passwortAendernSchema", () => {
 });
 
 describe("wartungSchema", () => {
-  it("akzeptiert alle erlaubten Aktionen", () => {
+  it("akzeptiert alle erlaubten Aktionen mit korrekter Bestätigungsphrase", () => {
     for (const aktion of [
       "buchungen_reset",
       "belege_reset",
       "kontenrahmen_reseed",
     ] as const) {
-      expect(wartungSchema.safeParse({ aktion }).success).toBe(true);
+      const r = wartungSchema.safeParse({
+        aktion,
+        bestaetigung: WARTUNG_BESTAETIGUNG[aktion],
+      });
+      expect(r.success, aktion).toBe(true);
     }
   });
 
+  it("lehnt fehlende Bestätigungsphrase ab", () => {
+    const r = wartungSchema.safeParse({ aktion: "buchungen_reset" });
+    expect(r.success).toBe(false);
+  });
+
+  it("lehnt falsche Bestätigungsphrase ab", () => {
+    const r = wartungSchema.safeParse({
+      aktion: "buchungen_reset",
+      bestaetigung: "BELEGE LÖSCHEN",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("toleriert umgebende Leerzeichen in der Phrase", () => {
+    const r = wartungSchema.safeParse({
+      aktion: "belege_reset",
+      bestaetigung: "  BELEGE LÖSCHEN  ",
+    });
+    expect(r.success).toBe(true);
+  });
+
   it("lehnt unbekannte Aktion ab", () => {
-    const r = wartungSchema.safeParse({ aktion: "alles_loeschen" });
+    const r = wartungSchema.safeParse({
+      aktion: "alles_loeschen",
+      bestaetigung: "x",
+    });
     expect(r.success).toBe(false);
   });
 

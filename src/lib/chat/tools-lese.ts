@@ -15,6 +15,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import type { ChatToolContext } from "./tool-context";
+import { werkzeugFehler } from "./fehler";
 import { holeProfil, profilHatInhalt } from "@/lib/classifier/profil";
 import {
   erkenneCluster,
@@ -145,7 +146,11 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
 
       const { data, error } = await q;
       if (error) {
-        return { fehler: `Suche fehlgeschlagen: ${error.message}` };
+        return werkzeugFehler(
+          "suche_buchungen",
+          error,
+          "Die Suche ist gerade fehlgeschlagen. Bitte später erneut versuchen.",
+        );
       }
 
       type Row = {
@@ -248,10 +253,18 @@ export function aggregatKategorienTool(ctx: ChatToolContext) {
       ]);
 
       if (bRes.error) {
-        return { fehler: `Buchungen konnten nicht geladen werden: ${bRes.error.message}` };
+        return werkzeugFehler(
+          "aggregat_kategorien",
+          bRes.error,
+          "Die Buchungen konnten nicht geladen werden.",
+        );
       }
       if (kRes.error) {
-        return { fehler: `Kategorien konnten nicht geladen werden: ${kRes.error.message}` };
+        return werkzeugFehler(
+          "aggregat_kategorien",
+          kRes.error,
+          "Die Kategorien konnten nicht geladen werden.",
+        );
       }
 
       type BuchungRow = {
@@ -370,8 +383,8 @@ export function cockpitKennzahlenTool(ctx: ChatToolContext) {
           .limit(1000),
       ]);
 
-      if (bRes.error) return { fehler: bRes.error.message };
-      if (kRes.error) return { fehler: kRes.error.message };
+      if (bRes.error) return werkzeugFehler("cockpit_kennzahlen", bRes.error);
+      if (kRes.error) return werkzeugFehler("cockpit_kennzahlen", kRes.error);
 
       type B = {
         buchung_datum: string;
@@ -531,7 +544,7 @@ export function wiederkehrendeBuchungenTool(ctx: ChatToolContext) {
         .lte("buchung_datum", bis)
         .order("buchung_datum", { ascending: true })
         .limit(20000);
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("wiederkehrende_buchungen", error);
 
       type B = {
         id: string;
@@ -648,7 +661,7 @@ export function prueflisteTool(ctx: ChatToolContext) {
         .eq("status", "zur_pruefung")
         .order("buchung_datum", { ascending: false })
         .limit(input.limit);
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("pruefliste", error);
 
       type Row = {
         id: string;
@@ -752,7 +765,7 @@ export function umsatzsteuerStandTool(ctx: ChatToolContext) {
         .gte("buchung_datum", von)
         .lte("buchung_datum", bis)
         .limit(20000);
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("umsatzsteuer_stand", error);
 
       type Row = {
         betrag: number;
@@ -845,7 +858,7 @@ export function buchungDetailsTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("id", input.buchung_id)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("buchung_details", error);
       if (!data) return { fehler: "Buchung nicht gefunden." };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -918,7 +931,7 @@ export function empfaengerKenntnisLookupTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .eq("empfaenger_norm", norm)
         .maybeSingle();
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("empfaenger_kenntnis_lookup", error);
       return { eintrag: data ?? null, normalisiert: norm };
     },
   });
@@ -944,7 +957,7 @@ export function lernregelnListeTool(ctx: ChatToolContext) {
         .order("aktiv", { ascending: false })
         .order("prioritaet", { ascending: false })
         .limit(500);
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("lernregeln_liste", error);
       return { regeln: data ?? [] };
     },
   });
@@ -996,7 +1009,7 @@ export function kategorienListeTool(ctx: ChatToolContext) {
         .limit(500);
       if (input.nur_aktive) q = q.eq("aktiv", true);
       const { data, error } = await q;
-      if (error) return { fehler: error.message };
+      if (error) return werkzeugFehler("kategorien_liste", error);
       return { kategorien: data ?? [] };
     },
   });

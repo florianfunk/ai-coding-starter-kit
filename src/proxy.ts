@@ -1,10 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { pruefeCsrf } from "@/lib/security/csrf";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
 /** Refresht die Supabase-Session und schützt App-Routen. */
 export async function proxy(request: NextRequest) {
+  // Zentraler CSRF-Schutz: mutierende Cross-Site-Anfragen abweisen, bevor
+  // irgendeine state-ändernde Logik (oder Session-Arbeit) läuft.
+  const csrf = pruefeCsrf(request);
+  if (!csrf.ok) {
+    console.warn(
+      JSON.stringify({
+        ereignis: "csrf_blockiert",
+        pfad: request.nextUrl.pathname,
+        methode: request.method,
+        grund: csrf.grund,
+      }),
+    );
+    return NextResponse.json(
+      { error: "Anfrage abgelehnt (CSRF-Schutz)." },
+      { status: 403 },
+    );
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

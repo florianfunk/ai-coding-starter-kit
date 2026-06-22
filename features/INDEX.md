@@ -28,12 +28,12 @@
 | PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Approved | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
 | PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
 | PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | Approved | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
-| PROJ-15 | Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | In Review | [Spec](PROJ-15-klassifizierung-pro.md) | 2026-05-20 |
-| PROJ-16 | Mein Profil — persönliche Stammdaten als LLM-Kontext | Approved | [Spec](PROJ-16-mein-profil-stammdaten.md) | 2026-05-21 |
+| PROJ-15 | Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | Deployed | [Spec](PROJ-15-klassifizierung-pro.md) | 2026-05-20 |
+| PROJ-16 | Mein Profil — persönliche Stammdaten als LLM-Kontext | Deployed | [Spec](PROJ-16-mein-profil-stammdaten.md) | 2026-05-21 |
 | PROJ-17 | KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Approved | [Spec](PROJ-17-ki-chat-finanzen.md) | 2026-05-21 |
 | PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | Deployed | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
-| PROJ-19 | Kündigungsliste für wiederkehrende Empfänger | Approved | [Spec](PROJ-19-kuendigungsliste.md) | 2026-06-13 |
-| PROJ-20 | Merkliste (Buchungen für späteres Review merken) | Approved | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |
+| PROJ-19 | Kündigungsliste für wiederkehrende Empfänger | Deployed | [Spec](PROJ-19-kuendigungsliste.md) | 2026-06-13 |
+| PROJ-20 | Merkliste (Buchungen für späteres Review merken) | Deployed | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |
 | PROJ-21 | Lieferanten-Notizen (Notizen pro wiederkehrendem Empfänger) | Deployed | [Spec](PROJ-21-lieferanten-notizen.md) | 2026-06-15 |
 | PROJ-22 | Globaler Jahreswähler (app-weiter Jahres-Modus) | Deployed | [Spec](PROJ-22-globaler-jahreswaehler.md) | 2026-06-16 |
 | PROJ-23 | Vorjahres-Übernahme (deterministischer Vor-Pass der Klassifizierung) | Deployed | [Spec](PROJ-23-vorjahres-uebernahme.md) | 2026-06-16 |

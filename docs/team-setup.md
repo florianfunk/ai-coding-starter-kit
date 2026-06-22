@@ -92,3 +92,23 @@ Modell-IDs Referenz: Opus 4.8 `claude-opus-4-8` (1M Kontext, 128K Output). Gatew
 | 2026-06-19 | Default-LLM = Claude Opus 4.8; Prompt-Caching einführen | Koordinator (delegiert) |
 | 2026-06-19 | Build-Reihenfolge: Phase 2 (Restscope) → Phase 3 (PROJ-15 P1) | Koordinator (delegiert) |
 | 2026-06-19 | 100 % Tempo + Qualität, Budget unbegrenzt | Tom/Florian |
+| 2026-06-22 | Rück-Übernahme 2026→2025 (Ausreißer-Schutz bewusst übergangen) | Florian |
+| 2026-06-22 | Apple → Software/IT/Cloud, Amazon → Wareneinkauf (Sammel + Lernregeln) | Florian |
+| 2026-06-22 | Kombinierter Prod-Deploy (PROJ-15 + Codex-Security), 0009-Chat bewusst NICHT | Florian |
+
+---
+
+## 8. Live-Stand & offene Punkte (Stand 2026-06-22)
+
+**In Produktion** (https://steueragent.vercel.app, Deploy via `vercel --prod` CLI vom `feat/steueragent-mvp`-Branch — etablierter Weg dieses Projekts; `origin/main` ist bewusst stale):
+- Default-LLM **Opus 4.8**; PROJ-15 **P1** (Regex/Split) + **P2 #1/#3** (Re-Klassifizierung, Häufige-Empfänger); PROJ-16/19/20 mit deployt.
+- Commits: `b8d4b15` (PROJ-15 + Opus 4.8), `82e8499` (Codex-Security: CSRF/SSRF/Krypto/Header/Middleware). Security-Header live verifiziert.
+- Migrationen **0014** (Regex/Split-CHECKs) + **0015** (Index) angewendet.
+- Daten: 361 Prüflisten-Fälle 2025 gelöst (55 Rück-Übernahme + 171 Apple + 135 Amazon) + 2 Lernregeln; alles auditiert/reversibel.
+
+**Bewusst offen / Handoff:**
+1. **PROJ-15 P2 #2** (konfigurierbarer Web-Recherche-Schwellwert in `app_einstellung`) — einziger offener PROJ-15-Teil; Codex-Block aufgelöst, jederzeit nachziehbar.
+2. **PROJ-17 Chat**: Code live, aber **Migration 0009 NICHT angewendet** (Guardrail-gated, außerhalb Scope) → Chat-Menüpunkt nicht funktionsfähig bis 0009 freigegeben. Unverändert zum Vorzustand.
+3. **343 offene 2025-Prüflisten-Fälle** (kleine Einmal-Empfänger ohne 2026-Pendant) — brauchen einen eingeloggten Klassifizierungs-Lauf (live-UI: Prüfliste-Multiselect „Neu klassifizieren").
+4. **Migrations-Tracking-Anomalie**: `0003`/`0004` nicht in `schema_migrations` (Objekte existieren) → **kein** `supabase db push` ohne vorherige Korrektur.
+5. **Prompt-Caching Klassifizierung**: auf Opus 4.8 wirkungslos (stabiler Prefix < 4096 Tokens); echter Hebel wäre KI-Chat-Caching (nach 0009).

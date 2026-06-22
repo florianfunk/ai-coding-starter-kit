@@ -1,6 +1,6 @@
 # PROJ-15: Klassifizierung-Pro — Empfänger-Cache, Regex- & Split-Regeln
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-05-20
 **Last Updated:** 2026-06-19
 

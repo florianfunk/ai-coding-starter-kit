@@ -1,6 +1,6 @@
 # PROJ-16: Mein Profil — persönliche Stammdaten als LLM-Kontext
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-05-21
 **Last Updated:** 2026-06-19
 

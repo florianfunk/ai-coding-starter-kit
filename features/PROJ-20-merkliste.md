@@ -1,6 +1,6 @@
 # PROJ-20 — Merkliste (Buchungen für späteres Review merken)
 
-**Status:** Approved
+**Status:** Deployed
 **Erstellt:** 2026-06-14
 **Aktualisiert:** 2026-06-19
 **Priorität:** P2

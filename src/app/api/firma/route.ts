@@ -19,7 +19,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("firmenprofil")
     .select(
-      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab",
+      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab, dauerfristverlaengerung",
     )
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -85,11 +85,12 @@ export async function PUT(request: Request) {
         wirtschaftsjahr_beginn: v.wirtschaftsjahr_beginn,
         ust_va_rhythmus: v.ust_va_rhythmus,
         rhythmus_gueltig_ab: v.rhythmus_gueltig_ab ?? null,
+        dauerfristverlaengerung: v.dauerfristverlaengerung,
       },
       { onConflict: "owner_id" },
     )
     .select(
-      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab",
+      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab, dauerfristverlaengerung",
     )
     .single();
 

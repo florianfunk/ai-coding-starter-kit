@@ -98,6 +98,10 @@ export const firmenprofilSchema = z.object({
       (v) => v === undefined || /^\d{4}-\d{2}-\d{2}$/.test(v),
       "Ungültiges Datum (Format: JJJJ-MM-TT)",
     ),
+
+  // PROJ-27 (AC4): Dauerfristverlängerung — verschiebt die USt-VA-Abgabefrist
+  // um einen Monat. Default false (Standardfall).
+  dauerfristverlaengerung: z.boolean().optional().default(false),
 });
 
 /** Validierte/normalisierte Profildaten (Output nach Transform). */
@@ -118,6 +122,7 @@ export type FirmenprofilFormValues = {
   wirtschaftsjahr_beginn: number;
   ust_va_rhythmus: "monatlich" | "quartalsweise" | "jaehrlich";
   rhythmus_gueltig_ab: string;
+  dauerfristverlaengerung: boolean;
 };
 
 /** Leere Default-Werte für das Formular (kein vorhandenes Profil). */
@@ -135,4 +140,5 @@ export const FIRMENPROFIL_DEFAULTS: FirmenprofilFormValues = {
   wirtschaftsjahr_beginn: 1,
   ust_va_rhythmus: "monatlich",
   rhythmus_gueltig_ab: "",
+  dauerfristverlaengerung: false,
 };

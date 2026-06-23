@@ -18,6 +18,10 @@ import {
   type DashboardAggregat,
   type DashboardBuchung,
 } from "./aggregate";
+import { naechsteUstFrist } from "./fristen";
+import { berechneHealthScore } from "./health-score";
+import { ladeAktivitaet } from "./aktivitaet";
+import type { UstRhythmus } from "@/lib/tax/perioden";
 
 /** Heutiges Datum als ISO yyyy-MM-dd (UTC, stabil & testbar separat). */
 function heuteIso(): string {
@@ -80,16 +84,22 @@ export async function ladeDashboardAggregat(
   // firmenname dient zugleich als Onboarding-Signal "Profil angelegt".
   const { data: profil } = await supabase
     .from("firmenprofil")
-    .select("wirtschaftsjahr_beginn, firmenname")
+    .select(
+      "wirtschaftsjahr_beginn, firmenname, ust_va_rhythmus, dauerfristverlaengerung",
+    )
     .eq("owner_id", ownerId)
     .limit(1)
     .maybeSingle();
   const profilRow = profil as {
     wirtschaftsjahr_beginn?: number;
     firmenname?: string | null;
+    ust_va_rhythmus?: UstRhythmus | null;
+    dauerfristverlaengerung?: boolean | null;
   } | null;
   const wjBeginn = profilRow?.wirtschaftsjahr_beginn ?? 1;
   const profilAngelegt = !!profilRow?.firmenname?.trim();
+  const ustRhythmus: UstRhythmus = profilRow?.ust_va_rhythmus ?? "monatlich";
+  const dauerfrist = profilRow?.dauerfristverlaengerung ?? false;
 
   // PROJ-22: Globales aktives Jahr berücksichtigen. Die Jahres-Kennzahlen
   // (Einnahmen/Ausgaben/USt-Schätzung) sollen das gewählte Jahr abbilden, nicht
@@ -276,12 +286,44 @@ export async function ladeDashboardAggregat(
     klassifizierung: (klassifiziertC.count ?? 0) > 0,
   };
 
+  // PROJ-27 (AC1): nächste USt-VA-Frist. Abgeschlossene USt-VA-Perioden aus
+  // den bereits geladenen Perioden ableiten (art='ust_va', status='abgeschlossen').
+  // "heute" wird als Parameter reingereicht (testbar in fristen.ts selbst).
+  const abgeschlossenePerioden = perioden
+    .filter((p) => p.art === "ust_va" && p.status === "abgeschlossen")
+    .map((p) => ({ jahr: p.jahr, periode: p.periode ?? 0 }));
+  const fristen = naechsteUstFrist({
+    rhythmus: ustRhythmus,
+    heute,
+    abgeschlossene_perioden: abgeschlossenePerioden,
+    dauerfristverlaengerung: dauerfrist,
+  });
+
+  // PROJ-27 (AC2): Health-Score aus den vorhandenen Counts + Fristen-Ampel.
+  const health_score = berechneHealthScore({
+    gesamt_buchungen: gesamtBuchungenC,
+    unklassifiziert: aktionen.unklassifiziert,
+    offene_prueffaelle: aktionen.offene_prueffaelle,
+    geschaeftlich_gesamt: geschaeftlicheIds.length,
+    fehlende_belege: aktionen.fehlende_belege,
+    sync_fehler:
+      syncStatusAus(paperlessJob).ist_fehler ||
+      syncStatusAus(importJob).ist_fehler,
+    fristen_ampel: fristen?.ampel ?? null,
+  });
+
+  // PROJ-27 (AC3): Aktivitäts-Feed (owner-scoped, zusätzlich zur RLS).
+  const aktivitaet = await ladeAktivitaet(supabase, ownerId);
+
   return {
     aktionen,
     jahr,
     perioden,
     paperless_sync: syncStatusAus(paperlessJob),
     konto_import: syncStatusAus(importJob),
+    fristen,
+    health_score,
+    aktivitaet,
     ist_leer:
       gesamtBuchungenC === 0 && belegeC === 0 && kontenC === 0,
     onboarding,

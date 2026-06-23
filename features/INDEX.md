@@ -40,7 +40,8 @@
 | PROJ-24 | Klassifizierung-Center (Menüpunkt, Statistik, Auto-Continue, Manuell-First) | Deployed | [Spec](PROJ-24-klassifizierung-center.md) | 2026-06-17 |
 | PROJ-25 | Auto-Erkennung Boost (Cache-Default, Konsens-Konfidenz, LLM-Ausfall-Fallback) | Approved | [Spec](PROJ-25-auto-erkennung-boost.md) | 2026-06-23 |
 | PROJ-26 | Prüflisten-Speedrun (Keyboard-Triage, Inline-Begründung, Sofort-Lernregel) | Approved | [Spec](PROJ-26-pruefliste-speedrun.md) | 2026-06-23 |
+| PROJ-27 | Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed) | Approved | [Spec](PROJ-27-cockpit-dashboard.md) | 2026-06-23 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-27
+## Next Available ID: PROJ-28

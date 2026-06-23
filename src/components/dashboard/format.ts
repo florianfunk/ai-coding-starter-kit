@@ -36,3 +36,40 @@ export function formatDatum(iso: string): string {
   if (!m) return iso;
   return `${m[3]}.${m[2]}.${m[1]}`;
 }
+
+/**
+ * ISO-Zeitstempel → relativer deutscher Zeitstempel ("vor 2 Std",
+ * "gestern", "vor 3 Tagen"). `jetzt` als Parameter (Default: Date.now())
+ * macht die Funktion testbar. Fällt bei ungültigem Input auf den
+ * absoluten Zeitpunkt zurück.
+ */
+export function formatRelativeZeit(
+  iso: string | null,
+  jetzt: number = Date.now(),
+): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const t = d.getTime();
+  if (Number.isNaN(t)) return iso;
+
+  const diffMs = jetzt - t;
+  const diffSek = Math.round(diffMs / 1000);
+
+  // Zukunft oder gerade eben.
+  if (diffSek < 60) return "gerade eben";
+
+  const diffMin = Math.round(diffSek / 60);
+  if (diffMin < 60) return `vor ${diffMin} Min`;
+
+  const diffStd = Math.round(diffMin / 60);
+  if (diffStd < 24) return `vor ${diffStd} Std`;
+
+  const diffTage = Math.round(diffStd / 24);
+  if (diffTage === 1) return "gestern";
+  if (diffTage < 7) return `vor ${diffTage} Tagen`;
+  if (diffTage < 14) return "vor 1 Woche";
+  if (diffTage < 30) return `vor ${Math.round(diffTage / 7)} Wochen`;
+
+  // Älter als ~1 Monat → absolutes Datum.
+  return formatZeitpunkt(iso);
+}

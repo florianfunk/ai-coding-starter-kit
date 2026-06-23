@@ -19,6 +19,8 @@ export interface Firmenprofil {
   wirtschaftsjahr_beginn: number;
   ust_va_rhythmus: UstRhythmus;
   rhythmus_gueltig_ab: string | null;
+  /** PROJ-27: Dauerfristverlängerung — verschiebt USt-VA-Frist um 1 Monat. */
+  dauerfristverlaengerung: boolean;
 }
 
 export type KategorieTyp = "einnahme" | "ausgabe" | "privat" | "neutral";

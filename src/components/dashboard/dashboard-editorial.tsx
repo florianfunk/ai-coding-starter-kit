@@ -30,6 +30,9 @@ import type {
   SyncStatus,
 } from "@/lib/dashboard/aggregate";
 import { formatDatum, formatEuro, formatZahl, formatZeitpunkt } from "./format";
+import { HealthScoreCard } from "./health-score-card";
+import { FristenCountdown } from "./fristen-countdown";
+import { AktivitaetFeed } from "./aktivitaet-feed";
 
 // ---------------------------------------------------------------------------
 // Action-Item: eine Zeile in "Jetzt zu tun"
@@ -248,7 +251,16 @@ function PeriodenBlock({ perioden }: { perioden: PeriodenZeile[] }) {
 // ---------------------------------------------------------------------------
 
 export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
-  const { aktionen, jahr, perioden, paperless_sync, konto_import } = data;
+  const {
+    aktionen,
+    jahr,
+    perioden,
+    paperless_sync,
+    konto_import,
+    fristen,
+    health_score,
+    aktivitaet,
+  } = data;
   const verlust = jahr.vorlaeufiger_gewinn < 0;
   const erstattung = jahr.voraussichtliche_ust_zahllast < 0;
   const offeneTasks =
@@ -258,6 +270,23 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
 
   return (
     <div className="space-y-7">
+      {/* 0) Cockpit — Health-Score + USt-VA-Fristen-Countdown (PROJ-27 AC6) */}
+      <Section
+        eyebrow="Cockpit"
+        titel="Stand & Fristen"
+        beschreibung="Wie weit deine Buchhaltung ist und wann die nächste USt-VA fällig wird."
+        innerCard={false}
+      >
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <div className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60 lg:col-span-2">
+            <HealthScoreCard data={health_score} />
+          </div>
+          <div className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+            <FristenCountdown fristen={fristen} />
+          </div>
+        </div>
+      </Section>
+
       {/* 1) Jetzt zu tun — iOS-Settings-Karte mit Listen-Eintraegen */}
       <Section
         eyebrow="Jetzt zu tun"
@@ -386,9 +415,21 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
         </div>
       </Section>
 
-      {/* 4) Letzte Aktivitaet — zwei nebeneinanderliegende Karten */}
+      {/* 4) Was ist passiert? — Aktivitäts-Feed (PROJ-27 AC6) */}
       <Section
         eyebrow="Aktivität"
+        titel="Was ist passiert?"
+        beschreibung="Die letzten Aktionen des Agenten — Importe, Syncs und Klassifizierungen."
+        innerCard={false}
+      >
+        <div className="overflow-hidden rounded-[var(--radius)] bg-card shadow-[var(--shadow-1)] ring-1 ring-line/60">
+          <AktivitaetFeed eintraege={aktivitaet} />
+        </div>
+      </Section>
+
+      {/* 5) Letzte Imports & Syncs — Sync-Status je Quelle */}
+      <Section
+        eyebrow="Quellen"
         titel="Letzte Imports & Syncs"
         beschreibung="Wann zuletzt Belege bzw. Kontoauszüge gezogen wurden."
         innerCard={false}

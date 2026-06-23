@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 const MONATE = [
   "Januar",
@@ -73,6 +74,8 @@ function profilZuFormValues(p: Firmenprofil | null): FirmenprofilFormValues {
     wirtschaftsjahr_beginn: p.wirtschaftsjahr_beginn ?? 1,
     ust_va_rhythmus: p.ust_va_rhythmus ?? "monatlich",
     rhythmus_gueltig_ab: p.rhythmus_gueltig_ab ?? "",
+    // PROJ-27 (AC4): Wert wird gelesen; UI-Schalter folgt im Frontend-Schritt.
+    dauerfristverlaengerung: p.dauerfristverlaengerung ?? false,
   };
 }
 
@@ -444,6 +447,28 @@ export function FirmaForm({
                     Optional — relevant bei Rhythmuswechsel mitten im Jahr.
                   </FormDescription>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="dauerfristverlaengerung"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between gap-4 rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Dauerfristverlängerung</FormLabel>
+                    <FormDescription>
+                      Verlängert die USt-VA-Abgabefrist um einen Monat.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      aria-label="Dauerfristverlängerung"
+                    />
+                  </FormControl>
                 </FormItem>
               )}
             />

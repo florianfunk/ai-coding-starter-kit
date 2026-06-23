@@ -13,6 +13,10 @@
 // - Die voraussichtliche USt-Zahllast ist eine grobe Schätzung aus den
 //   vorläufigen Einnahmen/Ausgaben und ist ebenfalls "vorläufig".
 
+import type { UstFristInfo } from "./fristen";
+import type { HealthScore } from "./health-score";
+import type { AktivitaetsEintrag } from "./aktivitaet";
+
 /** Buchungs-Rohdatensatz, soweit fürs Dashboard relevant. */
 export interface DashboardBuchung {
   /** > 0 = Einnahme, < 0 = Ausgabe (Vorzeichenkonvention wie Import). */
@@ -353,6 +357,12 @@ export interface DashboardAggregat {
   perioden: PeriodenZeile[];
   paperless_sync: SyncStatus;
   konto_import: SyncStatus;
+  /** PROJ-27 (AC1): nächste USt-VA-Frist (null = keine offene Frist). */
+  fristen: UstFristInfo | null;
+  /** PROJ-27 (AC2): Health-Score "Stand der Buchhaltung". */
+  health_score: HealthScore;
+  /** PROJ-27 (AC3): jüngste Aktivitäten (Top 20, DESC). */
+  aktivitaet: AktivitaetsEintrag[];
   /** true, wenn weder Buchungen noch Belege noch Konten vorhanden sind. */
   ist_leer: boolean;
   /** Status der 6 Ersteinrichtungs-Schritte. */

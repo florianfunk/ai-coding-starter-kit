@@ -27,6 +27,7 @@ import {
   formatiereProfilFuerLlm,
   type MeinProfil,
 } from "@/lib/classifier/profil";
+import type { FewShotBeispiel } from "@/lib/classifier/few-shot";
 
 /** Definierter Fehler bei LLM-Ausfall — kein Raten, sauberer Fallback. */
 export class LlmKlassifiziererError extends Error {
@@ -159,6 +160,15 @@ export interface LlmEingabe {
    * `entscheideCacheUebernahme`.)
    */
   cache_default_hinweis?: string | null;
+  /**
+   * PROJ-28: Few-Shot-Beispiele aus den bisherigen final bestaetigten
+   * Buchungen des Inhabers (pro Empfaenger eine repraesentative
+   * Kategorie+Klassifikation). Wird vom Pipeline-Wiring EINMAL pro Job geladen
+   * und als klar abgegrenzter "Gelernte Beispiele"-Block in den Prompt
+   * gerendert. NUR Kontext zur Orientierung — uebersteuert die LLM-Entscheidung
+   * nicht hart und ersetzt keine Regel.
+   */
+  few_shot_beispiele?: FewShotBeispiel[];
 }
 
 /** Eine wählbare Zielkategorie (nur ID + Bezeichnung + Typ ans LLM). */
@@ -270,6 +280,38 @@ function baueHistorieBlock(
     `- Bisher ${historie.anzahl}x verbucht, Betrag zwischen ${minStr} EUR und ${maxStr} EUR (Median ${medStr} EUR)\n` +
     `- Meistens als "${katBez}" (${historie.haeufigste_kategorie_anzahl}x), Klassifikation ${klass}\n` +
     `- Hinweis: Wenn der aktuelle Betrag und Empfaenger gut passen, hohe Konfidenz vergeben.`
+  );
+}
+
+/**
+ * PROJ-28 — Baut den optionalen Few-Shot-Block aus gelernten Beispielen
+ * frueherer Entscheidungen des Inhabers. Kategorien werden als BEZEICHNUNG
+ * (nicht UUID) gezeigt; Beispiele mit unbekannter kategorie_id werden
+ * uebersprungen. Leere/fehlende Eingabe → leerer String (Block entfaellt).
+ * Reine Funktion.
+ *
+ * Der Block ist bewusst als ORIENTIERUNG formuliert — er uebersteuert die
+ * LLM-Entscheidung nicht hart (Regeln/Vorjahr/Cache greifen ohnehin VOR dem
+ * LLM und werden hier nicht beruehrt).
+ */
+function baueFewShotBlock(
+  beispiele: FewShotBeispiel[] | undefined,
+  kategorien: readonly KategorieOption[],
+): string {
+  if (!beispiele || beispiele.length === 0) return "";
+
+  const zeilen: string[] = [];
+  for (const b of beispiele) {
+    const kat = kategorien.find((k) => k.id === b.kategorie_id);
+    if (!kat) continue; // unbekannte Kategorie-ID → ueberspringen (AC4)
+    const name = (b.rohwert ?? "").trim() || b.empfaenger_norm;
+    zeilen.push(`- "${name}" → ${kat.bezeichnung} (${b.klassifikation})`);
+  }
+  if (zeilen.length === 0) return "";
+
+  return (
+    `\n\nGelernte Beispiele aus früheren Entscheidungen des Inhabers ` +
+    `(als Orientierung — keine harte Vorgabe):\n${zeilen.join("\n")}`
   );
 }
 
@@ -432,6 +474,8 @@ export async function klassifiziereMitLlm(
 
   const kenntnisBlock = baueKenntnisBlock(eingabe.empfaenger_kenntnis);
   const historieBlock = baueHistorieBlock(eingabe.historie, kategorien);
+  // PROJ-28: Few-Shot-Block aus gelernten Korrekturen — als Orientierung.
+  const fewShotBlock = baueFewShotBlock(eingabe.few_shot_beispiele, kategorien);
   // PROJ-16: Persoenliche Stammdaten — Block kommt VOR Kenntnis/Historie,
   // weil Profil-Treffer (Arbeitgeber/Familie/eigene Konten) die staerksten
   // Signale sind.
@@ -454,7 +498,7 @@ export async function klassifiziereMitLlm(
     `Empfänger: ${eingabe.empfaenger ?? "(leer)"}\n` +
     `Betrag: ${eingabe.betrag.toFixed(2)} EUR ` +
     `(${eingabe.betrag < 0 ? "Ausgabe" : "Einnahme/Zugang"})` +
-    `${stichworte}${profilBlock}${profilHinweisBlock}${cacheHinweisBlock}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
+    `${stichworte}${profilBlock}${profilHinweisBlock}${cacheHinweisBlock}${kenntnisBlock}${historieBlock}${fewShotBlock}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
   let letzterFehler: unknown = null;

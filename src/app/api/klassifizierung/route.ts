@@ -33,6 +33,10 @@ import type { KonsistenzPassResultat } from "@/lib/classifier/konsistenz-pass";
 import type { KategorieOption } from "@/lib/classifier/llm";
 import type { Lernregel } from "@/lib/types";
 import { holeProfil, profilHatInhalt } from "@/lib/classifier/profil";
+import {
+  baueFewShotBeispiele,
+  type FewShotRow,
+} from "@/lib/classifier/few-shot";
 
 export const runtime = "nodejs";
 // Massen-Klassifizierung mit LLM-Aufrufen kann dauern.
@@ -335,7 +339,7 @@ export async function POST(request: Request) {
     supabase
       .from("buchung")
       .select(
-        "empfaenger_normalisiert, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
+        "empfaenger_normalisiert, empfaenger, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
       )
       .eq("owner_id", user.id)
       .in("status", ["auto_verbucht", "manuell_bestaetigt"])
@@ -372,6 +376,17 @@ export async function POST(request: Request) {
   // klare Arbeitgeber-Lohn-Buchungen ab.
   const meinProfil = await holeProfil(supabase, user.id);
   const profilGeladen = profilHatInhalt(meinProfil);
+
+  // PROJ-28: Few-Shot-Beispiele EINMAL pro Job aus denselben final verbuchten
+  // Buchungen ableiten (finalData liefert bereits empfaenger + Felder). Nur
+  // LLM-Kontext — die deterministischen Paesse (Regeln/Vorjahr/Cache) behalten
+  // Vorrang. Familienmitglieder werden ausgeschlossen (DSGVO).
+  const fewShot = baueFewShotBeispiele(
+    (finalData ?? []) as FewShotRow[],
+    {
+      familie_norm: meinProfil.familie.map((f) => f.name_normalisiert),
+    },
+  );
 
   const ergebnis: Klassifikationsergebnis = {
     verarbeitet: 0,
@@ -419,7 +434,14 @@ export async function POST(request: Request) {
           config,
           undefined,
           undefined,
-          { supabase, ownerId: user.id, inflight, vorjahr_map: vorjahrMap },
+          {
+            supabase,
+            ownerId: user.id,
+            inflight,
+            vorjahr_map: vorjahrMap,
+            mein_profil: meinProfil,
+            few_shot: fewShot,
+          },
         );
 
         // PROJ-15 P1: Hat eine Split-Regel gegriffen, hat die Pipeline die

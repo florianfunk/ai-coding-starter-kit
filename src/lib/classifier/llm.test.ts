@@ -262,3 +262,82 @@ describe("istRetryFaehig — reine Klassifikation der Fehler", () => {
     expect(istRetryFaehig(new Error("plain"))).toBe(false);
   });
 });
+
+describe("klassifiziereMitLlm — PROJ-28 Few-Shot-Block im Prompt", () => {
+  beforeEach(async () => {
+    generateObjectMock.mockReset();
+    ladeAiKeyMock.mockReset();
+    ladeAiKeyMock.mockResolvedValue({
+      key: "sk-ant-test",
+      model: "anthropic/claude-haiku-4-5",
+      quelle: "env",
+    });
+    const { _setRetryDelayForTest } = await import("./llm");
+    _setRetryDelayForTest(0);
+  });
+
+  it("rendert Few-Shot-Beispiele mit Kategorie-BEZEICHNUNG (nicht UUID)", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: erfolgsObjekt });
+    const { klassifiziereMitLlm } = await import("./llm");
+
+    await klassifiziereMitLlm(
+      {
+        ...eingabe,
+        few_shot_beispiele: [
+          {
+            empfaenger_norm: "adobe systems",
+            rohwert: "Adobe Systems",
+            kategorie_id: "kat-soft",
+            klassifikation: "geschaeftlich",
+          },
+        ],
+      },
+      kategorien,
+    );
+
+    const call = generateObjectMock.mock.calls[0][0] as { prompt: string };
+    expect(call.prompt).toMatch(/Gelernte Beispiele aus früheren Entscheidungen/);
+    // Few-Shot-Block isolieren (ab Ueberschrift bis zur Kategorienliste).
+    const blockStart = call.prompt.indexOf("Gelernte Beispiele");
+    const block = call.prompt.slice(
+      blockStart,
+      call.prompt.indexOf("Verfügbare EÜR-Kategorien"),
+    );
+    expect(block).toContain("Software"); // Bezeichnung statt UUID
+    expect(block).not.toContain("kat-soft"); // keine UUID im Few-Shot-Block
+    expect(block).toContain("Adobe Systems");
+  });
+
+  it("ueberspringt Beispiele mit unbekannter kategorie_id", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: erfolgsObjekt });
+    const { klassifiziereMitLlm } = await import("./llm");
+
+    await klassifiziereMitLlm(
+      {
+        ...eingabe,
+        few_shot_beispiele: [
+          {
+            empfaenger_norm: "x",
+            kategorie_id: "kat-existiert-nicht",
+            klassifikation: "privat",
+          },
+        ],
+      },
+      kategorien,
+    );
+
+    const call = generateObjectMock.mock.calls[0][0] as { prompt: string };
+    // Alle Beispiele uebersprungen → Block entfaellt komplett.
+    expect(call.prompt).not.toMatch(/Gelernte Beispiele aus früheren Entscheidungen/);
+  });
+
+  it("ohne few_shot_beispiele → kein Block", async () => {
+    generateObjectMock.mockResolvedValueOnce({ object: erfolgsObjekt });
+    const { klassifiziereMitLlm } = await import("./llm");
+
+    await klassifiziereMitLlm(eingabe, kategorien);
+
+    const call = generateObjectMock.mock.calls[0][0] as { prompt: string };
+    expect(call.prompt).not.toMatch(/Gelernte Beispiele/);
+  });
+});

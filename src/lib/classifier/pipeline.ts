@@ -62,6 +62,7 @@ import {
   vorjahrSchluessel,
   type VorjahrKategorisierung,
 } from "@/lib/classifier/vorjahres-uebernahme";
+import type { FewShotBeispiel } from "@/lib/classifier/few-shot";
 import {
   extrahiereBrancheUndLeistung,
   formatiereRechercheKontext,
@@ -617,6 +618,14 @@ export interface PipelineKontext {
    *  - Arbeitgeber-Match (Lohn/Gehalt) erhaelt explizites Pre-Hint
    */
   mein_profil?: MeinProfil | null;
+  /**
+   * PROJ-28: Few-Shot-Beispiele aus den bisherigen final bestaetigten
+   * Buchungen des Owners. Wird vom API-Route EINMAL pro Job gebaut
+   * (analog vorjahr_map / mein_profil) und als LLM-Prompt-Kontext durchgereicht.
+   * NUR Orientierung — greift NICHT vor den deterministischen Paessen
+   * (Regeln/Vorjahr/Cache behalten Vorrang).
+   */
+  few_shot?: FewShotBeispiel[];
 }
 
 type LlmFn = (
@@ -863,6 +872,7 @@ export async function klassifiziereBuchung(
         mein_profil: ctx.mein_profil ?? null,
         profil_hinweis: profilHinweis,
         cache_default_hinweis: cacheDefaultHinweis,
+        few_shot_beispiele: ctx.few_shot,
       },
       kategorien,
     );
@@ -985,6 +995,23 @@ export async function klassifiziereBuchung(
       ...entscheidung.audit.details,
       profil_hinweis: profilHinweis,
     };
+  }
+  // PROJ-28 (AC6): Few-Shot wurde nur dann tatsaechlich in den Prompt
+  // gerendert, wenn das LLM auch aufgerufen wurde (llm-Pfad erreicht) und
+  // mindestens ein Beispiel mit aufloesbarer Kategorie existiert. Wir zaehlen
+  // analog zum Block-Builder in llm.ts (nur Beispiele, deren kategorie_id in
+  // der Kategorienliste vorkommt).
+  if (llm && ctx.few_shot && ctx.few_shot.length > 0) {
+    const erlaubt = new Set(kategorien.map((k) => k.id));
+    const anzahl = ctx.few_shot.filter((b) =>
+      erlaubt.has(b.kategorie_id),
+    ).length;
+    if (anzahl > 0) {
+      entscheidung.audit.details = {
+        ...entscheidung.audit.details,
+        few_shot: { anzahl },
+      };
+    }
   }
 
   return entscheidung;

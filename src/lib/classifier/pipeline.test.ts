@@ -306,6 +306,54 @@ describe("klassifiziereBuchung — Orchestrierung & LLM-Fallback", () => {
     expect(ergebnis.status).toBe("auto_verbucht");
   });
 
+  it("PROJ-28: reicht ctx.few_shot an die LlmEingabe durch und vermerkt es im Audit", async () => {
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const { audit } = await klassifiziereBuchung(
+      buchung(),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      undefined,
+      {
+        few_shot: [
+          {
+            empfaenger_norm: "adobe",
+            kategorie_id: "kat-soft",
+            klassifikation: "geschaeftlich",
+          },
+        ],
+      },
+    );
+    expect(llmFn).toHaveBeenCalledOnce();
+    const llmEingabe = llmFn.mock.calls[0][0] as { few_shot_beispiele?: unknown[] };
+    expect(llmEingabe.few_shot_beispiele).toHaveLength(1);
+    expect(audit.details.few_shot).toMatchObject({ anzahl: 1 });
+  });
+
+  it("PROJ-28: zaehlt nur Beispiele mit aufloesbarer Kategorie im Audit", async () => {
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const { audit } = await klassifiziereBuchung(
+      buchung(),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      undefined,
+      {
+        few_shot: [
+          {
+            empfaenger_norm: "x",
+            kategorie_id: "kat-gibt-es-nicht",
+            klassifikation: "privat",
+          },
+        ],
+      },
+    );
+    // Kein aufloesbares Beispiel → kein few_shot-Audit.
+    expect(audit.details.few_shot).toBeUndefined();
+  });
+
   it("LLM-Ausfall → Fallback zur_pruefung (kein Raten)", async () => {
     const llmFn = vi
       .fn()

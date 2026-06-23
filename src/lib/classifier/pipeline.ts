@@ -48,6 +48,7 @@ import {
   upsertKenntnis,
   type EmpfaengerKenntnis,
   type InflightMap,
+  type LetzteKlassifikation,
 } from "@/lib/classifier/empfaenger-cache";
 import {
   holeAehnlicheBuchungen,
@@ -100,6 +101,33 @@ export const DEFAULT_CONFIG: PipelineConfig = {
   web_recherche_aktiv: true,
 };
 
+/**
+ * PROJ-25 (AC3) — fester Konfidenz-Aufschlag, wenn LLM-Kategorie,
+ * Historie-Mehrheitskategorie UND Cache-Default-Kategorie alle identisch sind.
+ * Hebt grenzwertige Fälle (0.78–0.84) bei klarem Signal-Konsens über die
+ * Auto-Verbuchungs-Schwelle. Deckel 1.0.
+ */
+export const KONSENS_BOOST = 0.1;
+
+/**
+ * PROJ-25 (AC4) — Mindest-Mehrheitsquote der Historie, ab der bei LLM-Ausfall
+ * eine Buchung mit der Historie-Mehrheitskategorie VORbelegt wird (Status
+ * bleibt zur_pruefung). Greift erst ab `HISTORIE_FALLBACK_MIN_ANZAHL` Treffern.
+ */
+const HISTORIE_FALLBACK_QUOTE = 0.8;
+const HISTORIE_FALLBACK_MIN_ANZAHL = 3;
+
+/**
+ * PROJ-25 — Signale, die `entscheideBuchung` für Konsens-Boost (AC3) und
+ * LLM-Ausfall-Fallback (AC4) zusätzlich zum LLM-Ergebnis kennen muss. Wird
+ * vom Orchestrator `klassifiziereBuchung` durchgereicht; in reinen Unit-Tests
+ * direkt gesetzt. Default {} → Verhalten exakt wie vor PROJ-25.
+ */
+export interface EntscheidungsSignale {
+  historie?: HistorieSummary | null;
+  cache_default?: LetzteKlassifikation | null;
+}
+
 /** Felder, die die Pipeline an der Buchung setzt. */
 export interface Klassifikationsergebnis {
   klassifikation: Klassifikation | null;
@@ -108,7 +136,7 @@ export interface Klassifikationsergebnis {
   ust_satz: number | null;
   begruendung: string;
   konfidenz: number | null;
-  quelle: "regel" | "ki" | "vorjahr";
+  quelle: "regel" | "ki" | "vorjahr" | "cache";
   regel_id: string | null;
   status: "auto_verbucht" | "zur_pruefung";
   pruef_grund: string | null;
@@ -183,6 +211,7 @@ export function entscheideBuchung(
   config: PipelineConfig = DEFAULT_CONFIG,
   llmFehler: string | null = null,
   llmRetries: number = 0,
+  signale: EntscheidungsSignale = {},
 ): PipelineEntscheidung {
   if (buchung.status === "manuell_bestaetigt") {
     throw new ManuellBestaetigtError();
@@ -264,6 +293,40 @@ export function entscheideBuchung(
   // --- Stufe 2/3: KI + Konfidenz-Bewertung --------------------------------
   if (!llm) {
     const detail = llmFehler ? ` Details: ${llmFehler}` : "";
+
+    // PROJ-25 (AC4) — LLM-Ausfall-Fallback: statt einer leeren Prüflisten-
+    // Buchung greifen wir auf ein eindeutiges Signal zurück und belegen die
+    // Buchung VOR. Status bleibt 'zur_pruefung' (keine Auto-Verbuchung ohne
+    // KI-Bestätigung), aber mit ausgefüllter Kategorie + Quelle-Marker.
+    // Cache-Default hat Vorrang vor Historie.
+    const vorbelegung = ermittleAusfallVorbelegung(signale);
+    if (vorbelegung) {
+      return baue(buchung, {
+        klassifikation: vorbelegung.klassifikation,
+        steuerrelevant: vorbelegung.steuerrelevant,
+        kategorie_id: vorbelegung.kategorie_id,
+        ust_satz: vorbelegung.ust_satz,
+        begruendung:
+          `KI-Klassifizierung nicht verfügbar — vorbelegt aus ${vorbelegung.quelle_text} (bitte prüfen).${detail}`,
+        konfidenz: null,
+        // BEWUSST quelle='ki': Die Buchung bleibt 'zur_pruefung' (keine
+        // Auto-Verbuchung), die WAHRE Vorbelegungsquelle steht im Audit unter
+        // `fallback_quelle` (cache|historie). Wir führen hier KEINE eigene
+        // DB-quelle für den Ausfall-Fallback ein — die Provenienz ist über das
+        // Audit nachvollziehbar. (QA-Hinweis W1, 2026-06-23: kein Bug.)
+        quelle: "ki",
+        regel_id: null,
+        status: "zur_pruefung",
+        pruef_grund: "ki_nicht_verfuegbar",
+        auditExtra: {
+          llm: "nicht_verfuegbar",
+          llm_fehler: llmFehler,
+          llm_retries: llmRetries,
+          fallback_quelle: vorbelegung.fallback_quelle,
+        },
+      });
+    }
+
     return baue(buchung, {
       klassifikation: null,
       steuerrelevant: null,
@@ -299,8 +362,27 @@ export function entscheideBuchung(
     effektiveKategorieId = config.default_kategorie[llm.klassifikation]!;
   }
 
+  // PROJ-25 (AC3) — Konsens-Konfidenz-Boost: Stimmen LLM-Kategorie,
+  // Historie-Mehrheitskategorie UND Cache-Default-Kategorie überein (alle
+  // gesetzt & gleich), heben wir die LLM-Konfidenz um KONSENS_BOOST an
+  // (Deckel 1.0). Greift NICHT, wenn ein Signal fehlt oder abweicht. Die
+  // geboostete Konfidenz fließt sowohl ins Schwellwert-Routing als auch in
+  // das gespeicherte Ergebnis + Audit.
+  const histKat = signale.historie?.haeufigste_kategorie_id ?? null;
+  const cacheKat = signale.cache_default?.kategorie_id ?? null;
+  const konsens =
+    effektiveKategorieId != null &&
+    histKat != null &&
+    cacheKat != null &&
+    effektiveKategorieId === histKat &&
+    effektiveKategorieId === cacheKat;
+  const basisKonfidenz = llm.konfidenz;
+  const effektiveKonfidenz = konsens
+    ? Math.min(1.0, basisKonfidenz + KONSENS_BOOST)
+    : basisKonfidenz;
+
   const gruende: string[] = [];
-  if (llm.konfidenz < config.konfidenz_schwellwert) {
+  if (effektiveKonfidenz < config.konfidenz_schwellwert) {
     gruende.push("konfidenz_unter_schwellwert");
   }
   if (!effektiveKategorieId) {
@@ -321,18 +403,27 @@ export function entscheideBuchung(
     kategorie_id: effektiveKategorieId,
     ust_satz: llm.ust_satz,
     begruendung: llm.begruendung,
-    konfidenz: llm.konfidenz,
+    konfidenz: effektiveKonfidenz,
     quelle: "ki",
     regel_id: null,
     status,
     pruef_grund: gruende.length > 0 ? gruende.join(",") : null,
     auditExtra: {
-      konfidenz: llm.konfidenz,
+      konfidenz: effektiveKonfidenz,
       schwellwert: config.konfidenz_schwellwert,
       betrag_limit: config.betrag_limit,
       // 0 bei erfolgreichem Initial-Versuch; >0 wenn das LLM stochastisch
       // zurueckkam (Retry-Mechanismus aus llm.ts).
       llm_retries: llmRetries,
+      ...(konsens
+        ? {
+            konsens_boost: {
+              angewandt: true,
+              basis_konfidenz: basisKonfidenz,
+              geboostet: effektiveKonfidenz,
+            },
+          }
+        : {}),
     },
   });
 }
@@ -408,6 +499,93 @@ export function entscheideVorjahresUebernahme(
       uebernommene_kategorie_id: treffer.kategorie_id,
     },
   });
+}
+
+/**
+ * PROJ-25 (AC1) — REINE Übernahme-Entscheidung aus einem Cache-Default, der aus
+ * einer früheren MANUELLEN Korrektur desselben Empfängers stammt (quelle='cache').
+ * Analog zu `entscheideVorjahresUebernahme`: deterministisch, kein LLM-Call.
+ * Beträge über dem Ausreißer-Limit gehen wie überall zur Prüfung. Kein IO.
+ */
+export function entscheideCacheUebernahme(
+  buchung: BuchungFuerPipeline,
+  letzteKlassifikation: LetzteKlassifikation,
+  config: PipelineConfig = DEFAULT_CONFIG,
+): PipelineEntscheidung {
+  if (buchung.status === "manuell_bestaetigt") {
+    throw new ManuellBestaetigtError();
+  }
+  const istAusreisser = Math.abs(buchung.betrag) > config.betrag_limit;
+  return baue(buchung, {
+    klassifikation: letzteKlassifikation.klassifikation,
+    steuerrelevant: letzteKlassifikation.steuerrelevant,
+    kategorie_id: letzteKlassifikation.kategorie_id,
+    ust_satz: letzteKlassifikation.ust_satz,
+    begruendung: istAusreisser
+      ? "Aus früherer manueller Korrektur desselben Empfängers übernommen — Betrag über Ausreißer-Limit, daher zur Prüfung."
+      : "Aus früherer manueller Korrektur desselben Empfängers übernommen.",
+    konfidenz: 1,
+    quelle: "cache",
+    regel_id: null,
+    status: istAusreisser ? "zur_pruefung" : "auto_verbucht",
+    pruef_grund: istAusreisser ? "ausreisser_betrag" : null,
+    auditExtra: {
+      cache_uebernahme: true,
+      uebernommene_kategorie_id: letzteKlassifikation.kategorie_id,
+    },
+  });
+}
+
+/**
+ * PROJ-25 (AC4) — wählt aus den Signalen eine Vorbelegung für den LLM-Ausfall.
+ * Cache-Default hat Vorrang vor Historie. Historie greift nur bei klarer
+ * Mehrheit (>= HISTORIE_FALLBACK_QUOTE bei >= HISTORIE_FALLBACK_MIN_ANZAHL).
+ * Reine Funktion.
+ */
+function ermittleAusfallVorbelegung(signale: EntscheidungsSignale): {
+  klassifikation: Klassifikation | null;
+  steuerrelevant: boolean | null;
+  kategorie_id: string | null;
+  ust_satz: number | null;
+  quelle_text: string;
+  fallback_quelle: "cache" | "historie";
+} | null {
+  const cache = signale.cache_default;
+  if (cache && cache.kategorie_id) {
+    return {
+      klassifikation: cache.klassifikation,
+      steuerrelevant: cache.steuerrelevant,
+      kategorie_id: cache.kategorie_id,
+      ust_satz: cache.ust_satz,
+      quelle_text: "bekanntem Empfänger-Default",
+      fallback_quelle: "cache",
+    };
+  }
+
+  const h = signale.historie;
+  if (
+    h &&
+    h.haeufigste_kategorie_id != null &&
+    h.anzahl >= HISTORIE_FALLBACK_MIN_ANZAHL &&
+    h.haeufigste_kategorie_anzahl / h.anzahl >= HISTORIE_FALLBACK_QUOTE
+  ) {
+    return {
+      klassifikation: h.haeufigste_klassifikation,
+      steuerrelevant:
+        h.haeufigste_klassifikation === "geschaeftlich"
+          ? true
+          : h.haeufigste_klassifikation === "privat" ||
+              h.haeufigste_klassifikation === "neutral"
+            ? false
+            : null,
+      kategorie_id: h.haeufigste_kategorie_id,
+      ust_satz: null,
+      quelle_text: "klarer Empfänger-Historie",
+      fallback_quelle: "historie",
+    };
+  }
+
+  return null;
 }
 
 /** Optionales Daten-Bundle, das die API-Route an die Pipeline reicht. */
@@ -621,6 +799,39 @@ export async function klassifiziereBuchung(
     webQuery = `${(buchung.empfaenger ?? norm).slice(0, 80)} Deutschland Unternehmen Branche`;
   }
 
+  // (2b) PROJ-25 (AC1/AC2/AC5) — Cache-Default-Pass: NACH Regeln + Vorjahr,
+  // VOR dem LLM. Greift nur bei gültigem (nicht abgelaufenem) Cache-Eintrag
+  // mit gesetztem `letzte_klassifikation_default`.
+  //  - quelle='manuell' → deterministisch übernehmen (kein LLM-Call), quelle
+  //    'cache'. Ausreißer-Limit gilt wie überall (→ zur Prüfung).
+  //  - quelle='llm'/'web' → NICHT übernehmen, sondern als weicher LLM-Hinweis
+  //    in den Prompt geben (übersteuert die KI nicht hart).
+  const cacheDefault =
+    cacheVorhanden && kenntnis?.letzte_klassifikation_default
+      ? kenntnis.letzte_klassifikation_default
+      : null;
+
+  if (cacheDefault && kenntnis?.quelle === "manuell") {
+    const entscheidung = entscheideCacheUebernahme(buchung, cacheDefault, config);
+    entscheidung.audit.details = {
+      ...entscheidung.audit.details,
+      empfaenger_kenntnis: { quelle: kenntnis.quelle, cached: cacheVorhanden },
+    };
+    return entscheidung;
+  }
+
+  let cacheDefaultHinweis: string | null = null;
+  if (cacheDefault && kenntnis && kenntnis.quelle !== "manuell") {
+    const katBez =
+      cacheDefault.kategorie_id
+        ? kategorien.find((k) => k.id === cacheDefault.kategorie_id)
+            ?.bezeichnung ?? "(unbekannte Kategorie)"
+        : "(keine Kategorie)";
+    cacheDefaultHinweis =
+      `Dieser Empfänger wurde zuletzt als ${cacheDefault.klassifikation} ` +
+      `(Kategorie ${katBez}) klassifiziert.`;
+  }
+
   // (3) Historie laden — owner-scoped, finalisierte Status, ohne self.
   let historie: HistorieSummary | null = null;
   if (ctx.supabase && ctx.ownerId && norm.length > 0) {
@@ -651,6 +862,7 @@ export async function klassifiziereBuchung(
         historie,
         mein_profil: ctx.mein_profil ?? null,
         profil_hinweis: profilHinweis,
+        cache_default_hinweis: cacheDefaultHinweis,
       },
       kategorien,
     );
@@ -668,7 +880,8 @@ export async function klassifiziereBuchung(
     }
   }
 
-  // (5) Entscheidung berechnen.
+  // (5) Entscheidung berechnen. PROJ-25: Historie + Cache-Default als Signale
+  // durchreichen (AC3 Konsens-Boost, AC4 LLM-Ausfall-Fallback).
   const entscheidung = entscheideBuchung(
     buchung,
     regeln,
@@ -676,6 +889,7 @@ export async function klassifiziereBuchung(
     config,
     llmFehler,
     llmRetries,
+    { historie, cache_default: cacheDefault },
   );
 
   // (6) Bei hoher LLM-Konfidenz und Recherche-Kandidat: in Cache uebernehmen.

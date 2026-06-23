@@ -58,6 +58,8 @@ interface Klassifikationsergebnis {
   via_ki: number;
   /** PROJ-23: aus eindeutiger Vorjahres-/Historie-Kategorisierung übernommen. */
   via_vorjahr: number;
+  /** PROJ-25: aus früherer manueller Korrektur (Empfänger-Cache) übernommen. */
+  via_cache: number;
   uebersprungen_manuell: number;
   fehler: Array<{ buchung_id: string; grund: string }>;
   /**
@@ -378,6 +380,7 @@ export async function POST(request: Request) {
     via_regel: 0,
     via_ki: 0,
     via_vorjahr: 0,
+    via_cache: 0,
     uebersprungen_manuell: 0,
     fehler: [],
     konsistenz_pass: null,
@@ -483,6 +486,8 @@ export async function POST(request: Request) {
           }
         } else if (e.quelle === "vorjahr") {
           ergebnis.via_vorjahr++;
+        } else if (e.quelle === "cache") {
+          ergebnis.via_cache++;
         } else {
           ergebnis.via_ki++;
         }

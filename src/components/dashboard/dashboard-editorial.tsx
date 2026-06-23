@@ -326,9 +326,10 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
               <StatBlock
                 label="Betriebseinnahmen"
                 wert={formatEuro(jahr.einnahmen)}
-                sub={`${formatZahl(jahr.anzahl_buchungen)} geschäftlich`}
+                sub={`${formatZahl(jahr.anzahl_buchungen)} geschäftlich →`}
                 tone="income"
                 size="lg"
+                href="/kategorien-analyse"
               />
             </div>
             <div className="px-5 py-5">
@@ -337,6 +338,8 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 wert={formatEuro(jahr.ausgaben)}
                 tone="expense"
                 size="lg"
+                href="/kategorien-analyse"
+                sub="Aufschlüsselung →"
               />
             </div>
             <div className="px-5 py-5">

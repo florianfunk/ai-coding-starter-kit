@@ -1,13 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   entscheideBuchung,
+  entscheideCacheUebernahme,
   entscheideVorjahresUebernahme,
   klassifiziereBuchung,
   ManuellBestaetigtError,
   DEFAULT_CONFIG,
+  KONSENS_BOOST,
   type BuchungFuerPipeline,
+  type EntscheidungsSignale,
 } from "./pipeline";
 import type { VorjahrKategorisierung } from "./vorjahres-uebernahme";
+import type { LetzteKlassifikation } from "./empfaenger-cache";
+import type { HistorieSummary } from "./historie";
 import {
   LlmKlassifiziererError,
   type LlmErgebnis,
@@ -1094,7 +1099,7 @@ describe("klassifiziereBuchung — PROJ-15 Split-Aktion", () => {
       },
     });
 
-    const { ergebnis, audit } = await klassifiziereBuchung(
+    const { ergebnis } = await klassifiziereBuchung(
       splitBuchung({ betrag: -100 }),
       [r],
       kategorien,
@@ -1199,5 +1204,435 @@ describe("klassifiziereBuchung — PROJ-15 Split-Aktion", () => {
     expect(llmFn).not.toHaveBeenCalled();
     expect(ergebnis.split_angewandt).toBeFalsy();
     expect(ergebnis.quelle).toBe("regel");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PROJ-25 — Auto-Erkennung Boost
+// ---------------------------------------------------------------------------
+
+const letzteKlass: LetzteKlassifikation = {
+  klassifikation: "geschaeftlich",
+  steuerrelevant: true,
+  kategorie_id: "kat-soft",
+  ust_satz: 19,
+  konfidenz: 0.95,
+};
+
+function historie(p: Partial<HistorieSummary> = {}): HistorieSummary {
+  return {
+    anzahl: p.anzahl ?? 5,
+    betrag_min: p.betrag_min ?? -60,
+    betrag_max: p.betrag_max ?? -40,
+    betrag_median: p.betrag_median ?? -50,
+    haeufigste_kategorie_id:
+      p.haeufigste_kategorie_id !== undefined
+        ? p.haeufigste_kategorie_id
+        : "kat-soft",
+    haeufigste_kategorie_anzahl: p.haeufigste_kategorie_anzahl ?? 5,
+    haeufigste_klassifikation:
+      p.haeufigste_klassifikation !== undefined
+        ? p.haeufigste_klassifikation
+        : "geschaeftlich",
+  };
+}
+
+/** Cache-Mock-Zeile mit manueller/llm/web Quelle und Default-Klassifikation. */
+function cacheRowMit(over: Partial<CacheRow> = {}): CacheRow {
+  return {
+    owner_id: "owner-1",
+    empfaenger_norm: "acme",
+    rohwert_beispiel: "Acme GmbH",
+    branche: null,
+    leistung: null,
+    web_snippets: null,
+    letzte_klassifikation_default: letzteKlass,
+    quelle: "manuell",
+    recherche_versucht: false,
+    cached_at: new Date().toISOString(),
+    ttl_tage: 36500,
+    updated_at: new Date().toISOString(),
+    ...over,
+  };
+}
+
+describe("PROJ-25 AC1 — Cache-Default deterministisch (entscheideCacheUebernahme)", () => {
+  it("übernimmt 1:1, quelle='cache', auto_verbucht, Audit cache_uebernahme", () => {
+    const { ergebnis, audit } = entscheideCacheUebernahme(buchung(), letzteKlass);
+    expect(ergebnis.quelle).toBe("cache");
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+    expect(ergebnis.klassifikation).toBe("geschaeftlich");
+    expect(ergebnis.konfidenz).toBe(1);
+    expect(audit.details.cache_uebernahme).toBe(true);
+  });
+
+  it("Ausreißer-Betrag → zur_pruefung trotz Cache-Treffer", () => {
+    const { ergebnis } = entscheideCacheUebernahme(
+      buchung({ betrag: -99999 }),
+      letzteKlass,
+    );
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toBe("ausreisser_betrag");
+    expect(ergebnis.quelle).toBe("cache");
+  });
+
+  it("manuell bestätigte Buchung wird nicht übernommen (wirft)", () => {
+    expect(() =>
+      entscheideCacheUebernahme(buchung({ status: "manuell_bestaetigt" }), letzteKlass),
+    ).toThrow(ManuellBestaetigtError);
+  });
+
+  it("klassifiziereBuchung: manueller Cache-Hit → quelle='cache' OHNE LLM-Aufruf", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [cacheRowMit({ quelle: "manuell" })],
+    });
+    const supabase = { from } as never;
+    const llmFn = vi.fn();
+    const rechercheFn = vi.fn();
+
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(llmFn).not.toHaveBeenCalled();
+    expect(rechercheFn).not.toHaveBeenCalled();
+    expect(ergebnis.quelle).toBe("cache");
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+  });
+
+  it("klassifiziereBuchung: Vorjahr hat Vorrang vor Cache-Default", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [cacheRowMit({ quelle: "manuell" })],
+    });
+    const supabase = { from } as never;
+    const llmFn = vi.fn();
+    const vorjahrTreffer: VorjahrKategorisierung = {
+      kategorie_id: "kat-soft",
+      klassifikation: "geschaeftlich",
+      steuerrelevant: true,
+      ust_satz: 19,
+    };
+    const map = new Map<string, VorjahrKategorisierung>([["acme", vorjahrTreffer]]);
+
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      undefined,
+      { supabase, ownerId: "owner-1", vorjahr_map: map },
+    );
+
+    expect(llmFn).not.toHaveBeenCalled();
+    // Vorjahres-Pass läuft VOR dem Cache-Lookup → quelle bleibt 'vorjahr'.
+    expect(ergebnis.quelle).toBe("vorjahr");
+  });
+
+  it("klassifiziereBuchung: manueller Cache OHNE Default → normaler LLM-Pfad", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [cacheRowMit({ quelle: "manuell", letzte_klassifikation_default: null })],
+    });
+    const supabase = { from } as never;
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const rechercheFn = vi.fn();
+
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(llmFn).toHaveBeenCalledOnce();
+    expect(ergebnis.quelle).toBe("ki");
+  });
+});
+
+describe("PROJ-25 AC2 — Cache-Default als LLM-Hinweis (quelle='llm'/'web')", () => {
+  it("llm-Cache mit Default → Hinweis fließt in den LLM-Prompt, kein deterministisches Übernehmen", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [cacheRowMit({ quelle: "llm" })],
+    });
+    const supabase = { from } as never;
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const rechercheFn = vi.fn();
+
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(llmFn).toHaveBeenCalledOnce();
+    expect(ergebnis.quelle).toBe("ki");
+    const eingabe = llmFn.mock.calls[0][0] as {
+      cache_default_hinweis?: string | null;
+    };
+    expect(eingabe.cache_default_hinweis).toBeTruthy();
+    expect(eingabe.cache_default_hinweis).toContain("geschaeftlich");
+  });
+
+  it("web-Cache mit Default → ebenfalls nur Hinweis, kein 'cache'-Ergebnis", async () => {
+    const { from } = makePipelineSupabase({
+      cache: [cacheRowMit({ quelle: "web", branche: "Software", leistung: "SaaS" })],
+    });
+    const supabase = { from } as never;
+    const llmFn = vi.fn().mockResolvedValue(llmOk());
+    const rechercheFn = vi.fn();
+
+    const { ergebnis } = await klassifiziereBuchung(
+      buchung({ empfaenger: "Acme GmbH", empfaenger_normalisiert: "acme" }),
+      [],
+      kategorien,
+      DEFAULT_CONFIG,
+      llmFn,
+      rechercheFn,
+      { supabase, ownerId: "owner-1" },
+    );
+
+    expect(ergebnis.quelle).toBe("ki");
+    const eingabe = llmFn.mock.calls[0][0] as {
+      cache_default_hinweis?: string | null;
+    };
+    expect(eingabe.cache_default_hinweis).toBeTruthy();
+  });
+});
+
+describe("PROJ-25 AC3 — Konsens-Konfidenz-Boost (entscheideBuchung)", () => {
+  it("LLM == Historie == Cache-Default → Konfidenz +KONSENS_BOOST, Audit hält Boost fest", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({ haeufigste_kategorie_id: "kat-soft" }),
+      cache_default: letzteKlass,
+    };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.8 }),
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.konfidenz).toBeCloseTo(0.8 + KONSENS_BOOST, 5);
+    const boost = audit.details.konsens_boost as {
+      angewandt: boolean;
+      basis_konfidenz: number;
+      geboostet: number;
+    };
+    expect(boost.angewandt).toBe(true);
+    expect(boost.basis_konfidenz).toBe(0.8);
+    expect(boost.geboostet).toBeCloseTo(0.9, 5);
+  });
+
+  it("grenzwertiger Fall: Boost hebt über die Auto-Verbuchungs-Schwelle", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({ haeufigste_kategorie_id: "kat-soft" }),
+      cache_default: letzteKlass,
+    };
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.78 }),
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    // 0.78 < 0.85, aber 0.78 + 0.1 = 0.88 ≥ 0.85 → auto_verbucht
+    expect(ergebnis.status).toBe("auto_verbucht");
+    expect(ergebnis.konfidenz).toBeCloseTo(0.88, 5);
+  });
+
+  it("Deckel 1.0: Boost überschreitet nie 1.0", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({ haeufigste_kategorie_id: "kat-soft" }),
+      cache_default: letzteKlass,
+    };
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.95 }),
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.konfidenz).toBe(1.0);
+  });
+
+  it("greift NICHT, wenn Historie-Kategorie abweicht", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({ haeufigste_kategorie_id: "kat-anders" }),
+      cache_default: letzteKlass,
+    };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.8 }),
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.konfidenz).toBe(0.8);
+    expect(audit.details.konsens_boost).toBeUndefined();
+  });
+
+  it("greift NICHT, wenn Cache-Default-Signal fehlt", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({ haeufigste_kategorie_id: "kat-soft" }),
+      cache_default: null,
+    };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.8 }),
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.konfidenz).toBe(0.8);
+    expect(audit.details.konsens_boost).toBeUndefined();
+  });
+
+  it("greift NICHT ohne signale (Default {}) — Rückwärtskompatibilität", () => {
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      llmOk({ kategorie_id: "kat-soft", konfidenz: 0.8 }),
+    );
+    expect(ergebnis.konfidenz).toBe(0.8);
+    expect(audit.details.konsens_boost).toBeUndefined();
+  });
+});
+
+describe("PROJ-25 AC4 — LLM-Ausfall-Fallback (entscheideBuchung)", () => {
+  it("eindeutiger Cache-Default → vorbelegt, status bleibt zur_pruefung, fallback_quelle='cache'", () => {
+    const signale: EntscheidungsSignale = { cache_default: letzteKlass };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      null,
+      DEFAULT_CONFIG,
+      "LLM down",
+      0,
+      signale,
+    );
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toBe("ki_nicht_verfuegbar");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+    expect(ergebnis.klassifikation).toBe("geschaeftlich");
+    expect(audit.details.fallback_quelle).toBe("cache");
+  });
+
+  it("Historie-Mehrheit ≥80% bei ≥3 → vorbelegt, fallback_quelle='historie'", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({
+        anzahl: 5,
+        haeufigste_kategorie_id: "kat-soft",
+        haeufigste_kategorie_anzahl: 5,
+        haeufigste_klassifikation: "geschaeftlich",
+      }),
+    };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      null,
+      DEFAULT_CONFIG,
+      "LLM down",
+      0,
+      signale,
+    );
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.kategorie_id).toBe("kat-soft");
+    expect(audit.details.fallback_quelle).toBe("historie");
+  });
+
+  it("Cache-Default hat Vorrang vor Historie", () => {
+    const cacheAlt: LetzteKlassifikation = {
+      ...letzteKlass,
+      kategorie_id: "kat-cache",
+    };
+    const signale: EntscheidungsSignale = {
+      cache_default: cacheAlt,
+      historie: historie({ haeufigste_kategorie_id: "kat-hist" }),
+    };
+    const { ergebnis, audit } = entscheideBuchung(
+      buchung(),
+      [],
+      null,
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.kategorie_id).toBe("kat-cache");
+    expect(audit.details.fallback_quelle).toBe("cache");
+  });
+
+  it("Historie-Mehrheit unter 80% → kein Fallback (leer zur Prüfung)", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({
+        anzahl: 5,
+        haeufigste_kategorie_id: "kat-soft",
+        haeufigste_kategorie_anzahl: 3, // 3/5 = 60%
+      }),
+    };
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      null,
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.kategorie_id).toBeNull();
+    expect(ergebnis.klassifikation).toBeNull();
+  });
+
+  it("Historie zu dünn (anzahl < 3) → kein Fallback", () => {
+    const signale: EntscheidungsSignale = {
+      historie: historie({
+        anzahl: 2,
+        haeufigste_kategorie_id: "kat-soft",
+        haeufigste_kategorie_anzahl: 2,
+      }),
+    };
+    const { ergebnis } = entscheideBuchung(
+      buchung(),
+      [],
+      null,
+      DEFAULT_CONFIG,
+      null,
+      0,
+      signale,
+    );
+    expect(ergebnis.kategorie_id).toBeNull();
+  });
+
+  it("kein Signal → bisheriges Verhalten (leer zur Prüfung)", () => {
+    const { ergebnis } = entscheideBuchung(buchung(), [], null);
+    expect(ergebnis.status).toBe("zur_pruefung");
+    expect(ergebnis.pruef_grund).toBe("ki_nicht_verfuegbar");
+    expect(ergebnis.kategorie_id).toBeNull();
   });
 });

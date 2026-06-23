@@ -150,6 +150,15 @@ export interface LlmEingabe {
    * nicht erst selbst rekonstruieren muss.
    */
   profil_hinweis?: string | null;
+  /**
+   * PROJ-25 (AC2): Wenn der Empfaenger-Cache eine gemerkte
+   * `letzte_klassifikation_default` aus quelle='llm'/'web' fuehrt, wird sie als
+   * weicher Hinweis in den Prompt gegeben ("zuletzt als X klassifiziert"). Sie
+   * uebersteuert die LLM-Entscheidung NICHT hart — nur Kontext. (Bei
+   * quelle='manuell' wird stattdessen deterministisch uebernommen, siehe
+   * `entscheideCacheUebernahme`.)
+   */
+  cache_default_hinweis?: string | null;
 }
 
 /** Eine wählbare Zielkategorie (nur ID + Bezeichnung + Typ ans LLM). */
@@ -432,6 +441,12 @@ export async function klassifiziereMitLlm(
     eingabe.profil_hinweis && eingabe.profil_hinweis.trim().length > 0
       ? `\n\nProfil-Hinweis für genau diese Buchung: ${eingabe.profil_hinweis.trim()}`
       : "";
+  // PROJ-25 (AC2): weicher Cache-Default-Hinweis — Kontext, kein Zwang.
+  const cacheHinweisBlock =
+    eingabe.cache_default_hinweis &&
+    eingabe.cache_default_hinweis.trim().length > 0
+      ? `\n\nHinweis aus dem Empfänger-Cache: ${eingabe.cache_default_hinweis.trim()}`
+      : "";
 
   const prompt =
     `Buchung:\n` +
@@ -439,7 +454,7 @@ export async function klassifiziereMitLlm(
     `Empfänger: ${eingabe.empfaenger ?? "(leer)"}\n` +
     `Betrag: ${eingabe.betrag.toFixed(2)} EUR ` +
     `(${eingabe.betrag < 0 ? "Ausgabe" : "Einnahme/Zugang"})` +
-    `${stichworte}${profilBlock}${profilHinweisBlock}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
+    `${stichworte}${profilBlock}${profilHinweisBlock}${cacheHinweisBlock}${kenntnisBlock}${historieBlock}${webBlock}\n\n` +
     `Verfügbare EÜR-Kategorien:\n${baueKategorienListe(kategorien)}`;
 
   let letzterFehler: unknown = null;

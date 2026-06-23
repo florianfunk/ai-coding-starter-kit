@@ -8,6 +8,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type {
   Buchung,
   Kategorie,
@@ -469,14 +471,43 @@ export function EntscheidungsDialog({
               </div>
             )}
 
-            <div className="space-y-3 rounded-md border p-3">
+            {/* PROJ-26 (Feature 4 / AC6): prominenter 1-Klick-Pfad. Aktiviert
+                den Lernregel-Switch und befüllt das Empfänger-Muster. */}
+            {!regelAktiv && (
+              <button
+                type="button"
+                onClick={() => form.setValue("regel_aktiv", true)}
+                className="flex w-full items-center gap-3 rounded-md border border-brand-violet/40 bg-tint-violet px-3 py-3 text-left transition-colors hover:bg-brand-violet/15"
+              >
+                <Sparkles className="h-5 w-5 shrink-0 text-brand-violet" />
+                <div className="min-w-0">
+                  <div className="text-[13.5px] font-semibold text-brand-violet">
+                    Immer so für diesen Empfänger
+                  </div>
+                  <div className="text-[12px] text-muted-foreground">
+                    Legt eine Lernregel an — gleichartige Buchungen laufen künftig
+                    automatisch und tauchen nicht mehr in der Prüfliste auf.
+                  </div>
+                </div>
+              </button>
+            )}
+
+            <div
+              className={cn(
+                "space-y-3 rounded-md border p-3",
+                regelAktiv && "border-brand-violet/50 bg-tint-violet/40",
+              )}
+            >
               <FormField
                 control={form.control}
                 name="regel_aktiv"
                 render={({ field }) => (
                   <FormItem className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <FormLabel>Als Lernregel speichern</FormLabel>
+                      <FormLabel className="flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-brand-violet" />
+                        Als Lernregel speichern
+                      </FormLabel>
                       <FormDescription>
                         Gleichartige Buchungen laufen künftig automatisch —
                         Vorschlag unten aus den Buchungen, anpassbar.

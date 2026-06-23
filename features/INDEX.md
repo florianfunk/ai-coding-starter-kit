@@ -38,9 +38,9 @@
 | PROJ-22 | Globaler Jahreswähler (app-weiter Jahres-Modus) | Deployed | [Spec](PROJ-22-globaler-jahreswaehler.md) | 2026-06-16 |
 | PROJ-23 | Vorjahres-Übernahme (deterministischer Vor-Pass der Klassifizierung) | Deployed | [Spec](PROJ-23-vorjahres-uebernahme.md) | 2026-06-16 |
 | PROJ-24 | Klassifizierung-Center (Menüpunkt, Statistik, Auto-Continue, Manuell-First) | Deployed | [Spec](PROJ-24-klassifizierung-center.md) | 2026-06-17 |
-| PROJ-25 | Auto-Erkennung Boost (Cache-Default, Konsens-Konfidenz, LLM-Ausfall-Fallback) | Approved | [Spec](PROJ-25-auto-erkennung-boost.md) | 2026-06-23 |
-| PROJ-26 | Prüflisten-Speedrun (Keyboard-Triage, Inline-Begründung, Sofort-Lernregel) | Approved | [Spec](PROJ-26-pruefliste-speedrun.md) | 2026-06-23 |
-| PROJ-27 | Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed) | Approved | [Spec](PROJ-27-cockpit-dashboard.md) | 2026-06-23 |
+| PROJ-25 | Auto-Erkennung Boost (Cache-Default, Konsens-Konfidenz, LLM-Ausfall-Fallback) | Deployed | [Spec](PROJ-25-auto-erkennung-boost.md) | 2026-06-23 |
+| PROJ-26 | Prüflisten-Speedrun (Keyboard-Triage, Inline-Begründung, Sofort-Lernregel) | Deployed | [Spec](PROJ-26-pruefliste-speedrun.md) | 2026-06-23 |
+| PROJ-27 | Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed) | Deployed | [Spec](PROJ-27-cockpit-dashboard.md) | 2026-06-23 |
 
 <!-- Add features above this line -->
 

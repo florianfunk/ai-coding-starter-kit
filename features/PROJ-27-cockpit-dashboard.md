@@ -1,6 +1,6 @@
 # PROJ-27: Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-23
 **Last Updated:** 2026-06-23
 **Priorität:** P1

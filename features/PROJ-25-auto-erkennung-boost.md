@@ -1,6 +1,6 @@
 # PROJ-25: Auto-Erkennung Boost (Cache-Default, Konsens-Konfidenz, LLM-Ausfall-Fallback)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-23
 **Last Updated:** 2026-06-23
 **Priorität:** P1

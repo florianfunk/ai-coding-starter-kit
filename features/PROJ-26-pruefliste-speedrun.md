@@ -1,6 +1,6 @@
 # PROJ-26: Prüflisten-Speedrun (Keyboard-Triage, Inline-Begründung, Sofort-Lernregel)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-23
 **Last Updated:** 2026-06-23
 **Priorität:** P1

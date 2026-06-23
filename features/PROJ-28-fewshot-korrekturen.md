@@ -1,6 +1,6 @@
 # PROJ-28: Few-Shot aus Korrekturen (lernende LLM-Klassifizierung)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-23
 **Last Updated:** 2026-06-23
 **Priorität:** P1

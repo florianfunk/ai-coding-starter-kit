@@ -41,7 +41,7 @@
 | PROJ-25 | Auto-Erkennung Boost (Cache-Default, Konsens-Konfidenz, LLM-Ausfall-Fallback) | Deployed | [Spec](PROJ-25-auto-erkennung-boost.md) | 2026-06-23 |
 | PROJ-26 | Prüflisten-Speedrun (Keyboard-Triage, Inline-Begründung, Sofort-Lernregel) | Deployed | [Spec](PROJ-26-pruefliste-speedrun.md) | 2026-06-23 |
 | PROJ-27 | Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed) | Deployed | [Spec](PROJ-27-cockpit-dashboard.md) | 2026-06-23 |
-| PROJ-28 | Few-Shot aus Korrekturen (lernende LLM-Klassifizierung) | Approved | [Spec](PROJ-28-fewshot-korrekturen.md) | 2026-06-23 |
+| PROJ-28 | Few-Shot aus Korrekturen (lernende LLM-Klassifizierung) | Deployed | [Spec](PROJ-28-fewshot-korrekturen.md) | 2026-06-23 |
 
 <!-- Add features above this line -->
 

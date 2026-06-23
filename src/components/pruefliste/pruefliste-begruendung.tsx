@@ -30,7 +30,10 @@ export function PrueflisteBegruendung({ fall }: { fall: Buchung }) {
   const prozent = hatKonfidenz ? Math.round((fall.konfidenz ?? 0) * 100) : 0;
 
   return (
-    <div className="space-y-3 border-t border-line-hair bg-[color:var(--surface-2)] px-4 py-3 text-[12px] text-muted-foreground">
+    <div
+      id={`begruendung-${fall.id}`}
+      className="space-y-3 border-t border-line-hair bg-[color:var(--surface-2)] px-4 py-3 text-[12px] text-muted-foreground"
+    >
       {/* Begründung */}
       <div className="space-y-0.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/80">

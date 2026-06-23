@@ -1032,51 +1032,56 @@ function PrueflisteZeile({
             {f.waehrung} · {kontoName}
           </div>
         </div>
-        {/* Warum? — Inline-Begründung aufklappen */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setWarumOffen((v) => !v)}
-          aria-expanded={warumOffen}
-          title="Begründung anzeigen"
-          className="h-8 shrink-0 gap-1 rounded-full px-2 text-[12px] font-medium text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
-        >
-          Warum?
-          <ChevronDown
-            className={cn(
-              "h-3.5 w-3.5 transition-transform",
-              warumOffen && "rotate-180",
-            )}
+        {/* Aktionsleiste — eigener shrink-0-Container, der bei sehr schmalen
+            Viewports (375px) umbricht statt den Empfängernamen zu quetschen */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+          {/* Warum? — Inline-Begründung aufklappen */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setWarumOffen((v) => !v)}
+            aria-expanded={warumOffen}
+            aria-controls={`begruendung-${f.id}`}
+            title="Begründung anzeigen"
+            className="h-8 shrink-0 gap-1 rounded-full px-2 text-[12px] font-medium text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+          >
+            Warum?
+            <ChevronDown
+              className={cn(
+                "h-3.5 w-3.5 transition-transform",
+                warumOffen && "rotate-180",
+              )}
+            />
+          </Button>
+          {/* Detail-Info */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onInfo}
+            aria-label="Buchungsdetails anzeigen"
+            title="Buchungsdetails anzeigen"
+            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
+          >
+            <Info className="h-4 w-4" />
+          </Button>
+          {/* Merken */}
+          <MerkenStern
+            gemerkt={gemerkt}
+            pending={merkenPending}
+            onToggle={onToggleMerken}
+            size="sm"
           />
-        </Button>
-        {/* Detail-Info */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onInfo}
-          aria-label="Buchungsdetails anzeigen"
-          title="Buchungsdetails anzeigen"
-          className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-tint-violet hover:text-brand-violet"
-        >
-          <Info className="h-4 w-4" />
-        </Button>
-        {/* Merken */}
-        <MerkenStern
-          gemerkt={gemerkt}
-          pending={merkenPending}
-          onToggle={onToggleMerken}
-          size="sm"
-        />
-        {/* Aktion */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onEntscheiden}
-          className="h-8 shrink-0 rounded-full text-[12.5px] font-semibold text-brand-violet hover:bg-tint-violet hover:text-brand-violet"
-        >
-          Entscheiden
-          <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
-        </Button>
+          {/* Aktion */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onEntscheiden}
+            className="h-8 shrink-0 rounded-full text-[12.5px] font-semibold text-brand-violet hover:bg-tint-violet hover:text-brand-violet"
+          >
+            Entscheiden
+            <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       {warumOffen && <PrueflisteBegruendung fall={f} />}
     </li>

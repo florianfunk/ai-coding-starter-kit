@@ -474,22 +474,23 @@ export function EntscheidungsDialog({
             {/* PROJ-26 (Feature 4 / AC6): prominenter 1-Klick-Pfad. Aktiviert
                 den Lernregel-Switch und befüllt das Empfänger-Muster. */}
             {!regelAktiv && (
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => form.setValue("regel_aktiv", true)}
-                className="flex w-full items-center gap-3 rounded-md border border-brand-violet/40 bg-tint-violet px-3 py-3 text-left transition-colors hover:bg-brand-violet/15"
+                className="flex h-auto w-full items-center justify-start gap-3 whitespace-normal border-brand-violet/40 bg-tint-violet px-3 py-3 text-left hover:bg-brand-violet/15"
               >
                 <Sparkles className="h-5 w-5 shrink-0 text-brand-violet" />
                 <div className="min-w-0">
                   <div className="text-[13.5px] font-semibold text-brand-violet">
                     Immer so für diesen Empfänger
                   </div>
-                  <div className="text-[12px] text-muted-foreground">
+                  <div className="text-[12px] font-normal text-muted-foreground">
                     Legt eine Lernregel an — gleichartige Buchungen laufen künftig
                     automatisch und tauchen nicht mehr in der Prüfliste auf.
                   </div>
                 </div>
-              </button>
+              </Button>
             )}
 
             <div

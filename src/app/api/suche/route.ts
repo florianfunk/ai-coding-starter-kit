@@ -20,7 +20,7 @@ import {
   normalisiereQuery,
   istSuchbar,
   erkenneBetrag,
-  ilikePattern,
+  ilikeOrWert,
   mapeBuchung,
   aggregiereEmpfaenger,
   leereAntwort,
@@ -51,7 +51,9 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const supabase = await createClient();
-  const pattern = ilikePattern(q);
+  // Doppelt-quotierter Wert: ein Komma im Suchbegriff darf die PostgREST-
+  // `.or()`-Bedingung nicht zerbrechen (QA-W1).
+  const pattern = ilikeOrWert(q);
   const betrag = erkenneBetrag(q);
 
   // --- Buchungen ---------------------------------------------------------

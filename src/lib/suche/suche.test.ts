@@ -6,6 +6,7 @@ import {
   istSuchbar,
   erkenneBetrag,
   ilikePattern,
+  ilikeOrWert,
   mapeBuchung,
   aggregiereEmpfaenger,
   leereAntwort,
@@ -85,6 +86,19 @@ describe("ilikePattern", () => {
   });
   it("escapt Backslash", () => {
     expect(ilikePattern("a\\b")).toBe("%a\\\\b%");
+  });
+});
+
+describe("ilikeOrWert", () => {
+  it("quotiert den Pattern-Wert für PostgREST .or()", () => {
+    expect(ilikeOrWert("rewe")).toBe('"%rewe%"');
+  });
+  it("schützt ein Komma im Suchbegriff (QA-W1)", () => {
+    // Ohne Quoting würde das Komma die .or()-Bedingung zerbrechen.
+    expect(ilikeOrWert("a,b")).toBe('"%a,b%"');
+  });
+  it("verdoppelt enthaltene Anführungszeichen", () => {
+    expect(ilikeOrWert('a"b')).toBe('"%a""b%"');
   });
 });
 

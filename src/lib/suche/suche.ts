@@ -118,6 +118,18 @@ export function ilikePattern(q: string): string {
   return `%${escaped}%`;
 }
 
+/**
+ * Liefert das ILIKE-Pattern als PostgREST-`.or()`-tauglichen, doppelt-quotierten
+ * Wert. Ohne Quoting würde ein Komma im Suchbegriff (z. B. "Amazon, AWS" oder
+ * "1,234") vom PostgREST-Parser als Bedingungs-Trennzeichen interpretiert und
+ * die ganze `.or()`-Bedingung zerbrechen (QA-W1). Doppelt-quotiert behandelt
+ * PostgREST den Inhalt als literalen Wert; ein enthaltenes `"` wird verdoppelt.
+ */
+export function ilikeOrWert(q: string): string {
+  const pattern = ilikePattern(q).replace(/"/g, '""');
+  return `"${pattern}"`;
+}
+
 // ---------------------------------------------------------------------------
 // Mapping DB → DTO
 // ---------------------------------------------------------------------------

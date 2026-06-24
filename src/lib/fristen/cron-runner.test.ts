@@ -10,6 +10,8 @@ interface MockData {
   abgeschlossene: Array<{ jahr: number; periode: number | null; status: string }>;
   gesendet: Array<{ periode_key: string; stufe: string }>;
   email: string | null;
+  /** Optionaler Insert-Fehler (für den W2-Pfad: Log scheitert nach Versand). */
+  insertError?: { code?: string; message: string } | null;
 }
 
 /**
@@ -38,7 +40,7 @@ function mockSupabase(data: MockData) {
       then: (resolve: (v: unknown) => void) => resolve(result()),
       insert: (row: Record<string, unknown>) => {
         inserts.push(row);
-        return Promise.resolve({ data: null, error: null });
+        return Promise.resolve({ data: null, error: data.insertError ?? null });
       },
     };
     return chain;
@@ -165,6 +167,52 @@ describe("laufFristenErinnerung", () => {
       owner_id: "owner-1",
       stufe: "14_tage",
     });
+  });
+
+  it("W2: Log-Insert scheitert nach Versand → warnung gesetzt", async () => {
+    // Transienter DB-Fehler (kein 23505) beim Idempotenz-Log nach erfolgreichem
+    // Versand → der Lauf meldet eine warnung (Doppelversand-Risiko sichtbar).
+    const supabase = mockSupabase({
+      profil: baseProfil,
+      abgeschlossene: abgeschlossenBisJan2026(),
+      gesendet: [],
+      email: "inhaber@firma.de",
+      insertError: { code: "08006", message: "connection reset" },
+    });
+    const versender = vi
+      .fn()
+      .mockResolvedValue({ gesendet: true, grund: "ok" });
+    const res = await laufFristenErinnerung({
+      supabase,
+      heute: "2026-02-28",
+      appUrl: "https://app.de",
+      versender,
+    });
+    expect(res.status).toBe("versendet");
+    expect(res.gesendet).toBe(true);
+    expect(res.warnung).toContain("Doppelversand");
+  });
+
+  it("W2: Duplikat-Verletzung (23505) ist KEIN Warnfall", async () => {
+    // Greift die unique-Constraint, ist alles korrekt — keine warnung.
+    const supabase = mockSupabase({
+      profil: baseProfil,
+      abgeschlossene: abgeschlossenBisJan2026(),
+      gesendet: [],
+      email: "inhaber@firma.de",
+      insertError: { code: "23505", message: "duplicate key" },
+    });
+    const versender = vi
+      .fn()
+      .mockResolvedValue({ gesendet: true, grund: "ok" });
+    const res = await laufFristenErinnerung({
+      supabase,
+      heute: "2026-02-28",
+      appUrl: "https://app.de",
+      versender,
+    });
+    expect(res.status).toBe("versendet");
+    expect(res.warnung).toBeUndefined();
   });
 
   it("idempotent: bereits gesendete Stufe → kein erneuter Versand", async () => {

@@ -49,6 +49,13 @@ export interface CronRunnerSummary {
     | "versand_uebersprungen";
   /** Mensch-lesbares Detail (Stufe/Periode/Grund). */
   detail: string;
+  /**
+   * Gesetzt, wenn die Mail versendet wurde, aber der Idempotenz-Log-Eintrag
+   * NICHT geschrieben werden konnte (transienter DB-Fehler). Dann fehlt die
+   * Sperre gegen einen Doppelversand im nächsten Lauf — der Endpoint soll das
+   * sichtbar machen (QA-W2). Die unique-Constraint bleibt letzte Verteidigung.
+   */
+  warnung?: string;
 }
 
 interface ProfilRow {
@@ -156,16 +163,28 @@ export async function laufFristenErinnerung(
   // den Versuch nur, wenn tatsächlich versendet wurde — so kann ein no-op
   // (kein Key) später bei scharfgeschaltetem Versand nachgeholt werden.
   if (ergebnis.gesendet) {
-    await supabase.from("fristen_erinnerung").insert({
-      owner_id: ownerId,
-      periode_key: faellig.periode_key,
-      stufe: faellig.stufe,
-    });
+    // Insert-Fehler NICHT verschlucken (QA-W2): scheitert der Log-Eintrag nach
+    // erfolgreichem Versand (transienter DB-Fehler), fehlt die Idempotenz-Sperre
+    // → nächster Lauf könnte erneut mailen. Das machen wir über `warnung`
+    // sichtbar (der Endpoint surfaced es). Bei einer echten Duplikat-Verletzung
+    // (Code 23505) ist alles in Ordnung — die unique-Constraint hat gegriffen.
+    const { error: insertErr } = await supabase
+      .from("fristen_erinnerung")
+      .insert({
+        owner_id: ownerId,
+        periode_key: faellig.periode_key,
+        stufe: faellig.stufe,
+      });
+    const warnung =
+      insertErr && (insertErr as { code?: string }).code !== "23505"
+        ? `Versand-Log konnte nicht geschrieben werden (${insertErr.message}) — Doppelversand im nächsten Lauf möglich.`
+        : undefined;
     return {
       geprueft: 1,
       gesendet: true,
       status: "versendet",
       detail: `Stufe ${faellig.stufe} für Periode ${faellig.periode_key} versendet.`,
+      ...(warnung ? { warnung } : {}),
     };
   }
 

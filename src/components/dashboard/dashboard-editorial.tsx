@@ -34,6 +34,7 @@ import { HealthScoreCard } from "./health-score-card";
 import { FristenCountdown } from "./fristen-countdown";
 import { AktivitaetFeed } from "./aktivitaet-feed";
 import { KpiSparkline } from "./kpi-sparkline";
+import { KpiYoy } from "./kpi-yoy";
 
 // ---------------------------------------------------------------------------
 // Action-Item: eine Zeile in "Jetzt zu tun"
@@ -262,7 +263,12 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
     health_score,
     aktivitaet,
     trend,
+    vorjahr,
   } = data;
+  // PROJ-31: YoY-Zeilen nur zeigen, wenn ein Vorjahresvergleich vorliegt UND
+  // im Vorjahres-Zeitraum überhaupt Buchungen lagen — sonst (leerer Account /
+  // erstes Jahr) blendet sich die Zeile sauber aus (AC5).
+  const zeigeYoy = vorjahr != null && !vorjahr.vorjahr_leer;
   const verlust = jahr.vorlaeufiger_gewinn < 0;
   const erstattung = jahr.voraussichtliche_ust_zahllast < 0;
   const offeneTasks =
@@ -363,6 +369,15 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 href="/kategorien-analyse"
               />
               <KpiSparkline punkte={trend} feld="einnahmen" tone="income" />
+              {zeigeYoy ? (
+                <KpiYoy
+                  vorjahrWert={vorjahr.vorjahr.einnahmen}
+                  delta={vorjahr.delta.einnahmen}
+                  tone="income"
+                  ist_ytd={vorjahr.ist_ytd}
+                  label="Betriebseinnahmen"
+                />
+              ) : null}
             </div>
             <div className="px-5 py-5">
               <StatBlock
@@ -374,6 +389,15 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 sub="Aufschlüsselung →"
               />
               <KpiSparkline punkte={trend} feld="ausgaben" tone="expense" />
+              {zeigeYoy ? (
+                <KpiYoy
+                  vorjahrWert={vorjahr.vorjahr.ausgaben}
+                  delta={vorjahr.delta.ausgaben}
+                  tone="expense"
+                  ist_ytd={vorjahr.ist_ytd}
+                  label="Betriebsausgaben"
+                />
+              ) : null}
             </div>
             <div className="px-5 py-5">
               <StatBlock
@@ -384,6 +408,15 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 href="/euer"
                 sub="Zur EÜR →"
               />
+              {zeigeYoy ? (
+                <KpiYoy
+                  vorjahrWert={vorjahr.vorjahr.gewinn}
+                  delta={vorjahr.delta.gewinn}
+                  tone={verlust ? "expense" : "income"}
+                  ist_ytd={vorjahr.ist_ytd}
+                  label={verlust ? "Vorläufiger Verlust" : "Vorläufiger Gewinn"}
+                />
+              ) : null}
             </div>
             <div className="px-5 py-5">
               <StatBlock
@@ -399,6 +432,19 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 sub="Zur USt-VA →"
               />
               <KpiSparkline punkte={trend} feld="ust_zahllast" tone="expense" />
+              {zeigeYoy ? (
+                <KpiYoy
+                  vorjahrWert={vorjahr.vorjahr.ust_zahllast}
+                  delta={vorjahr.delta.ust_zahllast}
+                  tone="expense"
+                  ist_ytd={vorjahr.ist_ytd}
+                  label={
+                    erstattung
+                      ? "Voraussichtl. USt-Erstattung"
+                      : "Voraussichtl. USt-Zahllast"
+                  }
+                />
+              ) : null}
             </div>
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
   type DashboardBuchung,
 } from "./aggregate";
 import { berechneMonatsReihen } from "./trend";
+import { berechneYoy } from "./yoy";
 import { naechsteUstFrist } from "./fristen";
 import { berechneHealthScore } from "./health-score";
 import { ladeAktivitaet } from "./aktivitaet";
@@ -253,6 +254,61 @@ export async function ladeDashboardAggregat(
   // Jahres-Aggregat (kein zusätzlicher DB-Query). Für die Trend-Sparklines.
   const trend = berechneMonatsReihen(dashboardBuchungen, refDatum, wjBeginn);
 
+  // PROJ-31 (AC3): Vorjahresvergleich. Das Vorjahres-WJ-Fenster liegt genau
+  // ein Jahr vor [von, bis]. Es ist NICHT in `dashboardBuchungen` enthalten
+  // (die decken nur das Bezugs-WJ ab), daher EIN zusätzlicher zeitgefilterter,
+  // vollständig paginierter Query auf das Vorjahres-Fenster (mit Obergrenze
+  // via ladeAlle — kein unbeschränkter Scan). YTD-Kürzung passiert rein in
+  // berechneYoy; wir laden das volle Vorjahres-WJ und lassen die Funktion auf
+  // den analogen Tag schneiden.
+  const vjVon = `${Number(von.slice(0, 4)) - 1}${von.slice(4)}`;
+  const vjBis = `${Number(bis.slice(0, 4)) - 1}${bis.slice(4)}`;
+  const { data: vjBuchungen } = await ladeAlle<Roh>((rangeVon, rangeBis) =>
+    supabase
+      .from("buchung")
+      .select("id, betrag, buchung_datum, klassifikation, status, ust_satz")
+      .eq("owner_id", ownerId)
+      .eq("klassifikation", "geschaeftlich")
+      .gte("buchung_datum", vjVon)
+      .lte("buchung_datum", vjBis)
+      .order("buchung_datum", { ascending: true })
+      .order("id", { ascending: true })
+      .range(rangeVon, rangeBis),
+  );
+  const vjDashboardBuchungen: DashboardBuchung[] = (vjBuchungen as Roh[]).map(
+    (b) => ({
+      betrag: typeof b.betrag === "number" ? b.betrag : Number(b.betrag),
+      buchung_datum: b.buchung_datum,
+      klassifikation: b.klassifikation,
+      status: b.status,
+      ust_satz:
+        b.ust_satz === null
+          ? null
+          : typeof b.ust_satz === "number"
+            ? b.ust_satz
+            : Number(b.ust_satz),
+      belegt: false,
+    }),
+  );
+  // Kein Crash bei leerem Account: berechneYoy verträgt leere Buchungen; wir
+  // setzen `vorjahr` aber nur, wenn überhaupt Buchungen existieren (sonst null
+  // → UI blendet die YoY-Zeile aus, AC5).
+  const vorjahr =
+    gesamtBuchungenC > 0
+      ? berechneYoy(
+          vjDashboardBuchungen,
+          {
+            einnahmen: jahr.einnahmen,
+            ausgaben: jahr.ausgaben,
+            ust_zahllast: jahr.voraussichtliche_ust_zahllast,
+            gewinn: jahr.vorlaeufiger_gewinn,
+          },
+          refDatum,
+          heute,
+          wjBeginn,
+        )
+      : null;
+
   // Steuerperioden (alle, klein begrenzt — eine Firma hat überschaubar viele).
   const { data: periodenData } = await supabase
     .from("steuerperiode")
@@ -324,6 +380,7 @@ export async function ladeDashboardAggregat(
     aktionen,
     jahr,
     trend,
+    vorjahr,
     perioden,
     paperless_sync: syncStatusAus(paperlessJob),
     konto_import: syncStatusAus(importJob),

@@ -1,6 +1,6 @@
 # PROJ-31: Vorjahresvergleich (YoY) der Dashboard-KPIs
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-24
 **Last Updated:** 2026-06-24
 **Priorität:** P2

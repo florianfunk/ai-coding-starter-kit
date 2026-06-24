@@ -1,6 +1,6 @@
 # PROJ-32: E-Mail-Fristen-Erinnerung (USt-VA-Frist)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-24
 **Last Updated:** 2026-06-24
 **Priorität:** P2

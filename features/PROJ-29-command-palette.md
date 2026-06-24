@@ -1,6 +1,6 @@
 # PROJ-29: Command-Palette (Cmd+K — globale Sprung-Navigation)
 
-## Status: Approved
+## Status: Deployed
 **Created:** 2026-06-24
 **Last Updated:** 2026-06-24
 **Priorität:** P1

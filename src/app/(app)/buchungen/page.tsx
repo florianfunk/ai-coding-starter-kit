@@ -28,6 +28,9 @@ type Such = {
   konto?: string;
   von?: string;
   bis?: string;
+  // PROJ-34: Vorausgefüllte Volltextsuche aus der Command-Palette (?q=...).
+  // Wird nur als initialer Client-Suchwert an den Ledger durchgereicht.
+  q?: string;
 };
 
 export default async function BuchungenPage({
@@ -43,6 +46,7 @@ export default async function BuchungenPage({
     konto: typeof sp.konto === "string" ? sp.konto : undefined,
     von: typeof sp.von === "string" ? sp.von : undefined,
     bis: typeof sp.bis === "string" ? sp.bis : undefined,
+    q: typeof sp.q === "string" ? sp.q : undefined,
   };
 
   // PROJ-22: Datumsfenster über den globalen Jahreswähler auflösen. Fehlen
@@ -59,6 +63,7 @@ export default async function BuchungenPage({
     konto: rohFilter.konto,
     von: effVon ?? undefined,
     bis: effBis ?? undefined,
+    q: rohFilter.q,
   };
 
   const { data: kontenData } = await supabase

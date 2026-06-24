@@ -199,7 +199,8 @@ export function BuchungenLedger({
   buchungen: Buchung[];
   konten: Konto[];
   kategorien: Kategorie[];
-  filter: { konto?: string; von?: string; bis?: string };
+  // PROJ-34: `q` = vorausgefüllte Volltextsuche aus der Command-Palette.
+  filter: { konto?: string; von?: string; bis?: string; q?: string };
   // Obergrenze beim Laden erreicht → Suche/Summen ggf. unvollständig.
   abgeschnitten?: boolean;
   maxBuchungen?: number;
@@ -222,7 +223,9 @@ export function BuchungenLedger({
 
   // Client-side Filter & Sort (keine URL-Persistenz — Konto/Zeitraum macht
   // schon Server-Side-Filter; das hier verfeinert nur die geladene Menge).
-  const [suche, setSuche] = useState("");
+  // PROJ-34: initialer Suchwert aus ?q= (Command-Palette-Sprung). Danach frei
+  // editierbar wie zuvor — keine fortlaufende URL-Synchronisation.
+  const [suche, setSuche] = useState(filter.q ?? "");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
   const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
   const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");

@@ -37,6 +37,7 @@ import {
   baueFewShotBeispiele,
   type FewShotRow,
 } from "@/lib/classifier/few-shot";
+import { mapMitLimit } from "@/lib/util/map-mit-limit";
 
 export const runtime = "nodejs";
 // Massen-Klassifizierung mit LLM-Aufrufen kann dauern.
@@ -53,6 +54,26 @@ const SELECT_JOB =
 // fuer die automatische Split-Aktion (Kind-Buchungen erben sie von der Klammer).
 const SELECT_BUCHUNG =
   "id, konto_id, betrag, verwendungszweck, empfaenger, empfaenger_normalisiert, buchung_datum, waehrung, duplikat_hash, status";
+
+/**
+ * PROJ-33: Teil-Ergebnis EINER Buchung aus dem parallelen Worker-Pool. Jeder
+ * Task gibt genau ein solches Objekt zurück; die Aggregation zu den Gesamt-
+ * Zählern passiert deterministisch nach `mapMitLimit` (keine geteilten
+ * Zähler-Mutationen im Worker → keine verlorenen/doppelten Increments).
+ *
+ * Genau eine der drei Ausgänge ist gesetzt:
+ *  - `fehler`               → Fehler (Update-Fehler oder unerwarteter Fehler)
+ *  - `uebersprungen_manuell`→ manuell_bestaetigt (ManuellBestaetigtError)
+ *  - `verarbeitet`          → erfolgreich klassifiziert + geschrieben
+ */
+interface TaskErgebnis {
+  verarbeitet?: boolean;
+  auto_verbucht?: boolean;
+  quelle?: "regel" | "ki" | "vorjahr" | "cache";
+  regel_id?: string | null;
+  uebersprungen_manuell?: boolean;
+  fehler?: { buchung_id: string; grund: string };
+}
 
 interface Klassifikationsergebnis {
   verarbeitet: number;
@@ -96,6 +117,26 @@ const ZEIT_BUDGET_MS = 210_000;
 // Ab diesem Alter gilt ein 'laeuft'-Job als tot (Funktion kann nicht länger als
 // maxDuration laufen) → darf überschrieben/freigegeben werden.
 const STALE_LAEUFT_MS = 6 * 60 * 1000;
+
+// PROJ-33: Begrenzte Nebenläufigkeit der pro-Buchung-Verarbeitung (LLM-Call +
+// DB-Update). Konservativer Default wegen Anthropic-Rate-Limits; per ENV
+// override-bar (KLASSIFIZIERUNG_CONCURRENCY). Ungültige/zu kleine Werte fallen
+// auf 1 zurück, sehr große werden gedeckelt — der Worker-Pool selbst hält das
+// Limit ohnehin ein und überschreitet nie die Anzahl der Buchungen.
+const DEFAULT_CONCURRENCY = 5;
+const MAX_CONCURRENCY = 20;
+
+/**
+ * Liest das Concurrency-Limit aus der Umgebung (KLASSIFIZIERUNG_CONCURRENCY).
+ * Default 5. Auf [1, MAX_CONCURRENCY] geklemmt; nicht-numerische Werte → Default.
+ */
+function ermittleConcurrency(): number {
+  const roh = process.env.KLASSIFIZIERUNG_CONCURRENCY;
+  if (!roh) return DEFAULT_CONCURRENCY;
+  const n = Number.parseInt(roh, 10);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_CONCURRENCY;
+  return Math.min(n, MAX_CONCURRENCY);
+}
 
 export async function GET() {
   const user = await getApiUser();
@@ -414,126 +455,178 @@ export async function POST(request: Request) {
 
   const startMs = Date.now();
   let zeitlimitErreicht = false;
+  const concurrency = ermittleConcurrency();
 
   try {
-    for (let i = 0; i < buchungen.length; i++) {
-      // Zeitbudget-Schutz: vor jeder Buchung prüfen, ob noch Zeit ist. Sonst
-      // sauber abbrechen (Job wird unten als 'fertig' markiert), Rest bleibt
-      // 'offen' für den nächsten Lauf — kein Funktions-Timeout, kein Zombie.
-      if (Date.now() - startMs > ZEIT_BUDGET_MS) {
-        zeitlimitErreicht = true;
-        ergebnis.verbleibend = buchungen.length - i;
-        break;
-      }
-      const b = buchungen[i];
-      try {
-        const { ergebnis: e, audit } = await klassifiziereBuchung(
-          b,
-          regeln,
-          kategorien,
-          config,
-          undefined,
-          undefined,
-          {
-            supabase,
-            ownerId: user.id,
-            inflight,
-            vorjahr_map: vorjahrMap,
-            mein_profil: meinProfil,
-            few_shot: fewShot,
-          },
-        );
-
-        // PROJ-15 P1: Hat eine Split-Regel gegriffen, hat die Pipeline die
-        // Eltern-Buchung bereits zur Klammer gemacht und zwei Kinder angelegt
-        // (via wendeSplitAn). Ein normales Update wuerde die Klammer wieder
-        // ueberschreiben — daher hier ueberspringen.
-        const updErr = e.split_angewandt
-          ? null
-          : (
-              await supabase
-                .from("buchung")
-                .update({
-                  klassifikation: e.klassifikation,
-                  steuerrelevant: e.steuerrelevant,
-                  kategorie_id: e.kategorie_id,
-                  ust_satz: e.ust_satz,
-                  begruendung: e.begruendung,
-                  konfidenz: e.konfidenz,
-                  quelle: e.quelle,
-                  regel_id: e.regel_id,
-                  status: e.status,
-                  pruef_grund: e.pruef_grund,
-                })
-                .eq("id", b.id)
-                .eq("owner_id", user.id)
-                .neq("status", "manuell_bestaetigt") // letzte Sicherung
-            ).error;
-
-        if (updErr) {
-          // Serverseitig die echte DB-Ursache loggen (z. B. CHECK-Constraint),
-          // damit stille Schreibfehler nicht mehr unentdeckt bleiben.
-          console.error(
-            "[klassifizierung] update fehlgeschlagen",
-            b.id,
-            "quelle=" + e.quelle,
-            updErr.message,
+    // PROJ-33: Begrenzte Nebenläufigkeit statt strikt seriell. Jeder Task
+    // verarbeitet GENAU EINE Buchung (klassifiziereBuchung + DB-Update + Audit)
+    // und liefert ein in sich abgeschlossenes Teil-Ergebnis (Zählerbeiträge,
+    // Regeltreffer, Fehler) zurück. Es gibt KEINE geteilten Zähler-Mutationen
+    // im Worker — die Aggregation passiert deterministisch NACH mapMitLimit aus
+    // den zurückgegebenen Teil-Ergebnissen. Dadurch sind die Zähler unter
+    // Parallelität exakt (keine verlorenen/doppelten Increments), obwohl
+    // await-Punkte Interleaving erlauben.
+    //
+    // Idempotenz/Korrektheit: Die deterministischen Pässe (Regeln/Vorjahr/
+    // Cache/Few-Shot) und Schwellen sind reihenfolge-unabhängig; das Ergebnis
+    // pro Buchung ist identisch zum seriellen Lauf. Der `manuell_bestaetigt`-
+    // Schutz (.neq) und der Split-Sonderfall bleiben pro Buchung unverändert.
+    //
+    // Zeitbudget: Der sollAbbrechen-Hook wird VOR dem Start jedes Tasks
+    // geprüft. Ist das Budget erreicht, startet mapMitLimit keine NEUEN Tasks
+    // mehr (laufende werden sauber zu Ende geführt — kein halber DB-Zustand).
+    // Bereits gestartete Buchungen schreiben vollständig; nicht gestartete
+    // bleiben 'offen' und werden im nächsten Lauf weiterverarbeitet.
+    const { ergebnisse: teilErgebnisse, gestartet } = await mapMitLimit(
+      buchungen,
+      concurrency,
+      async (b): Promise<TaskErgebnis> => {
+        try {
+          const { ergebnis: e, audit } = await klassifiziereBuchung(
+            b,
+            regeln,
+            kategorien,
+            config,
+            undefined,
+            undefined,
+            {
+              supabase,
+              ownerId: user.id,
+              inflight,
+              vorjahr_map: vorjahrMap,
+              mein_profil: meinProfil,
+              few_shot: fewShot,
+            },
           );
-          ergebnis.fehler.push({
-            buchung_id: b.id,
-            grund: "Buchung konnte nicht aktualisiert werden.",
+
+          // PROJ-15 P1: Hat eine Split-Regel gegriffen, hat die Pipeline die
+          // Eltern-Buchung bereits zur Klammer gemacht und zwei Kinder angelegt
+          // (via wendeSplitAn). Ein normales Update wuerde die Klammer wieder
+          // ueberschreiben — daher hier ueberspringen.
+          const updErr = e.split_angewandt
+            ? null
+            : (
+                await supabase
+                  .from("buchung")
+                  .update({
+                    klassifikation: e.klassifikation,
+                    steuerrelevant: e.steuerrelevant,
+                    kategorie_id: e.kategorie_id,
+                    ust_satz: e.ust_satz,
+                    begruendung: e.begruendung,
+                    konfidenz: e.konfidenz,
+                    quelle: e.quelle,
+                    regel_id: e.regel_id,
+                    status: e.status,
+                    pruef_grund: e.pruef_grund,
+                  })
+                  .eq("id", b.id)
+                  .eq("owner_id", user.id)
+                  .neq("status", "manuell_bestaetigt") // letzte Sicherung
+              ).error;
+
+          if (updErr) {
+            // Serverseitig die echte DB-Ursache loggen (z. B. CHECK-Constraint),
+            // damit stille Schreibfehler nicht mehr unentdeckt bleiben.
+            console.error(
+              "[klassifizierung] update fehlgeschlagen",
+              b.id,
+              "quelle=" + e.quelle,
+              updErr.message,
+            );
+            return {
+              fehler: {
+                buchung_id: b.id,
+                grund: "Buchung konnte nicht aktualisiert werden.",
+              },
+            };
+          }
+
+          await supabase.from("audit_eintrag").insert({
+            owner_id: user.id,
+            entitaet: "buchung",
+            entitaet_id: b.id,
+            aktion: audit.aktion,
+            quelle: audit.quelle,
+            details: audit.details,
           });
-          continue;
+
+          return {
+            verarbeitet: true,
+            auto_verbucht: e.status === "auto_verbucht",
+            quelle: e.quelle,
+            regel_id: e.quelle === "regel" ? e.regel_id : null,
+          };
+        } catch (err) {
+          if (err instanceof ManuellBestaetigtError) {
+            return { uebersprungen_manuell: true };
+          }
+          return {
+            fehler: {
+              buchung_id: b.id,
+              grund:
+                err instanceof Error ? err.message : "Unbekannter Fehler.",
+            },
+          };
         }
+      },
+      {
+        // Zeitbudget-Schutz: keine NEUEN Tasks mehr starten, sobald das Budget
+        // erreicht ist. Laufende Tasks führt mapMitLimit sauber zu Ende.
+        sollAbbrechen: () => Date.now() - startMs > ZEIT_BUDGET_MS,
+      },
+    );
 
-        await supabase.from("audit_eintrag").insert({
-          owner_id: user.id,
-          entitaet: "buchung",
-          entitaet_id: b.id,
-          aktion: audit.aktion,
-          quelle: audit.quelle,
-          details: audit.details,
-        });
+    // Verbleibend = nicht gestartete Buchungen (Zeitbudget-Abbruch). Bei
+    // vollständigem Lauf ist gestartet === buchungen.length → verbleibend 0.
+    const verbleibend = buchungen.length - gestartet;
+    if (verbleibend > 0) {
+      zeitlimitErreicht = true;
+      ergebnis.verbleibend = verbleibend;
+    }
 
+    // Teil-Ergebnisse deterministisch zu den Gesamt-Zählern aggregieren.
+    // Single-threaded, keine await-Punkte → atomar bzgl. der Zähler.
+    for (const t of teilErgebnisse) {
+      if (t.fehler) {
+        ergebnis.fehler.push(t.fehler);
+        continue;
+      }
+      if (t.uebersprungen_manuell) {
+        ergebnis.uebersprungen_manuell++;
+        continue;
+      }
+      if (t.verarbeitet) {
         ergebnis.verarbeitet++;
-        if (e.status === "auto_verbucht") ergebnis.auto_verbucht++;
+        if (t.auto_verbucht) ergebnis.auto_verbucht++;
         else ergebnis.zur_pruefung++;
-        if (e.quelle === "regel") {
+        if (t.quelle === "regel") {
           ergebnis.via_regel++;
-          if (e.regel_id) {
+          if (t.regel_id) {
             regelTreffer.set(
-              e.regel_id,
-              (regelTreffer.get(e.regel_id) ?? 0) + 1,
+              t.regel_id,
+              (regelTreffer.get(t.regel_id) ?? 0) + 1,
             );
           }
-        } else if (e.quelle === "vorjahr") {
+        } else if (t.quelle === "vorjahr") {
           ergebnis.via_vorjahr++;
-        } else if (e.quelle === "cache") {
+        } else if (t.quelle === "cache") {
           ergebnis.via_cache++;
         } else {
           ergebnis.via_ki++;
         }
-      } catch (err) {
-        if (err instanceof ManuellBestaetigtError) {
-          ergebnis.uebersprungen_manuell++;
-        } else {
-          ergebnis.fehler.push({
-            buchung_id: b.id,
-            grund:
-              err instanceof Error ? err.message : "Unbekannter Fehler.",
-          });
-        }
-      }
-
-      // Fortschritt regelmäßig pflegen (nicht bei jeder Zeile).
-      if (i % 10 === 0 || i === buchungen.length - 1) {
-        await supabase
-          .from("job_lauf")
-          .update({ fortschritt: i + 1 })
-          .eq("id", jobId)
-          .eq("owner_id", user.id);
       }
     }
+
+    // Fortschritt einmal final auf die tatsächlich gestartete Anzahl setzen.
+    // (Bei Nebenläufigkeit ist ein "alle 10 Zeilen"-Zwischenstand nicht mehr
+    // sinnvoll an einen seriellen Index gekoppelt; der Job-Status-GET zeigt
+    // ohnehin erst nach Rückkehr 'fertig'.)
+    await supabase
+      .from("job_lauf")
+      .update({ fortschritt: gestartet })
+      .eq("id", jobId)
+      .eq("owner_id", user.id);
 
     // Trefferzähler der angewandten Regeln erhöhen.
     for (const [regelId, anzahl] of regelTreffer) {

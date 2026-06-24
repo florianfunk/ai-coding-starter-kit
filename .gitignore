@@ -40,3 +40,6 @@ next-env.d.ts
 
 # Lokale Testdaten / Kontoauszüge — NIEMALS committen (sensible Steuerdaten)
 data/
+
+# Agent-Worktrees (transient, nie committen)
+.claude/worktrees/

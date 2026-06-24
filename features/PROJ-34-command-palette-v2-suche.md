@@ -1,6 +1,6 @@
 # PROJ-34: Command-Palette v2 — Buchungs- & Empfänger-Volltextsuche
 
-## Status: In Review
+## Status: Approved
 **Created:** 2026-06-24
 **Last Updated:** 2026-06-24
 **Priorität:** P2

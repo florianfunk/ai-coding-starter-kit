@@ -1,6 +1,6 @@
 # PROJ-33: Batch-LLM — Durchsatz der Klassifizierung
 
-## Status: In Progress
+## Status: Approved
 **Created:** 2026-06-24
 **Last Updated:** 2026-06-24
 **Priorität:** P2

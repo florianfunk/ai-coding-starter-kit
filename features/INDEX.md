@@ -44,10 +44,10 @@
 | PROJ-28 | Few-Shot aus Korrekturen (lernende LLM-Klassifizierung) | Deployed | [Spec](PROJ-28-fewshot-korrekturen.md) | 2026-06-23 |
 | PROJ-29 | Command-Palette (Cmd+K — globale Sprung-Navigation) | Deployed | [Spec](PROJ-29-command-palette.md) | 2026-06-24 |
 | PROJ-30 | Trend-Sparklines im Dashboard (Verlauf der Kern-KPIs) | Deployed | [Spec](PROJ-30-trend-sparklines.md) | 2026-06-24 |
-| PROJ-31 | Vorjahresvergleich (YoY) der Dashboard-KPIs | In Progress | [Spec](PROJ-31-yoy-vergleich.md) | 2026-06-24 |
-| PROJ-32 | E-Mail-Fristen-Erinnerung (USt-VA-Frist) | In Progress | [Spec](PROJ-32-email-fristen-erinnerung.md) | 2026-06-24 |
-| PROJ-33 | Batch-LLM — Durchsatz der Klassifizierung | In Progress | [Spec](PROJ-33-batch-llm-durchsatz.md) | 2026-06-24 |
-| PROJ-34 | Command-Palette v2 — Buchungs- & Empfänger-Volltextsuche | In Progress | [Spec](PROJ-34-command-palette-v2-suche.md) | 2026-06-24 |
+| PROJ-31 | Vorjahresvergleich (YoY) der Dashboard-KPIs | Approved | [Spec](PROJ-31-yoy-vergleich.md) | 2026-06-24 |
+| PROJ-32 | E-Mail-Fristen-Erinnerung (USt-VA-Frist) | Approved | [Spec](PROJ-32-email-fristen-erinnerung.md) | 2026-06-24 |
+| PROJ-33 | Batch-LLM — Durchsatz der Klassifizierung | Approved | [Spec](PROJ-33-batch-llm-durchsatz.md) | 2026-06-24 |
+| PROJ-34 | Command-Palette v2 — Buchungs- & Empfänger-Volltextsuche | Approved | [Spec](PROJ-34-command-palette-v2-suche.md) | 2026-06-24 |
 
 <!-- Add features above this line -->
 

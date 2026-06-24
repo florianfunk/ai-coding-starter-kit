@@ -17,6 +17,7 @@ import type { UstFristInfo } from "./fristen";
 import type { HealthScore } from "./health-score";
 import type { AktivitaetsEintrag } from "./aktivitaet";
 import type { MonatsPunkt } from "./trend";
+import type { YoyVergleich } from "./yoy";
 
 /** Buchungs-Rohdatensatz, soweit fürs Dashboard relevant. */
 export interface DashboardBuchung {
@@ -360,6 +361,13 @@ export interface DashboardAggregat {
    * folge) für die Trend-Sparklines. Gleiche Datenbasis/Logik wie `jahr`.
    */
   trend: MonatsPunkt[];
+  /**
+   * PROJ-31: Vorjahresvergleich (YoY) der Kern-KPIs des Bezugsjahres. Bei
+   * laufendem Bezugs-WJ auf denselben Year-to-Date-Ausschnitt begrenzt
+   * (`ist_ytd`). null, wenn keine Buchungen vorhanden sind (leerer Account).
+   * Gleiche Datenbasis/Logik wie `jahr`; bestehende Felder unverändert.
+   */
+  vorjahr: YoyVergleich | null;
   perioden: PeriodenZeile[];
   paperless_sync: SyncStatus;
   konto_import: SyncStatus;

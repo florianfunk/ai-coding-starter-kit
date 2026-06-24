@@ -135,7 +135,7 @@ function summiere(
 }
 
 /** Verschiebt ein ISO-Datum (yyyy-MM-dd) um -1 Jahr (UTC-stabil). */
-function minusEinJahr(iso: string): string {
+export function minusEinJahr(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return iso;
   const jahr = Number(m[1]) - 1;

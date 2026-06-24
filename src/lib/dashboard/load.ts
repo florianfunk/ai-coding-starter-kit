@@ -19,7 +19,7 @@ import {
   type DashboardBuchung,
 } from "./aggregate";
 import { berechneMonatsReihen } from "./trend";
-import { berechneYoy } from "./yoy";
+import { berechneYoy, minusEinJahr } from "./yoy";
 import { naechsteUstFrist } from "./fristen";
 import { berechneHealthScore } from "./health-score";
 import { ladeAktivitaet } from "./aktivitaet";
@@ -261,8 +261,11 @@ export async function ladeDashboardAggregat(
   // via ladeAlle — kein unbeschränkter Scan). YTD-Kürzung passiert rein in
   // berechneYoy; wir laden das volle Vorjahres-WJ und lassen die Funktion auf
   // den analogen Tag schneiden.
-  const vjVon = `${Number(von.slice(0, 4)) - 1}${von.slice(4)}`;
-  const vjBis = `${Number(bis.slice(0, 4)) - 1}${bis.slice(4)}`;
+  // Schalttag-sicher: minusEinJahr klemmt 29.02. ohne Vorjahres-Schalttag auf
+  // 28.02. (ein naiver String-Slice erzeugte sonst ein ungültiges Datum wie
+  // 2023-02-29 → kaputter DB-Query bei WJ-Beginn März).
+  const vjVon = minusEinJahr(von);
+  const vjBis = minusEinJahr(bis);
   const { data: vjBuchungen } = await ladeAlle<Roh>((rangeVon, rangeBis) =>
     supabase
       .from("buchung")

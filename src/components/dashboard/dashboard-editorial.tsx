@@ -33,6 +33,7 @@ import { formatDatum, formatEuro, formatZahl, formatZeitpunkt } from "./format";
 import { HealthScoreCard } from "./health-score-card";
 import { FristenCountdown } from "./fristen-countdown";
 import { AktivitaetFeed } from "./aktivitaet-feed";
+import { KpiSparkline } from "./kpi-sparkline";
 
 // ---------------------------------------------------------------------------
 // Action-Item: eine Zeile in "Jetzt zu tun"
@@ -260,6 +261,7 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
     fristen,
     health_score,
     aktivitaet,
+    trend,
   } = data;
   const verlust = jahr.vorlaeufiger_gewinn < 0;
   const erstattung = jahr.voraussichtliche_ust_zahllast < 0;
@@ -360,6 +362,7 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 size="lg"
                 href="/kategorien-analyse"
               />
+              <KpiSparkline punkte={trend} feld="einnahmen" tone="income" />
             </div>
             <div className="px-5 py-5">
               <StatBlock
@@ -370,6 +373,7 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 href="/kategorien-analyse"
                 sub="Aufschlüsselung →"
               />
+              <KpiSparkline punkte={trend} feld="ausgaben" tone="expense" />
             </div>
             <div className="px-5 py-5">
               <StatBlock
@@ -394,6 +398,7 @@ export function DashboardEditorial({ data }: { data: DashboardAggregat }) {
                 href="/ust-voranmeldung"
                 sub="Zur USt-VA →"
               />
+              <KpiSparkline punkte={trend} feld="ust_zahllast" tone="expense" />
             </div>
           </div>
         </div>

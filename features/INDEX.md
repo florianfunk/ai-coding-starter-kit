@@ -43,7 +43,8 @@
 | PROJ-27 | Cockpit-Dashboard (Health-Score, USt-VA-Fristen-Countdown, Aktivitäts-Feed) | Deployed | [Spec](PROJ-27-cockpit-dashboard.md) | 2026-06-23 |
 | PROJ-28 | Few-Shot aus Korrekturen (lernende LLM-Klassifizierung) | Deployed | [Spec](PROJ-28-fewshot-korrekturen.md) | 2026-06-23 |
 | PROJ-29 | Command-Palette (Cmd+K — globale Sprung-Navigation) | Deployed | [Spec](PROJ-29-command-palette.md) | 2026-06-24 |
+| PROJ-30 | Trend-Sparklines im Dashboard (Verlauf der Kern-KPIs) | Deployed | [Spec](PROJ-30-trend-sparklines.md) | 2026-06-24 |
 
 <!-- Add features above this line -->
 
-## Next Available ID: PROJ-30
+## Next Available ID: PROJ-31

@@ -16,6 +16,7 @@
 import type { UstFristInfo } from "./fristen";
 import type { HealthScore } from "./health-score";
 import type { AktivitaetsEintrag } from "./aktivitaet";
+import type { MonatsPunkt } from "./trend";
 
 /** Buchungs-Rohdatensatz, soweit fürs Dashboard relevant. */
 export interface DashboardBuchung {
@@ -354,6 +355,11 @@ export function onboardingVollstaendig(s: OnboardingStatus): boolean {
 export interface DashboardAggregat {
   aktionen: AktionsKennzahlen;
   jahr: JahresKennzahlen;
+  /**
+   * PROJ-30 (AC3): Monatsreihen des laufenden WJ (genau 12 Punkte, WJ-Reihen-
+   * folge) für die Trend-Sparklines. Gleiche Datenbasis/Logik wie `jahr`.
+   */
+  trend: MonatsPunkt[];
   perioden: PeriodenZeile[];
   paperless_sync: SyncStatus;
   konto_import: SyncStatus;

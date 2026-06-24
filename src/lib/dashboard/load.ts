@@ -18,6 +18,7 @@ import {
   type DashboardAggregat,
   type DashboardBuchung,
 } from "./aggregate";
+import { berechneMonatsReihen } from "./trend";
 import { naechsteUstFrist } from "./fristen";
 import { berechneHealthScore } from "./health-score";
 import { ladeAktivitaet } from "./aktivitaet";
@@ -248,6 +249,10 @@ export async function ladeDashboardAggregat(
   // intern abgeleitete Fenster mit dem geladenen `von`/`bis`.
   const jahr = berechneJahresKennzahlen(dashboardBuchungen, refDatum, wjBeginn);
 
+  // PROJ-30 (AC3): Monatsreihen aus DERSELBEN Datenmenge/Inputs wie das
+  // Jahres-Aggregat (kein zusätzlicher DB-Query). Für die Trend-Sparklines.
+  const trend = berechneMonatsReihen(dashboardBuchungen, refDatum, wjBeginn);
+
   // Steuerperioden (alle, klein begrenzt — eine Firma hat überschaubar viele).
   const { data: periodenData } = await supabase
     .from("steuerperiode")
@@ -318,6 +323,7 @@ export async function ladeDashboardAggregat(
   return {
     aktionen,
     jahr,
+    trend,
     perioden,
     paperless_sync: syncStatusAus(paperlessJob),
     konto_import: syncStatusAus(importJob),

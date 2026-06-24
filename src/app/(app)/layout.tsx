@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { AppSidebar } from "@/components/app-sidebar";
+import { CommandPalette } from "@/components/command-palette";
 import { JahrProvider } from "@/components/jahr/jahr-provider";
 import { JahresWaehler } from "@/components/jahr/jahres-waehler";
 import { ladeJahrKontext } from "@/lib/jahr/aktives-jahr";
@@ -59,7 +60,9 @@ export default async function AppLayout({
               </span>
               <span style={{ color: "var(--text)" }}>Arbeitsbereich</span>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {/* PROJ-29: Command-Palette — Topbar-Trigger + globaler ⌘K-Dialog. */}
+              <CommandPalette />
               <JahresWaehler />
             </div>
           </div>

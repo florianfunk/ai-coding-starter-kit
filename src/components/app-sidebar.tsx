@@ -13,59 +13,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
-
-// Bereichs-Trennung mit klarem Workflow-Fokus:
-//   Heute   — taeglich/woechentlich angefasste Ansichten
-//   Buecher — Buchhaltung: Buchungen, Belege, Analyse
-//   Steuer  — Steuer-Endprodukte
-//   Setup   — Stammdaten + System-Konfiguration
-const NAV_HEUTE = [
-  { href: "/dashboard", label: "Dashboard" },
-  // PROJ-17 — KI-Chat: prominenter Einstiegspunkt im Bereich "Heute",
-  // weil die taegliche Interaktion mit dem Agenten ueber den Chat laeuft.
-  { href: "/chat", label: "KI-Chat" },
-  { href: "/pruefliste", label: "Prüfliste" },
-  { href: "/merkliste", label: "Merkliste" },
-  { href: "/kuendigungen", label: "Kündigungen" },
-];
-
-const NAV_BUECHER = [
-  { href: "/buchungen", label: "Buchungen" },
-  { href: "/klassifizierung", label: "Klassifizierung" },
-  // PROJ-15 P2 (#3): Kandidatenliste für neue Lernregeln.
-  { href: "/klassifizierung/haeufige-empfaenger", label: "Häufige Empfänger" },
-  { href: "/kategorien-analyse", label: "Kategorien-Analyse" },
-  { href: "/lieferanten-notizen", label: "Lieferanten-Notizen" },
-  { href: "/abgleich", label: "Beleg-Abgleich" },
-  { href: "/belege", label: "Belege" },
-];
-
-const NAV_STEUER = [
-  { href: "/ust-voranmeldung", label: "USt-Voranmeldung" },
-  { href: "/euer", label: "EÜR" },
-  { href: "/einkommensteuer", label: "Einkommensteuer" },
-  { href: "/export", label: "Export" },
-];
-
-const SETTINGS = [
-  { href: "/profil", label: "Mein Profil" },
-  { href: "/einstellungen/firma", label: "Firma & Steuerprofil" },
-  { href: "/einstellungen/kontenrahmen", label: "Kontenrahmen" },
-  { href: "/einstellungen/konten", label: "Bankkonten" },
-  { href: "/einstellungen/paperless", label: "Paperless" },
-  { href: "/einstellungen/regeln", label: "Lernregeln" },
-  { href: "/einstellungen/admin", label: "Admin" },
-];
-
-// Block-Reihenfolge der Sidebar. Titel + zugehörige Einträge werden je
-// als eigener Container gerendert — so bleibt der Abstand zwischen den
-// Blöcken groß, die Einträge innerhalb eines Blocks aber eng zusammen.
-const NAV_SEKTIONEN = [
-  { titel: "Heute", eintraege: NAV_HEUTE },
-  { titel: "Bücher", eintraege: NAV_BUECHER },
-  { titel: "Steuer", eintraege: NAV_STEUER },
-  { titel: "Setup", eintraege: SETTINGS },
-];
+// PROJ-29: Navigationsstruktur lebt jetzt in einer gemeinsamen Quelle,
+// die auch die Command-Palette nutzt (AC3) — kein Duplikat mehr.
+import { NAV_SEKTIONEN, SECTION_COLORS } from "@/lib/navigation";
 
 function NavLink({
   href,
@@ -90,15 +40,6 @@ function NavLink({
     </Link>
   );
 }
-
-// Pro Bereich eine eigene Akzentfarbe — macht die Sidebar-Navigation auf
-// einen Blick scanbar und greift die Marken-Palette aus globals.css auf.
-const SECTION_COLORS: Record<string, string> = {
-  Heute: "var(--brand-violet)",
-  "Bücher": "var(--brand-cyan)",
-  Steuer: "var(--brand-cerise)",
-  Setup: "var(--brand-shaft)",
-};
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   const key = typeof children === "string" ? children : "";

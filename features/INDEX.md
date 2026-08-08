@@ -14,23 +14,23 @@
 
 | ID | Feature | Status | Spec | Created |
 |----|---------|--------|------|---------|
-| PROJ-1 | Auth & Firmen-/Steuerprofil-Stammdaten | Approved | [Spec](PROJ-1-auth-firmen-steuerprofil.md) | 2026-05-15 |
-| PROJ-2 | Konfigurierbarer EÜR-Kontenrahmen & Steuerregeln | Approved | [Spec](PROJ-2-euer-kontenrahmen-steuerregeln.md) | 2026-05-15 |
-| PROJ-3 | Paperless-Integration (Beleg- & OCR-Import) | Approved | [Spec](PROJ-3-paperless-integration.md) | 2026-05-15 |
-| PROJ-4 | Kontoauszug-Import (Excel/CSV, Multi-Konto) | Approved | [Spec](PROJ-4-kontoauszug-import.md) | 2026-05-15 |
-| PROJ-5 | Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | Approved | [Spec](PROJ-5-autonome-klassifizierung.md) | 2026-05-15 |
-| PROJ-6 | Beleg↔Buchung-Auto-Matching & Fehlliste | Approved | [Spec](PROJ-6-beleg-buchung-matching.md) | 2026-05-15 |
-| PROJ-7 | Prüfliste & Lernregeln (Ausnahmen-Workflow) | Approved | [Spec](PROJ-7-pruefliste-lernregeln.md) | 2026-05-15 |
+| PROJ-1 | Auth & Firmen-/Steuerprofil-Stammdaten | Deployed | [Spec](PROJ-1-auth-firmen-steuerprofil.md) | 2026-05-15 |
+| PROJ-2 | Konfigurierbarer EÜR-Kontenrahmen & Steuerregeln | Deployed | [Spec](PROJ-2-euer-kontenrahmen-steuerregeln.md) | 2026-05-15 |
+| PROJ-3 | Paperless-Integration (Beleg- & OCR-Import) | Deployed | [Spec](PROJ-3-paperless-integration.md) | 2026-05-15 |
+| PROJ-4 | Kontoauszug-Import (Excel/CSV, Multi-Konto) | Deployed | [Spec](PROJ-4-kontoauszug-import.md) | 2026-05-15 |
+| PROJ-5 | Autonome Klassifizierung: Steuerrelevanz & privat/geschäftlich | Deployed | [Spec](PROJ-5-autonome-klassifizierung.md) | 2026-05-15 |
+| PROJ-6 | Beleg↔Buchung-Auto-Matching & Fehlliste | Deployed | [Spec](PROJ-6-beleg-buchung-matching.md) | 2026-05-15 |
+| PROJ-7 | Prüfliste & Lernregeln (Ausnahmen-Workflow) | Deployed | [Spec](PROJ-7-pruefliste-lernregeln.md) | 2026-05-15 |
 | PROJ-8 | Umsatzsteuer-Voranmeldung (Vorschlag) | Deployed | [Spec](PROJ-8-umsatzsteuer-voranmeldung.md) | 2026-05-15 |
-| PROJ-9 | Jahres-EÜR (§4 Abs.3 EStG) | Approved | [Spec](PROJ-9-jahres-euer.md) | 2026-05-15 |
-| PROJ-10 | Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Approved | [Spec](PROJ-10-est-vorschau-privatentnahmen.md) | 2026-05-15 |
-| PROJ-11 | Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Approved | [Spec](PROJ-11-export.md) | 2026-05-15 |
-| PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Approved | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
-| PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Approved | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
-| PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | Approved | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
+| PROJ-9 | Jahres-EÜR (§4 Abs.3 EStG) | Deployed | [Spec](PROJ-9-jahres-euer.md) | 2026-05-15 |
+| PROJ-10 | Einkommensteuer-Vorschau & Privatentnahmen-Aufstellung | Deployed | [Spec](PROJ-10-est-vorschau-privatentnahmen.md) | 2026-05-15 |
+| PROJ-11 | Export (PDF, CSV/DATEV-ähnlich, ELSTER-konforme Kennzahlen) | Deployed | [Spec](PROJ-11-export.md) | 2026-05-15 |
+| PROJ-12 | Dashboard & Buchungsstatus-Übersicht | Deployed | [Spec](PROJ-12-dashboard-status.md) | 2026-05-15 |
+| PROJ-13 | Adminbereich (Systemkonfiguration & Benutzerverwaltung) | Deployed | [Spec](PROJ-13-adminbereich.md) | 2026-05-19 |
+| PROJ-14 | Kategorien-Analyse & Inline-Bearbeitung | Deployed | [Spec](PROJ-14-kategorien-analyse.md) | 2026-05-20 |
 | PROJ-15 | Klassifizierung-Pro: Empfänger-Cache, Regex- & Split-Regeln | Deployed | [Spec](PROJ-15-klassifizierung-pro.md) | 2026-05-20 |
 | PROJ-16 | Mein Profil — persönliche Stammdaten als LLM-Kontext | Deployed | [Spec](PROJ-16-mein-profil-stammdaten.md) | 2026-05-21 |
-| PROJ-17 | KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Approved | [Spec](PROJ-17-ki-chat-finanzen.md) | 2026-05-21 |
+| PROJ-17 | KI-Chat zu Buchungen & Finanzdaten (Lese + Schreib mit Confirm) | Deployed | [Spec](PROJ-17-ki-chat-finanzen.md) | 2026-05-21 |
 | PROJ-18 | Lieferanten-Tab (wiederkehrende Empfänger ohne Abo) | Deployed | [Spec](PROJ-18-lieferanten-tab.md) | 2026-05-21 |
 | PROJ-19 | Kündigungsliste für wiederkehrende Empfänger | Deployed | [Spec](PROJ-19-kuendigungsliste.md) | 2026-06-13 |
 | PROJ-20 | Merkliste (Buchungen für späteres Review merken) | Deployed | [Spec](PROJ-20-merkliste.md) | 2026-06-14 |

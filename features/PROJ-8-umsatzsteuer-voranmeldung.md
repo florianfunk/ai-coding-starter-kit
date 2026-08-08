@@ -90,7 +90,7 @@ Nachträgliche Buchungen → Berichtigungshinweis statt stillem Überschreiben; 
   Cent (keine Float-Drift), Brutto→Netto-Herausrechnung je Satz, Umsätze
   19/7/0, Umsatzsteuer, abziehbare Vorsteuer **nur** aus belegten
   Eingangsbuchungen, unbelegte Vorsteuer separat (Diagnostik). ELSTER-Feld-Map
-  `ELSTER_USTVA` als pflegbare Konstante (Kz 81/86/35/66/83).
+  `ELSTER_USTVA` als pflegbare Konstante (Kz 81/86/87/66/83).
   Kleinunternehmer → Nullmeldung + Hinweis. Filter: nur
   klassifikation='geschaeftlich' UND steuerrelevant=true.
 - `src/lib/tax/ust.test.ts` + `src/lib/tax/perioden.test.ts` — 30 Vitest-Tests

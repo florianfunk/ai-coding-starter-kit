@@ -176,6 +176,7 @@ export function GeldbewegungenAnsicht({
   ]);
 
   const ladeDaten = useCallback(() => {
+    void refreshKey;
     setFehler(null);
     const params = new URLSearchParams();
     if (filter.von) params.set("von", filter.von);

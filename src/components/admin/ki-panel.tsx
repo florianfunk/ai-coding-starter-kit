@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -71,7 +71,10 @@ export function KiPanel({ initialKi }: { initialKi: KiStatus }) {
   const keyGesetzt = status.ai_key_gesetzt;
 
   // Gespeichertes Modell nicht in der Liste → Freitext-Modus.
-  const aktuellesModell = form.watch("ai_model");
+  const aktuellesModell = useWatch({
+    control: form.control,
+    name: "ai_model",
+  });
   const inListe = modelle.some((m) => m.slug === aktuellesModell);
   const [freitext, setFreitext] = useState(
     () => !KURATIERT.some((m) => m.slug === initialKi.ai_model),

@@ -19,6 +19,11 @@ import {
   mapDocumentToBeleg,
   type PaperlessFilter,
 } from "@/lib/paperless/client";
+import { beurteileLaufendenJob } from "@/lib/jobs/stale";
+import { planeSyncSeite } from "@/lib/paperless/sync-plan";
+
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 interface SyncErgebnis {
   neu: number;
@@ -93,20 +98,48 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   // Schon ein laufender Sync? Dann blockieren (Doppelstart vermeiden).
-  const { data: laufend } = await supabase
+  const { data: laufend, error: laufendError } = await supabase
     .from("job_lauf")
-    .select("id, status")
+    .select("id, created_at")
     .eq("owner_id", user.id)
     .eq("art", "paperless_sync")
     .eq("status", "laeuft")
     .limit(1)
     .maybeSingle();
 
-  if (laufend) {
+  if (laufendError) {
+    return NextResponse.json(
+      { error: "Laufende Sync-Jobs konnten nicht geprüft werden." },
+      { status: 500 },
+    );
+  }
+
+  const laufStatus = beurteileLaufendenJob(
+    laufend as { id: string; created_at: string } | null,
+  );
+  if (laufStatus.status === "aktiv") {
     return NextResponse.json(
       { error: "Es läuft bereits ein Sync. Bitte warte, bis er fertig ist." },
       { status: 409 },
     );
+  }
+  if (laufStatus.status === "veraltet") {
+    const { error: staleError } = await supabase
+      .from("job_lauf")
+      .update({
+        status: "fehler",
+        fehler_text:
+          "Der Lauf wurde nach einem Abbruch automatisch als verwaist beendet.",
+      })
+      .eq("id", laufStatus.job_id)
+      .eq("owner_id", user.id)
+      .eq("status", "laeuft");
+    if (staleError) {
+      return NextResponse.json(
+        { error: "Ein verwaister Sync-Job konnte nicht bereinigt werden." },
+        { status: 500 },
+      );
+    }
   }
 
   // Verbindung laden + Token entschlüsseln.
@@ -176,6 +209,28 @@ export async function POST(request: Request) {
   const gesehenePaperlessIds = new Set<number>();
 
   try {
+    // Einmalig laden statt pro Dokument einen SELECT auszuführen. Bei mehreren
+    // tausend Belegen reduziert das den Sync von O(n) Netzwerk-Roundtrips auf
+    // paginierte Reads plus einen Batch-Upsert je Paperless-Seite.
+    const { data: vorhandeneRows, error: vorhandeneError } = await ladeAlle(
+      (von, bisIdx) =>
+        supabase
+          .from("beleg")
+          .select("paperless_id, inhalt_hash")
+          .eq("owner_id", user.id)
+          .order("paperless_id", { ascending: true })
+          .range(von, bisIdx),
+    );
+    if (vorhandeneError) {
+      throw new Error("Vorhandene Belege konnten nicht geladen werden.");
+    }
+    const vorhandeneHashes = new Map<number, string | null>(
+      (vorhandeneRows as Array<{
+        paperless_id: number;
+        inhalt_hash: string | null;
+      }>).map((row) => [row.paperless_id, row.inhalt_hash]),
+    );
+
     const lookups = await fetchLookups(verbindung.base_url, token);
 
     for await (const seite of iterateDocuments(
@@ -183,6 +238,7 @@ export async function POST(request: Request) {
       token,
       filter,
     )) {
+      const gemappt: Array<ReturnType<typeof mapDocumentToBeleg>> = [];
       for (const doc of seite) {
         try {
           const beleg = mapDocumentToBeleg(
@@ -191,56 +247,7 @@ export async function POST(request: Request) {
             verbindung.base_url,
           );
           gesehenePaperlessIds.add(beleg.paperless_id);
-
-          // Vorhandenen Beleg laden (Idempotenz + Änderungserkennung).
-          const { data: vorhanden } = await supabase
-            .from("beleg")
-            .select("id, inhalt_hash")
-            .eq("owner_id", user.id)
-            .eq("paperless_id", beleg.paperless_id)
-            .maybeSingle();
-
-          const istVorhanden = vorhanden as
-            | { id: string; inhalt_hash: string | null }
-            | null;
-
-          if (istVorhanden && istVorhanden.inhalt_hash === beleg.inhalt_hash) {
-            ergebnis.unveraendert++;
-            if (beleg.status === "unvollstaendig") ergebnis.unvollstaendig++;
-            continue;
-          }
-
-          const { error: upsertError } = await supabase
-            .from("beleg")
-            .upsert(
-              {
-                owner_id: user.id,
-                paperless_id: beleg.paperless_id,
-                titel: beleg.titel,
-                beleg_datum: beleg.beleg_datum,
-                korrespondent: beleg.korrespondent,
-                betrag: beleg.betrag,
-                tags: beleg.tags,
-                dokumenttyp: beleg.dokumenttyp,
-                ocr_text: beleg.ocr_text,
-                quell_link: beleg.quell_link,
-                inhalt_hash: beleg.inhalt_hash,
-                status: beleg.status,
-              },
-              { onConflict: "owner_id,paperless_id" },
-            );
-
-          if (upsertError) {
-            ergebnis.fehler.push({
-              paperless_id: beleg.paperless_id,
-              grund: "Beleg konnte nicht gespeichert werden.",
-            });
-            continue;
-          }
-
-          if (istVorhanden) ergebnis.aktualisiert++;
-          else ergebnis.neu++;
-          if (beleg.status === "unvollstaendig") ergebnis.unvollstaendig++;
+          gemappt.push(beleg);
         } catch (docErr) {
           // Einzeldokument-Fehler bricht den Gesamt-Sync nicht ab.
           ergebnis.fehler.push({
@@ -250,6 +257,46 @@ export async function POST(request: Request) {
                 ? docErr.message
                 : "Unbekannter Fehler bei Dokument.",
           });
+        }
+      }
+
+      const plan = planeSyncSeite(gemappt, vorhandeneHashes);
+      ergebnis.unveraendert += plan.unveraendert;
+      ergebnis.unvollstaendig += gemappt.filter(
+        (beleg) => beleg.status === "unvollstaendig",
+      ).length;
+
+      if (plan.zu_schreiben.length > 0) {
+        const { error: upsertError } = await supabase.from("beleg").upsert(
+          plan.zu_schreiben.map((beleg) => ({
+            owner_id: user.id,
+            paperless_id: beleg.paperless_id,
+            titel: beleg.titel,
+            beleg_datum: beleg.beleg_datum,
+            korrespondent: beleg.korrespondent,
+            betrag: beleg.betrag,
+            tags: beleg.tags,
+            dokumenttyp: beleg.dokumenttyp,
+            ocr_text: beleg.ocr_text,
+            quell_link: beleg.quell_link,
+            inhalt_hash: beleg.inhalt_hash,
+            status: beleg.status,
+          })),
+          { onConflict: "owner_id,paperless_id" },
+        );
+        if (upsertError) {
+          for (const beleg of plan.zu_schreiben) {
+            ergebnis.fehler.push({
+              paperless_id: beleg.paperless_id,
+              grund: "Beleg konnte nicht gespeichert werden.",
+            });
+          }
+        } else {
+          ergebnis.neu += plan.neu;
+          ergebnis.aktualisiert += plan.aktualisiert;
+          for (const beleg of plan.zu_schreiben) {
+            vorhandeneHashes.set(beleg.paperless_id, beleg.inhalt_hash);
+          }
         }
       }
 

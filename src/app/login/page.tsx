@@ -45,11 +45,11 @@ export default function LoginPage() {
 
   return (
     <main
-      className="grid min-h-screen place-items-center p-10"
+      className="grid min-h-screen place-items-center px-4 py-10 sm:p-10"
       style={{ background: "var(--bg)" }}
     >
       <div
-        className="w-[380px] max-w-full rounded-[10px] border p-8"
+        className="w-full max-w-[380px] rounded-[10px] border p-6 sm:p-8"
         style={{
           background: "var(--surface)",
           borderColor: "var(--line)",
@@ -74,9 +74,9 @@ export default function LoginPage() {
             >
               Anmeldung
             </div>
-            <div className="font-display text-[20px] leading-tight tracking-[-0.01em]">
+            <h1 className="font-display text-[20px] leading-tight tracking-[-0.01em]">
               Steueragent
-            </div>
+            </h1>
           </div>
         </div>
 

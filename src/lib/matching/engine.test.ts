@@ -51,6 +51,39 @@ describe("fuehreMatchingAus — Grundfälle", () => {
     expect(fuerB1.every((v) => v.status === "unsicher")).toBe(true);
   });
 
+  it("begrenzt eine mehrdeutige Prüfliste auf die drei besten Kandidaten", () => {
+    const belege = Array.from({ length: 10 }, (_, index) =>
+      r({ id: `r${index + 1}` }),
+    );
+
+    const res = fuehreMatchingAus([b()], belege, []);
+
+    expect(res.statistik.unsicher).toBe(1);
+    expect(res.vorschlaege).toHaveLength(3);
+    expect(res.vorschlaege.every((v) => v.status === "unsicher")).toBe(true);
+  });
+
+  it("zeigt bei Mehrdeutigkeit keine deutlich schwächeren Kandidaten", () => {
+    const bester = r({ id: "top" });
+    const schwach = r({
+      id: "weak",
+      titel: "Andere Rechnung",
+      korrespondent: "Andere Firma",
+      ocr_text: "Fremder Vorgang",
+    });
+
+    const res = fuehreMatchingAus([b()], [bester, schwach], [], {
+      ...DEFAULT_ENGINE_CONFIG,
+      eindeutig_vorsprung: 1,
+    });
+
+    expect(res.vorschlaege).toHaveLength(1);
+    expect(res.vorschlaege[0]).toMatchObject({
+      beleg_id: "top",
+      status: "unsicher",
+    });
+  });
+
   it("kein passender Beleg → Buchung landet in Fehlliste A", () => {
     const fremd = r({
       betrag: 9999,
@@ -63,6 +96,16 @@ describe("fuehreMatchingAus — Grundfälle", () => {
     expect(res.vorschlaege).toHaveLength(0);
     expect(res.buchungen_ohne_beleg).toEqual(["b1"]);
     expect(res.statistik.ohne_beleg).toBe(1);
+  });
+
+  it("schlägt trotz identischem Text niemals einen stark abweichenden Betrag vor", () => {
+    const res = fuehreMatchingAus(
+      [b({ betrag: -1000 })],
+      [r({ betrag: 100 })],
+      [],
+    );
+    expect(res.vorschlaege).toHaveLength(0);
+    expect(res.buchungen_ohne_beleg).toEqual(["b1"]);
   });
 });
 
@@ -125,6 +168,11 @@ describe("fuehreMatchingAus — N:M", () => {
       "rate1",
       "rate2",
     ]);
+    // Derselbe Beleg darf nie blind für mehrere Buchungen auto-bestätigt
+    // werden. Eine echte Raten-/Sammelzuordnung braucht Nutzerbestätigung.
+    expect(belegMatches.every((v) => v.status === "unsicher")).toBe(true);
+    expect(res.statistik.auto).toBe(0);
+    expect(res.statistik.unsicher).toBe(2);
   });
 
   it("Sammelrechnung: mehrere Belege als Kandidaten zu 1 Buchung → unsicher", () => {

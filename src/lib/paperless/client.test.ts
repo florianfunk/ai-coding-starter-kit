@@ -165,6 +165,22 @@ describe("normalizeNextUrl", () => {
 });
 
 describe("betragAusCustomFields", () => {
+  it("ignoriert numerische Nicht-Geldfelder und verwendet nur monetary", () => {
+    const definitionen = new Map([
+      [1, { name: "Seitenzahl", data_type: "integer" }],
+      [2, { name: "Rechnungsbetrag", data_type: "monetary" }],
+    ]);
+    expect(
+      betragAusCustomFields(
+        [
+          { field: 1, value: 0 },
+          { field: 2, value: "EUR119.00" },
+        ],
+        definitionen,
+      ),
+    ).toBe(119);
+  });
+
   it("findet numerischen Wert", () => {
     expect(
       betragAusCustomFields([{ field: 1, value: 250.5 }]),
@@ -190,6 +206,9 @@ describe("mapDocumentToBeleg", () => {
     tags: new Map([
       [30, "Steuer"],
       [31, "2026"],
+    ]),
+    customFields: new Map([
+      [1, { name: "Rechnungsbetrag", data_type: "monetary" }],
     ]),
   };
 

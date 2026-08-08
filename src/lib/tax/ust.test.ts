@@ -51,6 +51,9 @@ describe("berechneUstVa — Umsätze je Satz", () => {
     const z0 = r.zeilen.find((z) => z.schluessel === "umsatz_0")!;
     expect(z0.betrag).toBe(500);
     expect(z0.steuer).toBeNull();
+    // Amtlicher USt-VA-Vordruck 2026: steuerpflichtige Umsätze zu 0 % = Kz 87.
+    expect(z0.kennzahl).toBe("87");
+    expect(z0.bezeichnung).not.toMatch(/steuerfrei|Reverse-Charge/i);
     expect(r.summe.umsatzsteuer).toBe(0);
   });
 });

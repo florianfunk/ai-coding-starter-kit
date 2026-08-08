@@ -11,6 +11,7 @@ import {
 
 const TARIF_2024: EstTarif = seedTarif(2024).tarif;
 const TARIF_2025: EstTarif = seedTarif(2025).tarif;
+const TARIF_2026: EstTarif = seedTarif(2026).tarif;
 
 function eingabe(over: Partial<EstEingabe> = {}): EstEingabe {
   return {
@@ -52,6 +53,14 @@ describe("rundeCent", () => {
 });
 
 describe("seedTarif", () => {
+  it("liefert den amtlichen Tarif 2026 als exakten Seed", () => {
+    const tarif2026 = seedTarif(2026);
+    expect(tarif2026.exakt).toBe(true);
+    expect(tarif2026.tarif.jahr).toBe(2026);
+    expect(tarif2026.tarif.grundfreibetrag).toBe(12348);
+    expect(tarif2026.tarif.soli_freigrenze).toBe(20350);
+  });
+
   it("liefert exakten Tarif für 2024/2025", () => {
     expect(seedTarif(2024).exakt).toBe(true);
     expect(seedTarif(2025).exakt).toBe(true);
@@ -62,7 +71,7 @@ describe("seedTarif", () => {
   it("fällt für unbekanntes Jahr auf den letzten bekannten Tarif zurück", () => {
     const r = seedTarif(2030);
     expect(r.exakt).toBe(false);
-    expect(r.tarif.jahr).toBe(2025); // zuletzt bekannter <= 2030
+    expect(r.tarif.jahr).toBe(2026); // zuletzt bekannter <= 2030
     const r2 = seedTarif(1990);
     expect(r2.exakt).toBe(false);
     expect(r2.tarif.jahr).toBe(2024); // ältester bekannter
@@ -86,15 +95,25 @@ describe("berechneEst — Nullzone (Grundfreibetrag)", () => {
 });
 
 describe("berechneEst — Progressionszonen", () => {
+  it("wendet 2026 bei 70.000 € zvE amtlich an und rundet auf volle Euro ab", () => {
+    const r = berechneEst(
+      TARIF_2026,
+      eingabe({ jahr: 2026, euer_gewinn: 70000 }),
+      true,
+    );
+    // Amtliche Zone 4: 0,42 × 70.000 − 11.135,63 = 18.264,37 → 18.264 €.
+    expect(r.einkommensteuer).toBe(18264);
+  });
+
   it("Zone 2: 15.000 € zvE entspricht der §32a-Formel", () => {
     const r = berechneEst(TARIF_2024, eingabe({ euer_gewinn: 15000 }), true);
-    expect(r.einkommensteuer).toBe(rundeCent(referenz2024(15000)));
+    expect(r.einkommensteuer).toBe(Math.floor(referenz2024(15000)));
     expect(r.einkommensteuer).toBeGreaterThan(0);
   });
 
   it("Zone 3: 40.000 € zvE entspricht der §32a-Formel", () => {
     const r = berechneEst(TARIF_2024, eingabe({ euer_gewinn: 40000 }), true);
-    expect(r.einkommensteuer).toBe(rundeCent(referenz2024(40000)));
+    expect(r.einkommensteuer).toBe(Math.floor(referenz2024(40000)));
   });
 
   it("Grenzsteuersatz steigt mit dem Einkommen (Progression)", () => {
@@ -110,13 +129,13 @@ describe("berechneEst — Spitzensteuersatz (lineare Zonen)", () => {
   it("Zone 4: 42 % Grenzsteuersatz, Formel 0,42·zvE − c", () => {
     const r = berechneEst(TARIF_2024, eingabe({ euer_gewinn: 120000 }), true);
     expect(r.grenzsteuersatz).toBeCloseTo(0.42, 10);
-    expect(r.einkommensteuer).toBe(rundeCent(referenz2024(120000)));
+    expect(r.einkommensteuer).toBe(Math.floor(referenz2024(120000)));
   });
 
   it("Zone 5: 45 % Reichensteuersatz", () => {
     const r = berechneEst(TARIF_2024, eingabe({ euer_gewinn: 400000 }), true);
     expect(r.grenzsteuersatz).toBeCloseTo(0.45, 10);
-    expect(r.einkommensteuer).toBe(rundeCent(referenz2024(400000)));
+    expect(r.einkommensteuer).toBe(Math.floor(referenz2024(400000)));
   });
 });
 
@@ -136,7 +155,7 @@ describe("berechneEst — Splitting (Einzel vs. Zusammen)", () => {
     expect(zusammen.einkommensteuer).toBeLessThan(einzel.einkommensteuer);
     // 2× ESt(40.000) (amtliche Halbierung auf volle Euro).
     expect(zusammen.einkommensteuer).toBe(
-      rundeCent(referenz2024(40000) * 2),
+      Math.floor(referenz2024(40000)) * 2,
     );
   });
 
@@ -235,7 +254,7 @@ describe("berechneEst — Effektivsatz, Rundung, weitere Einkünfte", () => {
       true,
     );
     expect(r.bemessungsgrundlage).toBe(30000);
-    expect(r.einkommensteuer).toBe(rundeCent(referenz2024(30000)));
+    expect(r.einkommensteuer).toBe(Math.floor(referenz2024(30000)));
   });
 
   it("Ergebniswerte sind cent-genau (max. 2 Nachkommastellen)", () => {

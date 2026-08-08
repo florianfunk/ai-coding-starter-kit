@@ -83,7 +83,7 @@ export interface EstErgebnis {
   zu_versteuerndes_einkommen: number;
   /** zvE nach amtlicher Abrundung auf volle Euro (Bemessungsgrundlage). */
   bemessungsgrundlage: number;
-  /** Geschätzte tarifliche Einkommensteuer (cent-genau). */
+  /** Geschätzte tarifliche Einkommensteuer (amtlich auf volle Euro abgerundet). */
   einkommensteuer: number;
   /** Geschätzter Solidaritätszuschlag (cent-genau). */
   soli: number;
@@ -137,7 +137,7 @@ function findeZone(tarif: EstTarif, zve: number): EstTarifZone {
 
 /**
  * Tarifliche ESt für ein (bereits abgerundetes) Einzel-zvE nach §32a.
- * Liefert die ungerundete Steuer (Rundung erst nach Splitting).
+ * Liefert den Formelwert; die gesetzliche Euro-Abrundung erfolgt am Aufrufer.
  */
 function tariflicheEstEinzel(tarif: EstTarif, zve: number): number {
   if (zve <= tarif.grundfreibetrag) return 0;
@@ -233,13 +233,13 @@ export function berechneEst(
   if (eingabe.veranlagung === "zusammen") {
     // Splitting: Tarif auf halbes zvE, Ergebnis x2 (§32a Abs.5 EStG).
     const halb = abrundenZvE(bemessung / 2);
-    est = tariflicheEstEinzel(tarif, halb) * 2;
+    est = Math.floor(tariflicheEstEinzel(tarif, halb)) * 2;
     grenz = grenzsatzEinzel(tarif, halb);
   } else {
-    est = tariflicheEstEinzel(tarif, bemessung);
+    est = Math.floor(tariflicheEstEinzel(tarif, bemessung));
     grenz = grenzsatzEinzel(tarif, bemessung);
   }
-  const estGerundet = rundeCent(est);
+  const estGerundet = est;
   const soli = rundeCent(
     berechneSoli(tarif, estGerundet, eingabe.veranlagung),
   );
@@ -324,10 +324,37 @@ const TARIF_2025: EstTarif = {
   ],
 };
 
+/** §32a-Tarif 2026 (Grundfreibetrag 12.348 €). */
+const TARIF_2026: EstTarif = {
+  jahr: 2026,
+  grundfreibetrag: 12348,
+  soli_satz: 0.055,
+  soli_freigrenze: 20350,
+  zonen: [
+    { ab: 0, art: "null" },
+    // Zone 2: 12.349 – 17.799 €
+    { ab: 12349, art: "progression", a: 914.51, b: 1400, d: 0, basis: 12348 },
+    // Zone 3: 17.800 – 69.878 €
+    {
+      ab: 17800,
+      art: "progression",
+      a: 173.1,
+      b: 2397,
+      d: 1034.87,
+      basis: 17799,
+    },
+    // Zone 4: 69.879 – 277.825 €
+    { ab: 69879, art: "linear", m: 0.42, c: 11135.63 },
+    // Zone 5: ab 277.826 €
+    { ab: 277826, art: "linear", m: 0.45, c: 19470.38 },
+  ],
+};
+
 /** Alle hinterlegten Seed-Tarife, jahresweise. */
 const SEED_TARIFE: Readonly<Record<number, EstTarif>> = {
   2024: TARIF_2024,
   2025: TARIF_2025,
+  2026: TARIF_2026,
 };
 
 /**

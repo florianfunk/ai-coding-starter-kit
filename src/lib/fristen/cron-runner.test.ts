@@ -12,6 +12,9 @@ interface MockData {
   email: string | null;
   /** Optionaler Insert-Fehler (für den W2-Pfad: Log scheitert nach Versand). */
   insertError?: { code?: string; message: string } | null;
+  profilError?: { message: string } | null;
+  periodenError?: { message: string } | null;
+  gesendetError?: { message: string } | null;
 }
 
 /**
@@ -26,8 +29,12 @@ function mockSupabase(data: MockData) {
   function tableQuery(table: string) {
     // Terminale Promise-Auflösung je nach Tabelle.
     const result = () => {
-      if (table === "steuerperiode") return { data: data.abgeschlossene, error: null };
-      if (table === "fristen_erinnerung") return { data: data.gesendet, error: null };
+      if (table === "steuerperiode") {
+        return { data: data.abgeschlossene, error: data.periodenError ?? null };
+      }
+      if (table === "fristen_erinnerung") {
+        return { data: data.gesendet, error: data.gesendetError ?? null };
+      }
       return { data: null, error: null };
     };
 
@@ -35,7 +42,10 @@ function mockSupabase(data: MockData) {
       select: () => chain,
       eq: () => chain,
       limit: () => chain,
-      maybeSingle: async () => ({ data: data.profil, error: null }),
+      maybeSingle: async () => ({
+        data: data.profil,
+        error: data.profilError ?? null,
+      }),
       // Perioden/gesendet enden mit .limit() → thenable machen:
       then: (resolve: (v: unknown) => void) => resolve(result()),
       insert: (row: Record<string, unknown>) => {
@@ -86,6 +96,60 @@ function abgeschlossenBisJan2026() {
 }
 
 describe("laufFristenErinnerung", () => {
+  it("meldet Datenbankfehler beim Laden des Profils statt 'kein Profil'", async () => {
+    const supabase = mockSupabase({
+      profil: null,
+      profilError: { message: "connection reset" },
+      abgeschlossene: [],
+      gesendet: [],
+      email: "x@y.de",
+    });
+
+    await expect(
+      laufFristenErinnerung({
+        supabase,
+        heute: "2026-03-05",
+        appUrl: "https://app.de",
+      }),
+    ).rejects.toThrow("Firmenprofil");
+  });
+
+  it("meldet Datenbankfehler beim Laden der Steuerperioden", async () => {
+    const supabase = mockSupabase({
+      profil: baseProfil,
+      periodenError: { message: "timeout" },
+      abgeschlossene: [],
+      gesendet: [],
+      email: "x@y.de",
+    });
+
+    await expect(
+      laufFristenErinnerung({
+        supabase,
+        heute: "2026-03-05",
+        appUrl: "https://app.de",
+      }),
+    ).rejects.toThrow("Steuerperioden");
+  });
+
+  it("meldet Datenbankfehler beim Laden des Versandprotokolls", async () => {
+    const supabase = mockSupabase({
+      profil: baseProfil,
+      gesendetError: { message: "timeout" },
+      abgeschlossene: [],
+      gesendet: [],
+      email: "x@y.de",
+    });
+
+    await expect(
+      laufFristenErinnerung({
+        supabase,
+        heute: "2026-03-05",
+        appUrl: "https://app.de",
+      }),
+    ).rejects.toThrow("Versandprotokoll");
+  });
+
   it("kein Profil → status kein_profil, kein Versand", async () => {
     const supabase = mockSupabase({
       profil: null,

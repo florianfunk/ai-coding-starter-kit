@@ -9,8 +9,9 @@
 
 ## Schema
 
-Migration `supabase/migrations/0001_init_steueragent.sql` — 12 Tabellen, RLS auf jeder
-Tabelle (owner_id = auth.uid(), Single-Tenant). Eingespielt via Supabase-Integration.
+Die versionierten Migrationen liegen unter `supabase/migrations`. Alle
+mandantenbezogenen Tabellen verwenden Row Level Security; Server-Role-Zugriffe
+werden zusätzlich im Anwendungscode explizit auf `owner_id` begrenzt.
 
 ## Lokale Entwicklung
 
@@ -20,6 +21,7 @@ Tabelle (owner_id = auth.uid(), Single-Tenant). Eingespielt via Supabase-Integra
    - `STEUERAGENT_ALLOWED_EMAIL` — einzige erlaubte Login-E-Mail (Single-Tenant)
    - `STEUERAGENT_ENCRYPTION_KEY` — 32+ Zeichen Zufallswert (Paperless-Token-Verschlüsselung)
    - `AI_GATEWAY_API_KEY` + `STEUERAGENT_LLM_MODEL` — für KI-Klassifizierung (PROJ-5)
+   - `SUPABASE_SERVICE_ROLE_KEY` — nur serverseitig für Cron/Wartung
 2. `npm run dev` → http://localhost:3000
 
 ## Auth-User
@@ -39,15 +41,18 @@ unsichere Fälle landen in der Prüfliste mit pruef_grund 'ki_nicht_verfuegbar')
 2. In `.env.local` die Zeile `AI_GATEWAY_API_KEY=` mit dem echten Key ersetzen
 3. Dev-Server neu starten (`npm run dev`)
 
-## Status (2026-05-19)
+## Produktionsstatus (2026-08-08)
 
-- Supabase-Projekt live, Schema + RLS verifiziert (EU/Frankfurt)
-- Auth-User `soulschoki@googlemail.com` angelegt (E-Mail bestätigt)
-- ESt-Tarife 2024/2025 in `est_tarif` geseedet
-- Standard-Kontenrahmen (20 Kategorien) via App-API angelegt
-- End-to-End-Smoketest grün (Login → App-Middleware → API → DB mit RLS)
-- Branch `feat/steueragent-mvp` auf GitHub gepusht
-- Offen: AI-Gateway-Key (App läuft ohne KI über Regel-Engine + Prüfliste)
+- Anwendung: `https://steueragent.vercel.app`
+- Supabase-Projekt live, Schema, RLS und Data-API-Grants verifiziert
+  (EU/Frankfurt)
+- ESt-Tarife einschließlich 2026 in `est_tarif` vorhanden
+- Paperless-Verbindung und vollständiger Bestands-Sync live geprüft
+- Vercel-Cron für PROJ-32 erreichbar und durch `CRON_SECRET` geschützt
+- Qualitätsstand: 987 Vitest-Tests, 8 Playwright-Smoke-Tests, Lint, Build und
+  Dependency-Audit grün
+- Fristen-Mail bleibt ohne `RESEND_API_KEY` und ohne ausdrücklichen Profil-
+  Opt-in bewusst inaktiv
 
 ## Externe Voraussetzung: Paperless-ngx
 

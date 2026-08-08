@@ -178,6 +178,26 @@ export function betragScore(
 }
 
 /**
+ * Harte fachliche Kandidatengrenze. Text-/Datumsähnlichkeit darf niemals
+ * einen unplausiblen Betrag überstimmen; zugleich spart der Vorfilter teure
+ * OCR-Tokenisierung für tausende offensichtlich fremde Belege.
+ */
+export function istBetragPlausibel(
+  buchungBetrag: number,
+  belegBetrag: number | null,
+  cfg: ScoreConfig,
+): boolean {
+  if (belegBetrag === null || !Number.isFinite(belegBetrag)) return false;
+  const buchungAbs = Math.abs(buchungBetrag);
+  const belegAbs = Math.abs(belegBetrag);
+  const toleranz = Math.max(
+    cfg.betrag_abs_toleranz,
+    belegAbs * cfg.betrag_rel_toleranz,
+  );
+  return Math.abs(buchungAbs - belegAbs) <= toleranz * 2;
+}
+
+/**
  * Datums-Teilscore. Innerhalb halbem Fenster ~1.0, danach linearer Abfall
  * bis zum vollen Fenster, dann 0. Toleriert Rechnungs- vs. Zahlungsdatum.
  */

@@ -15,6 +15,7 @@
 import {
   bewerteMatch,
   DEFAULT_SCORE_CONFIG,
+  istBetragPlausibel,
   SCORE_SCHWELLEN,
   type BelegFuerScore,
   type BuchungFuerScore,
@@ -40,11 +41,17 @@ export interface EngineConfig extends ScoreConfig {
    * "eindeutig" (auto) gilt. Default 0.1.
    */
   eindeutig_vorsprung: number;
+  /** Maximal angezeigte Alternativen je unsicherer Buchung. */
+  unsicher_max_kandidaten: number;
+  /** Maximaler Score-Abstand eines Kandidaten zum besten Treffer. */
+  unsicher_score_abstand: number;
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   ...DEFAULT_SCORE_CONFIG,
   eindeutig_vorsprung: 0.1,
+  unsicher_max_kandidaten: 3,
+  unsicher_score_abstand: 0.1,
 };
 
 export type VorschlagStatus = "auto" | "unsicher";
@@ -124,6 +131,7 @@ export function fuehreMatchingAus(
 
     // Alle Belege bewerten, absteigend nach Score.
     const bewertet = belege
+      .filter((beleg) => istBetragPlausibel(b.betrag, beleg.betrag, config))
       .map((beleg) => ({
         beleg,
         ergebnis: bewerteMatch(toScoreBuchung(b), beleg, config),
@@ -158,11 +166,15 @@ export function fuehreMatchingAus(
       continue;
     }
 
-    // Mehrdeutig oder im unsicher-Band: alle plausiblen Kandidaten als
-    // 'unsicher' vorschlagen (gleicher Betrag mehrfach → Nutzerauswahl).
+    // Mehrdeutig oder im unsicher-Band: nur die besten, nahezu gleich guten
+    // Kandidaten vorschlagen. Sonst erzeugen häufige Standardbeträge bei
+    // großen Paperless-Beständen Dutzende fachlich wertlose Alternativen.
     const kandidaten = bewertet.filter(
-      (k) => k.ergebnis.score >= SCORE_SCHWELLEN.unsicher,
-    );
+      (k) =>
+        k.ergebnis.score >= SCORE_SCHWELLEN.unsicher &&
+        bester.ergebnis.score - k.ergebnis.score <=
+          config.unsicher_score_abstand,
+    ).slice(0, config.unsicher_max_kandidaten);
     for (const k of kandidaten) {
       vorschlaege.push({
         buchung_id: b.id,
@@ -173,6 +185,24 @@ export function fuehreMatchingAus(
       });
     }
     unsicher++;
+  }
+
+  // Globale Eindeutigkeit: Ein Beleg kann fachlich zwar mehrere Buchungen
+  // abdecken (Raten/Sammelzahlung), das darf aber nie ohne Bestätigung als
+  // mehrere Auto-Matches festgeschrieben werden. Kollidierende Auto-Treffer
+  // werden deshalb vollständig in die Prüfliste herabgestuft.
+  const autoNachBeleg = new Map<string, MatchVorschlag[]>();
+  for (const vorschlag of vorschlaege) {
+    if (vorschlag.status !== "auto") continue;
+    const gruppe = autoNachBeleg.get(vorschlag.beleg_id) ?? [];
+    gruppe.push(vorschlag);
+    autoNachBeleg.set(vorschlag.beleg_id, gruppe);
+  }
+  for (const gruppe of autoNachBeleg.values()) {
+    if (gruppe.length < 2) continue;
+    for (const vorschlag of gruppe) vorschlag.status = "unsicher";
+    auto -= gruppe.length;
+    unsicher += gruppe.length;
   }
 
   return {

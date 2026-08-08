@@ -33,6 +33,7 @@ export function LieferantenTab({
   const [isPending, startTransition] = useTransition();
 
   const ladeDaten = useCallback(() => {
+    void refreshKey;
     setFehler(null);
     const params = new URLSearchParams();
     if (filter.von) params.set("von", filter.von);

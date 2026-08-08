@@ -75,13 +75,17 @@ export async function laufFristenErinnerung(
   const { supabase, heute, appUrl, versender } = args;
 
   // 1) Firmenprofil (Single-Tenant → erstes/einziges Profil).
-  const { data: profil } = await supabase
+  const { data: profil, error: profilError } = await supabase
     .from("firmenprofil")
     .select(
       "owner_id, ust_va_rhythmus, dauerfristverlaengerung, fristen_mail_aktiv",
     )
     .limit(1)
     .maybeSingle();
+
+  if (profilError) {
+    throw new Error(`Firmenprofil konnte nicht geladen werden: ${profilError.message}`);
+  }
 
   const p = profil as ProfilRow | null;
   if (!p?.owner_id) {
@@ -110,13 +114,18 @@ export async function laufFristenErinnerung(
   }
 
   // 3) Abgeschlossene USt-VA-Perioden (für naechsteUstFrist).
-  const { data: periodenData } = await supabase
+  const { data: periodenData, error: periodenError } = await supabase
     .from("steuerperiode")
     .select("jahr, periode, status")
     .eq("owner_id", ownerId)
     .eq("art", "ust_va")
     .eq("status", "abgeschlossen")
     .limit(500);
+  if (periodenError) {
+    throw new Error(
+      `Steuerperioden konnten nicht geladen werden: ${periodenError.message}`,
+    );
+  }
   const abgeschlossene = ((periodenData ?? []) as Array<{
     jahr: number;
     periode: number | null;
@@ -130,11 +139,16 @@ export async function laufFristenErinnerung(
   });
 
   // 4) Bereits versendete Erinnerungen → Idempotenz-Set.
-  const { data: gesendetData } = await supabase
+  const { data: gesendetData, error: gesendetError } = await supabase
     .from("fristen_erinnerung")
     .select("periode_key, stufe")
     .eq("owner_id", ownerId)
     .limit(1000);
+  if (gesendetError) {
+    throw new Error(
+      `Versandprotokoll konnte nicht geladen werden: ${gesendetError.message}`,
+    );
+  }
   const gesendetSet = new Set(
     ((gesendetData ?? []) as Array<{ periode_key: string; stufe: string }>).map(
       (r) => idempotenzSchluessel(r.periode_key, r.stufe as never),

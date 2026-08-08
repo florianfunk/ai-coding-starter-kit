@@ -16,7 +16,9 @@
 //   USt-VA benötigt Belege, daher bleibt das Diagnostik-Signal erhalten.
 // - Kleinunternehmer (firmenprofil.ust_status='kleinunternehmer') →
 //   Nullmeldung: keine USt, keine Vorsteuer.
-// - 0 % / Reverse-Charge → eigene Kennzahl, kein USt-Ausweis.
+// - Steuerpflichtige Umsätze zu 0 % → Kz 87, kein USt-Ausweis.
+//   Steuerfreie und Reverse-Charge-Sachverhalte werden nicht mit Kz 87
+//   vermischt; dafür fehlt derzeit eine eigene Buchungs-Sachverhaltsart.
 
 import type { UstStatus } from "@/lib/types";
 
@@ -55,10 +57,10 @@ export const ELSTER_USTVA = {
   umsatz_19: { kennzahl: "81", bezeichnung: "Umsätze zu 19 %" },
   /** Steuerpflichtige Umsätze zum ermäßigten Satz (7 %) – Bemessung. */
   umsatz_7: { kennzahl: "86", bezeichnung: "Umsätze zu 7 %" },
-  /** Steuerfreie/0 %/Reverse-Charge-Umsätze (kein USt-Ausweis). */
+  /** Steuerpflichtige Umsätze zu 0 % (USt 1 A 2026, Kz 87). */
   umsatz_0: {
-    kennzahl: "35",
-    bezeichnung: "Umsätze 0 % / steuerfrei / Reverse-Charge",
+    kennzahl: "87",
+    bezeichnung: "Steuerpflichtige Umsätze zu 0 %",
   },
   /** Abziehbare Vorsteuer aus Rechnungen anderer Unternehmer. */
   vorsteuer: { kennzahl: "66", bezeichnung: "Abziehbare Vorsteuer" },

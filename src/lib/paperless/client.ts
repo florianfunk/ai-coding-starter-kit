@@ -24,6 +24,12 @@ export interface PaperlessLookups {
   correspondents: Map<number, string>;
   documentTypes: Map<number, string>;
   tags: Map<number, string>;
+  customFields: Map<number, PaperlessCustomFieldDefinition>;
+}
+
+export interface PaperlessCustomFieldDefinition {
+  name: string;
+  data_type: string;
 }
 
 /** Auf STEUERAGENT-Beleg gemapptes Dokument (Klartext, owner-frei). */
@@ -255,17 +261,46 @@ async function fetchLookup(
   return map;
 }
 
+async function fetchCustomFieldLookups(
+  baseUrl: string,
+  token: string,
+): Promise<Map<number, PaperlessCustomFieldDefinition>> {
+  const map = new Map<number, PaperlessCustomFieldDefinition>();
+  let next: string | null =
+    `${normalizeBaseUrl(baseUrl)}/api/custom_fields/?page_size=${DEFAULT_PAGE_SIZE}`;
+  let pages = 0;
+  while (next && pages < MAX_PAGES) {
+    const res = await paperlessFetch(next, token);
+    const json = (await res.json()) as PaginatedResponse<{
+      id: number;
+      name: string;
+      data_type: string;
+    }>;
+    for (const item of json.results) {
+      if (typeof item.id !== "number") continue;
+      map.set(item.id, {
+        name: item.name ?? "",
+        data_type: item.data_type ?? "",
+      });
+    }
+    next = normalizeNextUrl(json.next, baseUrl);
+    pages++;
+  }
+  return map;
+}
+
 /** Lädt Korrespondenten-, Dokumenttyp- und Tag-Namensauflösung. */
 export async function fetchLookups(
   baseUrl: string,
   token: string,
 ): Promise<PaperlessLookups> {
-  const [correspondents, documentTypes, tags] = await Promise.all([
+  const [correspondents, documentTypes, tags, customFields] = await Promise.all([
     fetchLookup(baseUrl, token, "correspondents"),
     fetchLookup(baseUrl, token, "document_types"),
     fetchLookup(baseUrl, token, "tags"),
+    fetchCustomFieldLookups(baseUrl, token),
   ]);
-  return { correspondents, documentTypes, tags };
+  return { correspondents, documentTypes, tags, customFields };
 }
 
 /** Baut die paginierte Dokumenten-URL inkl. optionalem Filter. */
@@ -410,7 +445,7 @@ export function mapDocumentToBeleg(
     .filter((v): v is string => typeof v === "string" && v.length > 0);
 
   const betrag =
-    betragAusCustomFields(doc.custom_fields) ??
+    betragAusCustomFields(doc.custom_fields, lookups.customFields) ??
     parseBetragAusText(doc.content);
 
   const titel = doc.title?.trim() || null;
@@ -444,13 +479,22 @@ export function mapDocumentToBeleg(
 /** Sucht in Paperless-Custom-Fields nach einem numerischen Betrag. */
 export function betragAusCustomFields(
   fields: PaperlessRawDocument["custom_fields"],
+  definitionen?: ReadonlyMap<number, PaperlessCustomFieldDefinition>,
 ): number | null {
   if (!Array.isArray(fields)) return null;
   for (const f of fields) {
+    // Mit geladenen Definitionen sind ausschließlich echte Geldfelder
+    // zulässig. Sonst würden z. B. Seitenzahl, Archivnummer oder Boolean-Werte
+    // als Rechnungsbetrag in Matching und Steuerlogik landen.
+    if (definitionen && definitionen.get(f.field)?.data_type !== "monetary") {
+      continue;
+    }
     const v = f?.value;
     if (typeof v === "number" && Number.isFinite(v)) return v;
     if (typeof v === "string") {
-      const n = normalizeAmountString(v);
+      // Paperless liefert monetary wahlweise numerisch oder mit ISO-Währung,
+      // z. B. "EUR119.00".
+      const n = normalizeAmountString(v.replace(/^[A-Z]{3}\s*/i, ""));
       if (n !== null) return n;
     }
   }

@@ -2,7 +2,7 @@
 
 ## Status: Deployed
 **Created:** 2026-06-24
-**Last Updated:** 2026-06-24
+**Last Updated:** 2026-08-08
 **Priorität:** P2
 
 ## Beschreibung
@@ -113,7 +113,7 @@ Mail verschickt (Versand-Log in DB), damit der tägliche Cron nicht spammt.
   `unique(owner_id, periode_key, stufe)`, RLS owner-scoped für SELECT/INSERT/
   UPDATE/DELETE, Index `(owner_id, periode_key)`) + `firmenprofil.fristen_mail_aktiv
   boolean not null default false`.
-- `vercel.json` (neu) — Cron `GET /api/cron/fristen-erinnerung` täglich 06:00
+- `vercel.json` — Cron `GET /api/cron/fristen-erinnerung` täglich 06:00
   (`"0 6 * * *"`).
 - `.env.local.example` — neue ENV-Variablen dokumentiert.
 - Tests: `erinnerung.test.ts`, `template.test.ts`, `mailer.test.ts`,
@@ -132,20 +132,24 @@ Mail verschickt (Versand-Log in DB), damit der tägliche Cron nicht spammt.
 Zusätzlich pro Inhaber: Opt-in `firmenprofil.fristen_mail_aktiv = true` setzen,
 sonst sendet der Lauf bewusst nicht.
 
-### Vercel-Cron / Deploy (Florian)
+### Produktionsstatus (2026-08-08)
 - `vercel.json` enthält den Cron-Eintrag (täglich 06:00 UTC). Vercel ruft den
   Endpoint dann automatisch mit `Authorization: Bearer $CRON_SECRET` auf —
   `CRON_SECRET` muss in den Vercel-Projekt-Env-Variablen gesetzt sein.
-- **DB-Migration 0018 wurde NICHT in Prod ausgeführt** (Florian macht
-  Migrationen selbst) — nur die `.sql`-Datei liegt im Repo.
+- Migration `0018_fristen_erinnerung` ist in Supabase Production angewendet;
+  Tabelle, Opt-in-Spalte, RLS, Grants, Index und Idempotenz-Constraint wurden
+  anschließend live geprüft.
+- Anwendung und Cron-Route sind auf Vercel Production deployt;
+  `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` und `NEXT_PUBLIC_APP_URL` sind
+  dort gesetzt.
 - Scharfschaltung: `RESEND_API_KEY` + verifizierte Absender-Domain bei Resend
   setzen, `FRISTEN_MAIL_FROM` auf die verifizierte Adresse, Opt-in aktivieren.
 
-### Status-/Test-Stand
-- `npx tsc --noEmit`: 0 Fehler.
+### Status-/Test-Stand (2026-08-08)
 - `npm run build`: erfolgreich (`/api/cron/fristen-erinnerung` registriert).
-- `npm test` (vitest): 908 grün / 1 skipped; davon 23 neu in `src/lib/fristen/`.
-- `npm run lint`: 0 Errors (nur vorbestehende Warnings in fremden Dateien).
+- `npm test`: 987 Tests grün.
+- `npm run test:e2e`: 8 Browser-Smoke-Tests grün.
+- `npm run lint`: 0 Fehler und 0 Warnungen.
 - `resend@4.8.0` per `npm install` ergänzt (package.json + lockfile).
 
 ### Hinweise für den Agenten

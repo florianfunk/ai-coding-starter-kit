@@ -32,6 +32,7 @@ import {
 import { DEFAULT_SCORE_CONFIG, type BelegFuerScore } from "@/lib/matching/score";
 import { ladeAlle, ladeNachBloecken } from "@/lib/supabase/fetch-all";
 import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
+import { beurteileLaufendenJob } from "@/lib/jobs/stale";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -285,19 +286,46 @@ export async function POST(request: Request) {
   const supabase = await createClient();
 
   // Doppelstart vermeiden.
-  const { data: laufend } = await supabase
+  const { data: laufend, error: laufendError } = await supabase
     .from("job_lauf")
-    .select("id")
+    .select("id, created_at")
     .eq("owner_id", user.id)
     .eq("art", "matching")
     .eq("status", "laeuft")
     .limit(1)
     .maybeSingle();
-  if (laufend) {
+  if (laufendError) {
+    return NextResponse.json(
+      { error: "Laufende Abgleich-Jobs konnten nicht geprüft werden." },
+      { status: 500 },
+    );
+  }
+  const laufStatus = beurteileLaufendenJob(
+    laufend as { id: string; created_at: string } | null,
+  );
+  if (laufStatus.status === "aktiv") {
     return NextResponse.json(
       { error: "Es läuft bereits ein Abgleich. Bitte warten." },
       { status: 409 },
     );
+  }
+  if (laufStatus.status === "veraltet") {
+    const { error: staleError } = await supabase
+      .from("job_lauf")
+      .update({
+        status: "fehler",
+        fehler_text:
+          "Der Lauf wurde nach einem Abbruch automatisch als verwaist beendet.",
+      })
+      .eq("id", laufStatus.job_id)
+      .eq("owner_id", user.id)
+      .eq("status", "laeuft");
+    if (staleError) {
+      return NextResponse.json(
+        { error: "Ein verwaister Abgleich-Job konnte nicht bereinigt werden." },
+        { status: 500 },
+      );
+    }
   }
 
   // Geschäftliche Buchungen laden.
@@ -363,8 +391,25 @@ export async function POST(request: Request) {
     gesperrt: z.gesperrt as boolean,
   }));
 
+  // `nur_offen` wirklich auf die Engine-Eingabe anwenden: bestätigte sichere
+  // Matches bleiben unangetastet, unsichere Vorschläge dürfen neu bewertet
+  // werden. Bei vollständigem Re-Matching schützen weiterhin die Locks.
+  const sicherZugeordneteBuchungen = new Set(
+    alleZuordnungen
+      .filter((z) => z.status !== "unsicher")
+      .map((z) => z.buchung_id as string),
+  );
+  const buchungenFuerLauf = nur_offen
+    ? buchungen.filter((b) => !sicherZugeordneteBuchungen.has(b.id))
+    : buchungen;
+
   // Engine-Lauf (rein in-memory).
-  const lauf = fuehreMatchingAus(buchungen, belege, bestehende, config);
+  const lauf = fuehreMatchingAus(
+    buchungenFuerLauf,
+    belege,
+    bestehende,
+    config,
+  );
 
   // job_lauf anlegen.
   const { data: jobRow, error: jobErr } = await supabase
@@ -429,15 +474,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // Neue Vorschläge schreiben (Konflikte mit gesperrten überspringen).
-    let i = 0;
-    for (const v of lauf.vorschlaege) {
-      if (gesperrteBuchungen.has(v.buchung_id)) {
-        i++;
-        continue;
-      }
-      const { error: insErr } = await supabase.from("beleg_buchung").upsert(
-        {
+    // Neue Vorschläge blockweise schreiben. Ein Roundtrip pro Vorschlag war
+    // bei großen Paperless-Beständen der zweite Laufzeit-Flaschenhals.
+    const zuSchreiben = lauf.vorschlaege
+      .filter((v) => !gesperrteBuchungen.has(v.buchung_id))
+      .map((v) => ({
           owner_id: user.id,
           beleg_id: v.beleg_id,
           buchung_id: v.buchung_id,
@@ -445,23 +486,33 @@ export async function POST(request: Request) {
           kriterien: v.kriterien as unknown as Record<string, unknown>,
           status: v.status,
           gesperrt: false,
-        },
-        { onConflict: "owner_id,beleg_id,buchung_id", ignoreDuplicates: false },
-      );
+      }));
+    const blockGroesse = 100;
+    for (let i = 0; i < zuSchreiben.length; i += blockGroesse) {
+      const block = zuSchreiben.slice(i, i + blockGroesse);
+      const { error: insErr } = await supabase
+        .from("beleg_buchung")
+        .upsert(block, {
+          onConflict: "owner_id,beleg_id,buchung_id",
+          ignoreDuplicates: false,
+        });
       if (insErr) {
-        ergebnis.fehler.push(
-          `Zuordnung Buchung ${v.buchung_id} konnte nicht gespeichert werden.`,
-        );
+        for (const row of block) {
+          ergebnis.fehler.push(
+            `Zuordnung Buchung ${row.buchung_id} konnte nicht gespeichert werden.`,
+          );
+        }
       } else {
-        ergebnis.geschrieben++;
+        ergebnis.geschrieben += block.length;
       }
-      i++;
-      if (i % 20 === 0 || i === lauf.vorschlaege.length) {
-        await supabase
+      const fortschritt = Math.min(i + block.length, zuSchreiben.length);
+      const { error: fortschrittError } = await supabase
           .from("job_lauf")
-          .update({ fortschritt: i })
+          .update({ fortschritt })
           .eq("id", jobId)
           .eq("owner_id", user.id);
+      if (fortschrittError) {
+        throw new Error("Abgleich-Fortschritt konnte nicht gespeichert werden.");
       }
     }
 

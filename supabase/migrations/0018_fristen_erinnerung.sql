@@ -41,17 +41,27 @@ alter table fristen_erinnerung enable row level security;
 
 create policy "fristen_erinnerung_owner_select"
   on fristen_erinnerung for select
-  using (owner_id = auth.uid());
+  to authenticated
+  using (owner_id = (select auth.uid()));
 
 create policy "fristen_erinnerung_owner_insert"
   on fristen_erinnerung for insert
-  with check (owner_id = auth.uid());
+  to authenticated
+  with check (owner_id = (select auth.uid()));
 
 create policy "fristen_erinnerung_owner_update"
   on fristen_erinnerung for update
-  using (owner_id = auth.uid())
-  with check (owner_id = auth.uid());
+  to authenticated
+  using (owner_id = (select auth.uid()))
+  with check (owner_id = (select auth.uid()));
 
 create policy "fristen_erinnerung_owner_delete"
   on fristen_erinnerung for delete
-  using (owner_id = auth.uid());
+  to authenticated
+  using (owner_id = (select auth.uid()));
+
+-- Seit 2026 werden neue Tabellen je nach Data-API-Einstellung nicht mehr
+-- automatisch exponiert. Zugriff explizit nur für angemeldete Nutzer; RLS
+-- begrenzt anschließend auf den jeweiligen Owner.
+revoke all on table fristen_erinnerung from anon;
+grant select, insert, update, delete on table fristen_erinnerung to authenticated;

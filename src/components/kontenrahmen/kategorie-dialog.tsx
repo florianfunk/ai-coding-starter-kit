@@ -45,7 +45,7 @@ const TYP_LABELS: Record<KategorieTyp, string> = {
 
 const UST_OPTIONEN = [
   { value: "null", label: "Kein USt-Satz (Privat/Neutral)" },
-  { value: "0", label: "0 % (steuerfrei / nicht steuerbar)" },
+  { value: "0", label: "0 % (keine Umsatzsteuer)" },
   { value: "7", label: "7 % (ermäßigt)" },
   { value: "19", label: "19 % (Regelsatz)" },
 ];

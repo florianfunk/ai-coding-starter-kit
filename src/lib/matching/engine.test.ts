@@ -75,6 +75,7 @@ describe("fuehreMatchingAus — Grundfälle", () => {
     const res = fuehreMatchingAus([b()], [bester, schwach], [], {
       ...DEFAULT_ENGINE_CONFIG,
       eindeutig_vorsprung: 1,
+      eindeutig_datum_tage: -1,
     });
 
     expect(res.vorschlaege).toHaveLength(1);
@@ -106,6 +107,28 @@ describe("fuehreMatchingAus — Grundfälle", () => {
     );
     expect(res.vorschlaege).toHaveLength(0);
     expect(res.buchungen_ohne_beleg).toEqual(["b1"]);
+  });
+
+  it("priorisiert einen einzigartigen exakten Betrag im engen Datumsfenster", () => {
+    const nah = r({
+      id: "near",
+      beleg_datum: "2026-03-15",
+      titel: null,
+      korrespondent: null,
+      ocr_text: null,
+    });
+    const alterTextTreffer = r({
+      id: "old-text-match",
+      beleg_datum: "2026-01-15",
+    });
+
+    const res = fuehreMatchingAus([b()], [alterTextTreffer, nah], []);
+
+    expect(res.vorschlaege).toHaveLength(1);
+    expect(res.vorschlaege[0]).toMatchObject({
+      beleg_id: "near",
+      status: "auto",
+    });
   });
 });
 

@@ -17,6 +17,7 @@ import {
   DEFAULT_SCORE_CONFIG,
   istBetragPlausibel,
   SCORE_SCHWELLEN,
+  tageDifferenz,
   type BelegFuerScore,
   type BuchungFuerScore,
   type ScoreBreakdown,
@@ -45,6 +46,10 @@ export interface EngineConfig extends ScoreConfig {
   unsicher_max_kandidaten: number;
   /** Maximaler Score-Abstand eines Kandidaten zum besten Treffer. */
   unsicher_score_abstand: number;
+  /** Betrag darf für den deterministischen Schnelltreffer höchstens abweichen. */
+  eindeutig_betrag_abs_toleranz: number;
+  /** Maximale Tage für Betrag-exakt-plus-Datum-eindeutig. */
+  eindeutig_datum_tage: number;
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
@@ -52,6 +57,8 @@ export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
   eindeutig_vorsprung: 0.1,
   unsicher_max_kandidaten: 3,
   unsicher_score_abstand: 0.1,
+  eindeutig_betrag_abs_toleranz: 0.01,
+  eindeutig_datum_tage: 3,
 };
 
 export type VorschlagStatus = "auto" | "unsicher";
@@ -137,6 +144,48 @@ export function fuehreMatchingAus(
         ergebnis: bewerteMatch(toScoreBuchung(b), beleg, config),
       }))
       .sort((x, y) => y.ergebnis.score - x.ergebnis.score);
+
+    // Deterministischer Schnelltreffer: Ein einziger Beleg mit centgenauem
+    // Betrag und sehr engem Datumsabstand ist belastbarer als ein alter
+    // Texttreffer desselben Standardbetrags. Mehrere solche Belege bleiben
+    // bewusst unsicher; globale Beleg-Kollisionen werden weiter unten ebenso
+    // herabgestuft.
+    const engeTreffer = bewertet.filter(({ beleg }) => {
+      if (beleg.betrag === null || !beleg.beleg_datum) return false;
+      const betragDifferenz = Math.abs(
+        Math.abs(b.betrag) - Math.abs(beleg.betrag),
+      );
+      return (
+        betragDifferenz <= config.eindeutig_betrag_abs_toleranz &&
+        tageDifferenz(b.buchung_datum, beleg.beleg_datum) <=
+          config.eindeutig_datum_tage
+      );
+    });
+    if (engeTreffer.length === 1) {
+      const treffer = engeTreffer[0];
+      vorschlaege.push({
+        buchung_id: b.id,
+        beleg_id: treffer.beleg.id,
+        match_score: treffer.ergebnis.score,
+        status: "auto",
+        kriterien: treffer.ergebnis.kriterien,
+      });
+      auto++;
+      continue;
+    }
+    if (engeTreffer.length > 1) {
+      for (const treffer of engeTreffer.slice(0, config.unsicher_max_kandidaten)) {
+        vorschlaege.push({
+          buchung_id: b.id,
+          beleg_id: treffer.beleg.id,
+          match_score: treffer.ergebnis.score,
+          status: "unsicher",
+          kriterien: treffer.ergebnis.kriterien,
+        });
+      }
+      unsicher++;
+      continue;
+    }
 
     const bester = bewertet[0];
     if (!bester || bester.ergebnis.score < SCORE_SCHWELLEN.unsicher) {

@@ -121,6 +121,7 @@ export async function GET(request: Request) {
       .order("id", { ascending: true })
       .range(von, bisIdx);
     if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
+    if (filter.nur_steuerrelevant) q = q.eq("steuer_zurueckgestellt", false);
     return q;
   });
   if (bErr) {

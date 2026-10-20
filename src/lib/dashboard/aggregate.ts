@@ -21,6 +21,7 @@ import type { YoyVergleich } from "./yoy";
 
 /** Buchungs-Rohdatensatz, soweit fürs Dashboard relevant. */
 export interface DashboardBuchung {
+  steuer_zurueckgestellt?: boolean;
   /** > 0 = Einnahme, < 0 = Ausgabe (Vorzeichenkonvention wie Import). */
   betrag: number;
   buchung_datum: string;
@@ -175,6 +176,7 @@ export function berechneJahresKennzahlen(
   let anzahl = 0;
 
   for (const b of buchungen) {
+    if (b.steuer_zurueckgestellt === true) continue;
     if (b.klassifikation !== "geschaeftlich") continue;
     if (!imIntervall(b.buchung_datum, von, bis)) continue;
     anzahl += 1;

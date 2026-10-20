@@ -120,6 +120,7 @@ export function berechneMonatsReihen(
   for (const b of buckets) proMonat.set(b.monat, b);
 
   for (const b of buchungen) {
+    if (b.steuer_zurueckgestellt === true) continue;
     if (b.klassifikation !== "geschaeftlich") continue;
     const datum = b.buchung_datum.slice(0, 10);
     // Identische Intervallprüfung wie im Jahres-Aggregat (inkl. Grenzen).

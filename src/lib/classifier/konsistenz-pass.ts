@@ -279,6 +279,7 @@ export async function wendeKonsistenzPassAn(
     .from("buchung")
     .select(SELECT_BUCHUNG_FUER_PASS)
     .eq("owner_id", owner_id)
+    .eq("steuer_zurueckgestellt", false)
     .in("status", ["auto_verbucht", "zur_pruefung"])
     .not("empfaenger_normalisiert", "is", null)
     .limit(10000);
@@ -367,6 +368,7 @@ export async function wendeKonsistenzPassAn(
           })
           .eq("id", b.id)
           .eq("owner_id", owner_id)
+    .eq("steuer_zurueckgestellt", false)
           .neq("status", "manuell_bestaetigt");
 
         if (updErr) continue;

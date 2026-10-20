@@ -126,7 +126,7 @@ export async function GET(request: Request) {
     if (von) q = q.gte("buchung_datum", von);
     if (bis) q = q.lte("buchung_datum", bis);
     if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
-    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
+    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true).eq("steuer_zurueckgestellt", false);
     return q;
   });
   if (bErr) {

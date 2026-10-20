@@ -173,6 +173,7 @@ export async function ladeDashboardAggregat(
       .select("id")
       .eq("owner_id", ownerId)
       .eq("klassifikation", "geschaeftlich")
+      .eq("steuer_zurueckgestellt", false)
       .order("id", { ascending: true })
       .range(von, bis),
   );
@@ -220,6 +221,7 @@ export async function ladeDashboardAggregat(
     supabase
       .from("buchung")
       .select("id, betrag, buchung_datum, klassifikation, status, ust_satz")
+      .eq("steuer_zurueckgestellt", false)
       .eq("owner_id", ownerId)
       .gte("buchung_datum", von)
       .lte("buchung_datum", bis)
@@ -270,6 +272,7 @@ export async function ladeDashboardAggregat(
     supabase
       .from("buchung")
       .select("id, betrag, buchung_datum, klassifikation, status, ust_satz")
+      .eq("steuer_zurueckgestellt", false)
       .eq("owner_id", ownerId)
       .eq("klassifikation", "geschaeftlich")
       .gte("buchung_datum", vjVon)

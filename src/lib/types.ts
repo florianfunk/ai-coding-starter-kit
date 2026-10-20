@@ -83,6 +83,10 @@ export interface Buchung {
   waehrung: string;
   klassifikation: Klassifikation | null;
   steuerrelevant: boolean | null;
+  /** Persönliche Rückstellung; bleibt unabhängig von KI/Kategorie erhalten. */
+  steuer_zurueckgestellt?: boolean;
+  steuer_zurueckgestellt_grund?: string | null;
+  steuer_zurueckgestellt_am?: string | null;
   kategorie_id: string | null;
   ust_satz: number | null;
   begruendung: string | null;

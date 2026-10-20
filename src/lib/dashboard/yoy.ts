@@ -102,6 +102,7 @@ function summiere(
   let vorsteuer = 0;
 
   for (const b of buchungen) {
+    if (b.steuer_zurueckgestellt === true) continue;
     if (b.klassifikation !== "geschaeftlich") continue;
     if (!imIntervall(b.buchung_datum, von, bis)) continue;
 

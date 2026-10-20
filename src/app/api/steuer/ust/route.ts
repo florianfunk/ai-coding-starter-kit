@@ -1,3 +1,4 @@
+import { ladeRueckstellungsVersion } from "@/lib/tax/rueckstellung-version";
 // PROJ-8: USt-Voranmeldung — Berechnung & Abschluss.
 //
 // GET  ?jahr=&periode=  -> Berechnet die Periode deterministisch aus den
@@ -154,6 +155,7 @@ export async function GET(request: Request) {
       .from("buchung")
       .select(SELECT_BUCHUNG)
       .eq("owner_id", user.id)
+      .eq("steuer_zurueckgestellt", false)
       .gte("buchung_datum", `${jahr}-01-01`)
       .lte("buchung_datum", `${jahr}-12-31`)
       .order("id", { ascending: true })
@@ -330,6 +332,7 @@ export async function POST(request: Request) {
   }
   const { jahr, periode } = parsed.data;
   const supabase = await createClient();
+  const rueckstellungenVersion = await ladeRueckstellungsVersion(supabase, user.id);
 
   const profil = await ladeProfil(supabase, user.id);
   if (!profil) {
@@ -378,6 +381,7 @@ export async function POST(request: Request) {
       .from("buchung")
       .select(SELECT_BUCHUNG)
       .eq("owner_id", user.id)
+      .eq("steuer_zurueckgestellt", false)
       .gte("buchung_datum", `${jahr}-01-01`)
       .lte("buchung_datum", `${jahr}-12-31`)
       .order("id", { ascending: true })
@@ -414,6 +418,7 @@ export async function POST(request: Request) {
   );
 
   const snapshot = {
+    rueckstellungen_version: rueckstellungenVersion,
     ...berechnung,
     abgeschlossen_am: new Date().toISOString(),
   } as unknown as Record<string, unknown>;
@@ -432,8 +437,8 @@ export async function POST(request: Request) {
       .neq("status", "abgeschlossen");
     if (updErr) {
       return NextResponse.json(
-        { error: "Periode konnte nicht abgeschlossen werden." },
-        { status: 500 },
+        { error: updErr.code === "P0001" ? updErr.message : "Periode konnte nicht abgeschlossen werden." },
+        { status: updErr.code === "P0001" ? 409 : 500 },
       );
     }
   } else {
@@ -448,8 +453,8 @@ export async function POST(request: Request) {
     });
     if (insErr) {
       return NextResponse.json(
-        { error: "Periode konnte nicht angelegt werden." },
-        { status: 500 },
+        { error: insErr.code === "P0001" ? insErr.message : "Periode konnte nicht angelegt werden." },
+        { status: insErr.code === "P0001" ? 409 : 500 },
       );
     }
   }

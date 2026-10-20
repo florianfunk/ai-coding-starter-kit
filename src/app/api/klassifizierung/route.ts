@@ -342,6 +342,7 @@ export async function POST(request: Request) {
           .from("buchung")
           .select(SELECT_BUCHUNG)
           .eq("owner_id", user.id)
+          .eq("steuer_zurueckgestellt", false)
           .in("id", block)
           .neq("status", "manuell_bestaetigt")
           .order("buchung_datum", { ascending: true })
@@ -352,6 +353,7 @@ export async function POST(request: Request) {
           .from("buchung")
           .select(SELECT_BUCHUNG)
           .eq("owner_id", user.id)
+          .eq("steuer_zurueckgestellt", false)
           .order("buchung_datum", { ascending: true })
           .order("id", { ascending: true })
           .range(von, bisIdx);
@@ -383,6 +385,7 @@ export async function POST(request: Request) {
         "empfaenger_normalisiert, empfaenger, kategorie_id, klassifikation, steuerrelevant, ust_satz, status",
       )
       .eq("owner_id", user.id)
+          .eq("steuer_zurueckgestellt", false)
       .in("status", ["auto_verbucht", "manuell_bestaetigt"])
       .order("id", { ascending: true })
       .range(von, bisIdx),
@@ -522,6 +525,7 @@ export async function POST(request: Request) {
                   })
                   .eq("id", b.id)
                   .eq("owner_id", user.id)
+          .eq("steuer_zurueckgestellt", false)
                   .neq("status", "manuell_bestaetigt") // letzte Sicherung
               ).error;
 

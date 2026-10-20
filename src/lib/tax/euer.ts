@@ -146,6 +146,7 @@ export function berechneEuer(
     // 1. Striktes Zufluss-/Abflussprinzip: nur Buchungen im WJ.
     if (!imZeitraum(b.buchung_datum, von, bis)) continue;
     // 2. Nur geschäftlich; privat/neutral/unklar ausgeschlossen.
+    if (b.steuer_zurueckgestellt === true || b.steuerrelevant === false) continue;
     if (b.klassifikation !== "geschaeftlich") continue;
 
     const kat = b.kategorie_id ? katById.get(b.kategorie_id) : undefined;

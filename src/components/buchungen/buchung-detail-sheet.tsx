@@ -5,6 +5,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { SteuerZurueckstellung } from "./steuer-zurueckstellung";
 import { StickyNote } from "lucide-react";
 import type { Buchung, Kategorie, Klassifikation } from "@/lib/types";
 import type { LieferantNotiz } from "@/lib/finanzen/lieferant-notizen";
@@ -98,6 +100,7 @@ export function BuchungDetailSheet({
   merkenPending?: boolean;
   onToggleMerken?: () => void;
 }) {
+  const router = useRouter();
   // Audit-Ladezustand wird AUSSCHLIESSLICH asynchron gesetzt (nie synchron im
   // Effekt), inkl. der zugehörigen Buchungs-ID, damit die Anzeige nicht den
   // Trail einer vorher geöffneten Buchung zeigt.
@@ -236,6 +239,8 @@ export function BuchungDetailSheet({
             </SheetHeader>
 
             <div className="mt-4 space-y-4 px-4 pb-6 text-sm">
+              <SteuerZurueckstellung key={`${buchung.id}-${buchung.steuer_zurueckgestellt_am ?? "aktiv"}`}
+                buchung={buchung} onGespeichert={() => { onOpenChange(false); router.refresh(); }} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-muted-foreground">Datum</div>

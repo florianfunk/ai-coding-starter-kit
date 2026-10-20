@@ -125,7 +125,7 @@ export async function GET(request: Request) {
     let q = supabase
       .from("buchung")
       .select(
-        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund",
+        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund",
       )
       .eq("owner_id", user.id)
       .order("id", { ascending: true })

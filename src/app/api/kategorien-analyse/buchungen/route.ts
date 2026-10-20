@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     let q = supabase
       .from("buchung")
       .select(
-        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil",
+        "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil",
       )
       .eq("owner_id", user.id)
       .order("buchung_datum", { ascending: false })
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     if (von) q = q.gte("buchung_datum", von);
     if (bis) q = q.lte("buchung_datum", bis);
     if (filter.konto_id) q = q.eq("konto_id", filter.konto_id);
-    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
+    if (filter.nur_steuerrelevant) q = q.eq("steuerrelevant", true).eq("steuer_zurueckgestellt", false);
     if (filter.kategorie_id === "ohne") {
       q = q.is("kategorie_id", null);
     } else if (filter.kategorie_id) {

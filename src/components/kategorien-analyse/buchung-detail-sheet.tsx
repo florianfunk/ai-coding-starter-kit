@@ -1,5 +1,7 @@
 "use client";
 
+import { SteuerZurueckstellung } from "@/components/buchungen/steuer-zurueckstellung";
+
 // PROJ-14 — Detail-Sheet für eine einzelne Buchung. Zeigt ALLE
 // Datenfelder, verlinkte Paperless-Belege und die Audit-Historie.
 // Lädt sich selbst nach beim Öffnen.
@@ -211,6 +213,9 @@ export function BuchungDetailSheet({
           </div>
         </SheetHeader>
 
+        {daten && <div className="mt-4"><SteuerZurueckstellung
+          key={`${daten.id}-${daten.steuer_zurueckgestellt_am ?? "aktiv"}`}
+          buchung={daten} onGespeichert={() => { onMutiert(); onClose(); }} /></div>}
         {fehler ? (
           <p className="mt-6 text-sm text-destructive">{fehler}</p>
         ) : !daten ? (

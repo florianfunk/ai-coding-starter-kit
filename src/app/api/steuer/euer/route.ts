@@ -1,3 +1,4 @@
+import { ladeRueckstellungsVersion } from "@/lib/tax/rueckstellung-version";
 // PROJ-9: Jahres-EÜR (§4 Abs.3 EStG) — Berechnung & Jahresabschluss.
 //
 // GET  ?jahr=YYYY  -> Liefert die EÜR des Wirtschaftsjahres. Ist das Jahr
@@ -30,7 +31,7 @@ import type { Buchung, Kategorie } from "@/lib/types";
 export const runtime = "nodejs";
 
 const SELECT_BUCHUNG =
-  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil";
+  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil";
 
 const SELECT_KATEGORIE =
   "id, bezeichnung, typ, ust_satz, euer_zeile, elster_kennzahl, aktiv, gueltig_ab";
@@ -44,6 +45,7 @@ interface EuerWarnungen {
 }
 
 interface EuerSnapshot {
+  rueckstellungen_version?: number;
   ergebnis: EuerErgebnis;
   warnungen: EuerWarnungen;
   abgeschlossen_at: string;
@@ -77,6 +79,7 @@ async function ladeBuchungen(
       .from("buchung")
       .select(SELECT_BUCHUNG)
       .eq("owner_id", ownerId)
+      .eq("steuer_zurueckgestellt", false)
       .gte("buchung_datum", von)
       .lte("buchung_datum", bis)
       .order("buchung_datum", { ascending: true })
@@ -278,6 +281,7 @@ export async function POST(request: Request) {
   const { jahr } = parsed.data;
 
   const supabase = await createClient();
+  const rueckstellungenVersion = await ladeRueckstellungsVersion(supabase, user.id);
 
   // Bereits abgeschlossen? Dann nicht erneut einfrieren (unveränderlich).
   const { data: vorhanden } = await supabase
@@ -340,6 +344,7 @@ export async function POST(request: Request) {
   );
   const abgeschlossenAt = new Date().toISOString();
   const snapshot: EuerSnapshot = {
+    rueckstellungen_version: rueckstellungenVersion,
     ergebnis,
     warnungen,
     abgeschlossen_at: abgeschlossenAt,
@@ -361,8 +366,8 @@ export async function POST(request: Request) {
     );
   if (upsertErr) {
     return NextResponse.json(
-      { error: "Jahresabschluss konnte nicht gespeichert werden." },
-      { status: 500 },
+      { error: upsertErr.code === "P0001" ? upsertErr.message : "Jahresabschluss konnte nicht gespeichert werden." },
+      { status: upsertErr.code === "P0001" ? 409 : 500 },
     );
   }
 

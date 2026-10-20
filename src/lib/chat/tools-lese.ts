@@ -13,6 +13,7 @@
 //    LLM soll den Fehler-Text in seiner Antwort verarbeiten koennen).
 
 import { tool } from "ai";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import { z } from "zod";
 import type { ChatToolContext } from "./tool-context";
 import { werkzeugFehler } from "./fehler";
@@ -120,7 +121,7 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
       let q = supabase
         .from("buchung")
         .select(
-          "id, buchung_datum, empfaenger, verwendungszweck, betrag, status, klassifikation, konfidenz, kategorie_id, kategorie:kategorie(id, bezeichnung, typ)",
+          "id, buchung_datum, empfaenger, verwendungszweck, betrag, status, klassifikation, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, konfidenz, kategorie_id, kategorie:kategorie(id, bezeichnung, typ)",
         )
         .eq("owner_id", ownerId)
         .order("buchung_datum", { ascending: false })
@@ -160,6 +161,9 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
         verwendungszweck: string | null;
         betrag: number;
         status: BuchungStatus;
+        steuer_zurueckgestellt: boolean;
+        steuer_zurueckgestellt_grund: string | null;
+        steuer_zurueckgestellt_am: string | null;
         klassifikation: Klassifikation | null;
         konfidenz: number | null;
         kategorie_id: string | null;
@@ -190,6 +194,9 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
           verwendungszweck: r.verwendungszweck,
           betrag: Number(r.betrag) || 0,
           status: r.status,
+          steuer_zurueckgestellt: r.steuer_zurueckgestellt,
+          steuer_zurueckgestellt_grund: r.steuer_zurueckgestellt_grund,
+          steuer_zurueckgestellt_am: r.steuer_zurueckgestellt_am,
           klassifikation: r.klassifikation,
           konfidenz: r.konfidenz === null ? null : Number(r.konfidenz),
           kategorie_id: r.kategorie_id,
@@ -232,6 +239,7 @@ export function aggregatKategorienTool(ctx: ChatToolContext) {
       const von = input.zeitraum_von ?? `${jetztJahr}-01-01`;
       const bis = input.zeitraum_bis ?? `${jetztJahr}-12-31`;
 
+      const baueSeite = (rangeVon: number, rangeBis: number) => {
       let q = supabase
         .from("buchung")
         .select(
@@ -240,11 +248,13 @@ export function aggregatKategorienTool(ctx: ChatToolContext) {
         .eq("owner_id", ownerId)
         .gte("buchung_datum", von)
         .lte("buchung_datum", bis)
-        .limit(20000);
-      if (input.nur_steuerrelevant) q = q.eq("steuerrelevant", true);
+        .order("id", { ascending: true }).range(rangeVon, rangeBis);
+      if (input.nur_steuerrelevant) q = q.eq("steuerrelevant", true).eq("steuer_zurueckgestellt", false);
+      return q;
+      };
 
       const [bRes, kRes] = await Promise.all([
-        q,
+        ladeAlle(baueSeite),
         supabase
           .from("kategorie")
           .select("id, bezeichnung, typ, ust_satz, aktiv")
@@ -755,16 +765,17 @@ export function umsatzsteuerStandTool(ctx: ChatToolContext) {
         bis = `${jahr}-12-31`;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await ladeAlle((rangeVon, rangeBis) => supabase
         .from("buchung")
         .select(
           "betrag, ust_satz, kategorie_id, klassifikation, steuerrelevant, kategorie:kategorie(typ)",
         )
         .eq("owner_id", ownerId)
         .eq("steuerrelevant", true)
+        .eq("steuer_zurueckgestellt", false)
         .gte("buchung_datum", von)
         .lte("buchung_datum", bis)
-        .limit(20000);
+        .order("id", { ascending: true }).range(rangeVon, rangeBis));
       if (error) return werkzeugFehler("umsatzsteuer_stand", error);
 
       type Row = {
@@ -853,7 +864,7 @@ export function buchungDetailsTool(ctx: ChatToolContext) {
       const { data, error } = await supabase
         .from("buchung")
         .select(
-          "id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, kategorie:kategorie(bezeichnung, typ), konto:konto(bezeichnung)",
+          "id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, kategorie:kategorie(bezeichnung, typ), konto:konto(bezeichnung)",
         )
         .eq("owner_id", ownerId)
         .eq("id", input.buchung_id)
@@ -884,6 +895,9 @@ export function buchungDetailsTool(ctx: ChatToolContext) {
         waehrung: b.waehrung,
         klassifikation: b.klassifikation,
         steuerrelevant: b.steuerrelevant,
+        steuer_zurueckgestellt: b.steuer_zurueckgestellt,
+        steuer_zurueckgestellt_grund: b.steuer_zurueckgestellt_grund,
+        steuer_zurueckgestellt_am: b.steuer_zurueckgestellt_am,
         kategorie_id: b.kategorie_id,
         kategorie_bezeichnung: kat?.bezeichnung ?? null,
         kategorie_typ: kat?.typ ?? null,

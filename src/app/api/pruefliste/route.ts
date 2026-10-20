@@ -16,7 +16,7 @@ import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { Buchung } from "@/lib/types";
 
 const SELECT_FELDER =
-  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
+  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
 
 const querySchema = z.object({
   konto: z.uuid().optional(),
@@ -68,6 +68,7 @@ export async function GET(request: Request) {
     .select(SELECT_FELDER)
     .eq("owner_id", user.id)
     .eq("status", "zur_pruefung")
+    .eq("steuer_zurueckgestellt", false)
     .order(sort === "betrag" ? "betrag" : "buchung_datum", {
       ascending: richtung === "asc",
     })

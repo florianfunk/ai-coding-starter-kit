@@ -226,6 +226,7 @@ export function BuchungenLedger({
   // PROJ-34: initialer Suchwert aus ?q= (Command-Palette-Sprung). Danach frei
   // editierbar wie zuvor — keine fortlaufende URL-Synchronisation.
   const [suche, setSuche] = useState(filter.q ?? "");
+  const [steuerFilter, setSteuerFilter] = useState("alle");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
   const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
   const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");
@@ -258,6 +259,8 @@ export function BuchungenLedger({
     }
     const q = suche.trim().toLowerCase();
     return buchungen.filter((b) => {
+      if (steuerFilter === "zurueckgestellt" && !b.steuer_zurueckgestellt) return false;
+      if (steuerFilter === "aktiv" && b.steuer_zurueckgestellt) return false;
       if (statusFilter !== "alle" && b.status !== statusFilter) return false;
       if (klassFilter !== "alle" && b.klassifikation !== klassFilter) return false;
       if (kategorieFilter === "ohne") {
@@ -279,6 +282,7 @@ export function BuchungenLedger({
   }, [
     buchungen,
     statusFilter,
+    steuerFilter,
     klassFilter,
     kategorieFilter,
     betragVon,
@@ -360,6 +364,7 @@ export function BuchungenLedger({
     setVon("");
     setBis("");
     setSuche("");
+    setSteuerFilter("alle");
     setStatusFilter("alle");
     setKlassFilter("alle");
     setKategorieFilter("alle");
@@ -419,6 +424,7 @@ export function BuchungenLedger({
     bis !== "" ||
     suche !== "" ||
     statusFilter !== "alle" ||
+    steuerFilter !== "alle" ||
     klassFilter !== "alle" ||
     kategorieFilter !== "alle" ||
     betragVon !== "" ||
@@ -698,7 +704,7 @@ export function BuchungenLedger({
         </div>
 
         {/* Betrag-Bereich (client-seitig, signiert: + = Einnahmen, − = Ausgaben) */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="f-betrag-von" className="text-xs text-muted-foreground">
               Betrag von (€)
@@ -728,6 +734,17 @@ export function BuchungenLedger({
               onChange={(e) => setBetragBis(e.target.value)}
               className="rounded-[var(--radius-inner)] border-line bg-[color:var(--surface-2)]"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="f-steuerstatus" className="text-xs text-muted-foreground">Steuerstatus</Label>
+            <Select value={steuerFilter} onValueChange={setSteuerFilter}>
+              <SelectTrigger id="f-steuerstatus"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Alle Buchungen</SelectItem>
+                <SelectItem value="aktiv">Nicht zurückgestellt</SelectItem>
+                <SelectItem value="zurueckgestellt">Zurückgestellt</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {betragVon !== "" || betragBis !== "" ? (
             <div className="flex items-end">
@@ -1004,6 +1021,8 @@ function LedgerZeile({
 
         {/* Spalte Inhalt — 3 Zeilen */}
         <div className="min-w-0 space-y-1">
+          {b.steuer_zurueckgestellt && <div title={b.steuer_zurueckgestellt_grund ?? undefined}
+            className="text-xs font-semibold text-amber-700">Zurückgestellt – steuerlich ausgeschlossen</div>}
           {/* Zeile 1 — Empfänger */}
           <div className="flex items-center gap-2">
             <span className="truncate text-[15px] font-semibold leading-tight">

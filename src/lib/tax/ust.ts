@@ -30,6 +30,7 @@ export interface UstBuchung {
   betrag: number;
   klassifikation: "privat" | "geschaeftlich" | "unklar" | "neutral" | null;
   steuerrelevant: boolean | null;
+  steuer_zurueckgestellt?: boolean;
   /** USt-Satz der Buchung (0 | 7 | 19) oder null = nicht zuordenbar. */
   ust_satz: number | null;
   /** true, wenn mind. eine beleg_buchung-Zuordnung existiert. */
@@ -170,6 +171,7 @@ export function berechneUstVa(
 
   for (const b of buchungen) {
     // Harte Filter: nur geschäftlich + steuerrelevant.
+    if (b.steuer_zurueckgestellt === true) continue;
     if (b.klassifikation !== "geschaeftlich") continue;
     if (b.steuerrelevant !== true) continue;
 

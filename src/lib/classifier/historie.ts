@@ -58,6 +58,7 @@ export async function holeAehnlicheBuchungen(
     .from("buchung")
     .select("betrag, kategorie_id, klassifikation")
     .eq("owner_id", owner_id)
+    .eq("steuer_zurueckgestellt", false)
     .eq("empfaenger_normalisiert", norm)
     .in("status", ["auto_verbucht", "manuell_bestaetigt"]);
 

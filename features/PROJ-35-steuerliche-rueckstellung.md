@@ -9,7 +9,7 @@ Buchungsdetails bieten „Für Steuer zurückstellen“ mit Pflichtgrund (1–10
 - Geschlossene Wirtschaftsjahre/USt-Perioden verhindern Hold und Resume; bestehende Snapshots bleiben unverändert. Neue USt-Snapshots speichern feste Zeitraumgrenzen. Historische Grenzen werden nur aus eindeutigen enthaltenen Buchungsdaten ergänzt; ohne belastbare Grenzen sperrt der Guard konservativ das Kalenderjahr.
 - Audit-Einträge sind für normale Benutzer nur lesbar/ergänzbar, nicht veränder- oder löschbar.
 - Split-Klammern können nicht zurückgestellt werden; Teilbuchungen einzeln. Eine zurückgestellte Buchung kann bis zur Wiederaufnahme nicht neu aufgeteilt werden.
-- Abschluss-Snapshots tragen die vor der Berechnung gelesene Summe der DB-geführten Buchungsversionen. Ein gemeinsamer Datenbank-Lock und Versionsprüfung verhindern einen veralteten Abschluss bei parallelem Hold/Resume.
+- Abschluss-Snapshots tragen die vor der Berechnung gelesene Anzahl unveränderlicher Rückstellungs-Auditereignisse. Ein gemeinsamer Datenbank-Lock und Versionsprüfung verhindern einen veralteten Abschluss bei parallelem Hold/Resume.
 
 ## Auswertungen
 

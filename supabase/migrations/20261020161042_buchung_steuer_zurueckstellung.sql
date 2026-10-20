@@ -139,7 +139,8 @@ begin
   if new.status = 'abgeschlossen' then
     perform pg_advisory_xact_lock(hashtextextended('steuer-hold:' || new.owner_id::text, 0));
     if coalesce((new.snapshot->>'rueckstellungen_version')::bigint, 0) <>
-      (select coalesce(sum(steuer_zurueckstellung_version),0) from public.buchung where owner_id = new.owner_id) then
+      (select count(*) from public.audit_eintrag where owner_id = new.owner_id
+        and aktion in ('steuerlich_zurueckgestellt','steuerlich_wieder_aufgenommen')) then
       raise exception 'Rückstellungen wurden inzwischen geändert. Bitte die Auswertung neu laden und erneut abschließen.';
     end if;
     if exists (select 1 from public.buchung b
@@ -159,11 +160,12 @@ revoke all on function public.audit_steuer_zurueckstellung() from public, anon;
 revoke all on function public.pruefe_abschluss_steuer_zurueckstellung() from public, anon;
 
 -- Audit remains readable/appendable by owner, but cannot be rewritten/deleted.
-revoke update, delete on public.audit_eintrag from public, anon, authenticated;
+revoke update, delete, truncate on public.audit_eintrag from public, anon, authenticated;
 
 create function public.steuer_rueckstellungs_version() returns bigint
 language sql stable security invoker set search_path = '' as $$
-  select coalesce(sum(steuer_zurueckstellung_version),0)::bigint from public.buchung where owner_id=(select auth.uid());
+  select count(*) from public.audit_eintrag where owner_id=(select auth.uid())
+    and aktion in ('steuerlich_zurueckgestellt','steuerlich_wieder_aufgenommen');
 $$;
 revoke all on function public.steuer_rueckstellungs_version() from public, anon;
 grant execute on function public.steuer_rueckstellungs_version() to authenticated;

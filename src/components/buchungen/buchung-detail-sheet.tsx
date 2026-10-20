@@ -90,6 +90,7 @@ export function BuchungDetailSheet({
   gemerkt = false,
   merkenPending = false,
   onToggleMerken,
+  onRueckstellungGespeichert,
 }: {
   buchung: Buchung | null;
   kategorien: Kategorie[];
@@ -99,6 +100,7 @@ export function BuchungDetailSheet({
   gemerkt?: boolean;
   merkenPending?: boolean;
   onToggleMerken?: () => void;
+  onRueckstellungGespeichert?: (buchung: Partial<Buchung> & { id: string }) => void;
 }) {
   const router = useRouter();
   // Audit-Ladezustand wird AUSSCHLIESSLICH asynchron gesetzt (nie synchron im
@@ -240,7 +242,7 @@ export function BuchungDetailSheet({
 
             <div className="mt-4 space-y-4 px-4 pb-6 text-sm">
               <SteuerZurueckstellung key={`${buchung.id}-${buchung.steuer_zurueckgestellt_am ?? "aktiv"}`}
-                buchung={buchung} onGespeichert={() => { onOpenChange(false); router.refresh(); }} />
+                buchung={buchung} onGespeichert={(nachher) => { onRueckstellungGespeichert?.(nachher); onOpenChange(false); router.refresh(); }} />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-muted-foreground">Datum</div>

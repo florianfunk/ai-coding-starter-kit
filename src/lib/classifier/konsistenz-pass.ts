@@ -352,7 +352,7 @@ export async function wendeKonsistenzPassAn(
           MIN_AVG_KONFIDENZ,
         );
 
-        const { error: updErr } = await supabase
+        const { data: aktualisiert, error: updErr } = await supabase
           .from("buchung")
           .update({
             kategorie_id: entscheidung.mehrheits_kategorie_id,
@@ -369,9 +369,10 @@ export async function wendeKonsistenzPassAn(
           .eq("id", b.id)
           .eq("owner_id", owner_id)
     .eq("steuer_zurueckgestellt", false)
-          .neq("status", "manuell_bestaetigt");
+          .neq("status", "manuell_bestaetigt")
+          .select("id").maybeSingle();
 
-        if (updErr) continue;
+        if (updErr || !aktualisiert) continue;
 
         angepasstFuerEmpfaenger++;
         resultat.buchungen_angepasst++;

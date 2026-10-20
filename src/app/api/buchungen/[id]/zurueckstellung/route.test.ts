@@ -26,16 +26,17 @@ import { POST } from "./route";
 const id = "a6e91b62-dcfb-40eb-a6f0-9b7157cf6251";
 const request = (body: unknown) => new Request(`http://localhost/api/buchungen/${id}/zurueckstellung`, {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+
 });
 const params = { params: Promise.resolve({ id }) };
-const hold = { aktion: "zurueckstellen", grund: "Rechnung strittig", erwartet_am: null };
+const hold = { aktion: "zurueckstellen", grund: "Rechnung strittig", erwartete_version: 0 };
 
 describe("Rückstellung API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.user = { id: "owner-test" };
-    mocks.vorher = { id, steuer_zurueckgestellt: false, steuer_zurueckgestellt_grund: null, steuer_zurueckgestellt_am: null };
-    mocks.nachher = { id, steuer_zurueckgestellt: true, steuer_zurueckgestellt_grund: "Rechnung strittig", steuer_zurueckgestellt_am: "2026-10-20T15:00:00Z" };
+    mocks.vorher = { id, steuer_zurueckgestellt: false, steuer_zurueckgestellt_grund: null, steuer_zurueckgestellt_am: null, steuer_zurueckstellung_version: 0 };
+    mocks.nachher = { id, steuer_zurueckgestellt: true, steuer_zurueckgestellt_grund: "Rechnung strittig", steuer_zurueckgestellt_am: "2026-10-20T15:00:00Z", steuer_zurueckstellung_version: 1 };
     mocks.error = null;
   });
   it("verweigert nicht angemeldeten Zugriff", async () => {
@@ -58,7 +59,7 @@ describe("Rückstellung API", () => {
     expect(mocks.update).toHaveBeenCalledWith({ steuer_zurueckgestellt: true, steuer_zurueckgestellt_grund: "Rechnung strittig" });
     expect(mocks.eq).toHaveBeenCalledWith("owner_id", "owner-test");
     expect(mocks.eq).toHaveBeenCalledWith("id", id);
-    expect(mocks.is).toHaveBeenCalledWith("steuer_zurueckgestellt_am", null);
+    expect(mocks.eq).toHaveBeenCalledWith("steuer_zurueckstellung_version", 0);
   });
   it("verweigert einen veralteten Stand", async () => {
     mocks.nachher = null;
@@ -71,13 +72,17 @@ describe("Rückstellung API", () => {
     expect(await result.json()).toMatchObject({ error: mocks.error.message });
   });
   it("nimmt nur die Rückstellung zurück und toleriert identische Wiederholungen", async () => {
-    const am = "2026-10-20T15:00:00Z";
     mocks.vorher = mocks.nachher;
-    expect((await POST(request(hold), params)).status).toBe(200);
+    expect((await POST(request({ ...hold, erwartete_version: 1 }), params)).status).toBe(200);
     expect(mocks.update).not.toHaveBeenCalled();
-    mocks.nachher = { id, steuer_zurueckgestellt: false, steuer_zurueckgestellt_grund: null, steuer_zurueckgestellt_am: null };
-    expect((await POST(request({ aktion: "wiederaufnehmen", erwartet_am: am }), params)).status).toBe(200);
+    mocks.nachher = { id, steuer_zurueckgestellt: false, steuer_zurueckgestellt_grund: null, steuer_zurueckgestellt_am: null, steuer_zurueckstellung_version: 0 };
+    expect((await POST(request({ aktion: "wiederaufnehmen", erwartete_version: 1 }), params)).status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith({ steuer_zurueckgestellt: false, steuer_zurueckgestellt_grund: null });
-    expect(mocks.eq).toHaveBeenCalledWith("steuer_zurueckgestellt_am", am);
+    expect(mocks.eq).toHaveBeenCalledWith("steuer_zurueckstellung_version", 1);
+  });
+  it("verweigert einen alten Hold nach Hold und Wiederaufnahme (ABA)", async () => {
+    mocks.vorher = { ...mocks.vorher, steuer_zurueckstellung_version: 2 };
+    expect((await POST(request(hold), params)).status).toBe(409);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

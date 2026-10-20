@@ -16,7 +16,7 @@ export const metadata = {
 };
 
 const SELECT_FELDER =
-  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
+  "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
 
 type Such = {
   konto?: string;

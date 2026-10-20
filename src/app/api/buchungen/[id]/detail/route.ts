@@ -56,6 +56,7 @@ export interface BuchungDetail {
   steuer_zurueckgestellt?: boolean;
   steuer_zurueckgestellt_grund?: string | null;
   steuer_zurueckgestellt_am?: string | null;
+  steuer_zurueckstellung_version?: number;
   kategorie_id: string | null;
   kategorie_bezeichnung: string | null;
   kategorie_typ: KategorieTyp | null;
@@ -95,7 +96,7 @@ export async function GET(
   const { data: bData, error: bErr } = await supabase
     .from("buchung")
     .select(
-      "id, konto_id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, duplikat_hash, import_quelle, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, regel_id, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am, created_at, updated_at",
+      "id, konto_id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, duplikat_hash, import_quelle, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version, kategorie_id, ust_satz, begruendung, konfidenz, quelle, regel_id, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am, created_at, updated_at",
     )
     .eq("owner_id", user.id)
     .eq("id", id)
@@ -125,6 +126,7 @@ export async function GET(
   steuer_zurueckgestellt?: boolean;
   steuer_zurueckgestellt_grund?: string | null;
   steuer_zurueckgestellt_am?: string | null;
+  steuer_zurueckstellung_version?: number;
     kategorie_id: string | null;
     ust_satz: number | null;
     begruendung: string | null;
@@ -269,6 +271,7 @@ export async function GET(
     steuer_zurueckgestellt: b.steuer_zurueckgestellt,
     steuer_zurueckgestellt_grund: b.steuer_zurueckgestellt_grund,
     steuer_zurueckgestellt_am: b.steuer_zurueckgestellt_am,
+    steuer_zurueckstellung_version: b.steuer_zurueckstellung_version,
     kategorie_id: b.kategorie_id,
     kategorie_bezeichnung:
       (katData as { bezeichnung?: string } | null)?.bezeichnung ?? null,

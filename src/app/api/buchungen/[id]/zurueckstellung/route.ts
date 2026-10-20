@@ -3,7 +3,7 @@ import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { steuerZurueckstellungSchema } from "@/lib/validation/steuer-zurueckstellung";
 
-const FELDER = "id, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am";
+const FELDER = "id, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getApiUser();
@@ -23,6 +23,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!vorher) return NextResponse.json({ error: "Buchung nicht gefunden." }, { status: 404 });
   const zurueck = eingabe.aktion === "zurueckstellen";
   const grund = zurueck ? eingabe.grund : null;
+  if (vorher.steuer_zurueckstellung_version !== eingabe.erwartete_version) {
+    return NextResponse.json({ error: "Die Buchung wurde inzwischen geändert. Bitte neu laden." }, { status: 409 });
+  }
   // Bereits erreichter Zielzustand: Wiederholte Requests sind ohne neue Audits sicher.
   if (vorher.steuer_zurueckgestellt === zurueck && vorher.steuer_zurueckgestellt_grund === grund) {
     return NextResponse.json({ buchung: vorher, veraendert: false });
@@ -31,9 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     steuer_zurueckgestellt: zurueck,
     steuer_zurueckgestellt_grund: grund,
   }).eq("owner_id", user.id).eq("id", id);
-  query = eingabe.erwartet_am === null
-    ? query.is("steuer_zurueckgestellt_am", null)
-    : query.eq("steuer_zurueckgestellt_am", eingabe.erwartet_am);
+  query = query.eq("steuer_zurueckstellung_version", eingabe.erwartete_version);
   // DB-Trigger validiert Perioden/Splits und schreibt den Audit atomar.
   const { data, error } = await query.select(FELDER).maybeSingle();
   if (error) {

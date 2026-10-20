@@ -332,7 +332,7 @@ export async function POST(request: Request) {
   }
   const { jahr, periode } = parsed.data;
   const supabase = await createClient();
-  const rueckstellungenVersion = await ladeRueckstellungsVersion(supabase, user.id);
+  const rueckstellungenVersion = await ladeRueckstellungsVersion(supabase);
 
   const profil = await ladeProfil(supabase, user.id);
   if (!profil) {
@@ -419,6 +419,8 @@ export async function POST(request: Request) {
 
   const snapshot = {
     rueckstellungen_version: rueckstellungenVersion,
+    zeitraum: { von: aktuell.start, bis: aktuell.ende },
+    rhythmus: rhy,
     ...berechnung,
     abgeschlossen_am: new Date().toISOString(),
   } as unknown as Record<string, unknown>;

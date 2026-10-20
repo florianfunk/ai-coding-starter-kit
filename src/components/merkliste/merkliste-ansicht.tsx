@@ -199,6 +199,7 @@ export function MerklisteAnsicht({
         kategorien={kategorien}
         open={detailOffen}
         onOpenChange={setDetailOffen}
+        onRueckstellungGespeichert={(nachher) => setBuchungen((prev) => prev.map((b) => b.id === nachher.id ? { ...b, ...nachher } : b))}
         gemerkt={detail ? buchungen.some((x) => x.id === detail.id) : false}
         merkenPending={detail ? pending.has(detail.id) : false}
         onToggleMerken={detail ? () => entfernen(detail) : undefined}

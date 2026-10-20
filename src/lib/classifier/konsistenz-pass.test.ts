@@ -186,6 +186,7 @@ describe("bestimmeMehrheit — reine Mehrheits-Entscheidung", () => {
 
 interface MockState {
   buchungen: BuchungRow[];
+  holdBeforeUpdate?: boolean;
 }
 
 function makeSupabase(state: MockState) {
@@ -247,44 +248,21 @@ function makeSupabase(state: MockState) {
   function makeBuchungUpdate(patch: Partial<BuchungRow>) {
     const filter: { id?: string; owner_id?: string } = {};
     let neqStatus: string | null = null;
-    type Chain = {
-      eq: (col: string, val: string) => Promise<{ error: null }> | Chain;
-      neq: (col: string, val: string) => Chain;
-    };
-    const chain: Chain = {
-      eq: (col: string, val: string) => {
-        if (col === "id") filter.id = val;
-        if (col === "owner_id") {
-          filter.owner_id = val;
-        }
-        // letzte eq() = Promise. Eigentlich kommt eq, eq, neq → wir muessen
-        // robust unterscheiden. Wir geben einfach immer den chain zurueck.
+    const chain = {
+      eq: (col: string, val: unknown) => {
+        if (col === "id") filter.id = String(val);
+        if (col === "owner_id") filter.owner_id = String(val);
         return chain;
       },
-      neq: (col: string, val: string) => {
-        if (col === "status") neqStatus = val;
-        return chain;
-      },
-    };
-
-    // Wir koennen die Update-Pseudo-Promise via Microtask aufloesen — der
-    // Test ruft `await supabase.from(...).update(...).eq(...).eq(...).neq(...)`.
-    // Wir wickeln das als Thenable nach den eq/neq-Calls ab.
-    // Vereinfachung: chain.eq() kann sowohl Chain als auch Promise sein —
-    // wir lassen den letzten eq als Promise wirken, in dem chain ein .then
-    // hat.
-    const chainAsThenable = chain as Chain & {
-      then?: (
-        resolve: (val: { error: null }) => void,
-      ) => void;
-    };
-    chainAsThenable.then = (resolve: (val: { error: null }) => void) => {
-      const target = state.buchungen.find((b) => b.id === filter.id);
-      if (target && (neqStatus === null || target.status !== neqStatus)) {
+      neq: (col: string, val: string) => { if (col === "status") neqStatus = val; return chain; },
+      select: () => chain,
+      maybeSingle: async () => {
+        const target = state.buchungen.find((b) => b.id === filter.id);
+        if (!target || state.holdBeforeUpdate || (neqStatus !== null && target.status === neqStatus)) return { data: null, error: null };
         Object.assign(target, patch);
         updateSpy({ id: filter.id, patch });
-      }
-      resolve({ error: null });
+        return { data: { id: target.id }, error: null };
+      },
     };
     return chain;
   }
@@ -319,6 +297,20 @@ function makeSupabase(state: MockState) {
 // ---------------------------------------------------------------------------
 
 describe("wendeKonsistenzPassAn — Pass mit Mock-Supabase", () => {
+  it("schreibt bei paralleler Rückstellung weder Audit noch Erfolg", async () => {
+    const state: MockState = { holdBeforeUpdate: true, buchungen: [
+      row({ id: "1", empfaenger_normalisiert: "test", kategorie_id: "kat-a", konfidenz: 0.95 }),
+      row({ id: "2", empfaenger_normalisiert: "test", kategorie_id: "kat-a", konfidenz: 0.95 }),
+      row({ id: "3", empfaenger_normalisiert: "test", kategorie_id: "kat-a", konfidenz: 0.95 }),
+      row({ id: "4", empfaenger_normalisiert: "test", kategorie_id: "kat-b", konfidenz: 0.7 }),
+    ] };
+    const { from, updateSpy, auditInsertSpy } = makeSupabase(state);
+    const result = await wendeKonsistenzPassAn({ from } as never, "owner-1");
+    expect(result.buchungen_angepasst).toBe(0);
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(auditInsertSpy).not.toHaveBeenCalled();
+  });
+
   it("3x A + 1x B → die B-Buchung wird auf A umgebogen, Audit geschrieben", async () => {
     const state: MockState = {
       buchungen: [

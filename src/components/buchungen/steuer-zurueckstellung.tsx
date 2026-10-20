@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-type SteuerBuchung = Pick<Buchung, "id" | "steuer_zurueckgestellt" | "steuer_zurueckgestellt_grund" | "steuer_zurueckgestellt_am">;
+type SteuerBuchung = Pick<Buchung, "id" | "steuer_zurueckgestellt" | "steuer_zurueckgestellt_grund" | "steuer_zurueckgestellt_am" | "steuer_zurueckstellung_version">;
 
-export function SteuerZurueckstellung({ buchung, onGespeichert }: { buchung: SteuerBuchung; onGespeichert: () => void }) {
+export function SteuerZurueckstellung({ buchung, onGespeichert }: { buchung: SteuerBuchung; onGespeichert: (buchung: SteuerBuchung) => void }) {
   const [grund, setGrund] = useState("");
   const [saving, setSaving] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -22,12 +22,12 @@ export function SteuerZurueckstellung({ buchung, onGespeichert }: { buchung: Ste
       const res = await fetch(`/api/buchungen/${buchung.id}/zurueckstellung`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(zurueck
-          ? { aktion: "wiederaufnehmen", erwartet_am: buchung.steuer_zurueckgestellt_am ?? null }
-          : { aktion: "zurueckstellen", grund: grund.trim(), erwartet_am: buchung.steuer_zurueckgestellt_am ?? null }),
+          ? { aktion: "wiederaufnehmen", erwartete_version: buchung.steuer_zurueckstellung_version ?? 0 }
+          : { aktion: "zurueckstellen", grund: grund.trim(), erwartete_version: buchung.steuer_zurueckstellung_version ?? 0 }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Speichern fehlgeschlagen.");
-      onGespeichert();
+      onGespeichert(json.buchung);
     } catch (error) {
       setFehler(error instanceof Error ? error.message : "Speichern fehlgeschlagen.");
     } finally {

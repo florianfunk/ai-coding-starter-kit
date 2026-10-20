@@ -506,8 +506,8 @@ export async function POST(request: Request) {
           // Eltern-Buchung bereits zur Klammer gemacht und zwei Kinder angelegt
           // (via wendeSplitAn). Ein normales Update wuerde die Klammer wieder
           // ueberschreiben — daher hier ueberspringen.
-          const updErr = e.split_angewandt
-            ? null
+          const updResult = e.split_angewandt
+            ? { data: { id: b.id }, error: null }
             : (
                 await supabase
                   .from("buchung")
@@ -527,7 +527,9 @@ export async function POST(request: Request) {
                   .eq("owner_id", user.id)
           .eq("steuer_zurueckgestellt", false)
                   .neq("status", "manuell_bestaetigt") // letzte Sicherung
-              ).error;
+                  .select("id").maybeSingle()
+              );
+          const updErr = updResult.error;
 
           if (updErr) {
             // Serverseitig die echte DB-Ursache loggen (z. B. CHECK-Constraint),
@@ -545,6 +547,8 @@ export async function POST(request: Request) {
               },
             };
           }
+
+          if (!updResult.data) return { uebersprungen_manuell: true };
 
           await supabase.from("audit_eintrag").insert({
             owner_id: user.id,

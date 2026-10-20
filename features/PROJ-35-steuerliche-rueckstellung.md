@@ -4,11 +4,12 @@ Buchungsdetails bieten „Für Steuer zurückstellen“ mit Pflichtgrund (1–10
 
 ## Daten und Schutz
 
-- Drei additive Felder auf `buchung`: `steuer_zurueckgestellt`, `_grund`, `_am`.
+- Vier additive Felder auf `buchung`: `steuer_zurueckgestellt`, `_grund`, `_am`, `steuer_zurueckstellung_version`.
 - Eigener owner-scoped POST-Endpunkt mit Versionsvergleich. Zeitstempel und Audit werden atomar durch DB-Trigger geführt. Bestehende Klassifikations- und Bulk-Endpunkte können die Rückstellung nicht ändern.
-- Geschlossene Wirtschaftsjahre/USt-Perioden verhindern Hold und Resume; bestehende Snapshots bleiben unverändert. Der Guard verwendet für USt denselben aktuellen Profilrhythmus wie die bestehenden Steuer-Routen.
+- Geschlossene Wirtschaftsjahre/USt-Perioden verhindern Hold und Resume; bestehende Snapshots bleiben unverändert. Neue USt-Snapshots speichern feste Zeitraumgrenzen. Historische Grenzen werden nur aus eindeutigen enthaltenen Buchungsdaten ergänzt; ohne belastbare Grenzen sperrt der Guard konservativ das Kalenderjahr.
+- Audit-Einträge sind für normale Benutzer nur lesbar/ergänzbar, nicht veränder- oder löschbar.
 - Split-Klammern können nicht zurückgestellt werden; Teilbuchungen einzeln. Eine zurückgestellte Buchung kann bis zur Wiederaufnahme nicht neu aufgeteilt werden.
-- Abschluss-Snapshots tragen die vor der Berechnung gelesene Audit-Version. Ein gemeinsamer Datenbank-Lock und Versionsprüfung verhindern einen veralteten Abschluss bei parallelem Hold/Resume.
+- Abschluss-Snapshots tragen die vor der Berechnung gelesene Summe der DB-geführten Buchungsversionen. Ein gemeinsamer Datenbank-Lock und Versionsprüfung verhindern einen veralteten Abschluss bei parallelem Hold/Resume.
 
 ## Auswertungen
 

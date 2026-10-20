@@ -835,6 +835,10 @@ export function PrueflisteAnsicht({
 
       <BuchungDetailSheet
         buchung={detailFall}
+        onRueckstellungGespeichert={(nachher) => {
+          setFaelle((prev) => prev.filter((b) => b.id !== nachher.id));
+          void reload();
+        }}
         kategorien={kategorien}
         open={detailFall !== null}
         onOpenChange={(o) => {

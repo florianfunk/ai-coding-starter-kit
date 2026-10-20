@@ -87,6 +87,7 @@ export interface Buchung {
   steuer_zurueckgestellt?: boolean;
   steuer_zurueckgestellt_grund?: string | null;
   steuer_zurueckgestellt_am?: string | null;
+  steuer_zurueckstellung_version?: number;
   kategorie_id: string | null;
   ust_satz: number | null;
   begruendung: string | null;

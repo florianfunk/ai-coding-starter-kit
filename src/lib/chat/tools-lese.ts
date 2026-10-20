@@ -121,7 +121,7 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
       let q = supabase
         .from("buchung")
         .select(
-          "id, buchung_datum, empfaenger, verwendungszweck, betrag, status, klassifikation, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, konfidenz, kategorie_id, kategorie:kategorie(id, bezeichnung, typ)",
+          "id, buchung_datum, empfaenger, verwendungszweck, betrag, status, klassifikation, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version, konfidenz, kategorie_id, kategorie:kategorie(id, bezeichnung, typ)",
         )
         .eq("owner_id", ownerId)
         .order("buchung_datum", { ascending: false })
@@ -164,6 +164,7 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
         steuer_zurueckgestellt: boolean;
         steuer_zurueckgestellt_grund: string | null;
         steuer_zurueckgestellt_am: string | null;
+        steuer_zurueckstellung_version: number;
         klassifikation: Klassifikation | null;
         konfidenz: number | null;
         kategorie_id: string | null;
@@ -197,6 +198,7 @@ export function sucheBuchungenTool(ctx: ChatToolContext) {
           steuer_zurueckgestellt: r.steuer_zurueckgestellt,
           steuer_zurueckgestellt_grund: r.steuer_zurueckgestellt_grund,
           steuer_zurueckgestellt_am: r.steuer_zurueckgestellt_am,
+          steuer_zurueckstellung_version: r.steuer_zurueckstellung_version,
           klassifikation: r.klassifikation,
           konfidenz: r.konfidenz === null ? null : Number(r.konfidenz),
           kategorie_id: r.kategorie_id,
@@ -864,7 +866,7 @@ export function buchungDetailsTool(ctx: ChatToolContext) {
       const { data, error } = await supabase
         .from("buchung")
         .select(
-          "id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, kategorie:kategorie(bezeichnung, typ), konto:konto(bezeichnung)",
+          "id, buchung_datum, betrag, waehrung, verwendungszweck, empfaenger, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, kategorie:kategorie(bezeichnung, typ), konto:konto(bezeichnung)",
         )
         .eq("owner_id", ownerId)
         .eq("id", input.buchung_id)
@@ -898,6 +900,7 @@ export function buchungDetailsTool(ctx: ChatToolContext) {
         steuer_zurueckgestellt: b.steuer_zurueckgestellt,
         steuer_zurueckgestellt_grund: b.steuer_zurueckgestellt_grund,
         steuer_zurueckgestellt_am: b.steuer_zurueckgestellt_am,
+    steuer_zurueckstellung_version: b.steuer_zurueckstellung_version,
         kategorie_id: b.kategorie_id,
         kategorie_bezeichnung: kat?.bezeichnung ?? null,
         kategorie_typ: kat?.typ ?? null,

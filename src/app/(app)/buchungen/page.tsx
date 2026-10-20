@@ -5,6 +5,7 @@
 
 import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 import { aktiverZeitraum } from "@/lib/jahr/aktives-jahr";
 import type { Buchung, Kategorie, Konto } from "@/lib/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,13 +17,6 @@ export const metadata = {
 
 const SELECT_FELDER =
   "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
-
-// Obergrenze der geladenen Buchungen. Such-, Filter- und Summenberechnung
-// laufen client-seitig über die geladene Menge — ist diese kleiner als der
-// gewählte Zeitraum (alte Grenze: 500), fehlen ältere Buchungen still in Suche
-// UND Summen. Großzügig dimensioniert (~2+ Jahre); wird die Grenze erreicht,
-// weist der Ledger sichtbar darauf hin.
-const MAX_BUCHUNGEN = 5000;
 
 type Such = {
   konto?: string;
@@ -84,28 +78,29 @@ export default async function BuchungenPage({
     .limit(500);
   const kategorien = (kategorienData ?? []) as Kategorie[];
 
-  let query = supabase
-    .from("buchung")
-    .select(SELECT_FELDER)
-    .eq("owner_id", user.id)
-    .order("buchung_datum", { ascending: false })
-    .limit(MAX_BUCHUNGEN);
+  // Suche, weitere Filter und Summen brauchen den gesamten Zeitraum.
+  // Ein einzelnes .limit(5000) liefert wegen des API-Limits nur 1000 Zeilen.
+  const { data, error } = await ladeAlle<Buchung>((von, bis) => {
+    let query = supabase
+      .from("buchung")
+      .select(SELECT_FELDER)
+      .eq("owner_id", user.id)
+      .order("buchung_datum", { ascending: false })
+      .order("id", { ascending: false })
+      .range(von, bis);
 
-  if (filter.konto && filter.konto !== "alle") {
-    query = query.eq("konto_id", filter.konto);
-  }
-  const isoRe = /^\d{4}-\d{2}-\d{2}$/;
-  if (filter.von && isoRe.test(filter.von)) {
-    query = query.gte("buchung_datum", filter.von);
-  }
-  if (filter.bis && isoRe.test(filter.bis)) {
-    query = query.lte("buchung_datum", filter.bis);
-  }
-
-  const { data, error } = await query;
-  // Wurde die Obergrenze erreicht, ist die geladene Menge ggf. unvollständig —
-  // der Ledger blendet dann einen Hinweis ein (Suche/Summen unvollständig).
-  const abgeschnitten = (data?.length ?? 0) >= MAX_BUCHUNGEN;
+    if (filter.konto && filter.konto !== "alle") {
+      query = query.eq("konto_id", filter.konto);
+    }
+    const isoRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (filter.von && isoRe.test(filter.von)) {
+      query = query.gte("buchung_datum", filter.von);
+    }
+    if (filter.bis && isoRe.test(filter.bis)) {
+      query = query.lte("buchung_datum", filter.bis);
+    }
+    return query;
+  });
 
   return (
     <div className="space-y-8">
@@ -123,8 +118,6 @@ export default async function BuchungenPage({
           konten={konten}
           kategorien={kategorien}
           filter={filter}
-          abgeschnitten={abgeschnitten}
-          maxBuchungen={MAX_BUCHUNGEN}
         />
       )}
     </div>

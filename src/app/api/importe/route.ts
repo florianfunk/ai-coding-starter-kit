@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { getApiUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
+import { ladeAlle } from "@/lib/supabase/fetch-all";
 
 export interface ImportLaufZeile {
   id: string;
@@ -91,16 +92,25 @@ export async function GET() {
     }
   }
 
-  // Buchungs-Counts pro Lauf in einem Schwung — ueber RPC waere noch
-  // effizienter, aber owner-scoped reicht ein zweites Select.
+  // Alle Seiten zählen: eine einzelne Antwort wird auf 1000 Zeilen begrenzt.
   const counts = new Map<string, number>();
   if (laeufe.length > 0) {
     const ids = laeufe.map((l) => l.id);
-    const { data: gruppen } = await supabase
-      .from("buchung")
-      .select("import_lauf_id")
-      .eq("owner_id", user.id)
-      .in("import_lauf_id", ids);
+    const { data: gruppen, error: zaehlFehler } = await ladeAlle<{ import_lauf_id: string }>((von, bis) =>
+      supabase
+        .from("buchung")
+        .select("import_lauf_id")
+        .eq("owner_id", user.id)
+        .in("import_lauf_id", ids)
+        .order("id", { ascending: true })
+        .range(von, bis),
+    );
+    if (zaehlFehler) {
+      return NextResponse.json(
+        { error: "Import-Buchungen konnten nicht gezählt werden." },
+        { status: 500 },
+      );
+    }
     for (const row of (gruppen ?? []) as Array<{ import_lauf_id: string }>) {
       counts.set(row.import_lauf_id, (counts.get(row.import_lauf_id) ?? 0) + 1);
     }

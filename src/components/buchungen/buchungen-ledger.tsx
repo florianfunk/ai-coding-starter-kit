@@ -200,7 +200,7 @@ export function BuchungenLedger({
   konten: Konto[];
   kategorien: Kategorie[];
   // PROJ-34: `q` = vorausgefüllte Volltextsuche aus der Command-Palette.
-  filter: { konto?: string; von?: string; bis?: string; q?: string };
+  filter: { konto?: string; von?: string; bis?: string; q?: string; steuerstatus?: "zurueckgestellt" };
   // Obergrenze beim Laden erreicht → Suche/Summen ggf. unvollständig.
   abgeschnitten?: boolean;
   maxBuchungen?: number;
@@ -226,7 +226,8 @@ export function BuchungenLedger({
   // PROJ-34: initialer Suchwert aus ?q= (Command-Palette-Sprung). Danach frei
   // editierbar wie zuvor — keine fortlaufende URL-Synchronisation.
   const [suche, setSuche] = useState(filter.q ?? "");
-  const [steuerFilter, setSteuerFilter] = useState("alle");
+  const nurZurueckgestellt = filter.steuerstatus === "zurueckgestellt";
+  const [steuerFilter, setSteuerFilter] = useState(nurZurueckgestellt ? "zurueckgestellt" : "alle");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("alle");
   const [klassFilter, setKlassFilter] = useState<KlassFilter>("alle");
   const [kategorieFilter, setKategorieFilter] = useState<KategorieFilter>("alle");
@@ -356,7 +357,8 @@ export function BuchungenLedger({
     if (vNeu) params.set("von", vNeu);
     if (bNeu) params.set("bis", bNeu);
     const qs = params.toString();
-    router.push(qs ? `/buchungen?${qs}` : "/buchungen");
+    const pfad = nurZurueckgestellt ? "/buchungen/zurueckgestellt" : "/buchungen";
+    router.push(qs ? `${pfad}?${qs}` : pfad);
   }
 
   function zuruecksetzen() {
@@ -457,12 +459,12 @@ export function BuchungenLedger({
       {/* ───────────────── PAGE-HEADER ───────────────── */}
       <header>
         <h1 className="font-display text-[40px] font-bold leading-[1.05] tracking-[-0.024em]">
-          Buchungen
+          {nurZurueckgestellt ? "Zurückgestellte Buchungen" : "Buchungen"}
         </h1>
         <p className="mt-2 max-w-2xl text-[15px] text-muted-foreground">
-          Alle importierten Kontobewegungen. Der Agent klassifiziert sie
+          {nurZurueckgestellt ? "Vorübergehend aus den Steuerauswertungen ausgeschlossene Buchungen. Öffne eine Buchung, um den Grund zu sehen oder sie wieder aufzunehmen." : <>Alle importierten Kontobewegungen. Der Agent klassifiziert sie
           autonom — privat/geschäftlich, Steuerrelevanz, EÜR-Kategorie. Tippe
-          eine Zeile für Begründung und Audit-Trail.
+          eine Zeile für Begründung und Audit-Trail.</>}
         </p>
       </header>
 
@@ -737,7 +739,7 @@ export function BuchungenLedger({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="f-steuerstatus" className="text-xs text-muted-foreground">Steuerstatus</Label>
-            <Select value={steuerFilter} onValueChange={setSteuerFilter}>
+            <Select value={steuerFilter} onValueChange={setSteuerFilter} disabled={nurZurueckgestellt}>
               <SelectTrigger id="f-steuerstatus"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="alle">Alle Buchungen</SelectItem>

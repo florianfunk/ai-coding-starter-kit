@@ -32,6 +32,7 @@ const NAV_HEUTE: NavEintrag[] = [
 
 const NAV_BUECHER: NavEintrag[] = [
   { href: "/buchungen", label: "Buchungen" },
+  { href: "/buchungen/zurueckgestellt", label: "Zurückgestellte Buchungen" },
   { href: "/klassifizierung", label: "Klassifizierung" },
   // PROJ-15 P2 (#3): Kandidatenliste für neue Lernregeln.
   { href: "/klassifizierung/haeufige-empfaenger", label: "Häufige Empfänger" },

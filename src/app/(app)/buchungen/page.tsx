@@ -25,6 +25,7 @@ type Such = {
   // PROJ-34: Vorausgefüllte Volltextsuche aus der Command-Palette (?q=...).
   // Wird nur als initialer Client-Suchwert an den Ledger durchgereicht.
   q?: string;
+  steuerstatus?: "zurueckgestellt";
 };
 
 export default async function BuchungenPage({
@@ -41,6 +42,7 @@ export default async function BuchungenPage({
     von: typeof sp.von === "string" ? sp.von : undefined,
     bis: typeof sp.bis === "string" ? sp.bis : undefined,
     q: typeof sp.q === "string" ? sp.q : undefined,
+    steuerstatus: sp.steuerstatus === "zurueckgestellt" ? "zurueckgestellt" : undefined,
   };
 
   // PROJ-22: Datumsfenster über den globalen Jahreswähler auflösen. Fehlen
@@ -58,6 +60,7 @@ export default async function BuchungenPage({
     von: effVon ?? undefined,
     bis: effBis ?? undefined,
     q: rohFilter.q,
+    steuerstatus: rohFilter.steuerstatus,
   };
 
   const { data: kontenData } = await supabase
@@ -114,6 +117,7 @@ export default async function BuchungenPage({
         </Alert>
       ) : (
         <BuchungenLedger
+          key={filter.steuerstatus ?? "alle"}
           buchungen={(data ?? []) as Buchung[]}
           konten={konten}
           kategorien={kategorien}

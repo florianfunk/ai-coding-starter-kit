@@ -30,6 +30,14 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -119,6 +127,9 @@ export function KategorieDrilldown({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [zielKat, setZielKat] = useState<string>("");
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [privatIds, setPrivatIds] = useState<string[]>([]);
+  const [privatKategorieId, setPrivatKategorieId] = useState("");
+  const privateKategorien = kategorien.filter((k) => k.typ === "privat");
   // Detail-Sheet (Info-Button) — Buchung, deren Details gezeigt werden.
   const [detailId, setDetailId] = useState<string | null>(null);
   // Filter + Sortierung.
@@ -349,7 +360,7 @@ export function KategorieDrilldown({
    * andere Kategorie verschwinden sie aus dieser Ansicht.
    */
   async function bulkSetzen(ids: string[], zielKategorieId: string) {
-    if (ids.length === 0 || !zielKategorieId) return;
+    if (ids.length === 0 || !zielKategorieId) return false;
     setBulkBusy(true);
     try {
       const r = await fetch("/api/buchungen/bulk-kategorie", {
@@ -362,9 +373,11 @@ export function KategorieDrilldown({
         throw new Error(e?.error ?? `HTTP ${r.status}`);
       }
       const j = (await r.json()) as BulkKategorieResponse;
-      const idSet = new Set(ids);
+      if (j.aktualisiert === 0) throw new Error("Keine Buchung wurde geändert. Bitte lade die Liste neu.");
+      const idSet = new Set(ids.filter((id) => !j.uebersprungen.includes(id)));
       const gleicheKategorie = zielKategorieId === kategorie?.kategorie_id;
-      setBuchungen((bs) =>
+      if (j.aktualisiert !== idSet.size) ladeDaten();
+      else setBuchungen((bs) =>
         gleicheKategorie
           ? bs.map((b) =>
               idSet.has(b.id) ? { ...b, status: "manuell_bestaetigt" } : b,
@@ -377,8 +390,10 @@ export function KategorieDrilldown({
           (gleicheKategorie ? "" : ` → ${j.kategorie.bezeichnung}`),
       );
       onMutiert();
+      return true;
     } catch (e) {
       toast.error("Fehler: " + (e instanceof Error ? e.message : "unbekannt"));
+      return false;
     } finally {
       setBulkBusy(false);
     }
@@ -397,6 +412,16 @@ export function KategorieDrilldown({
   function auswahlUebernehmen() {
     const ziel = zielKat || kategorie?.kategorie_id || "";
     bulkSetzen(Array.from(selected), ziel);
+  }
+
+  function privatVorbereiten(ids: string[]) {
+    setPrivatKategorieId(privateKategorien.some((k) => k.id === zielKat) ? zielKat : "");
+    setPrivatIds(ids);
+  }
+
+  async function privatBuchen() {
+    if (!privateKategorien.some((k) => k.id === privatKategorieId)) return;
+    if (await bulkSetzen(privatIds, privatKategorieId)) setPrivatIds([]);
   }
 
   return (
@@ -456,6 +481,10 @@ export function KategorieDrilldown({
                     <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
                   ) : null}
                   {zielKat ? "Übernehmen & bestätigen" : "Auswahl bestätigen"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => privatVorbereiten(Array.from(selected))}
+                  disabled={bulkBusy || savingId !== null || isPending}>
+                  Auswahl als privat buchen
                 </Button>
                 <Button
                   size="sm"
@@ -550,7 +579,7 @@ export function KategorieDrilldown({
                   </SortKopf>
                   <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead className="w-[260px]">Kategorie ändern</TableHead>
-                  <TableHead className="w-[150px]"></TableHead>
+                  <TableHead className="w-[240px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -600,6 +629,7 @@ export function KategorieDrilldown({
                       <Checkbox
                         checked={selected.has(b.id)}
                         onCheckedChange={() => toggleZeile(b.id)}
+                        disabled={bulkBusy || savingId !== null}
                         aria-label="Zeile auswählen"
                       />
                     </TableCell>
@@ -638,7 +668,7 @@ export function KategorieDrilldown({
                         onChange={(v) => {
                           if (v) aendereKategorie(b, v);
                         }}
-                        disabled={savingId === b.id}
+                        disabled={bulkBusy || savingId !== null}
                         triggerClassName="h-8 text-xs"
                         placeholder="Kategorie wählen…"
                         ariaLabel="Kategorie wählen"
@@ -647,6 +677,12 @@ export function KategorieDrilldown({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
+                        <Button variant="outline" size="sm"
+                          onClick={() => privatVorbereiten([b.id])}
+                          disabled={bulkBusy || savingId !== null || isPending}
+                          aria-label={`Als privat buchen: ${b.empfaenger ?? deDate(b.buchung_datum)}`}>
+                          Als privat
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -666,7 +702,7 @@ export function KategorieDrilldown({
                           <Button
                             variant="outline"
                             size="sm"
-                            disabled={savingId === b.id}
+                            disabled={bulkBusy || savingId !== null}
                             onClick={() => bestaetige(b)}
                           >
                             {savingId === b.id ? (
@@ -696,6 +732,31 @@ export function KategorieDrilldown({
         </div>
       </SheetContent>
     </Sheet>
+
+    <Dialog open={privatIds.length > 0} onOpenChange={(o) => { if (!o && !bulkBusy) setPrivatIds([]); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Als privat buchen</DialogTitle>
+          <DialogDescription>
+            {privatIds.length} ausgewählte Buchung{privatIds.length === 1 ? " wird" : "en werden"} in die gewählte Privatkategorie verschoben
+            und manuell bestätigt. Sie zählen danach nicht zu den betrieblichen Einnahmen, Ausgaben oder zur Umsatzsteuer.
+          </DialogDescription>
+        </DialogHeader>
+        <KategorieCombobox kategorien={privateKategorien} value={privatKategorieId}
+          onChange={setPrivatKategorieId} ariaLabel="Privatkategorie wählen"
+          placeholder="Privatkategorie wählen…" disabled={bulkBusy} inDialog />
+        {privateKategorien.length === 0 && <p role="alert" className="text-sm text-destructive">
+          Es ist keine aktive Privatkategorie vorhanden. Bitte lege zuerst eine im Kontenrahmen an.
+        </p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPrivatIds([])} disabled={bulkBusy}>Abbrechen</Button>
+          <Button onClick={privatBuchen} disabled={bulkBusy || !privateKategorien.some((k) => k.id === privatKategorieId)}>
+            {bulkBusy ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+            Als privat buchen
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <BuchungDetailSheet
       buchungId={detailId}

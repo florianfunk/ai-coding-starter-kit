@@ -18,7 +18,7 @@ import {
   ustVaPerioden,
   parseDatum,
   type UstPeriode,
-  type UstRhythmus,
+  type UstRhythmusPlan,
 } from "@/lib/tax/perioden";
 
 /** Ampelstufe für die Frist-Dringlichkeit. */
@@ -39,7 +39,7 @@ export interface UstFristInfo {
 }
 
 export interface NaechsteUstFristArgs {
-  rhythmus: UstRhythmus;
+  rhythmus: UstRhythmusPlan;
   /** Heutiges Datum (ISO yyyy-MM-dd) — als Parameter, damit testbar. */
   heute: string;
   /** Bereits abgeschlossene USt-VA-Perioden (status='abgeschlossen'). */

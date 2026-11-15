@@ -36,7 +36,7 @@ import {
 import {
   ustVaPeriode,
   periodeFuerDatum,
-  type UstRhythmus,
+  type UstRhythmusProfil,
 } from "@/lib/tax/perioden";
 import {
   euerPdf,
@@ -57,7 +57,7 @@ import { ladeAlle } from "@/lib/supabase/fetch-all";
 
 export const runtime = "nodejs";
 
-interface ProfilRow {
+interface ProfilRow extends UstRhythmusProfil {
   firmenname: string;
   inhaber: string;
   steuernummer: string | null;
@@ -72,7 +72,7 @@ interface ProfilRow {
 }
 
 const SELECT_PROFIL =
-  "firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, ust_status, ust_va_rhythmus, wirtschaftsjahr_beginn";
+  "firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, ust_status, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, wirtschaftsjahr_beginn";
 
 const SELECT_BUCHUNG =
   "id, konto_id, buchung_datum, betrag, verwendungszweck, empfaenger, waehrung, klassifikation, steuerrelevant, steuer_zurueckgestellt, steuer_zurueckgestellt_grund, steuer_zurueckgestellt_am, steuer_zurueckstellung_version, kategorie_id, ust_satz, begruendung, konfidenz, quelle, status, pruef_grund, parent_buchung_id, split_anteil, gemerkt_am";
@@ -80,13 +80,6 @@ const SELECT_BUCHUNG =
 const SELECT_KATEGORIE =
   "id, bezeichnung, typ, ust_satz, euer_zeile, elster_kennzahl, aktiv, gueltig_ab";
 
-function rhythmusVon(p: ProfilRow): UstRhythmus {
-  return p.ust_va_rhythmus === "quartalsweise"
-    ? "quartalsweise"
-    : p.ust_va_rhythmus === "jaehrlich"
-      ? "jaehrlich"
-      : "monatlich";
-}
 
 function firmenKopf(p: ProfilRow): FirmenKopf {
   return {
@@ -424,7 +417,7 @@ async function ladeUstVaBerechnung(
   | { ok: true; berechnung: UstBerechnung; vorlaeufig: boolean; label: string }
   | { ok: false; response: NextResponse }
 > {
-  const rhy = rhythmusVon(profil);
+  const rhy = profil;
   const p = ustVaPeriode(jahr, periode, rhy);
   if (!p) {
     return {

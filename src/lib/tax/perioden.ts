@@ -19,6 +19,14 @@ import {
 
 export type UstRhythmus = "monatlich" | "quartalsweise" | "jaehrlich";
 
+export interface UstRhythmusProfil {
+  ust_va_rhythmus: UstRhythmus;
+  rhythmus_gueltig_ab?: string | null;
+  ust_va_rhythmus_vorher?: UstRhythmus | null;
+}
+
+export type UstRhythmusPlan = UstRhythmus | UstRhythmusProfil;
+
 /** Eine USt-VA-Periode innerhalb eines Kalenderjahres. */
 export interface UstPeriode {
   /** Kalenderjahr der Periode. */
@@ -117,8 +125,16 @@ export function wirtschaftsjahrZuDatum(
  */
 export function ustVaPerioden(
   jahr: number,
-  rhythmus: UstRhythmus,
+  rhythmus: UstRhythmusPlan,
 ): UstPeriode[] {
+  if (typeof rhythmus !== "string") {
+    const { ust_va_rhythmus: neu, ust_va_rhythmus_vorher: alt, rhythmus_gueltig_ab: ab } = rhythmus;
+    if (!alt || !ab) return ustVaPerioden(jahr, neu);
+    return [
+      ...ustVaPerioden(jahr, alt).filter((p) => p.ende < ab),
+      ...ustVaPerioden(jahr, neu).filter((p) => p.start >= ab),
+    ];
+  }
   if (rhythmus === "jaehrlich") {
     return [
       {
@@ -168,7 +184,7 @@ export function ustVaPerioden(
 export function periodeFuerDatum(
   datumIso: string | null | undefined,
   jahr: number,
-  rhythmus: UstRhythmus,
+  rhythmus: UstRhythmusPlan,
 ): UstPeriode | null {
   if (!datumIso) return null;
   let d: Date;
@@ -197,11 +213,17 @@ export function periodeFuerDatum(
 export function ustVaPeriode(
   jahr: number,
   periode: number,
-  rhythmus: UstRhythmus,
+  rhythmus: UstRhythmusPlan,
 ): UstPeriode | null {
   return (
     ustVaPerioden(jahr, rhythmus).find((p) => p.periode === periode) ?? null
   );
+}
+
+/** Tatsächlicher Rhythmus einer erzeugten Periode, auch im Wechseljahr. */
+export function rhythmusFuerPeriode(p: UstPeriode): UstRhythmus {
+  if (p.periode === 0) return "jaehrlich";
+  return p.start.slice(0, 7) === p.ende.slice(0, 7) ? "monatlich" : "quartalsweise";
 }
 
 /** Robustes ISO-Datum-Parsing (yyyy-MM-dd, auch mit Zeitanteil). */

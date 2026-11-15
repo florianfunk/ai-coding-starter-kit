@@ -13,7 +13,7 @@
 // ohne echten Versand und ohne echte DB (Client mockbar).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { UstRhythmus } from "@/lib/tax/perioden";
+import type { UstRhythmus, UstRhythmusPlan } from "@/lib/tax/perioden";
 import { naechsteUstFrist } from "@/lib/dashboard/fristen";
 import {
   bestimmeFaelligeErinnerung,
@@ -61,6 +61,8 @@ export interface CronRunnerSummary {
 interface ProfilRow {
   owner_id: string;
   ust_va_rhythmus: UstRhythmus | null;
+  ust_va_rhythmus_vorher?: UstRhythmus | null;
+  rhythmus_gueltig_ab?: string | null;
   dauerfristverlaengerung: boolean | null;
   fristen_mail_aktiv: boolean | null;
 }
@@ -78,7 +80,7 @@ export async function laufFristenErinnerung(
   const { data: profil, error: profilError } = await supabase
     .from("firmenprofil")
     .select(
-      "owner_id, ust_va_rhythmus, dauerfristverlaengerung, fristen_mail_aktiv",
+      "owner_id, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, dauerfristverlaengerung, fristen_mail_aktiv",
     )
     .limit(1)
     .maybeSingle();
@@ -93,7 +95,11 @@ export async function laufFristenErinnerung(
   }
 
   const ownerId = p.owner_id;
-  const rhythmus: UstRhythmus = p.ust_va_rhythmus ?? "monatlich";
+  const rhythmus: UstRhythmusPlan = {
+    ust_va_rhythmus: p.ust_va_rhythmus ?? "monatlich",
+    ust_va_rhythmus_vorher: p.ust_va_rhythmus_vorher,
+    rhythmus_gueltig_ab: p.rhythmus_gueltig_ab,
+  };
   const dauerfrist = p.dauerfristverlaengerung ?? false;
   const optIn = p.fristen_mail_aktiv ?? false;
 

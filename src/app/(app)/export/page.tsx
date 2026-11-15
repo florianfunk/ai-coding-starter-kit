@@ -9,7 +9,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExportAuswahl } from "@/components/export/export-auswahl";
-import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
+import { ustVaPerioden, rhythmusFuerPeriode, type UstRhythmus, type UstRhythmusProfil } from "@/lib/tax/perioden";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { ladeAktivesJahr } from "@/lib/jahr/aktives-jahr";
 
@@ -17,16 +17,8 @@ export const metadata = {
   title: "Export · STEUERAGENT",
 };
 
-interface ProfilRow {
+interface ProfilRow extends UstRhythmusProfil {
   ust_va_rhythmus: "monatlich" | "quartalsweise" | "jaehrlich";
-}
-
-function rhythmusVon(p: ProfilRow): UstRhythmus {
-  return p.ust_va_rhythmus === "quartalsweise"
-    ? "quartalsweise"
-    : p.ust_va_rhythmus === "jaehrlich"
-      ? "jaehrlich"
-      : "monatlich";
 }
 
 export default async function ExportPage() {
@@ -35,7 +27,7 @@ export default async function ExportPage() {
 
   const { data: profilData } = await supabase
     .from("firmenprofil")
-    .select("ust_va_rhythmus")
+    .select("ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab")
     .eq("owner_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -76,14 +68,18 @@ export default async function ExportPage() {
       ? aktivesJahr
       : (jahre[0] ?? heute);
 
-  const rhy: UstRhythmus = profil ? rhythmusVon(profil) : "monatlich";
+  const rhy = profil?.ust_va_rhythmus ?? "monatlich";
   // Perioden je auswählbarem Jahr (für USt-VA/ELSTER).
   const periodenProJahr: Record<
     number,
     Array<{ periode: number; label: string }>
   > = {};
+  const rhythmusProJahr: Record<number, UstRhythmus | "wechsel"> = {};
   for (const j of jahre) {
-    periodenProJahr[j] = ustVaPerioden(j, rhy).map((p) => ({
+    const perioden = ustVaPerioden(j, profil ?? rhy);
+    const rhythmen = new Set(perioden.map(rhythmusFuerPeriode));
+    rhythmusProJahr[j] = rhythmen.size > 1 ? "wechsel" : (rhythmen.values().next().value ?? rhy);
+    periodenProJahr[j] = perioden.map((p) => ({
       periode: p.periode,
       label: p.label,
     }));
@@ -110,6 +106,7 @@ export default async function ExportPage() {
           key={vorgewaehlt}
           jahre={jahre}
           rhythmus={rhy}
+          rhythmusProJahr={rhythmusProJahr}
           periodenProJahr={periodenProJahr}
           jahrInitial={vorgewaehlt}
         />

@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { createClient } from "@/lib/supabase/server";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { UstvaAnsicht } from "@/components/ustva/ustva-ansicht";
-import { ustVaPerioden, type UstRhythmus } from "@/lib/tax/perioden";
+import { ustVaPerioden, type UstRhythmusProfil } from "@/lib/tax/perioden";
 import type { UstStatus } from "@/lib/types";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { ladeJahrKontext, parseJahrParam } from "@/lib/jahr/aktives-jahr";
@@ -16,17 +16,9 @@ export const metadata = {
   title: "USt-Voranmeldung · STEUERAGENT",
 };
 
-interface ProfilRow {
+interface ProfilRow extends UstRhythmusProfil {
   ust_status: UstStatus;
   ust_va_rhythmus: "monatlich" | "quartalsweise" | "jaehrlich";
-}
-
-function rhythmusVon(p: ProfilRow): UstRhythmus {
-  return p.ust_va_rhythmus === "quartalsweise"
-    ? "quartalsweise"
-    : p.ust_va_rhythmus === "jaehrlich"
-      ? "jaehrlich"
-      : "monatlich";
 }
 
 export default async function UstVoranmeldungPage({
@@ -40,7 +32,7 @@ export default async function UstVoranmeldungPage({
 
   const { data: profilData } = await supabase
     .from("firmenprofil")
-    .select("ust_status, ust_va_rhythmus")
+    .select("ust_status, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab")
     .eq("owner_id", user.id)
     .limit(1)
     .maybeSingle();
@@ -76,10 +68,13 @@ export default async function UstVoranmeldungPage({
         </Alert>
       ) : (
         <UstvaAnsicht
-          rhythmus={rhythmusVon(profil)}
+          key={`${jahr}:${profil.ust_va_rhythmus}:${profil.rhythmus_gueltig_ab ?? ""}`}
+          rhythmus={profil.ust_va_rhythmus}
+          rhythmusVorher={profil.ust_va_rhythmus_vorher ?? null}
+          rhythmusGueltigAb={profil.rhythmus_gueltig_ab ?? null}
           ustStatus={profil.ust_status}
           jahr={jahr}
-          perioden={ustVaPerioden(jahr, rhythmusVon(profil)).map(
+          perioden={ustVaPerioden(jahr, profil).map(
             (p) => ({ periode: p.periode, label: p.label }),
           )}
         />

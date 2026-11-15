@@ -48,6 +48,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { KennzahlDrilldown } from "./kennzahl-drilldown";
+import { UstRhythmusEinstellung } from "./ust-rhythmus-einstellung";
 import {
   formatEuro,
   type KennzahlZeileDTO,
@@ -70,16 +71,24 @@ const STATUS_VARIANT: Record<
 
 export function UstvaAnsicht({
   rhythmus,
+  rhythmusVorher = null,
+  rhythmusGueltigAb = null,
   ustStatus,
   jahr,
   perioden,
 }: {
   rhythmus: UstRhythmus;
+  rhythmusVorher?: UstRhythmus | null;
+  rhythmusGueltigAb?: string | null;
   ustStatus: UstStatus;
   jahr: number;
   perioden: Array<{ periode: number; label: string }>;
 }) {
-  const [periode, setPeriode] = useState<number>(perioden[0]?.periode ?? 0);
+  const [periode, setPeriode] = useState<number>(() => {
+    const wechselMonat = rhythmusVorher && rhythmusGueltigAb?.startsWith(`${jahr}-`)
+      ? Number(rhythmusGueltigAb.slice(5, 7)) : null;
+    return perioden.find((p) => p.periode === wechselMonat)?.periode ?? perioden[0]?.periode ?? 0;
+  });
   const [daten, setDaten] = useState<UstApiResponse | null>(null);
   const [laden, setLaden] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -184,18 +193,19 @@ export function UstvaAnsicht({
         <CardHeader>
           <CardTitle>Voranmeldungszeitraum {jahr}</CardTitle>
           <CardDescription>
-            Rhythmus laut Steuerprofil:{" "}
+            {rhythmusVorher ? "Datierter Rhythmuswechsel laut Steuerprofil" : <>Rhythmus laut Steuerprofil:{" "}
             {rhythmus === "monatlich"
               ? "monatlich"
               : rhythmus === "quartalsweise"
                 ? "quartalsweise"
-                : "jährlich"}
+                : "jährlich"}</>}
             {ustStatus === "kleinunternehmer"
               ? " · Kleinunternehmer (§ 19 UStG)"
               : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <UstRhythmusEinstellung rhythmus={rhythmus} vorher={rhythmusVorher} gueltigAb={rhythmusGueltigAb} jahr={jahr} />
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-full max-w-xs space-y-2">
               <label

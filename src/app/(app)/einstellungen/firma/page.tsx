@@ -20,7 +20,7 @@ export default async function FirmaPage() {
   const { data, error } = await supabase
     .from("firmenprofil")
     .select(
-      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab",
+      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, dauerfristverlaengerung",
     )
     .eq("owner_id", user.id)
     .maybeSingle();

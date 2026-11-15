@@ -97,11 +97,13 @@ const RHY_LABEL: Record<UstRhythmus, string> = {
 export function ExportAuswahl({
   jahre,
   rhythmus,
+  rhythmusProJahr,
   periodenProJahr,
   jahrInitial,
 }: {
   jahre: number[];
   rhythmus: UstRhythmus;
+  rhythmusProJahr?: Record<number, UstRhythmus | "wechsel">;
   periodenProJahr: Record<number, Array<{ periode: number; label: string }>>;
   /** PROJ-22: Vorauswahl (aktives Jahr). Default: jüngstes Jahr. */
   jahrInitial?: number;
@@ -115,6 +117,8 @@ export function ExportAuswahl({
   const [laden, setLaden] = useState(false);
   const [statusLaden, setStatusLaden] = useState(false);
   const [abgeschlossen, setAbgeschlossen] = useState<boolean | null>(null);
+
+  const jahresRhythmus = rhythmusProJahr?.[jahr] ?? rhythmus;
 
   const typ = useMemo(
     () => TYPEN.find((t) => t.id === typId) ?? TYPEN[0],
@@ -267,7 +271,7 @@ export function ExportAuswahl({
           <CardTitle>Zeitraum &amp; Format</CardTitle>
           <CardDescription>
             USt-VA/ELSTER nutzen Perioden (Rhythmus laut Steuerprofil:{" "}
-            {RHY_LABEL[rhythmus]}), übrige Exporte das Wirtschaftsjahr.
+            {jahresRhythmus === "wechsel" ? "Quartale und Monate gemäß Wechseltermin" : RHY_LABEL[jahresRhythmus]}), übrige Exporte das Wirtschaftsjahr.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -19,7 +19,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("firmenprofil")
     .select(
-      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab, dauerfristverlaengerung",
+      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, dauerfristverlaengerung",
     )
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -66,33 +66,30 @@ export async function PUT(request: Request) {
   const v = parsed.data;
   const supabase = await createClient();
 
-  // Upsert auf unique(owner_id): genau ein Datensatz pro Account.
-  const { data, error } = await supabase
-    .from("firmenprofil")
-    .upsert(
-      {
-        owner_id: user.id,
-        firmenname: v.firmenname,
-        inhaber: v.inhaber,
-        steuernummer: v.steuernummer ?? null,
-        ust_idnr: v.ust_idnr ?? null,
-        strasse: v.strasse ?? null,
-        plz: v.plz ?? null,
-        ort: v.ort ?? null,
-        finanzamt: v.finanzamt ?? null,
-        rechtsform: v.rechtsform,
-        ust_status: v.ust_status,
-        wirtschaftsjahr_beginn: v.wirtschaftsjahr_beginn,
-        ust_va_rhythmus: v.ust_va_rhythmus,
-        rhythmus_gueltig_ab: v.rhythmus_gueltig_ab ?? null,
-        dauerfristverlaengerung: v.dauerfristverlaengerung,
-      },
-      { onConflict: "owner_id" },
-    )
-    .select(
-      "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, rhythmus_gueltig_ab, dauerfristverlaengerung",
-    )
-    .single();
+  const { data: bisher, error: leseFehler } = await supabase.from("firmenprofil")
+    .select("ust_va_rhythmus, rhythmus_gueltig_ab").eq("owner_id", user.id).maybeSingle();
+  if (leseFehler) return NextResponse.json({ error: "Profil konnte nicht geladen werden." }, { status: 500 });
+  if (bisher && (bisher.ust_va_rhythmus !== v.ust_va_rhythmus ||
+    (bisher.rhythmus_gueltig_ab ?? null) !== (v.rhythmus_gueltig_ab ?? null))) {
+    return NextResponse.json({ error: "Bitte den Abgaberhythmus direkt in der USt-Voranmeldung umstellen. Dort bleiben frühere Zeiträume erhalten." }, { status: 409 });
+  }
+
+  const stammdaten = {
+    firmenname: v.firmenname, inhaber: v.inhaber,
+    steuernummer: v.steuernummer ?? null, ust_idnr: v.ust_idnr ?? null,
+    strasse: v.strasse ?? null, plz: v.plz ?? null, ort: v.ort ?? null,
+    finanzamt: v.finanzamt ?? null, rechtsform: v.rechtsform,
+    ust_status: v.ust_status, wirtschaftsjahr_beginn: v.wirtschaftsjahr_beginn,
+    dauerfristverlaengerung: v.dauerfristverlaengerung,
+  };
+  // Update statt Upsert: ausgelassene Rhythmusfelder dürfen nicht auf Defaults zurückfallen.
+  const speicherQuery = bisher
+    ? supabase.from("firmenprofil").update(stammdaten).eq("owner_id", user.id)
+    : supabase.from("firmenprofil").insert({ ...stammdaten, owner_id: user.id,
+      ust_va_rhythmus: v.ust_va_rhythmus, rhythmus_gueltig_ab: v.rhythmus_gueltig_ab ?? null });
+  const { data, error } = await speicherQuery.select(
+    "id, firmenname, inhaber, steuernummer, ust_idnr, strasse, plz, ort, finanzamt, rechtsform, ust_status, wirtschaftsjahr_beginn, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, dauerfristverlaengerung",
+  ).single();
 
   if (error) {
     return NextResponse.json(

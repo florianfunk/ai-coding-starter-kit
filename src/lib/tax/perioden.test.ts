@@ -6,7 +6,35 @@ import {
   wirtschaftsjahrGrenzen,
   wirtschaftsjahrZuDatum,
   parseDatum,
+  rhythmusFuerPeriode,
 } from "./perioden";
+
+describe("Datierter Wechsel von Quartalen auf Monate", () => {
+  const profil = { ust_va_rhythmus: "monatlich", ust_va_rhythmus_vorher: "quartalsweise", rhythmus_gueltig_ab: "2026-04-01" } as const;
+  it("behält frühere Jahre und Q1 und erzeugt ab April Monatsperioden", () => {
+    expect(ustVaPerioden(2025, profil).map((p) => p.label)).toEqual(["Q1 2025", "Q2 2025", "Q3 2025", "Q4 2025"]);
+    const perioden = ustVaPerioden(2026, profil);
+    expect(perioden).toHaveLength(10);
+    expect(perioden.map((p) => p.periode)).toEqual([1, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(perioden[0]).toMatchObject({ label: "Q1 2026", start: "2026-01-01", ende: "2026-03-31" });
+    expect(perioden[1]).toMatchObject({ label: "April 2026", start: "2026-04-01", ende: "2026-04-30" });
+    expect(rhythmusFuerPeriode(perioden[0])).toBe("quartalsweise");
+    expect(rhythmusFuerPeriode(perioden[1])).toBe("monatlich");
+    expect(ustVaPerioden(2027, profil)).toHaveLength(12);
+  });
+  it("ordnet Buchungen an der Grenze genau einer Periode zu", () => {
+    expect(periodeFuerDatum("2026-03-31", 2026, profil)?.periode).toBe(1);
+    expect(periodeFuerDatum("2026-04-01", 2026, profil)?.periode).toBe(4);
+    expect(ustVaPeriode(2026, 2, profil)).toBeNull();
+    expect(ustVaPeriode(2026, 4, profil)?.label).toBe("April 2026");
+    for (let monat=1; monat<=12; monat++) {
+      expect(periodeFuerDatum(`2026-${String(monat).padStart(2, "0")}-15`, 2026, profil)).not.toBeNull();
+    }
+  });
+  it("bewahrt das bisherige Verhalten bei Profilen ohne gespeicherten Wechsel", () => {
+    expect(ustVaPerioden(2026, { ust_va_rhythmus: "monatlich", rhythmus_gueltig_ab: "2026-04-01" })).toHaveLength(12);
+  });
+});
 
 describe("ustVaPerioden", () => {
   it("liefert 12 Monatsperioden bei monatlichem Rhythmus", () => {

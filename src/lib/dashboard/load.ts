@@ -23,7 +23,7 @@ import { berechneYoy, minusEinJahr } from "./yoy";
 import { naechsteUstFrist } from "./fristen";
 import { berechneHealthScore } from "./health-score";
 import { ladeAktivitaet } from "./aktivitaet";
-import type { UstRhythmus } from "@/lib/tax/perioden";
+import { ustVaPeriode, type UstRhythmus, type UstRhythmusPlan } from "@/lib/tax/perioden";
 
 /** Heutiges Datum als ISO yyyy-MM-dd (UTC, stabil & testbar separat). */
 function heuteIso(): string {
@@ -87,7 +87,7 @@ export async function ladeDashboardAggregat(
   const { data: profil } = await supabase
     .from("firmenprofil")
     .select(
-      "wirtschaftsjahr_beginn, firmenname, ust_va_rhythmus, dauerfristverlaengerung",
+      "wirtschaftsjahr_beginn, firmenname, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab, dauerfristverlaengerung",
     )
     .eq("owner_id", ownerId)
     .limit(1)
@@ -96,11 +96,17 @@ export async function ladeDashboardAggregat(
     wirtschaftsjahr_beginn?: number;
     firmenname?: string | null;
     ust_va_rhythmus?: UstRhythmus | null;
+    ust_va_rhythmus_vorher?: UstRhythmus | null;
+    rhythmus_gueltig_ab?: string | null;
     dauerfristverlaengerung?: boolean | null;
   } | null;
   const wjBeginn = profilRow?.wirtschaftsjahr_beginn ?? 1;
   const profilAngelegt = !!profilRow?.firmenname?.trim();
-  const ustRhythmus: UstRhythmus = profilRow?.ust_va_rhythmus ?? "monatlich";
+  const ustRhythmus: UstRhythmusPlan = {
+    ust_va_rhythmus: profilRow?.ust_va_rhythmus ?? "monatlich",
+    ust_va_rhythmus_vorher: profilRow?.ust_va_rhythmus_vorher,
+    rhythmus_gueltig_ab: profilRow?.rhythmus_gueltig_ab,
+  };
   const dauerfrist = profilRow?.dauerfristverlaengerung ?? false;
 
   // PROJ-22: Globales aktives Jahr berücksichtigen. Die Jahres-Kennzahlen
@@ -329,7 +335,10 @@ export async function ladeDashboardAggregat(
       periode: number | null;
       status: "offen" | "geprueft" | "abgeschlossen";
     }>,
-  );
+  ).map((p) => {
+    const ustPeriode = p.art === "ust_va" ? ustVaPeriode(p.jahr, p.periode ?? 0, ustRhythmus) : null;
+    return ustPeriode ? { ...p, label: `USt-VA ${ustPeriode.label}` } : p;
+  });
 
   const [paperlessJob, importJob] = await Promise.all([
     letzterJob(supabase, ownerId, "paperless_sync"),

@@ -4,6 +4,7 @@
 // react-hook-form + zod (gemeinsames Schema), shadcn/ui-Primitiven, Speichern via PUT /api/firma.
 
 import { useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -414,6 +415,7 @@ export function FirmaForm({
                     <Select
                       onValueChange={field.onChange}
                       value={field.value}
+                      disabled={!isNew}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -441,10 +443,10 @@ export function FirmaForm({
                 <FormItem className="sm:max-w-xs">
                   <FormLabel>Rhythmus gültig ab</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} />
+                    <Input type="date" {...field} disabled={!isNew} />
                   </FormControl>
                   <FormDescription>
-                    Optional — relevant bei Rhythmuswechsel mitten im Jahr.
+                    {isNew ? "Optionaler Beginn des Rhythmus." : <Link href="/ust-voranmeldung" className="underline">Abgaberhythmus in der USt-Voranmeldung ändern</Link>}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

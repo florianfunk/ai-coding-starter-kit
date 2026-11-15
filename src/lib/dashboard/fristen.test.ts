@@ -1,6 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { naechsteUstFrist } from "./fristen";
 
+it("berechnet im Wechseljahr die April-Frist nach dem abgeschlossenen Q1", () => {
+  const r = naechsteUstFrist({
+    rhythmus: { ust_va_rhythmus: "monatlich", ust_va_rhythmus_vorher: "quartalsweise", rhythmus_gueltig_ab: "2026-04-01" },
+    heute: "2026-04-12", dauerfristverlaengerung: false,
+    abgeschlossene_perioden: [...[1, 2, 3, 4].map((periode) => ({ jahr: 2025, periode })), { jahr: 2026, periode: 1 }],
+  });
+  expect(r?.periode.label).toBe("April 2026");
+  expect(r?.abgabefrist).toBe("2026-05-10");
+});
+
 // Helfer: alle Monate eines Jahres als "abgeschlossen" (realistische Eingabe:
 // die Vergangenheit ist regulär eingereicht, nur die jüngsten Perioden sind
 // noch offen). Ohne das würde der Rechner korrekt die ÄLTESTE noch offene

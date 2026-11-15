@@ -32,17 +32,17 @@ import { berechneUstVa, type UstBuchung } from "@/lib/tax/ust";
 import { ladeAlle } from "@/lib/supabase/fetch-all";
 import {
   ustVaPerioden,
+  rhythmusFuerPeriode,
   ustVaPeriode,
   periodeFuerDatum,
-  type UstRhythmus,
+  type UstRhythmusProfil,
 } from "@/lib/tax/perioden";
-import type { Firmenprofil, UstStatus } from "@/lib/types";
+import type { UstStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-interface ProfilRow {
+interface ProfilRow extends UstRhythmusProfil {
   ust_status: UstStatus;
-  ust_va_rhythmus: Firmenprofil["ust_va_rhythmus"];
 }
 
 interface BuchungRow {
@@ -60,22 +60,13 @@ interface BuchungRow {
 const SELECT_BUCHUNG =
   "id, buchung_datum, betrag, verwendungszweck, empfaenger, klassifikation, steuerrelevant, ust_satz, status";
 
-/** Rhythmus → kanonische perioden.ts-Variante. */
-function rhythmus(p: ProfilRow): UstRhythmus {
-  return p.ust_va_rhythmus === "quartalsweise"
-    ? "quartalsweise"
-    : p.ust_va_rhythmus === "jaehrlich"
-      ? "jaehrlich"
-      : "monatlich";
-}
-
 async function ladeProfil(
   supabase: Awaited<ReturnType<typeof createClient>>,
   ownerId: string,
 ): Promise<ProfilRow | null> {
   const { data } = await supabase
     .from("firmenprofil")
-    .select("ust_status, ust_va_rhythmus")
+    .select("ust_status, ust_va_rhythmus, ust_va_rhythmus_vorher, rhythmus_gueltig_ab")
     .eq("owner_id", ownerId)
     .limit(1)
     .maybeSingle();
@@ -136,7 +127,7 @@ export async function GET(request: Request) {
       { status: 409 },
     );
   }
-  const rhy = rhythmus(profil);
+  const rhy = profil;
 
   const periodenListe = ustVaPerioden(jahr, rhy);
   const aktuell = ustVaPeriode(jahr, periode, rhy);
@@ -275,7 +266,7 @@ export async function GET(request: Request) {
     jahr,
     periode,
     periode_label: aktuell.label,
-    rhythmus: rhy,
+    rhythmus: rhythmusFuerPeriode(aktuell),
     buchung_details: buchungDetails,
     status: periodeRow
       ? (periodeRow as { status: string }).status
@@ -341,7 +332,7 @@ export async function POST(request: Request) {
       { status: 409 },
     );
   }
-  const rhy = rhythmus(profil);
+  const rhy = profil;
   const aktuell = ustVaPeriode(jahr, periode, rhy);
   if (!aktuell) {
     return NextResponse.json(
@@ -420,7 +411,7 @@ export async function POST(request: Request) {
   const snapshot = {
     rueckstellungen_version: rueckstellungenVersion,
     zeitraum: { von: aktuell.start, bis: aktuell.ende },
-    rhythmus: rhy,
+    rhythmus: rhythmusFuerPeriode(aktuell),
     ...berechnung,
     abgeschlossen_am: new Date().toISOString(),
   } as unknown as Record<string, unknown>;

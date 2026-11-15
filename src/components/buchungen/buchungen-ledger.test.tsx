@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { Buchung } from "@/lib/types";
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-}));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/components/buchungen/buchung-detail-sheet", () => ({
   BuchungDetailSheet: () => null,
 }));
@@ -33,7 +32,7 @@ const buchungen = [
 ];
 
 function anzeigen(filter: { steuerstatus?: "zurueckgestellt" } = {}) {
-  render(<BuchungenLedger buchungen={buchungen} konten={[]} kategorien={[
+  return render(<BuchungenLedger buchungen={buchungen} konten={[]} kategorien={[
     { id: "kategorie", bezeichnung: "Kategorie mit 19 %", ust_satz: 19,
       typ: "ausgabe", euer_zeile: null, elster_kennzahl: null, aktiv: true, gueltig_ab: null },
   ]} filter={filter} />);
@@ -45,10 +44,11 @@ function waehlen(label: string, option: string) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   // Radix scrollt beim Öffnen zur ausgewählten Option; jsdom hat kein Layout.
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("Steuersatzfilter im Buchungsledger", () => {
   it("zeigt 0 %, fehlende und andere Sätze anhand der Buchung statt der Kategorie", () => {
@@ -92,5 +92,36 @@ describe("Steuersatzfilter im Buchungsledger", () => {
     expect(screen.getByText("Zurückgestellt ohne Satz")).toBeVisible();
     waehlen("Steuersatz", "Alle Steuersätze");
     expect(screen.getByRole("combobox", { name: "Steuersatz" })).toHaveTextContent("Alle Steuersätze");
+  });
+});
+
+describe("Steuersatz-Sammeländerung im Buchungsledger", () => {
+  it("ändert nur die sichtbare Auswahl, auch wenn vor dem Filtern alle markiert waren", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({
+      aktualisiert: 5, uebersprungen: [], ust_satz: 19,
+    }) });
+    vi.stubGlobal("fetch", fetchMock);
+    const ansicht = anzeigen();
+    expect(screen.getByRole("button", { name: "Steuersatz ändern" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Alle sichtbaren Buchungen auswählen" }));
+    waehlen("Steuersatz", "Weder 19 % noch 7 %");
+    expect(screen.getByText("5 ausgewählt")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Steuersatz ändern" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Für 5 ausgewählte Buchungen");
+    waehlen("Neuer Steuersatz", "19 %");
+    fireEvent.click(screen.getByRole("button", { name: "Steuersatz speichern" }));
+    await waitFor(() => expect(router.refresh).toHaveBeenCalledOnce());
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      ids: buchungen.filter((b) => b.ust_satz !== 19 && b.ust_satz !== 7).map((b) => b.id),
+      ust_satz: 19,
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Steuersatz ändern" })).toBeDisabled();
+    ansicht.rerender(<BuchungenLedger
+      buchungen={buchungen.map((b) => ({ ...b, ust_satz: b.ust_satz === 7 ? 7 : 19 }))}
+      konten={[]} kategorien={[]} filter={{}}
+    />);
+    expect(screen.getByText("Keine Treffer")).toBeVisible();
+    expect(screen.getByText("Einträge").nextElementSibling).toHaveTextContent("0");
   });
 });

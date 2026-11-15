@@ -35,6 +35,7 @@ import type {
   Konto,
 } from "@/lib/types";
 import { BuchungDetailSheet } from "@/components/buchungen/buchung-detail-sheet";
+import { SteuersatzBulkDialog } from "@/components/buchungen/steuersatz-bulk-dialog";
 import { MerkenStern } from "@/components/merkliste/merken-stern";
 import { useMerkSet } from "@/hooks/use-merk-set";
 import { Button } from "@/components/ui/button";
@@ -214,6 +215,7 @@ export function BuchungenLedger({
   const [detailOffen, setDetailOffen] = useState(false);
   // PROJ-15 P2 (#1): Multi-Select für Re-Klassifizierung.
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  const [steuersatzAuswahl, setSteuersatzAuswahl] = useState<string[]>([]);
 
   // PROJ-20: Merken-Status (Set) wird hier zentral gehalten, damit Zeile und
   // Detail-Sheet derselben Buchung synchron bleiben.
@@ -422,6 +424,7 @@ export function BuchungenLedger({
   }
 
   const istLeer = sortiert.length === 0;
+  const sichtbareAuswahl = sortiert.filter((b) => auswahl.has(b.id)).map((b) => b.id);
   const alleGewaehlt =
     sortiert.length > 0 && sortiert.every((b) => auswahl.has(b.id));
   const hatFilter =
@@ -798,20 +801,21 @@ export function BuchungenLedger({
         </div>
       )}
 
-      {/* ───────────────── AUSWAHL-LEISTE (Re-Klassifizierung) ─────────────── */}
+      {/* ───────────────── AUSWAHL-LEISTE ─────────────── */}
       {!istLeer && (
         <section className="flex flex-col gap-3 rounded-[var(--radius)] bg-card px-4 py-3 shadow-[var(--shadow-1)] ring-1 ring-line/60 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Checkbox
-              checked={alleGewaehlt}
+              id="buchungen-alle"
+              checked={alleGewaehlt ? true : sichtbareAuswahl.length > 0 ? "indeterminate" : false}
               onCheckedChange={(v) => alleSichtbarenWaehlen(Boolean(v))}
               aria-label="Alle sichtbaren Buchungen auswählen"
             />
-            <span className="text-[13px] text-muted-foreground">
-              {auswahl.size > 0
-                ? `${auswahl.size} ausgewählt`
-                : "Buchungen auswählen, um sie neu zu klassifizieren"}
-            </span>
+            <Label htmlFor="buchungen-alle" className="cursor-pointer text-[13px] font-normal text-muted-foreground">
+              {sichtbareAuswahl.length > 0
+                ? `${sichtbareAuswahl.length} ausgewählt`
+                : "Alle angezeigten Buchungen auswählen"}
+            </Label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {auswahl.size > 0 && (
@@ -825,8 +829,16 @@ export function BuchungenLedger({
             )}
             <Button
               variant="outline"
+              onClick={() => setSteuersatzAuswahl(sichtbareAuswahl)}
+              disabled={sichtbareAuswahl.length === 0 || reklassPending}
+              className="h-9 rounded-full font-semibold"
+            >
+              Steuersatz ändern
+            </Button>
+            <Button
+              variant="outline"
               onClick={reklassifiziereAuswahl}
-              disabled={auswahl.size === 0 || reklassPending}
+              disabled={sichtbareAuswahl.length === 0 || reklassPending}
               title="Ausgewählte Buchungen mit dem aktuellen Wissen erneut klassifizieren (manuell bestätigte werden übersprungen)"
               className="h-9 rounded-full font-semibold"
             >
@@ -900,6 +912,21 @@ export function BuchungenLedger({
             );
           })}
         </section>
+      )}
+
+      {steuersatzAuswahl.length > 0 && (
+        <SteuersatzBulkDialog
+          ids={steuersatzAuswahl}
+          onClose={() => setSteuersatzAuswahl([])}
+          onAktualisiert={(ids) => {
+            setAuswahl((prev) => {
+              const next = new Set(prev);
+              for (const id of ids) next.delete(id);
+              return next;
+            });
+            router.refresh();
+          }}
+        />
       )}
 
       <BuchungDetailSheet
